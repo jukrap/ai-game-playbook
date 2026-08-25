@@ -9,6 +9,16 @@ export type {
   TaskRoutingDiagnosticCode,
 } from "./routing-errors.js";
 export { validateTaskRoutingSelection } from "./routing.js";
+export {
+  FOUNDATION_PLAN_ARTIFACT,
+  serializeFoundationPlanArtifact,
+} from "./foundation-plan.js";
+export type {
+  FoundationPlanArtifact,
+  FoundationPlanData,
+  PlannedCommandSurface,
+  PlannedSkillSurface,
+} from "./foundation-plan.js";
 export { generateRegistrySurfaces } from "./generation.js";
 export {
   GeneratedArtifactDriftError,

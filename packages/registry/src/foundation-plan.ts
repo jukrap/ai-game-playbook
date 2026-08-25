@@ -1,0 +1,298 @@
+import {
+  canonicalizeJson,
+  digestCanonicalJson,
+  type Sha256Digest,
+} from "@ai-game-playbook/contracts";
+
+export interface PlannedCommandSurface {
+  readonly id: string;
+  readonly cliPath: readonly string[];
+  readonly syntax: string;
+  readonly capability: string;
+  readonly availability: "planned";
+}
+
+export interface PlannedSkillSurface {
+  readonly id: string;
+  readonly capability: string;
+  readonly availability: "planned";
+  readonly mode: "general" | "planning-check";
+  readonly engine?: "godot" | "unity" | "unreal";
+}
+
+export interface FoundationPlanData {
+  readonly implementationStatus: "design-only";
+  readonly executableAvailable: false;
+  readonly package: {
+    readonly npm: "ai-game-playbook";
+    readonly executable: "agpb";
+  };
+  readonly commands: readonly PlannedCommandSurface[];
+  readonly skills: readonly PlannedSkillSurface[];
+}
+
+export interface FoundationPlanArtifact {
+  readonly schemaVersion: "1.0.0";
+  readonly artifact: "ai-game-playbook-foundation-plan";
+  readonly digest: Sha256Digest;
+  readonly data: FoundationPlanData;
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) {
+      deepFreeze(child);
+    }
+    Object.freeze(value);
+  }
+  return value;
+}
+
+const commands: readonly PlannedCommandSurface[] = [
+  {
+    id: "init",
+    cliPath: ["init"],
+    syntax: "agpb init",
+    capability: "workspace.init",
+    availability: "planned",
+  },
+  {
+    id: "doctor",
+    cliPath: ["doctor"],
+    syntax: "agpb doctor",
+    capability: "workspace.doctor",
+    availability: "planned",
+  },
+  {
+    id: "project.inspect",
+    cliPath: ["project", "inspect"],
+    syntax: "agpb project inspect",
+    capability: "project.inspect",
+    availability: "planned",
+  },
+  {
+    id: "pack.list",
+    cliPath: ["pack", "list"],
+    syntax: "agpb pack list",
+    capability: "pack.list",
+    availability: "planned",
+  },
+  {
+    id: "pack.add",
+    cliPath: ["pack", "add"],
+    syntax: "agpb pack add",
+    capability: "pack.add",
+    availability: "planned",
+  },
+  {
+    id: "pack.update",
+    cliPath: ["pack", "update"],
+    syntax: "agpb pack update",
+    capability: "pack.update",
+    availability: "planned",
+  },
+  {
+    id: "pack.remove",
+    cliPath: ["pack", "remove"],
+    syntax: "agpb pack remove",
+    capability: "pack.remove",
+    availability: "planned",
+  },
+  {
+    id: "pack.doctor",
+    cliPath: ["pack", "doctor"],
+    syntax: "agpb pack doctor",
+    capability: "pack.doctor",
+    availability: "planned",
+  },
+  {
+    id: "skill.list",
+    cliPath: ["skill", "list"],
+    syntax: "agpb skill list",
+    capability: "skill.list",
+    availability: "planned",
+  },
+  {
+    id: "skill.install",
+    cliPath: ["skill", "install"],
+    syntax: "agpb skill install",
+    capability: "skill.install",
+    availability: "planned",
+  },
+  {
+    id: "skill.check",
+    cliPath: ["skill", "check"],
+    syntax: "agpb skill check",
+    capability: "skill.check",
+    availability: "planned",
+  },
+  {
+    id: "engine.status",
+    cliPath: ["engine", "status"],
+    syntax: "agpb engine status",
+    capability: "engine.status",
+    availability: "planned",
+  },
+  {
+    id: "engine.capabilities",
+    cliPath: ["engine", "capabilities"],
+    syntax: "agpb engine capabilities",
+    capability: "engine.capabilities",
+    availability: "planned",
+  },
+  {
+    id: "engine.connect",
+    cliPath: ["engine", "connect"],
+    syntax: "agpb engine connect",
+    capability: "engine.connect",
+    availability: "planned",
+  },
+  {
+    id: "run",
+    cliPath: ["run"],
+    syntax: "agpb run <workflow>",
+    capability: "workflow.run",
+    availability: "planned",
+  },
+  {
+    id: "verify",
+    cliPath: ["verify"],
+    syntax: "agpb verify",
+    capability: "feature.verify",
+    availability: "planned",
+  },
+  {
+    id: "evidence.list",
+    cliPath: ["evidence", "list"],
+    syntax: "agpb evidence list",
+    capability: "evidence.list",
+    availability: "planned",
+  },
+  {
+    id: "evidence.show",
+    cliPath: ["evidence", "show"],
+    syntax: "agpb evidence show",
+    capability: "evidence.show",
+    availability: "planned",
+  },
+  {
+    id: "evidence.export",
+    cliPath: ["evidence", "export"],
+    syntax: "agpb evidence export",
+    capability: "evidence.export",
+    availability: "planned",
+  },
+  {
+    id: "docs.check",
+    cliPath: ["docs", "check"],
+    syntax: "agpb docs check",
+    capability: "docs.check",
+    availability: "planned",
+  },
+];
+
+const skills: readonly PlannedSkillSurface[] = [
+  {
+    id: "project.inspection",
+    capability: "project.inspect",
+    availability: "planned",
+    mode: "general",
+  },
+  {
+    id: "feature.contracting",
+    capability: "feature.contract",
+    availability: "planned",
+    mode: "general",
+  },
+  {
+    id: "gameplay.vertical-slice",
+    capability: "gameplay.vertical-slice",
+    availability: "planned",
+    mode: "general",
+  },
+  {
+    id: "save-load.integrity",
+    capability: "gameplay.save-load",
+    availability: "planned",
+    mode: "general",
+  },
+  {
+    id: "ui.hud-qa",
+    capability: "ui.hud-qa",
+    availability: "planned",
+    mode: "general",
+  },
+  {
+    id: "playtest.deterministic",
+    capability: "playtest.deterministic",
+    availability: "planned",
+    mode: "general",
+  },
+  {
+    id: "evidence.support-review",
+    capability: "evidence.review",
+    availability: "planned",
+    mode: "general",
+  },
+  {
+    id: "performance.budget-review",
+    capability: "performance.review",
+    availability: "planned",
+    mode: "general",
+  },
+  {
+    id: "asset.intake-promotion",
+    capability: "asset.provenance",
+    availability: "planned",
+    mode: "general",
+  },
+  {
+    id: "build.export-readiness",
+    capability: "build.export",
+    availability: "planned",
+    mode: "general",
+  },
+  {
+    id: "engine.godot-operation",
+    capability: "engine.godot.operation",
+    availability: "planned",
+    mode: "planning-check",
+    engine: "godot",
+  },
+  {
+    id: "engine.unity-operation",
+    capability: "engine.unity.operation",
+    availability: "planned",
+    mode: "planning-check",
+    engine: "unity",
+  },
+  {
+    id: "engine.unreal-operation",
+    capability: "engine.unreal.operation",
+    availability: "planned",
+    mode: "planning-check",
+    engine: "unreal",
+  },
+];
+
+const planData = deepFreeze<FoundationPlanData>({
+  implementationStatus: "design-only",
+  executableAvailable: false,
+  package: { npm: "ai-game-playbook", executable: "agpb" },
+  commands,
+  skills,
+});
+const unsignedArtifact = deepFreeze({
+  schemaVersion: "1.0.0" as const,
+  artifact: "ai-game-playbook-foundation-plan" as const,
+  data: planData,
+});
+
+export const FOUNDATION_PLAN_ARTIFACT: FoundationPlanArtifact = deepFreeze({
+  ...unsignedArtifact,
+  digest: digestCanonicalJson(unsignedArtifact),
+});
+
+export function serializeFoundationPlanArtifact(): string {
+  return `${canonicalizeJson(FOUNDATION_PLAN_ARTIFACT)}\n`;
+}

@@ -14,9 +14,11 @@
     "build": "tsc -b --pretty false",
     "docs:check": "node scripts/check-docs.mjs",
     "docs:test": "node scripts/check-docs.test.mjs",
+    "plan:check": "node scripts/generate-foundation-plan.mjs --check",
+    "plan:write": "node scripts/generate-foundation-plan.mjs --write",
     "test": "node --test \"test/*.test.mjs\" \"packages/*/test/*.test.mjs\"",
     "typecheck": "tsc -b --pretty false",
-    "verify": "pnpm run typecheck && pnpm run test && pnpm run docs:test && pnpm run docs:check"
+    "verify": "pnpm run typecheck && pnpm run plan:check && pnpm run test && pnpm run docs:test && pnpm run docs:check"
   },
   "devDependencies": {
     "@types/node": "22.20.1",

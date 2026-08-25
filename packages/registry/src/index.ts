@@ -4,12 +4,25 @@ export type {
   RegistryDiagnosticCode,
 } from "./errors.js";
 export { generateRegistrySurfaces } from "./generation.js";
+export {
+  GeneratedArtifactDriftError,
+  assertGeneratedFileCurrent,
+  checkGeneratedFile,
+  materializeRegistrySurfaces,
+  serializeGeneratedArtifact,
+} from "./generated-artifacts.js";
+export type { GeneratedArtifactDriftErrorCode } from "./generated-artifacts.js";
 export type {
   CliCommandSurface,
   CliSurface,
   DocumentationCommandSurface,
   DocumentationSurface,
   GeneratedArtifact,
+  GeneratedFileCheck,
+  GeneratedFileFailureCheck,
+  GeneratedSurfaceFile,
+  GeneratedSurfaceKind,
+  GeneratedSurfacePath,
   McpSurface,
   McpToolSurface,
   RegistryDefinition,

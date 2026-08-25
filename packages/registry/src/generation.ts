@@ -11,6 +11,7 @@ import type {
   DocumentationCommandSurface,
   DocumentationSurface,
   GeneratedArtifact,
+  GeneratedSurfaceKind,
   McpSurface,
   McpToolSurface,
   RegistrySurfaces,
@@ -32,6 +33,8 @@ const writePermissions = new Set([
   "destructive",
   "publish-release",
 ]);
+const generatedSurfaceInstances = new WeakSet<object>();
+const generatedArtifactInstances = new WeakSet<object>();
 
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
@@ -44,12 +47,14 @@ function deepFreeze<T>(value: T): T {
 }
 
 function artifact<T>(
-  kind: string,
+  kind: GeneratedSurfaceKind,
   sourceRegistryDigest: Sha256Digest,
   data: T,
 ): GeneratedArtifact<T> {
   const digest = digestCanonicalJson({ kind, sourceRegistryDigest, data });
-  return deepFreeze({ sourceRegistryDigest, digest, data });
+  const generated = deepFreeze({ kind, sourceRegistryDigest, digest, data });
+  generatedArtifactInstances.add(generated);
+  return generated;
 }
 
 function isPublicCommand(command: CommandDescriptor): boolean {
@@ -186,11 +191,41 @@ export function generateRegistrySurfaces(
     routes: skillRoutes(registry),
   };
 
-  return deepFreeze({
+  const surfaces = deepFreeze({
     registryDigest: registry.digest,
     cli: artifact("cli", registry.digest, cliData),
     mcp: artifact("mcp", registry.digest, mcpData),
     docs: artifact("docs", registry.digest, docsData),
     skills: artifact("skills", registry.digest, skillsData),
   });
+  generatedSurfaceInstances.add(surfaces);
+  return surfaces;
+}
+
+export function assertGeneratedRegistrySurfaces(
+  value: unknown,
+): asserts value is RegistrySurfaces {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    !generatedSurfaceInstances.has(value)
+  ) {
+    throw new TypeError(
+      "surfaces must be produced by generateRegistrySurfaces in this process",
+    );
+  }
+}
+
+export function assertGeneratedArtifact(
+  value: unknown,
+): asserts value is GeneratedArtifact<unknown> {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    !generatedArtifactInstances.has(value)
+  ) {
+    throw new TypeError(
+      "artifact must be produced by generateRegistrySurfaces in this process",
+    );
+  }
 }

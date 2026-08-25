@@ -21,11 +21,52 @@ export interface ValidatedRegistry extends RegistryDefinition {
   readonly digest: Sha256Digest;
 }
 
+export type GeneratedSurfaceKind = "cli" | "docs" | "mcp" | "skills";
+
 export interface GeneratedArtifact<T> {
+  readonly kind: GeneratedSurfaceKind;
   readonly sourceRegistryDigest: Sha256Digest;
   readonly digest: Sha256Digest;
   readonly data: T;
 }
+
+export type GeneratedSurfacePath =
+  | "generated/cli.json"
+  | "generated/docs.json"
+  | "generated/mcp.json"
+  | "generated/skills.json";
+
+export interface GeneratedSurfaceFile {
+  readonly path: GeneratedSurfacePath;
+  readonly sourceRegistryDigest: Sha256Digest;
+  readonly artifactDigest: Sha256Digest;
+  readonly contentDigest: Sha256Digest;
+  readonly content: string;
+}
+
+interface GeneratedFileCheckBase {
+  readonly path: GeneratedSurfacePath;
+  readonly expectedDigest: Sha256Digest;
+}
+
+export type GeneratedFileCheck =
+  | (GeneratedFileCheckBase & {
+      readonly status: "current";
+      readonly actualDigest: Sha256Digest;
+    })
+  | (GeneratedFileCheckBase & {
+      readonly status: "missing";
+    })
+  | (GeneratedFileCheckBase & {
+      readonly status: "drift";
+      readonly actualDigest: Sha256Digest;
+      readonly firstDifferenceOffset?: number;
+    });
+
+export type GeneratedFileFailureCheck = Extract<
+  GeneratedFileCheck,
+  { readonly status: "missing" | "drift" }
+>;
 
 export interface CliCommandSurface {
   readonly id: string;

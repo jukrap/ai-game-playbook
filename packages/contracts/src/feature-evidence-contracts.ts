@@ -191,42 +191,89 @@ export const featureContractSchema: VersionedContractSchema =
     title: "Feature Contract",
     description:
       "Bounds one player-facing outcome, mutation scope, oracle, risk, budget, approval, and rollback.",
-    schema: contractRoot(
-      {
-        schemaVersion: reference("semanticVersion"),
-        featureId: reference("stableId"),
-        version: reference("semanticVersion"),
-        projectId: reference("stableId"),
-        status: enumSchema([
-          "draft",
-          "approved",
-          "active",
-          "completed",
-          "cancelled",
-          "expired",
-        ]),
-        playerOutcome: textSchema(1000),
-        scope: featureScope,
-        completion: featureCompletion,
-        risk: featureRisk,
-        budgets: reference("executionBudgets"),
-        rollback: featureRollback,
-        approval: featureApproval,
-      },
-      [
-        "schemaVersion",
-        "featureId",
-        "version",
-        "projectId",
-        "status",
-        "playerOutcome",
-        "scope",
-        "completion",
-        "risk",
-        "budgets",
-        "rollback",
+    schema: {
+      ...contractRoot(
+        {
+          schemaVersion: reference("semanticVersion"),
+          featureId: reference("stableId"),
+          version: reference("semanticVersion"),
+          projectId: reference("stableId"),
+          status: enumSchema([
+            "draft",
+            "approved",
+            "active",
+            "completed",
+            "cancelled",
+            "expired",
+          ]),
+          playerOutcome: textSchema(1000),
+          scope: featureScope,
+          completion: featureCompletion,
+          risk: featureRisk,
+          budgets: reference("executionBudgets"),
+          rollback: featureRollback,
+          approval: featureApproval,
+        },
+        [
+          "schemaVersion",
+          "featureId",
+          "version",
+          "projectId",
+          "status",
+          "playerOutcome",
+          "scope",
+          "completion",
+          "risk",
+          "budgets",
+          "rollback",
+        ],
+      ),
+      allOf: [
+        {
+          if: {
+            type: "object",
+            properties: { status: { enum: ["approved", "active"] } },
+            required: ["status"],
+          },
+          then: {
+            type: "object",
+            properties: { approval: featureApproval },
+            required: ["approval"],
+          },
+        },
+        {
+          if: {
+            type: "object",
+            properties: {
+              rollback: {
+                type: "object",
+                properties: { mode: { const: "required" } },
+                required: ["mode"],
+              },
+            },
+            required: ["rollback"],
+          },
+          then: {
+            type: "object",
+            properties: {
+              rollback: {
+                type: "object",
+                properties: {
+                  preimageRequired: { const: true },
+                  commandId: reference("stableId"),
+                  requiredEvidence: { type: "array", minItems: 1 },
+                },
+                required: [
+                  "preimageRequired",
+                  "commandId",
+                  "requiredEvidence",
+                ],
+              },
+            },
+          },
+        },
       ],
-    ),
+    },
   });
 
 export type RunStatus =

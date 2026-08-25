@@ -11,9 +11,10 @@ const definition = {
   schema: {
     type: "object",
     properties: {
+      schemaVersion: { type: "string" },
       id: { type: "string" },
     },
-    required: ["id"],
+    required: ["schemaVersion", "id"],
     additionalProperties: false,
   },
 };
@@ -25,8 +26,11 @@ test("contract schemas receive deterministic versioned identity and digest", () 
   const second = contracts.defineContractSchema({
     ...definition,
     schema: {
-      required: ["id"],
-      properties: { id: { type: "string" } },
+      required: ["schemaVersion", "id"],
+      properties: {
+        id: { type: "string" },
+        schemaVersion: { type: "string" },
+      },
       additionalProperties: false,
       type: "object",
     },
@@ -45,6 +49,10 @@ test("contract schemas receive deterministic versioned identity and digest", () 
   assert.equal(first.schema.$id, first.schemaId);
   assert.equal(first.schema.title, definition.title);
   assert.equal(first.schema.description, definition.description);
+  assert.deepEqual(first.schema.properties.schemaVersion, {
+    type: "string",
+    const: "1.0.0",
+  });
   assert.equal(first.digest, second.digest);
   assert.match(first.digest, /^sha256:[0-9a-f]{64}$/);
 });
@@ -71,6 +79,26 @@ test("contract schema definitions reject ambiguous or unsafe roots", () => {
     [
       { ...definition, schema: { ...definition.schema, type: "array" } },
       '$definition.schema["type"]',
+    ],
+    [
+      {
+        ...definition,
+        schema: {
+          ...definition.schema,
+          properties: { id: { type: "string" } },
+        },
+      },
+      '$definition.schema["properties"]["schemaVersion"]',
+    ],
+    [
+      {
+        ...definition,
+        schema: {
+          ...definition.schema,
+          required: ["id"],
+        },
+      },
+      '$definition.schema["required"]',
     ],
   ]) {
     assert.throws(

@@ -118,7 +118,13 @@ export const runHandleSchema: VersionedContractSchema = defineContractSchema({
           type: "object",
           properties: {
             status: {
-              enum: ["succeeded", "failed", "cancelled", "uncertain"],
+              enum: [
+                "succeeded",
+                "failed",
+                "blocked",
+                "cancelled",
+                "uncertain",
+              ],
             },
           },
           required: ["status"],
@@ -218,32 +224,65 @@ export const engineSessionIdentitySchema: VersionedContractSchema =
     title: "Engine Session Identity",
     description:
       "Binds an engine process and optional editor instance to one attested project session.",
-    schema: contractRoot(
-      {
-        schemaVersion: reference("semanticVersion"),
-        sessionId: reference("uuid"),
-        projectIdentityDigest: reference("sha256Digest"),
-        executionKind: enumSchema([
-          "static",
-          "headless",
-          "editor",
-          "runtime",
-          "packaged",
-        ]),
-        process: engineProcessIdentity,
-        editorInstanceId: reference("stableId"),
-        nonceDigest: reference("sha256Digest"),
-        boundAt: reference("timestamp"),
-      },
-      [
-        "schemaVersion",
-        "sessionId",
-        "projectIdentityDigest",
-        "executionKind",
-        "process",
-        "boundAt",
+    schema: {
+      ...contractRoot(
+        {
+          schemaVersion: reference("semanticVersion"),
+          sessionId: reference("uuid"),
+          projectIdentityDigest: reference("sha256Digest"),
+          executionKind: enumSchema([
+            "static",
+            "headless",
+            "editor",
+            "runtime",
+            "packaged",
+          ]),
+          process: engineProcessIdentity,
+          editorInstanceId: reference("stableId"),
+          nonceDigest: reference("sha256Digest"),
+          boundAt: reference("timestamp"),
+        },
+        [
+          "schemaVersion",
+          "sessionId",
+          "projectIdentityDigest",
+          "executionKind",
+          "process",
+          "boundAt",
+        ],
+      ),
+      allOf: [
+        {
+          if: {
+            type: "object",
+            properties: {
+              executionKind: { enum: ["editor", "runtime"] },
+            },
+            required: ["executionKind"],
+          },
+          then: {
+            type: "object",
+            properties: {
+              editorInstanceId: reference("stableId"),
+              nonceDigest: reference("sha256Digest"),
+            },
+            required: ["editorInstanceId", "nonceDigest"],
+          },
+        },
+        {
+          if: {
+            type: "object",
+            properties: { executionKind: { const: "packaged" } },
+            required: ["executionKind"],
+          },
+          then: {
+            type: "object",
+            properties: { nonceDigest: reference("sha256Digest") },
+            required: ["nonceDigest"],
+          },
+        },
       ],
-    ),
+    },
   });
 
 export interface EngineDiagnostic {
@@ -363,6 +402,36 @@ export const engineOperationRequestSchema: VersionedContractSchema =
           if: {
             type: "object",
             properties: {
+              operation: {
+                enum: [
+                  "mutate",
+                  "save",
+                  "compile-import",
+                  "test",
+                  "play",
+                  "input-replay",
+                  "logs",
+                  "capture",
+                  "profile",
+                  "build-export",
+                  "rollback",
+                ],
+              },
+            },
+            required: ["operation"],
+          },
+          then: {
+            type: "object",
+            properties: {
+              sessionIdentityDigest: reference("sha256Digest"),
+            },
+            required: ["sessionIdentityDigest"],
+          },
+        },
+        {
+          if: {
+            type: "object",
+            properties: {
               operation: { enum: ["mutate", "save", "rollback"] },
             },
             required: ["operation"],
@@ -415,7 +484,7 @@ export interface EngineOperationResult {
     readonly complete: boolean;
   }[];
   readonly mutation: EngineMutationOutcome;
-  readonly receiptDigest?: Sha256Digest;
+  readonly receiptDigest: Sha256Digest;
   readonly completedAt: string;
 }
 
@@ -500,6 +569,7 @@ const engineOperationResultRoot = contractRoot(
     "diagnostics",
     "artifacts",
     "mutation",
+    "receiptDigest",
     "completedAt",
   ],
 );
@@ -514,6 +584,36 @@ export const engineOperationResultSchema: VersionedContractSchema =
     schema: {
       ...engineOperationResultRoot,
       allOf: [
+        {
+          if: {
+            type: "object",
+            properties: {
+              operation: {
+                enum: [
+                  "mutate",
+                  "save",
+                  "compile-import",
+                  "test",
+                  "play",
+                  "input-replay",
+                  "logs",
+                  "capture",
+                  "profile",
+                  "build-export",
+                  "rollback",
+                ],
+              },
+            },
+            required: ["operation"],
+          },
+          then: {
+            type: "object",
+            properties: {
+              sessionIdentityDigest: reference("sha256Digest"),
+            },
+            required: ["sessionIdentityDigest"],
+          },
+        },
         {
           if: {
             type: "object",

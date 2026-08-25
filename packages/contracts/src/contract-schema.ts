@@ -131,7 +131,10 @@ function deepFreeze<T extends CanonicalJsonValue>(value: T): T {
   return value;
 }
 
-function normalizedBody(value: unknown): Record<string, CanonicalJsonValue> {
+function normalizedBody(
+  value: unknown,
+  version: SemanticVersion,
+): Record<string, CanonicalJsonValue> {
   const body = dataRecord(value, "$definition.schema");
   for (const reservedKey of ["$schema", "$id", "title", "description"]) {
     if (Object.hasOwn(body, reservedKey)) {
@@ -172,6 +175,35 @@ function normalizedBody(value: unknown): Record<string, CanonicalJsonValue> {
       "root contract schema must reject additional properties",
     );
   }
+
+  const properties = clone["properties"];
+  if (
+    properties === null ||
+    typeof properties !== "object" ||
+    Array.isArray(properties)
+  ) {
+    throw invalidSchema(
+      '$definition.schema["properties"]',
+      "root contract schema must declare object properties",
+    );
+  }
+  if (!Object.hasOwn(properties, "schemaVersion")) {
+    throw invalidSchema(
+      '$definition.schema["properties"]["schemaVersion"]',
+      "root contract schema must declare schemaVersion",
+    );
+  }
+  const propertyMap = properties as Record<string, CanonicalJsonValue>;
+
+  const required = clone["required"];
+  if (!Array.isArray(required) || !required.includes("schemaVersion")) {
+    throw invalidSchema(
+      '$definition.schema["required"]',
+      "root contract schema must require schemaVersion",
+    );
+  }
+
+  propertyMap["schemaVersion"] = { type: "string", const: version };
 
   return clone;
 }
@@ -218,6 +250,7 @@ export function defineContractSchema(
         );
   const body = normalizedBody(
     ownValue(record, "schema", "$definition.schema"),
+    version,
   );
   const schemaId =
     `urn:ai-game-playbook:schema:${id}:${version}` as ContractSchemaId;

@@ -118,6 +118,7 @@ export const validFoundationProtocolFixtures = {
     diagnostics: [],
     artifacts: [],
     mutation: "not-applicable",
+    receiptDigest: secondDigest,
     completedAt: endedAt,
   },
   "runtime-frame-evidence": {

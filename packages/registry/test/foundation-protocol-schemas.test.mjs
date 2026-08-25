@@ -62,6 +62,16 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       })(),
     ],
     [
+      "run-handle",
+      (() => {
+        const { latestReceiptDigest: _, ...terminalWithoutReceipt } = {
+          ...fixtures["run-handle"],
+          status: "blocked",
+        };
+        return terminalWithoutReceipt;
+      })(),
+    ],
+    [
       "engine-session-identity",
       {
         ...fixtures["engine-session-identity"],
@@ -69,10 +79,55 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       },
     ],
     [
+      "engine-session-identity",
+      (() => {
+        const { nonceDigest: _, ...withoutNonce } =
+          fixtures["engine-session-identity"];
+        return withoutNonce;
+      })(),
+    ],
+    [
+      "engine-session-identity",
+      (() => {
+        const { editorInstanceId: _, ...withoutEditorInstance } =
+          fixtures["engine-session-identity"];
+        return withoutEditorInstance;
+      })(),
+    ],
+    [
       "engine-operation-request",
       {
         ...fixtures["engine-operation-request"],
         operation: "mutate",
+      },
+    ],
+    [
+      "engine-operation-request",
+      {
+        ...fixtures["engine-operation-request"],
+        operation: "play",
+      },
+    ],
+    [
+      "engine-operation-request",
+      {
+        ...fixtures["engine-operation-request"],
+        operation: "capture",
+      },
+    ],
+    [
+      "engine-operation-result",
+      (() => {
+        const { receiptDigest: _, ...withoutReceipt } =
+          fixtures["engine-operation-result"];
+        return withoutReceipt;
+      })(),
+    ],
+    [
+      "engine-operation-result",
+      {
+        ...fixtures["engine-operation-result"],
+        operation: "play",
       },
     ],
     [
@@ -158,5 +213,20 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       contracts.FOUNDATION_PROTOCOL_SCHEMAS[id].schema,
     );
     assert.equal(validate(fixture), false, `${id} accepted unsafe evidence`);
+  }
+});
+
+test("every foundation protocol rejects a mismatched schema version", () => {
+  const ajv = validator();
+
+  for (const [id, fixture] of Object.entries(validFoundationProtocolFixtures)) {
+    const validate = ajv.compile(
+      contracts.FOUNDATION_PROTOCOL_SCHEMAS[id].schema,
+    );
+    assert.equal(
+      validate({ ...fixture, schemaVersion: "999.0.0" }),
+      false,
+      `${id} accepted a mismatched schema version`,
+    );
   }
 });

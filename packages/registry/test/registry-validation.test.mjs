@@ -139,8 +139,10 @@ test("registry validation rejects external schema references", () => {
     schema: {
       type: "object",
       properties: {
+        schemaVersion: { type: "string" },
         value: { $ref: "https://example.invalid/value.schema.json" },
       },
+      required: ["schemaVersion"],
       additionalProperties: false,
     },
   });
@@ -159,11 +161,13 @@ test("registry validation rejects nested schema identities and hidden attestatio
       schema: {
         type: "object",
         properties: {
+          schemaVersion: { type: "string" },
           value: {
             $id: "urn:ai-game-playbook:schema:nested-resource:1.0.0",
             type: "string",
           },
         },
+        required: ["schemaVersion"],
         additionalProperties: false,
       },
     }),

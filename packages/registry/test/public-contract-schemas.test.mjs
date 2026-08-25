@@ -97,6 +97,19 @@ test("every top-level contract is closed to undeclared fields", () => {
   }
 });
 
+test("every public and orchestration contract rejects a mismatched schema version", () => {
+  const ajv = createValidator();
+
+  for (const [id, fixture] of Object.entries(validContractFixtures)) {
+    const validate = ajv.compile(contracts.ALL_CONTRACT_SCHEMAS[id].schema);
+    assert.equal(
+      validate({ ...fixture, schemaVersion: "999.0.0" }),
+      false,
+      `${id} accepted a mismatched schema version`,
+    );
+  }
+});
+
 test("contract schemas reject unsafe identity, scope, support, and cost shapes", () => {
   const invalidCases = [
     [
@@ -178,6 +191,53 @@ test("contract schemas reject unsafe identity, scope, support, and cost shapes",
               recursive: true,
             },
           ],
+        },
+      },
+    ],
+    [
+      "feature-contract",
+      (() => {
+        const { approval: _, ...withoutApproval } =
+          validPublicContractFixtures["feature-contract"];
+        return withoutApproval;
+      })(),
+    ],
+    [
+      "feature-contract",
+      (() => {
+        const { approval: _, ...withoutApproval } =
+          validPublicContractFixtures["feature-contract"];
+        return { ...withoutApproval, status: "active" };
+      })(),
+    ],
+    [
+      "feature-contract",
+      {
+        ...validPublicContractFixtures["feature-contract"],
+        rollback: {
+          ...validPublicContractFixtures["feature-contract"].rollback,
+          preimageRequired: false,
+        },
+      },
+    ],
+    [
+      "feature-contract",
+      {
+        ...validPublicContractFixtures["feature-contract"],
+        rollback: {
+          mode: "required",
+          preimageRequired: true,
+          requiredEvidence: ["rollback-state"],
+        },
+      },
+    ],
+    [
+      "feature-contract",
+      {
+        ...validPublicContractFixtures["feature-contract"],
+        rollback: {
+          ...validPublicContractFixtures["feature-contract"].rollback,
+          requiredEvidence: [],
         },
       },
     ],

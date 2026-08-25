@@ -14,8 +14,8 @@ const emptyInputSchema = contracts.defineContractSchema({
   title: "Empty Input",
   schema: {
     type: "object",
-    properties: {},
-    required: [],
+    properties: { schemaVersion: { type: "string" } },
+    required: ["schemaVersion"],
     additionalProperties: false,
   },
 });

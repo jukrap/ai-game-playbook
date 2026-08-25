@@ -58,7 +58,7 @@ function artifact<T>(
 }
 
 function isPublicCommand(command: CommandDescriptor): boolean {
-  return command.lifecycle !== "internal";
+  return command.lifecycle !== "internal" && command.lifecycle !== "deprecated";
 }
 
 function commandIsReadOnly(command: CommandDescriptor): boolean {
@@ -84,16 +84,7 @@ function commandTitle(command: CommandDescriptor): string {
 }
 
 function cliCommand(command: CommandDescriptor): CliCommandSurface {
-  return {
-    id: command.id,
-    version: command.version,
-    lifecycle: command.lifecycle,
-    summary: command.summary,
-    path: command.cli.path,
-    aliases: command.cli.aliases,
-    input: command.input,
-    output: command.output,
-  };
+  return command;
 }
 
 function documentationCommand(
@@ -121,7 +112,7 @@ function mcpTool(
   return {
     commandId: command.id,
     name: mcpToolName(command.id),
-    enabledByDefault: readOnly,
+    enabledByDefault: readOnly && command.lifecycle === "stable",
     title: commandTitle(command),
     description: command.summary,
     inputSchemaId: input.schemaId,
@@ -146,6 +137,7 @@ function mcpTool(
       requiresApply: !readOnly,
       permissions: command.permissions,
       lane: command.lane,
+      command: cliCommand(command),
     },
   };
 }
@@ -157,13 +149,7 @@ function skillRoutes(registry: ValidatedRegistry): readonly SkillRouteSurface[] 
         skill.lifecycle === "stable" &&
         (skill.invocation === "model" || skill.invocation === "both"),
     )
-    .map((skill) => ({
-      id: skill.id,
-      version: skill.version,
-      summary: skill.summary,
-      triggers: skill.triggers,
-      exclusions: skill.exclusions,
-    }));
+    .map((skill) => skill);
 }
 
 export function generateRegistrySurfaces(
@@ -176,18 +162,22 @@ export function generateRegistrySurfaces(
   );
   const cliData: CliSurface = {
     executable: "agpb",
+    controlPlaneVersion: registry.controlPlaneVersion,
     commands: commands.map(cliCommand),
   };
   const mcpData: McpSurface = {
     protocolRevision: "2026-07-28",
     lifecycle: "stateless",
+    controlPlaneVersion: registry.controlPlaneVersion,
     extensions: [],
     tools: commands.map((command) => mcpTool(command, schemas)),
   };
   const docsData: DocumentationSurface = {
+    controlPlaneVersion: registry.controlPlaneVersion,
     commands: commands.map(documentationCommand),
   };
   const skillsData: SkillRoutingSurface = {
+    controlPlaneVersion: registry.controlPlaneVersion,
     routes: skillRoutes(registry),
   };
 

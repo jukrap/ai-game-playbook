@@ -71,19 +71,11 @@ export type GeneratedFileFailureCheck = Extract<
   { readonly status: "missing" | "drift" }
 >;
 
-export interface CliCommandSurface {
-  readonly id: string;
-  readonly version: string;
-  readonly lifecycle: string;
-  readonly summary: string;
-  readonly path: readonly string[];
-  readonly aliases: readonly (readonly string[])[];
-  readonly input: { readonly schemaId: string; readonly digest: string };
-  readonly output: { readonly schemaId: string; readonly digest: string };
-}
+export interface CliCommandSurface extends CommandDescriptor {}
 
 export interface CliSurface {
   readonly executable: "agpb";
+  readonly controlPlaneVersion: string;
   readonly commands: readonly CliCommandSurface[];
 }
 
@@ -110,35 +102,31 @@ export interface McpToolSurface {
     readonly requiresApply: boolean;
     readonly permissions: readonly string[];
     readonly lane: string;
+    readonly command: CliCommandSurface;
   };
 }
 
 export interface McpSurface {
   readonly protocolRevision: "2026-07-28";
   readonly lifecycle: "stateless";
+  readonly controlPlaneVersion: string;
   readonly extensions: readonly string[];
   readonly tools: readonly McpToolSurface[];
 }
 
 export interface DocumentationCommandSurface extends CliCommandSurface {
   readonly usage: string;
-  readonly permissions: readonly string[];
-  readonly requiredEvidence: readonly string[];
 }
 
 export interface DocumentationSurface {
+  readonly controlPlaneVersion: string;
   readonly commands: readonly DocumentationCommandSurface[];
 }
 
-export interface SkillRouteSurface {
-  readonly id: string;
-  readonly version: string;
-  readonly summary: string;
-  readonly triggers: readonly string[];
-  readonly exclusions: readonly string[];
-}
+export interface SkillRouteSurface extends SkillDescriptor {}
 
 export interface SkillRoutingSurface {
+  readonly controlPlaneVersion: string;
   readonly routes: readonly SkillRouteSurface[];
 }
 

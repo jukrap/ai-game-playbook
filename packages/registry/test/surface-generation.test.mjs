@@ -5,21 +5,44 @@ import * as registry from "../dist/index.js";
 
 import { createValidRegistryDefinition } from "./fixtures/registry.mjs";
 
-test("surface generation is deterministic and excludes internal entries", () => {
+test("surface generation is deterministic and excludes non-public entries", () => {
   assert.equal(typeof registry.generateRegistrySurfaces, "function");
 
-  const first = registry.generateRegistrySurfaces(
-    registry.validateRegistry(createValidRegistryDefinition()),
-  );
-  const reordered = createValidRegistryDefinition();
+  const firstDefinition = createValidRegistryDefinition();
+  firstDefinition.commands.push({
+    ...structuredClone(firstDefinition.commands[0]),
+    id: "legacy.inspect",
+    lifecycle: "deprecated",
+    cli: { path: ["legacy", "inspect"], aliases: [] },
+    handler: {
+      ...firstDefinition.commands[0].handler,
+      export: "inspectLegacyProject",
+    },
+  });
+  const reordered = structuredClone(firstDefinition);
   reordered.commands.reverse();
   reordered.skills.reverse();
+  const first = registry.generateRegistrySurfaces(
+    registry.validateRegistry(firstDefinition),
+  );
   const second = registry.generateRegistrySurfaces(
     registry.validateRegistry(reordered),
   );
 
   assert.deepEqual(first, second);
   assert.equal(first.registryDigest, second.registryDigest);
+  const deprecatedIds = second.cli.data.commands.map(({ id }) => id);
+  assert.equal(deprecatedIds.includes("legacy.inspect"), false);
+  assert.equal(
+    second.docs.data.commands.some(({ id }) => id === "legacy.inspect"),
+    false,
+  );
+  assert.equal(
+    second.mcp.data.tools.some(
+      ({ commandId }) => commandId === "legacy.inspect",
+    ),
+    false,
+  );
   for (const artifact of [first.cli, first.mcp, first.docs, first.skills]) {
     assert.equal(artifact.sourceRegistryDigest, first.registryDigest);
     assert.match(artifact.digest, /^sha256:[0-9a-f]{64}$/);
@@ -42,9 +65,8 @@ test("surface generation refuses registry-shaped values that skipped validation"
 });
 
 test("CLI, docs, and MCP surfaces carry the same command and schema identity", () => {
-  const surfaces = registry.generateRegistrySurfaces(
-    registry.validateRegistry(createValidRegistryDefinition()),
-  );
+  const validated = registry.validateRegistry(createValidRegistryDefinition());
+  const surfaces = registry.generateRegistrySurfaces(validated);
 
   const cli = new Map(surfaces.cli.data.commands.map((item) => [item.id, item]));
   const docs = new Map(
@@ -54,10 +76,19 @@ test("CLI, docs, and MCP surfaces carry the same command and schema identity", (
     surfaces.mcp.data.tools.map((item) => [item.commandId, item]),
   );
 
+  assert.equal(surfaces.cli.data.controlPlaneVersion, "0.0.0");
+  assert.equal(surfaces.docs.data.controlPlaneVersion, "0.0.0");
+  assert.equal(surfaces.mcp.data.controlPlaneVersion, "0.0.0");
+  assert.equal(surfaces.skills.data.controlPlaneVersion, "0.0.0");
+
   assert.deepEqual([...cli.keys()], [...docs.keys()]);
   assert.deepEqual([...cli.keys()], [...tools.keys()]);
   for (const id of cli.keys()) {
-    assert.equal(cli.get(id).input.schemaId, docs.get(id).input.schemaId);
+    const source = validated.commands.find((command) => command.id === id);
+    const { usage: _, ...documentedCommand } = docs.get(id);
+    assert.deepEqual(cli.get(id), source);
+    assert.deepEqual(documentedCommand, source);
+    assert.deepEqual(tools.get(id).meta.command, source);
     assert.equal(cli.get(id).input.digest, tools.get(id).inputDigest);
     assert.equal(cli.get(id).output.digest, tools.get(id).outputDigest);
   }
@@ -92,6 +123,12 @@ test("MCP generation targets the stateless current protocol with hint-only annot
   assert.equal(rollback.enabledByDefault, false);
   assert.equal(rollback.meta.permissionAuthority, "agpb-broker");
   assert.equal(rollback.meta.requiresApply, true);
+  assert.deepEqual(rollback.meta.command.permissions, [
+    "write-project-source",
+    "editor-control",
+  ]);
+  assert.equal(rollback.meta.command.timeoutMs, 30000);
+  assert.equal(rollback.meta.command.handler.export, "rollbackFeature");
 });
 
 test("MCP tool names preserve distinct dot and hyphen command identities", () => {
@@ -116,7 +153,7 @@ test("MCP tool names preserve distinct dot and hyphen command identities", () =>
   assert.notEqual(names.get("project.inspect"), names.get("project-inspect"));
 });
 
-test("skill routing exports only stable model-invocable discovery metadata", () => {
+test("skill routing exports complete stable model-invocable authority metadata", () => {
   const definition = createValidRegistryDefinition();
   definition.skills.push({
     ...structuredClone(definition.skills[0]),
@@ -136,11 +173,19 @@ test("skill routing exports only stable model-invocable discovery metadata", () 
   assert.deepEqual(skills.data.routes.map(({ id }) => id), [
     "gameplay.vertical-slice",
   ]);
-  assert.deepEqual(Object.keys(skills.data.routes[0]).sort(), [
-    "exclusions",
-    "id",
-    "summary",
-    "triggers",
-    "version",
+  assert.deepEqual(
+    skills.data.routes[0],
+    definition.skills.find(({ id }) => id === "gameplay.vertical-slice"),
+  );
+  assert.deepEqual(skills.data.routes[0].capabilities, [
+    "project.inspect",
+    "engine.mutate",
+    "engine.test",
   ]);
+  assert.equal(
+    skills.data.routes[0].body.path,
+    "skills/gameplay-vertical-slice/SKILL.md",
+  );
+  assert.equal(skills.data.routes[0].completionCriteria.length > 0, true);
+  assert.equal(skills.data.routes[0].evidenceDuties.length > 0, true);
 });

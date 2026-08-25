@@ -1,10 +1,21 @@
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const workflowText = readFileSync(join(sourceRoot, ".github", "workflows", "docs.yml"), "utf8");
+
+if (!workflowText.includes('- "scripts/check-docs.test.mjs"')) {
+  throw new Error("documentation CI must watch the regression suite path");
+}
+
+const plannedSurfaceArtifact = JSON.parse(readFileSync(join(sourceRoot, "docs", "planned-surface.json"), "utf8"));
+if (plannedSurfaceArtifact.schemaVersion !== "1" || Object.hasOwn(plannedSurfaceArtifact, "$schema")) {
+  throw new Error("planned surface must use its manifest schemaVersion without claiming to be a JSON Schema");
+}
 
 function createFixture() {
   const fixtureRoot = mkdtempSync(join(tmpdir(), "agpb-docs-check-"));
@@ -123,6 +134,27 @@ const scenarios = [
       })
   },
   {
+    name: "review command removed everywhere",
+    shouldPass: false,
+    diagnostic: "review command set",
+    mutate: (root) => {
+      updateFile(root, "docs/planned-surface.json", (text) => {
+        const surface = JSON.parse(text);
+        surface.commands = surface.commands.filter((command) => command !== "agpb docs check");
+        return `${JSON.stringify(surface, null, 2)}\n`;
+      });
+      updateFile(root, "docs/planned-cli.md", (text) => text.replace("agpb docs check\n", ""));
+      const englishDigest = createHash("sha256")
+        .update(readFileSync(join(root, "docs", "planned-cli.md")))
+        .digest("hex");
+      updateFile(root, "docs/planned-cli.ko.md", (text) =>
+        text
+          .replace("agpb docs check\n", "")
+          .replace(/^source_sha256: [0-9a-f]{64}$/m, `source_sha256: ${englishDigest}`)
+      );
+    }
+  },
+  {
     name: "missing public type",
     shouldPass: false,
     diagnostic: "missing public type RunReceipt",
@@ -137,6 +169,17 @@ const scenarios = [
       updateFile(root, "docs/planned-surface.json", (text) => {
         const surface = JSON.parse(text);
         surface.executableAvailable = true;
+        return `${JSON.stringify(surface, null, 2)}\n`;
+      })
+  },
+  {
+    name: "planned surface schema version drift",
+    shouldPass: false,
+    diagnostic: "schemaVersion 1",
+    mutate: (root) =>
+      updateFile(root, "docs/planned-surface.json", (text) => {
+        const surface = JSON.parse(text);
+        surface.schemaVersion = "2";
         return `${JSON.stringify(surface, null, 2)}\n`;
       })
   },

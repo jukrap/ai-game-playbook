@@ -6,6 +6,46 @@ import { fileURLToPath } from "node:url";
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const root = resolve(scriptDir, "..");
 const failures = [];
+const reviewDesignSurface = {
+  package: {
+    npm: "ai-game-playbook",
+    executable: "agpb"
+  },
+  commands: [
+    "agpb init",
+    "agpb doctor",
+    "agpb project inspect",
+    "agpb pack list",
+    "agpb pack add",
+    "agpb pack update",
+    "agpb pack remove",
+    "agpb pack doctor",
+    "agpb skill list",
+    "agpb skill install",
+    "agpb skill check",
+    "agpb engine status",
+    "agpb engine capabilities",
+    "agpb engine connect",
+    "agpb run <workflow>",
+    "agpb verify",
+    "agpb evidence list",
+    "agpb evidence show",
+    "agpb evidence export",
+    "agpb docs check"
+  ],
+  publicTypes: [
+    "CommandDescriptor",
+    "PackManifest",
+    "GameProjectProfile",
+    "EngineCapabilityReport",
+    "FeatureContract",
+    "RunReceipt",
+    "AssetProvenance"
+  ],
+  engines: ["Godot", "Unity", "Unreal Engine"],
+  supportGrades: ["planned", "detected", "headless", "editor-preview", "verified"],
+  evidenceGrades: ["documented", "implemented", "test-witnessed", "locally-executed", "engine-verified"]
+};
 
 function fail(message) {
   failures.push(message);
@@ -260,11 +300,20 @@ try {
 }
 
 if (plannedSurface) {
+  if (plannedSurface.schemaVersion !== "1" || Object.hasOwn(plannedSurface, "$schema")) {
+    fail("docs/planned-surface.json: must be schemaVersion 1 design metadata, not a JSON Schema document");
+  }
   if (plannedSurface.implementationStatus !== "design-only") {
     fail("docs/planned-surface.json: implementationStatus must remain design-only before product implementation");
   }
   if (plannedSurface.executableAvailable !== false) {
     fail("docs/planned-surface.json: executableAvailable must remain false before product implementation");
+  }
+  if (
+    plannedSurface.package?.npm !== reviewDesignSurface.package.npm ||
+    plannedSurface.package?.executable !== reviewDesignSurface.package.executable
+  ) {
+    fail("docs/planned-surface.json: review package or executable name has changed");
   }
 
   for (const field of ["commands", "publicTypes", "engines", "supportGrades", "evidenceGrades"]) {
@@ -274,6 +323,31 @@ if (plannedSurface) {
     } else if (new Set(values).size !== values.length) {
       fail(`docs/planned-surface.json: ${field} contains duplicates`);
     }
+  }
+
+  if (Array.isArray(plannedSurface.commands) && !sameArray(plannedSurface.commands, reviewDesignSurface.commands)) {
+    fail("docs/planned-surface.json: review command set has changed");
+  }
+  if (
+    Array.isArray(plannedSurface.publicTypes) &&
+    !sameArray(plannedSurface.publicTypes, reviewDesignSurface.publicTypes)
+  ) {
+    fail("docs/planned-surface.json: review public type set has changed");
+  }
+  if (Array.isArray(plannedSurface.engines) && !sameArray(plannedSurface.engines, reviewDesignSurface.engines)) {
+    fail("docs/planned-surface.json: review engine set has changed");
+  }
+  if (
+    Array.isArray(plannedSurface.supportGrades) &&
+    !sameArray(plannedSurface.supportGrades, reviewDesignSurface.supportGrades)
+  ) {
+    fail("docs/planned-surface.json: review support grade sequence has changed");
+  }
+  if (
+    Array.isArray(plannedSurface.evidenceGrades) &&
+    !sameArray(plannedSurface.evidenceGrades, reviewDesignSurface.evidenceGrades)
+  ) {
+    fail("docs/planned-surface.json: review evidence grade sequence has changed");
   }
 
   if (Array.isArray(plannedSurface.commands)) {
@@ -302,10 +376,6 @@ if (plannedSurface) {
     }
   }
 
-  const supportValues = new Set(Object.values(plannedSurface.supportGrades ?? {}));
-  for (const required of ["planned", "detected", "headless", "editor-preview", "verified"]) {
-    if (!supportValues.has(required)) fail(`docs/planned-surface.json: missing support grade ${required}`);
-  }
 }
 
 const readme = readText("README.md");

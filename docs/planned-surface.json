@@ -1,5 +1,5 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schemaVersion": "1",
   "artifact": "ai-game-playbook-planned-surface",
   "reviewedAt": "2026-08-26",
   "implementationStatus": "design-only",

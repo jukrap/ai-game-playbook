@@ -16,6 +16,46 @@ export type {
   VersionedContractSchema,
 } from "./contract-schema.js";
 export {
+  commandDescriptorSchema,
+  packManifestSchema,
+} from "./command-pack-contracts.js";
+export type {
+  CommandDescriptor,
+  PackKind,
+  PackManifest,
+  VersionInterval,
+} from "./command-pack-contracts.js";
+export {
+  CAPABILITY_SUPPORT_GRADES,
+  COMPONENT_OUTCOMES,
+  EFFECT_BOUNDARIES,
+  ENGINE_OPERATION_KINDS,
+  EVIDENCE_GRADES,
+  EXECUTION_LANES,
+  PERMISSION_CLASSES,
+  PROJECT_STAGES,
+} from "./contract-vocabulary.js";
+export type {
+  CapabilitySupportGrade,
+  ComponentOutcome,
+  CpuArchitecture,
+  DecimalAmount,
+  EffectBoundary,
+  EngineId,
+  EngineIdentity,
+  EngineOperationKind,
+  EvidenceGrade,
+  ExecutionBudgets,
+  ExecutionLane,
+  Lifecycle,
+  OperatingSystem,
+  PermissionClass,
+  PortableProjectPath,
+  ProjectStage,
+  SchemaReference,
+  VersionedIdentity,
+} from "./contract-vocabulary.js";
+export {
   digestCanonicalJson,
   isSha256Digest,
   parseSha256Digest,
@@ -24,6 +64,51 @@ export {
 export type { Sha256Digest, Sha256Input } from "./digest.js";
 export { ContractValueError } from "./errors.js";
 export type { ContractValueErrorCode } from "./errors.js";
+export {
+  assetProvenanceSchema,
+  featureContractSchema,
+  runReceiptSchema,
+} from "./feature-evidence-contracts.js";
+export type {
+  AssetLifecycleState,
+  AssetLineageStage,
+  AssetProvenance,
+  AssetQaResult,
+  FeatureContract,
+  RunReceipt,
+  RunStatus,
+} from "./feature-evidence-contracts.js";
+export {
+  roleLensDescriptorSchema,
+  skillDescriptorSchema,
+  workflowDescriptorSchema,
+} from "./orchestration-contracts.js";
+export type {
+  RoleLensDescriptor,
+  SkillBody,
+  SkillDescriptor,
+  WorkflowDescriptor,
+  WorkflowFailureTransition,
+  WorkflowStep,
+} from "./orchestration-contracts.js";
+export {
+  engineCapabilityReportSchema,
+  gameProjectProfileSchema,
+} from "./project-engine-contracts.js";
+export type {
+  BuildTarget,
+  EngineCapability,
+  EngineCapabilityReport,
+  EngineExecutionKind,
+  GameProjectProfile,
+  StageAssessment,
+} from "./project-engine-contracts.js";
+export {
+  ALL_CONTRACT_SCHEMAS,
+  ORCHESTRATION_DESCRIPTOR_SCHEMAS,
+  PUBLIC_CONTRACT_SCHEMAS,
+} from "./schema-catalog.js";
+export type { ContractSchemaCatalog } from "./schema-catalog.js";
 export {
   compareSemanticVersions,
   parseSemanticVersion,

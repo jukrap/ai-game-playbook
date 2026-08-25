@@ -4,6 +4,18 @@ export type {
   CanonicalJsonValue,
 } from "./canonical-json.js";
 export {
+  CONTRACT_SCHEMA_DRAFT,
+  CONTRACT_SCHEMA_MAX_BYTES,
+  defineContractSchema,
+} from "./contract-schema.js";
+export type {
+  ContractSchemaDefinition,
+  ContractSchemaId,
+  JsonSchemaObject,
+  RootContractSchema,
+  VersionedContractSchema,
+} from "./contract-schema.js";
+export {
   digestCanonicalJson,
   isSha256Digest,
   parseSha256Digest,

@@ -1,5 +1,6 @@
 export type ContractValueErrorCode =
   | "invalid-canonical-json"
+  | "invalid-contract-schema"
   | "invalid-semantic-version"
   | "invalid-sha256-digest"
   | "invalid-sha256-input"

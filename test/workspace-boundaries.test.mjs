@@ -15,7 +15,10 @@ test("workspace packages stay private and follow the foundation dependency direc
 
   assert.equal(root.private, true);
   assert.equal(root.license, "UNLICENSED");
-  assert.equal(root.packageManager, "pnpm@11.4.0");
+  assert.equal(
+    root.packageManager,
+    "pnpm@11.4.0+sha512.f0febc7e37552ab485494a914241b338e0b3580b93d54ce31f00933015880863129038a1b4ae4e414a0ee63ac35bf21197e990172c4a68256450b5636310968f",
+  );
 
   assert.equal(contracts.private, true);
   assert.equal(contracts.license, "UNLICENSED");

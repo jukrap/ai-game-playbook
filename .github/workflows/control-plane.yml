@@ -1,0 +1,56 @@
+name: Control plane checks
+
+on:
+  pull_request:
+    paths:
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig*.json"
+      - "packages/**"
+      - "test/**"
+      - "scripts/**"
+      - ".github/workflows/control-plane.yml"
+  push:
+    paths:
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig*.json"
+      - "packages/**"
+      - "test/**"
+      - "scripts/**"
+      - ".github/workflows/control-plane.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    name: Verify control plane (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.23.2
+      - name: Enable locked package manager
+        run: corepack enable
+      - name: Confirm package manager
+        run: pnpm --version
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify contracts and generated surfaces
+        run: pnpm verify
+      - name: Audit production dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm audit --prod
+      - name: Check tracked-file drift
+        run: git diff --exit-code -- .

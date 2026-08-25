@@ -184,7 +184,7 @@ function preflightRegistryInput(input: unknown): void {
   }
 }
 
-function cloneBoundedInput(input: unknown): unknown {
+export function cloneBoundedInput(input: unknown): unknown {
   preflightRegistryInput(input);
   let serialized: string;
   try {

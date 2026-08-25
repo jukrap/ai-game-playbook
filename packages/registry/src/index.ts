@@ -3,6 +3,12 @@ export type {
   RegistryDiagnostic,
   RegistryDiagnosticCode,
 } from "./errors.js";
+export { TaskRoutingSelectionError } from "./routing-errors.js";
+export type {
+  TaskRoutingDiagnostic,
+  TaskRoutingDiagnosticCode,
+} from "./routing-errors.js";
+export { validateTaskRoutingSelection } from "./routing.js";
 export { generateRegistrySurfaces } from "./generation.js";
 export {
   GeneratedArtifactDriftError,

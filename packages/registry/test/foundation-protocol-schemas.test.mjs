@@ -17,6 +17,7 @@ const expectedIds = [
   "input-replay-trace",
   "run-handle",
   "runtime-frame-evidence",
+  "task-routing-selection",
 ];
 
 function validator() {
@@ -101,6 +102,17 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
     [
       "runtime-frame-evidence",
       { ...fixtures["runtime-frame-evidence"], complete: false },
+    ],
+    [
+      "task-routing-selection",
+      { ...fixtures["task-routing-selection"], skills: [] },
+    ],
+    [
+      "task-routing-selection",
+      {
+        ...fixtures["task-routing-selection"],
+        roleLenses: ["lens.one", "lens.two", "lens.three", "lens.four"],
+      },
     ],
     [
       "input-replay-trace",

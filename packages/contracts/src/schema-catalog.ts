@@ -30,6 +30,7 @@ import {
   engineSessionIdentitySchema,
   runHandleSchema,
 } from "./run-engine-contracts.js";
+import { taskRoutingSelectionSchema } from "./routing-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -63,6 +64,7 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "input-replay-trace": inputReplayTraceSchema,
     "run-handle": runHandleSchema,
     "runtime-frame-evidence": runtimeFrameEvidenceSchema,
+    "task-routing-selection": taskRoutingSelectionSchema,
   });
 
 export const ALL_CONTRACT_SCHEMAS: ContractSchemaCatalog = Object.freeze({

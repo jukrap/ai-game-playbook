@@ -129,6 +129,11 @@ export {
   engineSessionIdentitySchema,
   runHandleSchema,
 } from "./run-engine-contracts.js";
+export { taskRoutingSelectionSchema } from "./routing-contracts.js";
+export type {
+  TaskRoutingSelection,
+  TaskRoutingSource,
+} from "./routing-contracts.js";
 export type {
   EngineDiagnostic,
   EngineMutationOutcome,

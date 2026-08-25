@@ -27,6 +27,18 @@ export const validFoundationProtocolFixtures = {
       resume: "run.resume",
     },
   },
+  "task-routing-selection": {
+    schemaVersion: "1.0.0",
+    selectionId: "018f6f35-2c9e-7d1a-8a4b-123456789ac0",
+    registryDigest: digest,
+    projectId: "sample.graybox",
+    stage: "vertical-slice",
+    source: "model",
+    skills: ["gameplay.vertical-slice"],
+    roleLenses: ["lens.gameplay-risk"],
+    rationaleDigest: secondDigest,
+    selectedAt: startedAt,
+  },
   "engine-project-identity": {
     schemaVersion: "1.0.0",
     projectId: "sample.graybox",

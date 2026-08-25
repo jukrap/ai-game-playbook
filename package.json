@@ -1,0 +1,25 @@
+{
+  "name": "ai-game-playbook",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Safety-bounded AI game development control plane for Godot, Unity, and Unreal Engine.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": ">=22.22.0 <23",
+    "pnpm": ">=11.4.0 <12"
+  },
+  "scripts": {
+    "build": "tsc -b --pretty false",
+    "docs:check": "node scripts/check-docs.mjs",
+    "docs:test": "node scripts/check-docs.test.mjs",
+    "test": "node --test \"test/*.test.mjs\" \"packages/*/test/*.test.mjs\"",
+    "typecheck": "tsc -b --pretty false",
+    "verify": "pnpm run typecheck && pnpm run test && pnpm run docs:test && pnpm run docs:check"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.1",
+    "typescript": "7.0.2"
+  }
+}

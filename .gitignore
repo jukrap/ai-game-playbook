@@ -1,2 +1,7 @@
 .ai-agent-playbook/
 .worktrees/
+node_modules/
+dist/
+coverage/
+.pnpm-store/
+*.tsbuildinfo

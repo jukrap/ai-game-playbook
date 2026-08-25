@@ -1,0 +1,14 @@
+packages:
+  - packages/*
+
+autoInstallPeers: false
+disallowWorkspaceCycles: true
+engineStrict: true
+ignoreScripts: true
+preferWorkspacePackages: true
+saveExact: true
+strictPeerDependencies: true
+
+catalog:
+  '@types/node': 22.20.1
+  typescript: 7.0.2

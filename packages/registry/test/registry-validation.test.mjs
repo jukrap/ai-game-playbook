@@ -5,6 +5,7 @@ import * as contracts from "@ai-game-playbook/contracts";
 import * as registry from "../dist/index.js";
 
 import { createValidRegistryDefinition } from "./fixtures/registry.mjs";
+import { validPublicContractFixtures } from "./fixtures/public-contracts.mjs";
 
 function expectDiagnostic(definition, code) {
   assert.throws(
@@ -14,6 +15,30 @@ function expectDiagnostic(definition, code) {
       error?.diagnostics?.some((diagnostic) => diagnostic.code === code),
     `expected ${code}`,
   );
+}
+
+function createPack(id, version, dependencies = []) {
+  const pack = structuredClone(validPublicContractFixtures["pack-manifest"]);
+  pack.id = id;
+  pack.version = version;
+  pack.compatibility.controlPlane = {
+    minimum: "0.0.0",
+    maximumExclusive: "1.0.0",
+  };
+  pack.provides = {
+    commands: [],
+    skills: [],
+    workflows: [],
+    capabilities: [],
+    schemas: [],
+  };
+  pack.dependencies = dependencies;
+  pack.lifecycleHooks = {};
+  const directory = id.replaceAll(".", "-");
+  pack.artifacts[0].target =
+    `.ai-game-playbook/packs/${directory}/index.js`;
+  pack.ownedPaths[0].path = pack.artifacts[0].target;
+  return pack;
 }
 
 test("valid registries are sorted, immutable, and deterministically attested", () => {
@@ -144,6 +169,165 @@ test("registry diagnostics and normalization never depend on localeCompare", () 
   } finally {
     String.prototype.localeCompare = original;
   }
+});
+
+test("pack dependency graphs are versioned, sorted, and deterministically attested", () => {
+  const definition = createValidRegistryDefinition();
+  definition.packs.push(
+    createPack("feature.gameplay", "1.1.0", [
+      {
+        id: "foundation.core",
+        minimum: "1.0.0",
+        maximumExclusive: "2.0.0",
+        optional: false,
+      },
+    ]),
+    createPack("foundation.core", "1.2.0"),
+  );
+  const reordered = structuredClone(definition);
+  reordered.packs.reverse();
+
+  const first = registry.validateRegistry(definition);
+  const second = registry.validateRegistry(reordered);
+  assert.deepEqual(
+    first.packs.map(({ id }) => id),
+    ["feature.gameplay", "foundation.core"],
+  );
+  assert.equal(first.digest, second.digest);
+});
+
+test("pack validation rejects empty intervals and control-plane incompatibility", () => {
+  const invalidControlPlane = createValidRegistryDefinition();
+  invalidControlPlane.controlPlaneVersion = "latest";
+  expectDiagnostic(invalidControlPlane, "invalid-control-plane-version");
+
+  const invalidInterval = createValidRegistryDefinition();
+  const invalidIntervalPack = createPack("pack.invalid-interval", "1.0.0");
+  invalidIntervalPack.compatibility.engines[0].minimum = "4.8.0";
+  invalidIntervalPack.compatibility.engines[0].maximumExclusive = "4.8.0";
+  invalidInterval.packs.push(invalidIntervalPack);
+  expectDiagnostic(invalidInterval, "pack-version-interval-invalid");
+
+  const incompatible = createValidRegistryDefinition();
+  const incompatiblePack = createPack("pack.incompatible", "1.0.0");
+  incompatiblePack.compatibility.controlPlane = {
+    minimum: "1.0.0",
+    maximumExclusive: "2.0.0",
+  };
+  incompatible.packs.push(incompatiblePack);
+  expectDiagnostic(incompatible, "pack-control-plane-incompatible");
+});
+
+test("pack validation rejects dependency gaps, version conflicts, and cycles", () => {
+  const missing = createValidRegistryDefinition();
+  missing.packs.push(
+    createPack("feature.missing", "1.0.0", [
+      {
+        id: "foundation.missing",
+        minimum: "1.0.0",
+        maximumExclusive: "2.0.0",
+        optional: false,
+      },
+    ]),
+  );
+  expectDiagnostic(missing, "pack-dependency-missing");
+
+  const optional = createValidRegistryDefinition();
+  optional.packs.push(
+    createPack("feature.optional", "1.0.0", [
+      {
+        id: "foundation.optional",
+        minimum: "1.0.0",
+        maximumExclusive: "2.0.0",
+        optional: true,
+      },
+    ]),
+  );
+  assert.equal(registry.validateRegistry(optional).packs.length, 1);
+
+  const conflict = createValidRegistryDefinition();
+  conflict.packs.push(
+    createPack("foundation.core", "2.0.0"),
+    createPack("feature.conflict", "1.0.0", [
+      {
+        id: "foundation.core",
+        minimum: "1.0.0",
+        maximumExclusive: "2.0.0",
+        optional: false,
+      },
+    ]),
+  );
+  expectDiagnostic(conflict, "pack-dependency-version-mismatch");
+
+  const cycle = createValidRegistryDefinition();
+  cycle.packs.push(
+    createPack("cycle.first", "1.0.0", [
+      {
+        id: "cycle.second",
+        minimum: "1.0.0",
+        maximumExclusive: "2.0.0",
+        optional: false,
+      },
+    ]),
+    createPack("cycle.second", "1.0.0", [
+      {
+        id: "cycle.first",
+        minimum: "1.0.0",
+        maximumExclusive: "2.0.0",
+        optional: false,
+      },
+    ]),
+  );
+  expectDiagnostic(cycle, "pack-dependency-cycle");
+});
+
+test("pack validation rejects duplicate identities and unresolved provisions", () => {
+  const duplicate = createValidRegistryDefinition();
+  duplicate.packs.push(
+    createPack("pack.duplicate", "1.0.0"),
+    createPack("pack.duplicate", "2.0.0"),
+  );
+  expectDiagnostic(duplicate, "duplicate-id");
+
+  const unresolved = createValidRegistryDefinition();
+  const unresolvedPack = createPack("pack.unresolved", "1.0.0");
+  unresolvedPack.provides.commands = ["command.missing"];
+  unresolved.packs.push(unresolvedPack);
+  expectDiagnostic(unresolved, "pack-provision-missing");
+
+  const duplicateDependency = createValidRegistryDefinition();
+  duplicateDependency.packs.push(
+    createPack("foundation.shared", "1.0.0"),
+    createPack("pack.duplicate-dependency", "1.0.0", [
+      {
+        id: "foundation.shared",
+        minimum: "0.9.0",
+        maximumExclusive: "2.0.0",
+        optional: false,
+      },
+      {
+        id: "foundation.shared",
+        minimum: "1.0.0",
+        maximumExclusive: "3.0.0",
+        optional: true,
+      },
+    ]),
+  );
+  expectDiagnostic(duplicateDependency, "pack-dependency-duplicate");
+
+  const collision = createValidRegistryDefinition();
+  const firstProvider = createPack("pack.first-provider", "1.0.0");
+  const secondProvider = createPack("pack.second-provider", "1.0.0");
+  firstProvider.provides.commands = ["verify"];
+  secondProvider.provides.commands = ["verify"];
+  collision.packs.push(firstProvider, secondProvider);
+  expectDiagnostic(collision, "pack-provision-collision");
+
+  const missingHook = createValidRegistryDefinition();
+  const missingHookPack = createPack("pack.missing-hook", "1.0.0");
+  missingHookPack.lifecycleHooks = { install: "pack.install-missing" };
+  missingHook.packs.push(missingHookPack);
+  expectDiagnostic(missingHook, "pack-lifecycle-command-missing");
 });
 
 test("registry validation rejects duplicate IDs and CLI path collisions", () => {

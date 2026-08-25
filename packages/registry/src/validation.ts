@@ -5,16 +5,21 @@ import {
   canonicalizeJson,
   commandDescriptorSchema,
   compareCanonicalText,
+  compareSemanticVersions,
   digestCanonicalJson,
   isSha256Digest,
   isStableId,
+  packManifestSchema,
   parseSemanticVersion,
   roleLensDescriptorSchema,
   skillDescriptorSchema,
   workflowDescriptorSchema,
   type CommandDescriptor,
+  type PackManifest,
   type PermissionClass,
   type SchemaReference,
+  type SemanticVersion,
+  type VersionInterval,
   type VersionedContractSchema,
   type WorkflowDescriptor,
 } from "@ai-game-playbook/contracts";
@@ -227,11 +232,13 @@ function validateRootShape(value: unknown): MutableRecord {
   const diagnostics: RegistryDiagnostic[] = [];
   const expectedKeys = new Set([
     "schemaVersion",
+    "controlPlaneVersion",
     "schemas",
     "commands",
     "skills",
     "roleLenses",
     "workflows",
+    "packs",
   ]);
   for (const key of Object.keys(value)) {
     if (!expectedKeys.has(key)) {
@@ -257,12 +264,29 @@ function validateRootShape(value: unknown): MutableRecord {
     );
   }
 
+  try {
+    parseSemanticVersion(
+      value["controlPlaneVersion"],
+      "$.controlPlaneVersion",
+    );
+  } catch {
+    appendDiagnostic(
+      diagnostics,
+      diagnostic(
+        "invalid-control-plane-version",
+        "$.controlPlaneVersion",
+        "expected a canonical Semantic Version 2.0.0 string",
+      ),
+    );
+  }
+
   const limits: Readonly<Record<string, number>> = {
     schemas: 4096,
     commands: 4096,
     skills: 4096,
     roleLenses: 1024,
     workflows: 1024,
+    packs: 1024,
   };
   for (const [key, maximum] of Object.entries(limits)) {
     const collection = value[key];
@@ -302,6 +326,7 @@ function descriptorValidators(
     skills: ajv.compile(skillDescriptorSchema.schema as AnySchemaObject),
     roleLenses: ajv.compile(roleLensDescriptorSchema.schema as AnySchemaObject),
     workflows: ajv.compile(workflowDescriptorSchema.schema as AnySchemaObject),
+    packs: ajv.compile(packManifestSchema.schema as AnySchemaObject),
   };
 }
 
@@ -318,7 +343,13 @@ function validateDescriptors(
   validators: Readonly<Record<string, ValidateFunction>>,
   diagnostics: RegistryDiagnostic[],
 ): void {
-  for (const key of ["commands", "skills", "roleLenses", "workflows"]) {
+  for (const key of [
+    "commands",
+    "skills",
+    "roleLenses",
+    "workflows",
+    "packs",
+  ]) {
     const values = root[key] as unknown[];
     const validate = validators[key];
     if (validate === undefined) {
@@ -818,6 +849,7 @@ function addUniqueDescriptorIds(
     ["skills", definition.skills],
     ["roleLenses", definition.roleLenses],
     ["workflows", definition.workflows],
+    ["packs", definition.packs],
   ] as const;
   for (const [key, descriptors] of groups) {
     for (let index = 0; index < descriptors.length; index += 1) {
@@ -1135,6 +1167,379 @@ function validateSchemaBindings(
       );
     }
   }
+  for (let packIndex = 0; packIndex < definition.packs.length; packIndex += 1) {
+    const pack = definition.packs[packIndex];
+    if (pack === undefined) {
+      continue;
+    }
+    for (
+      let schemaIndex = 0;
+      schemaIndex < pack.provides.schemas.length;
+      schemaIndex += 1
+    ) {
+      const schema = pack.provides.schemas[schemaIndex];
+      if (schema !== undefined) {
+        validateSchemaReference(
+          schema,
+          `$.packs[${packIndex}].provides.schemas[${schemaIndex}]`,
+          schemas,
+          diagnostics,
+        );
+      }
+    }
+  }
+}
+
+function validateVersionInterval(
+  interval: VersionInterval,
+  path: string,
+  diagnostics: RegistryDiagnostic[],
+): boolean {
+  if (
+    compareSemanticVersions(interval.minimum, interval.maximumExclusive) >= 0
+  ) {
+    appendDiagnostic(
+      diagnostics,
+      diagnostic(
+        "pack-version-interval-invalid",
+        path,
+        "minimum must be lower than maximumExclusive",
+      ),
+    );
+    return false;
+  }
+  return true;
+}
+
+function versionIsInInterval(
+  version: SemanticVersion,
+  interval: VersionInterval,
+): boolean {
+  return (
+    compareSemanticVersions(version, interval.minimum) >= 0 &&
+    compareSemanticVersions(version, interval.maximumExclusive) < 0
+  );
+}
+
+function validatePackIntervals(
+  definition: RegistryDefinition,
+  diagnostics: RegistryDiagnostic[],
+): void {
+  for (let packIndex = 0; packIndex < definition.packs.length; packIndex += 1) {
+    const pack = definition.packs[packIndex];
+    if (pack === undefined) {
+      continue;
+    }
+    const basePath = `$.packs[${packIndex}]`;
+    const controlPlanePath = `${basePath}.compatibility.controlPlane`;
+    if (
+      validateVersionInterval(
+        pack.compatibility.controlPlane,
+        controlPlanePath,
+        diagnostics,
+      ) &&
+      !versionIsInInterval(
+        definition.controlPlaneVersion,
+        pack.compatibility.controlPlane,
+      )
+    ) {
+      appendDiagnostic(
+        diagnostics,
+        diagnostic(
+          "pack-control-plane-incompatible",
+          controlPlanePath,
+          `control plane ${definition.controlPlaneVersion} is outside the declared interval`,
+        ),
+      );
+    }
+
+    const engineIds = new Set<string>();
+    for (
+      let engineIndex = 0;
+      engineIndex < pack.compatibility.engines.length;
+      engineIndex += 1
+    ) {
+      const compatibility = pack.compatibility.engines[engineIndex];
+      if (compatibility === undefined) {
+        continue;
+      }
+      const path = `${basePath}.compatibility.engines[${engineIndex}]`;
+      validateVersionInterval(compatibility, path, diagnostics);
+      if (engineIds.has(compatibility.engine)) {
+        appendDiagnostic(
+          diagnostics,
+          diagnostic(
+            "pack-compatibility-duplicate",
+            `${path}.engine`,
+            `engine ${compatibility.engine} has more than one interval`,
+          ),
+        );
+      }
+      engineIds.add(compatibility.engine);
+    }
+
+    const hostIds = new Set<string>();
+    for (
+      let hostIndex = 0;
+      hostIndex < pack.compatibility.hosts.length;
+      hostIndex += 1
+    ) {
+      const compatibility = pack.compatibility.hosts[hostIndex];
+      if (compatibility === undefined) {
+        continue;
+      }
+      const path = `${basePath}.compatibility.hosts[${hostIndex}]`;
+      validateVersionInterval(compatibility, path, diagnostics);
+      if (hostIds.has(compatibility.id)) {
+        appendDiagnostic(
+          diagnostics,
+          diagnostic(
+            "pack-compatibility-duplicate",
+            `${path}.id`,
+            `host ${compatibility.id} has more than one interval`,
+          ),
+        );
+      }
+      hostIds.add(compatibility.id);
+    }
+
+    const dependencyIds = new Set<string>();
+    for (
+      let dependencyIndex = 0;
+      dependencyIndex < pack.dependencies.length;
+      dependencyIndex += 1
+    ) {
+      const dependency = pack.dependencies[dependencyIndex];
+      if (dependency === undefined) {
+        continue;
+      }
+      const path = `${basePath}.dependencies[${dependencyIndex}]`;
+      validateVersionInterval(dependency, path, diagnostics);
+      if (dependencyIds.has(dependency.id)) {
+        appendDiagnostic(
+          diagnostics,
+          diagnostic(
+            "pack-dependency-duplicate",
+            `${path}.id`,
+            `dependency ${dependency.id} is declared more than once`,
+          ),
+        );
+      }
+      dependencyIds.add(dependency.id);
+    }
+  }
+}
+
+function packGraphHasCycle(packs: readonly PackManifest[]): boolean {
+  const packsById = new Map<string, PackManifest>();
+  for (const pack of packs) {
+    if (!packsById.has(pack.id)) {
+      packsById.set(pack.id, pack);
+    }
+  }
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+
+  const visit = (id: string): boolean => {
+    if (visiting.has(id)) {
+      return true;
+    }
+    if (visited.has(id)) {
+      return false;
+    }
+    visiting.add(id);
+    const pack = packsById.get(id);
+    for (const dependency of pack?.dependencies ?? []) {
+      if (packsById.has(dependency.id) && visit(dependency.id)) {
+        return true;
+      }
+    }
+    visiting.delete(id);
+    visited.add(id);
+    return false;
+  };
+
+  return [...packsById.keys()].some((id) => visit(id));
+}
+
+function validatePackDependencies(
+  definition: RegistryDefinition,
+  diagnostics: RegistryDiagnostic[],
+): void {
+  const packsById = new Map<string, PackManifest>();
+  for (const pack of definition.packs) {
+    if (!packsById.has(pack.id)) {
+      packsById.set(pack.id, pack);
+    }
+  }
+
+  for (let packIndex = 0; packIndex < definition.packs.length; packIndex += 1) {
+    const pack = definition.packs[packIndex];
+    if (pack === undefined) {
+      continue;
+    }
+    for (
+      let dependencyIndex = 0;
+      dependencyIndex < pack.dependencies.length;
+      dependencyIndex += 1
+    ) {
+      const dependency = pack.dependencies[dependencyIndex];
+      if (dependency === undefined) {
+        continue;
+      }
+      const path = `$.packs[${packIndex}].dependencies[${dependencyIndex}]`;
+      const selected = packsById.get(dependency.id);
+      if (selected === undefined) {
+        if (!dependency.optional) {
+          appendDiagnostic(
+            diagnostics,
+            diagnostic(
+              "pack-dependency-missing",
+              `${path}.id`,
+              `required pack ${dependency.id} is not registered`,
+            ),
+          );
+        }
+      } else if (
+        compareSemanticVersions(
+          dependency.minimum,
+          dependency.maximumExclusive,
+        ) < 0 &&
+        !versionIsInInterval(selected.version, dependency)
+      ) {
+        appendDiagnostic(
+          diagnostics,
+          diagnostic(
+            "pack-dependency-version-mismatch",
+            path,
+            `selected ${dependency.id}@${selected.version} is outside the declared interval`,
+          ),
+        );
+      }
+    }
+  }
+
+  if (packGraphHasCycle(definition.packs)) {
+    appendDiagnostic(
+      diagnostics,
+      diagnostic(
+        "pack-dependency-cycle",
+        "$.packs",
+        "pack dependencies must form an acyclic graph",
+      ),
+    );
+  }
+}
+
+function validateProvidedIds(
+  values: readonly string[],
+  available: ReadonlySet<string>,
+  providers: Map<string, string>,
+  path: string,
+  diagnostics: RegistryDiagnostic[],
+): void {
+  for (let index = 0; index < values.length; index += 1) {
+    const id = values[index];
+    if (id === undefined) {
+      continue;
+    }
+    const itemPath = `${path}[${index}]`;
+    if (!available.has(id)) {
+      appendDiagnostic(
+        diagnostics,
+        diagnostic(
+          "pack-provision-missing",
+          itemPath,
+          `provided item ${id} is not registered`,
+        ),
+      );
+    }
+    const previous = providers.get(id);
+    if (previous !== undefined) {
+      appendDiagnostic(
+        diagnostics,
+        diagnostic(
+          "pack-provision-collision",
+          itemPath,
+          `provided item ${id} is already owned by ${previous}`,
+        ),
+      );
+    } else {
+      providers.set(id, itemPath);
+    }
+  }
+}
+
+function validatePackProvisions(
+  definition: RegistryDefinition,
+  diagnostics: RegistryDiagnostic[],
+): void {
+  const commands = new Set(definition.commands.map(({ id }) => id));
+  const skills = new Set(definition.skills.map(({ id }) => id));
+  const workflows = new Set(definition.workflows.map(({ id }) => id));
+  const schemas = new Set(definition.schemas.map(({ schemaId }) => schemaId));
+  const commandProviders = new Map<string, string>();
+  const skillProviders = new Map<string, string>();
+  const workflowProviders = new Map<string, string>();
+  const schemaProviders = new Map<string, string>();
+
+  for (let packIndex = 0; packIndex < definition.packs.length; packIndex += 1) {
+    const pack = definition.packs[packIndex];
+    if (pack === undefined) {
+      continue;
+    }
+    const basePath = `$.packs[${packIndex}]`;
+    validateProvidedIds(
+      pack.provides.commands,
+      commands,
+      commandProviders,
+      `${basePath}.provides.commands`,
+      diagnostics,
+    );
+    validateProvidedIds(
+      pack.provides.skills,
+      skills,
+      skillProviders,
+      `${basePath}.provides.skills`,
+      diagnostics,
+    );
+    validateProvidedIds(
+      pack.provides.workflows,
+      workflows,
+      workflowProviders,
+      `${basePath}.provides.workflows`,
+      diagnostics,
+    );
+    validateProvidedIds(
+      pack.provides.schemas.map(({ schemaId }) => schemaId),
+      schemas,
+      schemaProviders,
+      `${basePath}.provides.schemas`,
+      diagnostics,
+    );
+
+    for (const [hook, commandId] of Object.entries(pack.lifecycleHooks)) {
+      if (!commands.has(commandId)) {
+        appendDiagnostic(
+          diagnostics,
+          diagnostic(
+            "pack-lifecycle-command-missing",
+            `${basePath}.lifecycleHooks[${JSON.stringify(hook)}]`,
+            `lifecycle command ${commandId} is not registered`,
+          ),
+        );
+      }
+    }
+  }
+}
+
+function validatePacks(
+  definition: RegistryDefinition,
+  diagnostics: RegistryDiagnostic[],
+): void {
+  validatePackIntervals(definition, diagnostics);
+  validatePackDependencies(definition, diagnostics);
+  validatePackProvisions(definition, diagnostics);
 }
 
 function workflowHasCycle(workflow: WorkflowDescriptor): boolean {
@@ -1300,6 +1705,7 @@ export function validateRegistry(input: unknown): ValidatedRegistry {
   validateCliPaths(definition.commands, diagnostics);
   validateCommandSemantics(definition.commands, diagnostics);
   validateSchemaBindings(definition, diagnostics);
+  validatePacks(definition, diagnostics);
   validateWorkflows(definition, diagnostics);
   if (diagnostics.length > 0) {
     throw new RegistryValidationError(diagnostics);
@@ -1307,6 +1713,7 @@ export function validateRegistry(input: unknown): ValidatedRegistry {
 
   const normalized: RegistryDefinition = {
     schemaVersion: definition.schemaVersion,
+    controlPlaneVersion: definition.controlPlaneVersion,
     schemas: [...definition.schemas].sort((left, right) =>
       compareCanonicalText(left.schemaId, right.schemaId),
     ),
@@ -1314,6 +1721,7 @@ export function validateRegistry(input: unknown): ValidatedRegistry {
     skills: [...definition.skills].sort(byId),
     roleLenses: [...definition.roleLenses].sort(byId),
     workflows: [...definition.workflows].sort(byId),
+    packs: [...definition.packs].sort(byId),
   };
   const result: ValidatedRegistry = {
     ...normalized,

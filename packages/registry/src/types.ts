@@ -1,5 +1,6 @@
 import type {
   CommandDescriptor,
+  PackManifest,
   RoleLensDescriptor,
   SemanticVersion,
   Sha256Digest,
@@ -10,11 +11,13 @@ import type {
 
 export interface RegistryDefinition {
   readonly schemaVersion: SemanticVersion;
+  readonly controlPlaneVersion: SemanticVersion;
   readonly schemas: readonly VersionedContractSchema[];
   readonly commands: readonly CommandDescriptor[];
   readonly skills: readonly SkillDescriptor[];
   readonly roleLenses: readonly RoleLensDescriptor[];
   readonly workflows: readonly WorkflowDescriptor[];
+  readonly packs: readonly PackManifest[];
 }
 
 export interface ValidatedRegistry extends RegistryDefinition {

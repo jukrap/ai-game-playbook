@@ -115,6 +115,7 @@ const workflow = {
 export function createValidRegistryDefinition() {
   return {
     schemaVersion: "1.0.0",
+    controlPlaneVersion: "0.0.0",
     schemas: [
       emptyInputSchema,
       contracts.featureContractSchema,
@@ -138,5 +139,6 @@ export function createValidRegistryDefinition() {
       ),
     ],
     workflows: structuredClone([workflow]),
+    packs: [],
   };
 }

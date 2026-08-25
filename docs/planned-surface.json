@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "artifact": "ai-game-playbook-planned-surface",
+  "reviewedAt": "2026-08-26",
+  "implementationStatus": "design-only",
+  "executableAvailable": false,
+  "package": {
+    "npm": "ai-game-playbook",
+    "executable": "agpb"
+  },
+  "commands": [
+    "agpb init",
+    "agpb doctor",
+    "agpb project inspect",
+    "agpb pack list",
+    "agpb pack add",
+    "agpb pack update",
+    "agpb pack remove",
+    "agpb pack doctor",
+    "agpb skill list",
+    "agpb skill install",
+    "agpb skill check",
+    "agpb engine status",
+    "agpb engine capabilities",
+    "agpb engine connect",
+    "agpb run <workflow>",
+    "agpb verify",
+    "agpb evidence list",
+    "agpb evidence show",
+    "agpb evidence export",
+    "agpb docs check"
+  ],
+  "publicTypes": [
+    "CommandDescriptor",
+    "PackManifest",
+    "GameProjectProfile",
+    "EngineCapabilityReport",
+    "FeatureContract",
+    "RunReceipt",
+    "AssetProvenance"
+  ],
+  "engines": [
+    "Godot",
+    "Unity",
+    "Unreal Engine"
+  ],
+  "supportGrades": [
+    "planned",
+    "detected",
+    "headless",
+    "editor-preview",
+    "verified"
+  ],
+  "evidenceGrades": [
+    "documented",
+    "implemented",
+    "test-witnessed",
+    "locally-executed",
+    "engine-verified"
+  ]
+}

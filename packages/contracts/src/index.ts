@@ -141,6 +141,14 @@ export type {
   RunHandleStatus,
 } from "./run-engine-contracts.js";
 export {
+  checkEngineCapabilityReportSemantics,
+  checkRunReceiptSemantics,
+} from "./semantic-validation.js";
+export type {
+  ContractSemanticIssue,
+  ContractSemanticIssueCode,
+} from "./semantic-validation.js";
+export {
   compareSemanticVersions,
   parseSemanticVersion,
 } from "./semantic-version.js";

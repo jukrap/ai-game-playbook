@@ -221,7 +221,7 @@ const sessionIdentity = closedObject(
   ["sessionId", "processId", "startedAt", "identityDigest"],
 );
 
-const engineCapability = closedObject(
+const engineCapabilityRoot = closedObject(
   {
     id: reference("stableId"),
     operation: reference("engineOperation"),
@@ -268,6 +268,39 @@ const engineCapability = closedObject(
     "checkedAt",
   ],
 );
+
+const engineCapability = {
+  ...engineCapabilityRoot,
+  allOf: [
+    {
+      if: {
+        type: "object",
+        properties: { support: { const: "verified" } },
+        required: ["support"],
+      },
+      then: {
+        type: "object",
+        properties: {
+          evidenceGrade: { const: "engine-verified" },
+          latestReceiptDigest: reference("sha256Digest"),
+        },
+        required: ["evidenceGrade", "latestReceiptDigest"],
+      },
+    },
+    {
+      if: {
+        type: "object",
+        properties: { support: { const: "planned" } },
+        required: ["support"],
+      },
+      then: {
+        type: "object",
+        properties: { degradeReason: textSchema(500) },
+        required: ["degradeReason"],
+      },
+    },
+  ],
+};
 
 export const engineCapabilityReportSchema: VersionedContractSchema =
   defineContractSchema({

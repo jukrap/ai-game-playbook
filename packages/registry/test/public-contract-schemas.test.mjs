@@ -136,6 +136,36 @@ test("contract schemas reject unsafe identity, scope, support, and cost shapes",
       },
     ],
     [
+      "engine-capability-report",
+      {
+        ...validPublicContractFixtures["engine-capability-report"],
+        capabilities: [
+          {
+            ...validPublicContractFixtures["engine-capability-report"]
+              .capabilities[0],
+            support: "verified",
+            latestReceiptDigest:
+              validPublicContractFixtures["engine-capability-report"]
+                .environmentDigest,
+          },
+        ],
+      },
+    ],
+    [
+      "engine-capability-report",
+      {
+        ...validPublicContractFixtures["engine-capability-report"],
+        capabilities: [
+          {
+            ...validPublicContractFixtures["engine-capability-report"]
+              .capabilities[0],
+            support: "planned",
+            evidenceGrade: "documented",
+          },
+        ],
+      },
+    ],
+    [
       "feature-contract",
       {
         ...validPublicContractFixtures["feature-contract"],
@@ -156,6 +186,45 @@ test("contract schemas reject unsafe identity, scope, support, and cost shapes",
       {
         ...validPublicContractFixtures["run-receipt"],
         receiptId: "not-a-uuid",
+      },
+    ],
+    [
+      "run-receipt",
+      {
+        ...validPublicContractFixtures["run-receipt"],
+        outcomes: {
+          ...validPublicContractFixtures["run-receipt"].outcomes,
+          outer: {
+            ...validPublicContractFixtures["run-receipt"].outcomes.outer,
+            timedOut: true,
+          },
+        },
+      },
+    ],
+    [
+      "run-receipt",
+      {
+        ...validPublicContractFixtures["run-receipt"],
+        outcomes: {
+          ...validPublicContractFixtures["run-receipt"].outcomes,
+          tests: {
+            status: "passed",
+            discovered: 0,
+            passed: 0,
+            failed: 0,
+            skipped: 0,
+          },
+        },
+      },
+    ],
+    [
+      "run-receipt",
+      {
+        ...validPublicContractFixtures["run-receipt"],
+        mutation: {
+          ...validPublicContractFixtures["run-receipt"].mutation,
+          status: "uncertain",
+        },
       },
     ],
     [

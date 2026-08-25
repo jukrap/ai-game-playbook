@@ -490,13 +490,7 @@ const recovery = closedObject(
   ["attempted", "outcome", "actions"],
 );
 
-export const runReceiptSchema: VersionedContractSchema = defineContractSchema({
-  id: "run-receipt",
-  version: "1.0.0",
-  title: "Run Receipt",
-  description:
-    "Attests execution identity, authority, separated outcomes, mutations, artifacts, diagnostics, and recovery.",
-  schema: contractRoot(
+const runReceiptRoot = contractRoot(
     {
       schemaVersion: reference("semanticVersion"),
       receiptId: reference("uuid"),
@@ -534,7 +528,124 @@ export const runReceiptSchema: VersionedContractSchema = defineContractSchema({
       "recovery",
       "receiptDigest",
     ],
-  ),
+);
+
+export const runReceiptSchema: VersionedContractSchema = defineContractSchema({
+  id: "run-receipt",
+  version: "1.0.0",
+  title: "Run Receipt",
+  description:
+    "Attests execution identity, authority, separated outcomes, mutations, artifacts, diagnostics, and recovery.",
+  schema: {
+    ...runReceiptRoot,
+    allOf: [
+      {
+        if: {
+          type: "object",
+          properties: { status: { const: "succeeded" } },
+          required: ["status"],
+        },
+        then: {
+          type: "object",
+          properties: {
+            outcomes: {
+              type: "object",
+              properties: {
+                outer: {
+                  type: "object",
+                  properties: {
+                    status: { const: "passed" },
+                    exitCode: { const: 0 },
+                    timedOut: { const: false },
+                  },
+                  required: ["status", "timedOut"],
+                },
+                inner: {
+                  type: "object",
+                  properties: { status: { const: "passed" } },
+                  required: ["status"],
+                },
+                tests: {
+                  type: "object",
+                  properties: { status: { const: "passed" } },
+                  required: ["status"],
+                },
+              },
+              required: ["outer", "inner"],
+            },
+            mutation: {
+              type: "object",
+              properties: {
+                status: {
+                  enum: ["none", "committed", "rolled-back"],
+                },
+              },
+              required: ["status"],
+            },
+          },
+          required: ["outcomes", "mutation"],
+        },
+      },
+      {
+        if: {
+          type: "object",
+          properties: {
+            outcomes: {
+              type: "object",
+              properties: {
+                tests: {
+                  type: "object",
+                  properties: { status: { const: "passed" } },
+                  required: ["status"],
+                },
+              },
+              required: ["tests"],
+            },
+          },
+          required: ["outcomes"],
+        },
+        then: {
+          type: "object",
+          properties: {
+            outcomes: {
+              type: "object",
+              properties: {
+                tests: {
+                  type: "object",
+                  properties: {
+                    discovered: { type: "integer", minimum: 1 },
+                    passed: { type: "integer", minimum: 1 },
+                    failed: { const: 0 },
+                  },
+                  required: ["discovered", "passed", "failed"],
+                },
+              },
+              required: ["tests"],
+            },
+          },
+          required: ["outcomes"],
+        },
+      },
+      {
+        if: {
+          type: "object",
+          properties: {
+            mutation: {
+              type: "object",
+              properties: { status: { const: "uncertain" } },
+              required: ["status"],
+            },
+          },
+          required: ["mutation"],
+        },
+        then: {
+          type: "object",
+          properties: { status: { const: "uncertain" } },
+          required: ["status"],
+        },
+      },
+    ],
+  },
 });
 
 export type AssetLifecycleState =

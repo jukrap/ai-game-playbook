@@ -23,6 +23,15 @@ test("canonical JSON sorts object keys recursively without changing array order"
   assert.equal(contracts.canonicalizeJson(second), expected);
 });
 
+test("canonical text comparison follows locale-independent UTF-16 ordering", () => {
+  assert.equal(typeof contracts.compareCanonicalText, "function");
+  assert.deepEqual(
+    ["ä", "z", "A", "a"].sort(contracts.compareCanonicalText),
+    ["A", "a", "z", "ä"],
+  );
+  assert.equal(contracts.compareCanonicalText("same", "same"), 0);
+});
+
 test("canonical JSON rejects values that cannot be safely attested", () => {
   const circular = {};
   circular.self = circular;

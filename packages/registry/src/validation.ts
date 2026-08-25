@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import {
   canonicalizeJson,
   commandDescriptorSchema,
+  compareCanonicalText,
   digestCanonicalJson,
   isSha256Digest,
   isStableId,
@@ -341,6 +342,229 @@ function validateDescriptors(
 interface SchemaScanState {
   objectCount: number;
   complexityReported: boolean;
+  compileAllowed: boolean;
+}
+
+interface PatternAtomSummary {
+  canMatchEmpty: boolean;
+  containsUnboundedQuantifier: boolean;
+  quantified: boolean;
+  group?: PatternGroupSummary;
+}
+
+interface PatternGroupSummary {
+  canMatchEmpty: boolean;
+  containsUnboundedQuantifier: boolean;
+  directAtomCount: number;
+  hasAlternation: boolean;
+}
+
+interface PatternFrame {
+  readonly branches: PatternAtomSummary[][];
+  readonly assertion: boolean;
+}
+
+interface PatternQuantifier {
+  readonly end: number;
+  readonly minimum: number;
+  readonly unbounded: boolean;
+}
+
+function quantifierAt(
+  pattern: string,
+  index: number,
+): PatternQuantifier | undefined {
+  const character = pattern[index];
+  if (character === "*") {
+    return { end: index, minimum: 0, unbounded: true };
+  }
+  if (character === "+") {
+    return { end: index, minimum: 1, unbounded: true };
+  }
+  if (character === "?") {
+    return { end: index, minimum: 0, unbounded: false };
+  }
+  if (character !== "{") {
+    return undefined;
+  }
+
+  const match = /^\{(0|[1-9][0-9]*)(?:,(0|[1-9][0-9]*)?)?\}/.exec(
+    pattern.slice(index),
+  );
+  if (match === null) {
+    return undefined;
+  }
+  const hasComma = match[0].includes(",");
+  return {
+    end: index + match[0].length - 1,
+    minimum: Number(match[1]),
+    unbounded: hasComma && match[2] === undefined,
+  };
+}
+
+function summarizePatternFrame(frame: PatternFrame): PatternGroupSummary {
+  const canMatchEmpty =
+    frame.assertion ||
+    frame.branches.some((branch) =>
+      branch.every((atom) => atom.canMatchEmpty),
+    );
+  return {
+    canMatchEmpty,
+    containsUnboundedQuantifier: frame.branches.some((branch) =>
+      branch.some((atom) => atom.containsUnboundedQuantifier),
+    ),
+    directAtomCount:
+      frame.branches.length === 1 ? (frame.branches[0]?.length ?? 0) : 0,
+    hasAlternation: frame.branches.length > 1,
+  };
+}
+
+function patternSafetyIssue(pattern: string): string | undefined {
+  const frames: PatternFrame[] = [{ branches: [[]], assertion: false }];
+  let lazyModifierAllowed = false;
+
+  const currentBranch = (): PatternAtomSummary[] => {
+    const frame = frames.at(-1);
+    return frame?.branches.at(-1) ?? [];
+  };
+  const appendAtom = (atom: PatternAtomSummary): void => {
+    currentBranch().push(atom);
+  };
+
+  for (let index = 0; index < pattern.length; index += 1) {
+    const character = pattern[index];
+    if (character === "?" && lazyModifierAllowed) {
+      lazyModifierAllowed = false;
+      continue;
+    }
+    lazyModifierAllowed = false;
+
+    if (character === "\\") {
+      const escaped = pattern[index + 1];
+      if (escaped !== undefined && /[1-9]/.test(escaped)) {
+        return "backreferences are not allowed in registry schemas";
+      }
+      if (escaped === "k" && pattern[index + 2] === "<") {
+        return "named backreferences are not allowed in registry schemas";
+      }
+      appendAtom({
+        canMatchEmpty: false,
+        containsUnboundedQuantifier: false,
+        quantified: false,
+      });
+      index += escaped === undefined ? 0 : 1;
+      continue;
+    }
+
+    if (character === "[") {
+      let escaped = false;
+      for (index += 1; index < pattern.length; index += 1) {
+        const classCharacter = pattern[index];
+        if (!escaped && classCharacter === "]") {
+          break;
+        }
+        escaped = !escaped && classCharacter === "\\";
+        if (classCharacter !== "\\") {
+          escaped = false;
+        }
+      }
+      appendAtom({
+        canMatchEmpty: false,
+        containsUnboundedQuantifier: false,
+        quantified: false,
+      });
+      continue;
+    }
+
+    if (character === "(") {
+      if (
+        pattern.startsWith("(?<=", index) ||
+        pattern.startsWith("(?<!", index)
+      ) {
+        return "lookbehind assertions are not allowed in registry schemas";
+      }
+      let assertion = false;
+      if (pattern.startsWith("(?:", index)) {
+        index += 2;
+      } else if (
+        pattern.startsWith("(?=", index) ||
+        pattern.startsWith("(?!", index)
+      ) {
+        assertion = true;
+        index += 2;
+      } else if (pattern.startsWith("(?", index)) {
+        return "unsupported regular expression group construct";
+      }
+      frames.push({ branches: [[]], assertion });
+      continue;
+    }
+
+    if (character === "|") {
+      const frame = frames.at(-1);
+      frame?.branches.push([]);
+      continue;
+    }
+
+    if (character === ")") {
+      if (frames.length === 1) {
+        continue;
+      }
+      const frame = frames.pop();
+      if (frame !== undefined) {
+        const group = summarizePatternFrame(frame);
+        appendAtom({
+          canMatchEmpty: group.canMatchEmpty,
+          containsUnboundedQuantifier: group.containsUnboundedQuantifier,
+          quantified: false,
+          group,
+        });
+      }
+      continue;
+    }
+
+    const quantifier = quantifierAt(pattern, index);
+    if (quantifier !== undefined) {
+      const branch = currentBranch();
+      const atom = branch.at(-1);
+      if (atom === undefined) {
+        continue;
+      }
+      if (atom.quantified) {
+        return "stacked quantifiers are not allowed in registry schemas";
+      }
+      if (quantifier.unbounded && atom.group !== undefined) {
+        if (atom.group.hasAlternation) {
+          return "unbounded repetition of alternation is not allowed";
+        }
+        if (atom.group.canMatchEmpty) {
+          return "unbounded repetition of an empty-matching group is not allowed";
+        }
+        if (
+          atom.group.directAtomCount === 1 &&
+          atom.group.containsUnboundedQuantifier
+        ) {
+          return "nested unbounded quantifiers are not allowed";
+        }
+      }
+      atom.quantified = true;
+      atom.canMatchEmpty = atom.canMatchEmpty || quantifier.minimum === 0;
+      atom.containsUnboundedQuantifier =
+        atom.containsUnboundedQuantifier || quantifier.unbounded;
+      index = quantifier.end;
+      lazyModifierAllowed = true;
+      continue;
+    }
+
+    if (character !== "^" && character !== "$") {
+      appendAtom({
+        canMatchEmpty: false,
+        containsUnboundedQuantifier: false,
+        quantified: false,
+      });
+    }
+  }
+
+  return undefined;
 }
 
 function scanSchemaValue(
@@ -351,6 +575,7 @@ function scanSchemaValue(
   diagnostics: RegistryDiagnostic[],
 ): void {
   if (depth > SCHEMA_MAX_DEPTH) {
+    state.compileAllowed = false;
     if (!state.complexityReported) {
       state.complexityReported = true;
       appendDiagnostic(
@@ -382,6 +607,7 @@ function scanSchemaValue(
 
   state.objectCount += 1;
   if (state.objectCount > SCHEMA_MAX_OBJECTS) {
+    state.compileAllowed = false;
     if (!state.complexityReported) {
       state.complexityReported = true;
       appendDiagnostic(
@@ -399,6 +625,7 @@ function scanSchemaValue(
   for (const [key, child] of Object.entries(value)) {
     const childPath = `${path}[${JSON.stringify(key)}]`;
     if (key === "$ref" && (typeof child !== "string" || !child.startsWith("#"))) {
+      state.compileAllowed = false;
       appendDiagnostic(
         diagnostics,
         diagnostic(
@@ -409,6 +636,7 @@ function scanSchemaValue(
       );
     }
     if (key === "$id" && depth > 0) {
+      state.compileAllowed = false;
       appendDiagnostic(
         diagnostics,
         diagnostic(
@@ -418,18 +646,20 @@ function scanSchemaValue(
         ),
       );
     }
-    if (
-      key === "pattern" &&
-      (typeof child !== "string" || child.length > SCHEMA_MAX_PATTERN_LENGTH)
-    ) {
-      appendDiagnostic(
-        diagnostics,
-        diagnostic(
-          "schema-complexity-exceeded",
-          childPath,
-          `schema pattern exceeds ${SCHEMA_MAX_PATTERN_LENGTH} characters`,
-        ),
-      );
+    if (key === "pattern") {
+      const issue =
+        typeof child !== "string"
+          ? "schema pattern must be text"
+          : child.length > SCHEMA_MAX_PATTERN_LENGTH
+            ? `schema pattern exceeds ${SCHEMA_MAX_PATTERN_LENGTH} characters`
+            : patternSafetyIssue(child);
+      if (issue !== undefined) {
+        state.compileAllowed = false;
+        appendDiagnostic(
+          diagnostics,
+          diagnostic("schema-complexity-exceeded", childPath, issue),
+        );
+      }
     }
     scanSchemaValue(child, childPath, depth + 1, state, diagnostics);
   }
@@ -537,13 +767,21 @@ function validateSchemaEntries(
     }
     schemaIds.set(schemaId, index);
 
+    const scanState: SchemaScanState = {
+      objectCount: 0,
+      complexityReported: false,
+      compileAllowed: true,
+    };
     scanSchemaValue(
       schema,
       `${path}.schema`,
       0,
-      { objectCount: 0, complexityReported: false },
+      scanState,
       diagnostics,
     );
+    if (!scanState.compileAllowed) {
+      continue;
+    }
     try {
       if (!ajv.validateSchema(schema as AnySchemaObject)) {
         appendDiagnostic(
@@ -1043,7 +1281,7 @@ function deepFreeze<T>(value: T): T {
 }
 
 function byId<T extends { readonly id: string }>(left: T, right: T): number {
-  return left.id.localeCompare(right.id);
+  return compareCanonicalText(left.id, right.id);
 }
 
 export function validateRegistry(input: unknown): ValidatedRegistry {
@@ -1070,7 +1308,7 @@ export function validateRegistry(input: unknown): ValidatedRegistry {
   const normalized: RegistryDefinition = {
     schemaVersion: definition.schemaVersion,
     schemas: [...definition.schemas].sort((left, right) =>
-      left.schemaId.localeCompare(right.schemaId),
+      compareCanonicalText(left.schemaId, right.schemaId),
     ),
     commands: [...definition.commands].sort(byId),
     skills: [...definition.skills].sort(byId),

@@ -1,3 +1,5 @@
+import { compareCanonicalText } from "@ai-game-playbook/contracts";
+
 export type TaskRoutingDiagnosticCode =
   | "routing-lifecycle-not-routable"
   | "routing-registry-digest-mismatch"
@@ -19,7 +21,8 @@ export class TaskRoutingSelectionError extends TypeError {
   constructor(diagnostics: readonly TaskRoutingDiagnostic[]) {
     const sorted = [...diagnostics].sort(
       (left, right) =>
-        left.path.localeCompare(right.path) || left.code.localeCompare(right.code),
+        compareCanonicalText(left.path, right.path) ||
+        compareCanonicalText(left.code, right.code),
     );
     super(
       sorted.length === 1

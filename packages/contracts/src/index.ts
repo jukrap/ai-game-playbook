@@ -1,4 +1,4 @@
-export { canonicalizeJson } from "./canonical-json.js";
+export { canonicalizeJson, compareCanonicalText } from "./canonical-json.js";
 export type {
   CanonicalJsonPrimitive,
   CanonicalJsonValue,

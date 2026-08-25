@@ -58,6 +58,94 @@ test("registry input budgets fail before deeply nested values reach schema compi
   expectDiagnostic(nested, "registry-input-invalid");
 });
 
+test("unsafe schemas are rejected before validator compilation", () => {
+  const oversizedDefinition = createValidRegistryDefinition();
+  oversizedDefinition.schemas.push(
+    contracts.defineContractSchema({
+      id: "oversized-pattern-input",
+      version: "1.0.0",
+      title: "Oversized Pattern Input",
+      schema: {
+        type: "object",
+        properties: {
+          schemaVersion: { type: "string" },
+          value: { type: "string", pattern: "(".repeat(513) },
+        },
+        required: ["schemaVersion", "value"],
+        additionalProperties: false,
+      },
+    }),
+  );
+
+  assert.throws(
+    () => registry.validateRegistry(oversizedDefinition),
+    (error) => {
+      const codes = error?.diagnostics?.map(({ code }) => code);
+      return (
+        error?.name === "RegistryValidationError" &&
+        codes?.includes("schema-complexity-exceeded") &&
+        !codes?.includes("schema-attestation-invalid")
+      );
+    },
+  );
+
+  const nestedQuantifierDefinition = createValidRegistryDefinition();
+  nestedQuantifierDefinition.schemas.push(
+    contracts.defineContractSchema({
+      id: "nested-quantifier-input",
+      version: "1.0.0",
+      title: "Nested Quantifier Input",
+      schema: {
+        type: "object",
+        properties: {
+          schemaVersion: { type: "string" },
+          value: { type: "string", pattern: "^(a+)+$", maxLength: 64 },
+        },
+        required: ["schemaVersion", "value"],
+        additionalProperties: false,
+      },
+    }),
+  );
+  expectDiagnostic(nestedQuantifierDefinition, "schema-complexity-exceeded");
+});
+
+test("registry diagnostics and normalization never depend on localeCompare", () => {
+  const original = String.prototype.localeCompare;
+  String.prototype.localeCompare = () => {
+    throw new Error("localeCompare must not be called");
+  };
+
+  try {
+    const definition = createValidRegistryDefinition();
+    definition.commands.reverse();
+    const validated = registry.validateRegistry(definition);
+    assert.deepEqual(
+      validated.commands.map(({ id }) => id),
+      ["engine.rollback", "internal.health", "project.inspect", "verify"],
+    );
+
+    const error = new registry.RegistryValidationError([
+      { code: "duplicate-id", path: "$.z", message: "z" },
+      { code: "duplicate-id", path: "$.a", message: "a" },
+    ]);
+    assert.deepEqual(
+      error.diagnostics.map(({ path }) => path),
+      ["$.a", "$.z"],
+    );
+
+    const routingError = new registry.TaskRoutingSelectionError([
+      { code: "routing-skill-missing", path: "$.z", message: "z" },
+      { code: "routing-skill-missing", path: "$.a", message: "a" },
+    ]);
+    assert.deepEqual(
+      routingError.diagnostics.map(({ path }) => path),
+      ["$.a", "$.z"],
+    );
+  } finally {
+    String.prototype.localeCompare = original;
+  }
+});
+
 test("registry validation rejects duplicate IDs and CLI path collisions", () => {
   const duplicate = createValidRegistryDefinition();
   duplicate.commands.push(structuredClone(duplicate.commands[0]));

@@ -6,6 +6,10 @@ export type CanonicalJsonValue =
   | readonly CanonicalJsonValue[]
   | { readonly [key: string]: CanonicalJsonValue };
 
+export function compareCanonicalText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function invalidCanonicalJson(
   path: string,
   reason: string,
@@ -95,7 +99,7 @@ function serializeObject(
   }
 
   const entries: string[] = [];
-  const keys = Object.getOwnPropertyNames(value).sort();
+  const keys = Object.getOwnPropertyNames(value).sort(compareCanonicalText);
   for (const key of keys) {
     if (hasLoneSurrogate(key)) {
       throw invalidCanonicalJson(path, "object key contains a lone surrogate");

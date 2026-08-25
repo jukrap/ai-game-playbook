@@ -208,6 +208,15 @@ for (const englishPath of englishDocs) {
   const englishText = englishBytes.toString("utf8");
   const koreanText = readText(koreanPath);
   const metadata = parseFrontmatter(koreanPath, koreanText);
+  const englishOpening = englishText.replaceAll("\r\n", "\n").split("\n").slice(0, 20).join("\n");
+  const koreanOpening = koreanText.replaceAll("\r\n", "\n").split("\n").slice(0, 20).join("\n");
+
+  if (!/^> Status:/m.test(englishOpening)) {
+    fail(`${englishPath}: missing Status banner near the top of the document`);
+  }
+  if (!/^> 상태:/m.test(koreanOpening)) {
+    fail(`${koreanPath}: missing Status banner near the top of the document`);
+  }
 
   if (metadata.source !== englishPath) {
     fail(`${koreanPath}: source must be ${englishPath}`);

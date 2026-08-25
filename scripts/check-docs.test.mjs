@@ -97,6 +97,24 @@ const scenarios = [
     mutate: (root) => updateFile(root, "README.md", (text) => `${text}\nChanged.\n`)
   },
   {
+    name: "status banners removed from a document pair",
+    shouldPass: false,
+    diagnostic: "missing Status banner",
+    mutate: (root) => {
+      updateFile(root, "docs/assets-and-provenance.md", (text) =>
+        text.replace("> Status: planned asset policy. No asset pipeline or provider integration exists yet.\n\n", "")
+      );
+      const englishDigest = createHash("sha256")
+        .update(readFileSync(join(root, "docs", "assets-and-provenance.md")))
+        .digest("hex");
+      updateFile(root, "docs/assets-and-provenance.ko.md", (text) =>
+        text
+          .replace("> 상태: 계획된 자산 정책입니다. asset pipeline이나 provider integration은 아직 없습니다.\n\n", "")
+          .replace(/^source_sha256: [0-9a-f]{64}$/m, `source_sha256: ${englishDigest}`)
+      );
+    }
+  },
+  {
     name: "missing Korean mirror",
     shouldPass: false,
     diagnostic: "missing Korean mirror",

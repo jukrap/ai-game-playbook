@@ -47,7 +47,11 @@ test("the contracts package exposes the complete versioned schema catalog", () =
   );
   assert.deepEqual(
     Object.keys(contracts.ALL_CONTRACT_SCHEMAS).sort(),
-    [...publicIds, ...orchestrationIds].sort(),
+    [
+      ...publicIds,
+      ...orchestrationIds,
+      ...Object.keys(contracts.FOUNDATION_PROTOCOL_SCHEMAS),
+    ].sort(),
   );
 
   for (const [id, entry] of Object.entries(contracts.ALL_CONTRACT_SCHEMAS)) {
@@ -63,8 +67,12 @@ test("the contracts package exposes the complete versioned schema catalog", () =
 
 test("all public contract and orchestration fixtures validate in strict 2020-12 mode", () => {
   const ajv = createValidator();
+  const schemas = {
+    ...contracts.PUBLIC_CONTRACT_SCHEMAS,
+    ...contracts.ORCHESTRATION_DESCRIPTOR_SCHEMAS,
+  };
 
-  for (const [id, entry] of Object.entries(contracts.ALL_CONTRACT_SCHEMAS)) {
+  for (const [id, entry] of Object.entries(schemas)) {
     const validate = ajv.compile(entry.schema);
     const fixture = validContractFixtures[id];
     assert.notEqual(fixture, undefined, `missing fixture for ${id}`);

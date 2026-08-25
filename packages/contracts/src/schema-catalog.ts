@@ -9,6 +9,11 @@ import {
   runReceiptSchema,
 } from "./feature-evidence-contracts.js";
 import {
+  buildArtifactEvidenceSchema,
+  inputReplayTraceSchema,
+  runtimeFrameEvidenceSchema,
+} from "./engine-evidence-contracts.js";
+import {
   roleLensDescriptorSchema,
   skillDescriptorSchema,
   workflowDescriptorSchema,
@@ -17,6 +22,14 @@ import {
   engineCapabilityReportSchema,
   gameProjectProfileSchema,
 } from "./project-engine-contracts.js";
+import {
+  engineDiagnosticSchema,
+  engineOperationRequestSchema,
+  engineOperationResultSchema,
+  engineProjectIdentitySchema,
+  engineSessionIdentitySchema,
+  runHandleSchema,
+} from "./run-engine-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -39,7 +52,21 @@ export const ORCHESTRATION_DESCRIPTOR_SCHEMAS: ContractSchemaCatalog =
     "workflow-descriptor": workflowDescriptorSchema,
   });
 
+export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
+  Object.freeze({
+    "build-artifact-evidence": buildArtifactEvidenceSchema,
+    "engine-diagnostic": engineDiagnosticSchema,
+    "engine-operation-request": engineOperationRequestSchema,
+    "engine-operation-result": engineOperationResultSchema,
+    "engine-project-identity": engineProjectIdentitySchema,
+    "engine-session-identity": engineSessionIdentitySchema,
+    "input-replay-trace": inputReplayTraceSchema,
+    "run-handle": runHandleSchema,
+    "runtime-frame-evidence": runtimeFrameEvidenceSchema,
+  });
+
 export const ALL_CONTRACT_SCHEMAS: ContractSchemaCatalog = Object.freeze({
   ...PUBLIC_CONTRACT_SCHEMAS,
   ...ORCHESTRATION_DESCRIPTOR_SCHEMAS,
+  ...FOUNDATION_PROTOCOL_SCHEMAS,
 });

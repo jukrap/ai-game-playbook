@@ -65,6 +65,17 @@ export type { Sha256Digest, Sha256Input } from "./digest.js";
 export { ContractValueError } from "./errors.js";
 export type { ContractValueErrorCode } from "./errors.js";
 export {
+  buildArtifactEvidenceSchema,
+  inputReplayTraceSchema,
+  runtimeFrameEvidenceSchema,
+} from "./engine-evidence-contracts.js";
+export type {
+  BuildArtifactEvidence,
+  InputReplayTrace,
+  RuntimeFrameEvidence,
+  RuntimeFrameOrigin,
+} from "./engine-evidence-contracts.js";
+export {
   assetProvenanceSchema,
   featureContractSchema,
   runReceiptSchema,
@@ -105,10 +116,30 @@ export type {
 } from "./project-engine-contracts.js";
 export {
   ALL_CONTRACT_SCHEMAS,
+  FOUNDATION_PROTOCOL_SCHEMAS,
   ORCHESTRATION_DESCRIPTOR_SCHEMAS,
   PUBLIC_CONTRACT_SCHEMAS,
 } from "./schema-catalog.js";
 export type { ContractSchemaCatalog } from "./schema-catalog.js";
+export {
+  engineDiagnosticSchema,
+  engineOperationRequestSchema,
+  engineOperationResultSchema,
+  engineProjectIdentitySchema,
+  engineSessionIdentitySchema,
+  runHandleSchema,
+} from "./run-engine-contracts.js";
+export type {
+  EngineDiagnostic,
+  EngineMutationOutcome,
+  EngineOperationRequest,
+  EngineOperationResult,
+  EngineProjectIdentity,
+  EngineSessionExecutionKind,
+  EngineSessionIdentity,
+  RunHandle,
+  RunHandleStatus,
+} from "./run-engine-contracts.js";
 export {
   compareSemanticVersions,
   parseSemanticVersion,

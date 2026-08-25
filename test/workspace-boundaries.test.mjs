@@ -25,6 +25,8 @@ test("workspace packages stay private and follow the foundation dependency direc
   assert.equal(registry.license, "UNLICENSED");
   assert.deepEqual(registry.dependencies, {
     "@ai-game-playbook/contracts": "workspace:*",
+    ajv: "catalog:",
+    "ajv-formats": "catalog:",
   });
 });
 

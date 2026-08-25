@@ -93,6 +93,55 @@ function sameArray(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+function headingSlug(heading) {
+  return heading
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[`*_~]/g, "")
+    .replace(/<[^>]+>/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
+    .replace(/\s+/g, "-");
+}
+
+const headingAnchorCache = new Map();
+
+function headingAnchors(relativePath) {
+  if (headingAnchorCache.has(relativePath)) return headingAnchorCache.get(relativePath);
+
+  const anchors = new Set();
+  const duplicateCounts = new Map();
+  const text = readText(relativePath).replaceAll("\r\n", "\n");
+  let openFence = null;
+
+  for (const line of text.split("\n")) {
+    const fence = line.match(/^\s*(```|~~~)/);
+    if (fence) {
+      if (openFence === null) openFence = fence[1];
+      else if (fence[1] === openFence) openFence = null;
+      continue;
+    }
+    if (openFence !== null) continue;
+
+    const heading = line.match(/^#{1,6}\s+(.+?)\s*#*\s*$/);
+    if (!heading) continue;
+
+    const base = headingSlug(heading[1]);
+    if (!base) continue;
+    const duplicate = duplicateCounts.get(base) ?? 0;
+    anchors.add(duplicate === 0 ? base : `${base}-${duplicate}`);
+    duplicateCounts.set(base, duplicate + 1);
+  }
+
+  for (const match of text.matchAll(/\bid\s*=\s*["']([^"']+)["']/gi)) {
+    anchors.add(match[1]);
+  }
+
+  headingAnchorCache.set(relativePath, anchors);
+  return anchors;
+}
+
 function mirrorFor(englishPath) {
   return englishPath.replace(/\.md$/, ".ko.md");
 }
@@ -153,7 +202,7 @@ const publicMarkdown = [...new Set([...englishDocs, ...koreanDocs])];
 const forbiddenPublicPatterns = [
   [/\.ai-agent-playbook/i, "private playbook path"],
   [/\.worktrees/i, "worktree path"],
-  [/[A-Za-z]:[\\/]/, "Windows absolute path"],
+  [/(?<![A-Za-z0-9])[A-Za-z]:[\\/]/, "Windows absolute path"],
   [/(?:^|[\s(])\/(?:Users|home)\/[^\s)]+/m, "personal absolute path"],
   [/file:\/\//i, "local file URI"],
   [/\b(?:dossier|upstream|reference)\b/i, "non-public investigation term"]
@@ -169,26 +218,36 @@ for (const markdownPath of publicMarkdown) {
   for (const match of text.matchAll(linkPattern)) {
     let target = match[1].trim();
     if (target.startsWith("<") && target.endsWith(">")) target = target.slice(1, -1);
-    if (/^(?:https?:|mailto:|#)/i.test(target)) continue;
+    if (/^(?:https?:|mailto:)/i.test(target)) continue;
 
     target = target.split(/\s+["']/)[0];
-    const pathPart = target.split("#", 1)[0].split("?", 1)[0];
-    if (!pathPart) continue;
+    const hashIndex = target.indexOf("#");
+    const rawPath = (hashIndex >= 0 ? target.slice(0, hashIndex) : target).split("?", 1)[0];
+    const rawFragment = hashIndex >= 0 ? target.slice(hashIndex + 1) : "";
 
-    let decoded;
+    let decodedPath;
+    let decodedFragment;
     try {
-      decoded = decodeURIComponent(pathPart);
+      decodedPath = decodeURIComponent(rawPath);
+      decodedFragment = decodeURIComponent(rawFragment);
     } catch {
       fail(`${markdownPath}: link is not valid URI encoding: ${target}`);
       continue;
     }
 
-    const absoluteTarget = resolve(dirname(rootPath(markdownPath)), decoded);
+    const absoluteTarget = decodedPath
+      ? resolve(dirname(rootPath(markdownPath)), decodedPath)
+      : rootPath(markdownPath);
     const relativeTarget = relative(root, absoluteTarget);
     if (relativeTarget.startsWith(`..${sep}`) || relativeTarget === "..") {
       fail(`${markdownPath}: relative link escapes the repository: ${target}`);
     } else if (!existsSync(absoluteTarget)) {
       fail(`${markdownPath}: broken relative link: ${target}`);
+    } else if (decodedFragment && extname(absoluteTarget).toLowerCase() === ".md") {
+      const targetMarkdown = portable(relativeTarget || markdownPath);
+      if (!headingAnchors(targetMarkdown).has(decodedFragment)) {
+        fail(`${markdownPath}: missing heading anchor: ${target}`);
+      }
     }
   }
 }

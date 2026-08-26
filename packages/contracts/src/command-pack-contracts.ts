@@ -21,6 +21,40 @@ import {
 import { digestCanonicalJson, type Sha256Digest } from "./digest.js";
 import type { StableId } from "./stable-id.js";
 
+export type RetryProofMechanism =
+  | "content-addressed-write"
+  | "compare-and-swap"
+  | "idempotency-key"
+  | "transactional-rollback";
+
+export interface RetryIdempotencyProof {
+  readonly mechanism: RetryProofMechanism;
+  readonly scope: string;
+  readonly evidenceKind: StableId;
+  readonly proofDigest: Sha256Digest;
+  readonly uncertainOutcome: "stop";
+}
+
+export type CommandRetryPolicy =
+  | {
+      readonly mode: "never";
+      readonly maxAttempts: 1;
+      readonly backoffMs?: never;
+      readonly proof?: never;
+    }
+  | {
+      readonly mode: "read-only";
+      readonly maxAttempts: number;
+      readonly backoffMs?: readonly number[];
+      readonly proof?: never;
+    }
+  | {
+      readonly mode: "proven-idempotent";
+      readonly maxAttempts: number;
+      readonly backoffMs?: readonly number[];
+      readonly proof: RetryIdempotencyProof;
+    };
+
 export interface CommandDescriptor {
   readonly schemaVersion: SemanticVersion;
   readonly id: StableId;
@@ -53,11 +87,7 @@ export interface CommandDescriptor {
     readonly mode: "cooperative" | "process-tree" | "not-applicable";
     readonly graceMs: number;
   };
-  readonly retry: {
-    readonly mode: "never" | "read-only" | "proven-idempotent";
-    readonly maxAttempts: number;
-    readonly backoffMs?: readonly number[];
-  };
+  readonly retry: CommandRetryPolicy;
   readonly budgets: ExecutionBudgets;
   readonly requiredEvidence: readonly StableId[];
   readonly handler: {
@@ -104,7 +134,29 @@ const cancellation = closedObject(
   ["mode", "graceMs"],
 );
 
-const retry = closedObject(
+const retryProof = closedObject(
+  {
+    mechanism: enumSchema([
+      "content-addressed-write",
+      "compare-and-swap",
+      "idempotency-key",
+      "transactional-rollback",
+    ]),
+    scope: reference("shortText"),
+    evidenceKind: reference("stableId"),
+    proofDigest: reference("sha256Digest"),
+    uncertainOutcome: { const: "stop" },
+  },
+  [
+    "mechanism",
+    "scope",
+    "evidenceKind",
+    "proofDigest",
+    "uncertainOutcome",
+  ],
+);
+
+const retryRoot = closedObject(
   {
     mode: enumSchema(["never", "read-only", "proven-idempotent"]),
     maxAttempts: { type: "integer", minimum: 1, maximum: 5 },
@@ -112,9 +164,53 @@ const retry = closedObject(
       { type: "integer", minimum: 0, maximum: 300000 },
       { maximum: 4 },
     ),
+    proof: retryProof,
   },
   ["mode", "maxAttempts"],
 );
+
+const retry = {
+  ...retryRoot,
+  allOf: [
+    {
+      if: {
+        properties: { mode: { const: "never" } },
+        required: ["mode"],
+      },
+      then: {
+        properties: {
+          maxAttempts: { const: 1 },
+          backoffMs: false,
+          proof: false,
+        },
+      },
+    },
+    {
+      if: {
+        properties: { mode: { const: "read-only" } },
+        required: ["mode"],
+      },
+      then: {
+        properties: {
+          maxAttempts: { type: "integer", minimum: 2, maximum: 5 },
+          proof: false,
+        },
+      },
+    },
+    {
+      if: {
+        properties: { mode: { const: "proven-idempotent" } },
+        required: ["mode"],
+      },
+      then: {
+        properties: {
+          maxAttempts: { type: "integer", minimum: 2, maximum: 5 },
+        },
+        required: ["proof"],
+      },
+    },
+  ],
+};
 
 const commandHandler = closedObject(
   {

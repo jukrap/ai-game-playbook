@@ -120,6 +120,52 @@ test("contract schemas reject unsafe identity, scope, support, and cost shapes",
       },
     ],
     [
+      "command-descriptor",
+      {
+        ...validPublicContractFixtures["command-descriptor"],
+        retry: {
+          mode: "proven-idempotent",
+          maxAttempts: 2,
+          backoffMs: [100],
+        },
+      },
+    ],
+    [
+      "command-descriptor",
+      {
+        ...validPublicContractFixtures["command-descriptor"],
+        retry: {
+          ...validPublicContractFixtures["command-descriptor"].retry,
+          proof: {
+            mechanism: "content-addressed-write",
+            scope: "project files",
+            evidenceKind: "retry.idempotency-proof",
+            proofDigest:
+              validPublicContractFixtures["command-descriptor"].handler.digest,
+            uncertainOutcome: "stop",
+          },
+        },
+      },
+    ],
+    [
+      "command-descriptor",
+      {
+        ...validPublicContractFixtures["command-descriptor"],
+        retry: {
+          mode: "proven-idempotent",
+          maxAttempts: 2,
+          proof: {
+            mechanism: "content-addressed-write",
+            scope: "project files",
+            evidenceKind: "retry.idempotency-proof",
+            proofDigest:
+              validPublicContractFixtures["command-descriptor"].handler.digest,
+            uncertainOutcome: "retry",
+          },
+        },
+      },
+    ],
+    [
       "pack-manifest",
       {
         ...validPublicContractFixtures["pack-manifest"],

@@ -517,7 +517,59 @@ test("registry validation enforces command authority, lane, and retry invariants
 
   const invalidNeverRetry = createValidRegistryDefinition();
   invalidNeverRetry.commands[0].retry = { mode: "never", maxAttempts: 2 };
-  expectDiagnostic(invalidNeverRetry, "invalid-retry-attempts");
+  expectDiagnostic(invalidNeverRetry, "descriptor-schema-invalid");
+
+  const provenMutation = createValidRegistryDefinition();
+  provenMutation.commands[2].retry = {
+    mode: "proven-idempotent",
+    maxAttempts: 2,
+    backoffMs: [10],
+    proof: {
+      mechanism: "compare-and-swap",
+      scope: "attested feature paths",
+      evidenceKind: "retry.cas-proof",
+      proofDigest: provenMutation.commands[2].handler.digest,
+      uncertainOutcome: "stop",
+    },
+  };
+  assert.equal(registry.validateRegistry(provenMutation).commands.length, 4);
+
+  const staleMutationProof = createValidRegistryDefinition();
+  staleMutationProof.commands[2].retry = {
+    ...provenMutation.commands[2].retry,
+    proof: {
+      ...provenMutation.commands[2].retry.proof,
+      proofDigest: `sha256:${"f".repeat(64)}`,
+    },
+  };
+  expectDiagnostic(staleMutationProof, "unsafe-retry-policy");
+
+  const unsafeNetworkProof = createValidRegistryDefinition();
+  unsafeNetworkProof.commands.push({
+    ...structuredClone(unsafeNetworkProof.commands[0]),
+    id: "network.retry",
+    cli: { path: ["network", "retry"], aliases: [] },
+    permissions: ["read-project", "network"],
+    sideEffects: [
+      { kind: "network", scope: "declared-endpoint", boundary: "network" },
+    ],
+    retry: {
+      mode: "proven-idempotent",
+      maxAttempts: 2,
+      proof: {
+        mechanism: "content-addressed-write",
+        scope: "remote request",
+        evidenceKind: "retry.remote-proof",
+        proofDigest: unsafeNetworkProof.commands[0].handler.digest,
+        uncertainOutcome: "stop",
+      },
+    },
+    handler: {
+      ...unsafeNetworkProof.commands[0].handler,
+      export: "retryRemoteRequest",
+    },
+  });
+  expectDiagnostic(unsafeNetworkProof, "unsafe-retry-policy");
 });
 
 test("network effect boundaries remain independent from project serialization lanes", () => {

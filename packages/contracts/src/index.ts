@@ -28,10 +28,13 @@ export {
   packManifestSchema,
 } from "./command-pack-contracts.js";
 export type {
+  CommandRetryPolicy,
   CommandDescriptor,
   PackKind,
   PackManifest,
   PackManifestDigestInput,
+  RetryIdempotencyProof,
+  RetryProofMechanism,
   VersionInterval,
 } from "./command-pack-contracts.js";
 export {

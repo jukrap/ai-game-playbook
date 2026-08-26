@@ -931,6 +931,11 @@ const retryUnsafePermissions = new Set([
   "external-transmission",
   "paid-call",
 ]);
+const remoteRetryPermissions = new Set([
+  "network",
+  "external-transmission",
+  "paid-call",
+]);
 
 function hasAnyPermission(
   command: CommandDescriptor,
@@ -1083,6 +1088,37 @@ function validateCommandSemantics(
           "unsafe-retry-policy",
           `${path}.retry.mode`,
           "read-only retry cannot be used by a command with side effects",
+        ),
+      );
+    }
+    const hasRemoteRetryAuthority =
+      effectKinds.has("network") ||
+      effectKinds.has("external") ||
+      hasAnyPermission(command, remoteRetryPermissions);
+    if (
+      command.retry.mode === "proven-idempotent" &&
+      command.retry.proof.proofDigest !== command.handler.digest
+    ) {
+      appendDiagnostic(
+        diagnostics,
+        diagnostic(
+          "unsafe-retry-policy",
+          `${path}.retry.proof.proofDigest`,
+          "retry proof must attest the exact command handler implementation",
+        ),
+      );
+    }
+    if (
+      command.retry.mode === "proven-idempotent" &&
+      hasRemoteRetryAuthority &&
+      command.retry.proof.mechanism !== "idempotency-key"
+    ) {
+      appendDiagnostic(
+        diagnostics,
+        diagnostic(
+          "unsafe-retry-policy",
+          `${path}.retry.proof.mechanism`,
+          "remote and paid operations require a server-recognized idempotency key",
         ),
       );
     }

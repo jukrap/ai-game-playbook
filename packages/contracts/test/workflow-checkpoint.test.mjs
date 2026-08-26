@@ -93,3 +93,57 @@ test("workflow checkpoint semantics reject broken chain, lifecycle, identity, an
     ]),
   );
 });
+
+test("uncertain effects remain attestable after the resume window expires", () => {
+  const base = checkpointBody();
+  const inFlight = {
+    stepId: "step.inspect",
+    ordinal: 0,
+    attempt: 1,
+    phase: "command",
+    command: {
+      id: "project.inspect",
+      version: "1.0.0",
+      descriptorDigest: digest("1"),
+      handlerDigest: digest("2"),
+      lane: "parallel-read",
+      permissions: ["read-project"],
+    },
+    inputDigest: digest("3"),
+    authorizationId: "323e4567-e89b-42d3-a456-426614174000",
+    authorizationRequestDigest: digest("4"),
+    authorizationExpiresAt: "2026-08-26T04:31:00.000Z",
+    approvalIds: [],
+    sideEffect: "uncertain",
+  };
+  const uncertainBody = {
+    ...base,
+    sequence: 1,
+    status: "uncertain",
+    inFlight,
+    updatedAt: "2026-08-28T04:30:00.000Z",
+    parentCheckpointDigest: digest("5"),
+  };
+  const uncertain = {
+    ...uncertainBody,
+    checkpointDigest:
+      contracts.computeWorkflowCheckpointDigest(uncertainBody),
+  };
+  assert.deepEqual(contracts.checkWorkflowCheckpointSemantics(uncertain), []);
+
+  const runningBody = {
+    ...uncertainBody,
+    status: "running",
+    inFlight: { ...inFlight, sideEffect: "started" },
+  };
+  const running = {
+    ...runningBody,
+    checkpointDigest: contracts.computeWorkflowCheckpointDigest(runningBody),
+  };
+  assert.equal(
+    contracts
+      .checkWorkflowCheckpointSemantics(running)
+      .some(({ code }) => code === "workflow-checkpoint-time-invalid"),
+    true,
+  );
+});

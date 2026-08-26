@@ -101,6 +101,25 @@ export type {
   ProjectMutationLane,
 } from "./project-lane.js";
 export {
+  loadWorkflowCheckpoint,
+  persistWorkflowCheckpoint,
+  resumeWorkflowCheckpoint,
+  WORKFLOW_CHECKPOINT_MAX_CHAIN_BYTES,
+  WORKFLOW_CHECKPOINT_MAX_CHAIN_LENGTH,
+  WORKFLOW_CHECKPOINT_MAX_HEAD_BYTES,
+  WORKFLOW_CHECKPOINT_MAX_RECORD_BYTES,
+  WORKFLOW_CHECKPOINT_STORE_PATH,
+} from "./workflow-checkpoint-store.js";
+export type {
+  LoadWorkflowCheckpointRequest,
+  PersistWorkflowCheckpointRequest,
+  ResumeWorkflowCheckpointRequest,
+  StoredWorkflowCheckpoint,
+  WorkflowCheckpointResumeDisposition,
+  WorkflowCheckpointResumePolicy,
+  WorkflowCheckpointResumeResult,
+} from "./workflow-checkpoint-store.js";
+export {
   beginWorkflowStep,
   createWorkflowCheckpoint,
   markWorkflowStepStarted,

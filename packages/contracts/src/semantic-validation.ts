@@ -166,8 +166,7 @@ export function checkWorkflowCheckpointSemantics(
     checkpoint.status === "waiting-approval" ||
     checkpoint.status === "waiting-restart" ||
     checkpoint.status === "waiting-rollback" ||
-    checkpoint.status === "rolling-back" ||
-    checkpoint.status === "uncertain";
+    checkpoint.status === "rolling-back";
   if (
     createdAt === undefined ||
     updatedAt === undefined ||

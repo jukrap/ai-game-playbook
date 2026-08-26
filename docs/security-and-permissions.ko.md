@@ -1,12 +1,12 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: 35dce31323cfbd13aa20994794fb7b26ed651c7f8f373f9def524c5924ae40fb
+source_sha256: 64c12cfcd5f15ac4cfbc50d130720fbd423de0edf4986bc1e973b85523f42b47
 translated_at: 2026-08-26
 ---
 
 # 보안과 권한
 
-> 상태: 초기 private admission primitive가 포함된 계획된 permission 정책입니다. filesystem/process/mutating-lane/in-memory grant enforcement는 존재하지만 command dispatch, Editor 또는 bridge enforcement는 아직 없습니다.
+> 상태: 초기 private admission, workflow-checkpoint, durable checkpoint-store primitive가 포함된 계획된 permission 정책입니다. command dispatch, Editor 또는 bridge enforcement는 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
@@ -29,7 +29,7 @@ permission은 control plane이 평가하며 MCP annotation, skill, engine bridge
 
 현재 private broker는 같은 process에서 검증한 registry instance만 받습니다. 실제 command payload를 등록 input schema로 검증하고 그 digest를 project, command/handler, registry, feature, workflow step, Editor session, 정규화된 target, budget, deadline, run에 결합하며 설정된 public key로 domain-separated 단일 permission Ed25519 grant를 검증합니다. 민감한 grant는 한 번만 사용할 수 있고 authorization lease를 반환하기 전에 동기적으로 reserve합니다. 자동 admission은 범위가 제한된 project read, 승인된 feature source path와 change kind, approval checkpoint를 선언하지 않은 등록 test/build workflow step으로 제한합니다. test/build 권한은 project file 또는 Editor object mutation 권한을 암묵적으로 포함하지 않습니다. Editor object source mutation은 object operation type을 feature contract와 대조할 수 있을 때까지 거부합니다.
 
-authorization은 실행이 아닙니다. 이 primitive는 아직 process runner, filesystem CAS, project lane, CLI, MCP, engine bridge와 연결되지 않았습니다. grant use count, active lease, uncertainty barrier는 memory에만 있어 restart를 넘지 못하며 approval UI, durable revocation/checkpoint store, recovery action, secret-path classifier도 없습니다. registry는 이제 exact validated authority에서 domain-separated workflow-plan digest를 파생하고 모호한 binding을 거부하며 immutable plan을 의미 검증합니다. 하지만 dispatcher integration 전에는 broker가 요청에 제공된 plan digest가 이 resolver에서 왔음을 증명하지 않습니다. runtime enforcement와 accounting이 없는 동안 memory, CPU, GPU request budget은 거부합니다. settlement에서 보고된 effect를 검사하고 undeclared 또는 malformed side-effect completion은 해당 broker instance의 후속 side effect를 차단하지만, 최종적으로 durable workflow가 같은 상태를 보존하고 reconcile해야 합니다.
+authorization은 실행이 아닙니다. 이 primitive는 아직 process runner, filesystem CAS, project lane, CLI, MCP, engine bridge와 연결되지 않았습니다. grant use count와 active lease는 memory에만 있어 restart를 넘지 못하며 approval UI, durable approval 또는 revocation store, recovery action, secret-path classifier도 없습니다. registry는 exact validated authority에서 domain-separated workflow-plan digest를 파생하고 모호한 binding을 거부하며 immutable plan을 의미 검증합니다. workflow state machine은 broker 결정을 받기 전에 이 plan을 다시 해석하고 exact authorization과 실제 effect를 각 transition에 결합합니다. durable checkpoint store는 그 결과인 uncertainty barrier를 restart 뒤에도 보존하지만 stale authorization capability를 의도적으로 버리고 uncertainty를 reconcile하거나 해제하지는 못합니다. runtime enforcement와 accounting이 없는 동안 memory, CPU, GPU request budget은 거부합니다.
 
 ## Fail-closed 중단 조건
 

@@ -245,6 +245,46 @@ function retainCheckpoint(
   return retained;
 }
 
+export function retainHydratedWorkflowCheckpoint(
+  checkpoint: WorkflowCheckpointRecord,
+): WorkflowCheckpointRecord {
+  const issues = checkWorkflowCheckpointSemantics(checkpoint);
+  if (issues.length > 0) {
+    throw checkpointError(
+      "workflow-checkpoint-state-invalid",
+      "$checkpoint",
+      `hydrated checkpoint violated ${issues[0]?.code ?? "an invariant"}`,
+    );
+  }
+  return retainCheckpoint(checkpoint);
+}
+
+export function assertWorkflowCheckpointRuntimeInstance(
+  value: unknown,
+): WorkflowCheckpointRecord {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    !workflowCheckpointInstances.has(value)
+  ) {
+    throw checkpointError(
+      "workflow-checkpoint-state-invalid",
+      "$checkpoint",
+      "checkpoint must be produced or hydrated by this workflow runtime",
+    );
+  }
+  const checkpoint = value as WorkflowCheckpointRecord;
+  const issues = checkWorkflowCheckpointSemantics(checkpoint);
+  if (issues.length > 0) {
+    throw checkpointError(
+      "workflow-checkpoint-state-invalid",
+      "$checkpoint",
+      `checkpoint violated ${issues[0]?.code ?? "an invariant"}`,
+    );
+  }
+  return checkpoint;
+}
+
 function checkpointError(
   code:
     | "workflow-checkpoint-plan-mismatch"
@@ -257,31 +297,12 @@ function checkpointError(
 }
 
 function trustedCheckpoint(value: unknown): WorkflowCheckpointRecord {
-  if (
-    value === null ||
-    typeof value !== "object" ||
-    !workflowCheckpointInstances.has(value)
-  ) {
-    throw checkpointError(
-      "workflow-checkpoint-state-invalid",
-      "$request.checkpoint",
-      "checkpoint must be produced or hydrated by this workflow runtime",
-    );
-  }
-  const checkpoint = value as WorkflowCheckpointRecord;
+  const checkpoint = assertWorkflowCheckpointRuntimeInstance(value);
   if (transitionedCheckpointInstances.has(checkpoint)) {
     throw checkpointError(
       "workflow-checkpoint-state-invalid",
       "$request.checkpoint",
       "checkpoint already has a successor in this workflow runtime",
-    );
-  }
-  const issues = checkWorkflowCheckpointSemantics(checkpoint);
-  if (issues.length > 0) {
-    throw checkpointError(
-      "workflow-checkpoint-state-invalid",
-      "$request.checkpoint",
-      `checkpoint violated ${issues[0]?.code ?? "an invariant"}`,
     );
   }
   return checkpoint;
@@ -537,6 +558,12 @@ function assertReceiptBinding(
   }
   const startedAt = Date.parse(receipt.timing.startedAt);
   const endedAt = Date.parse(receipt.timing.endedAt);
+  if (startedAt < Date.parse(checkpoint.updatedAt)) {
+    throw receiptError(
+      "$request.receipt.timing.startedAt",
+      "receipt execution cannot begin before the dispatch checkpoint",
+    );
+  }
   if (
     receipt.artifacts.some(
       (artifact) =>
@@ -767,6 +794,121 @@ function nextReadyStatus(
   return plan.requiredEvidence.every((kind) => evidenceKinds.includes(kind))
     ? "succeeded"
     : "blocked";
+}
+
+export function recoverHydratedWorkflowCheckpoint(
+  registry: ValidatedRegistry,
+  value: unknown,
+  currentTime: number,
+): WorkflowCheckpointRecord {
+  const checkpoint = trustedCheckpoint(value);
+  if (
+    !Number.isSafeInteger(currentTime) ||
+    currentTime < 0 ||
+    currentTime > 8_640_000_000_000_000
+  ) {
+    throw boundaryError(
+      "$currentTime",
+      "expected an epoch millisecond inside the supported date range",
+    );
+  }
+  if (registry.digest !== checkpoint.identity.registryDigest) {
+    throw checkpointError(
+      "workflow-checkpoint-plan-mismatch",
+      "$registry",
+      "registry digest differs from the checkpoint authority",
+    );
+  }
+  const plan = resolveWorkflowPlan(
+    registry,
+    checkpoint.identity.workflow.id,
+    checkpoint.identity.projectStage,
+  );
+  if (
+    plan.workflow.version !== checkpoint.identity.workflow.version ||
+    plan.resolvedPlanDigest !==
+      checkpoint.identity.workflow.resolvedPlanDigest
+  ) {
+    throw checkpointError(
+      "workflow-checkpoint-plan-mismatch",
+      "$checkpoint.identity.workflow",
+      "resolved workflow authority changed after checkpoint persistence",
+    );
+  }
+
+  const expired = currentTime >= Date.parse(checkpoint.expiresAt);
+  const inFlight = checkpoint.inFlight;
+  let status: WorkflowCheckpointStatus;
+  let recoveredInFlight: WorkflowCheckpointInFlight | undefined;
+  if (
+    (checkpoint.status === "running" ||
+      checkpoint.status === "rolling-back") &&
+    inFlight !== undefined &&
+    inFlight.sideEffect === "started"
+  ) {
+    status = "uncertain";
+    recoveredInFlight = {
+      ...inFlight,
+      command: {
+        ...inFlight.command,
+        permissions: [...inFlight.command.permissions],
+      },
+      approvalIds: [...inFlight.approvalIds],
+      sideEffect: "uncertain",
+    };
+  } else if (expired) {
+    status = "expired";
+  } else if (
+    checkpoint.status === "running" &&
+    inFlight?.sideEffect === "not-started"
+  ) {
+    status = plan.steps[checkpoint.nextOrdinal]?.approvalCheckpoint
+      ? "waiting-approval"
+      : "prepared";
+  } else if (
+    checkpoint.status === "rolling-back" &&
+    inFlight?.sideEffect === "not-started"
+  ) {
+    status = "waiting-rollback";
+  } else {
+    throw checkpointError(
+      "workflow-checkpoint-transition-invalid",
+      "$checkpoint.status",
+      "checkpoint does not require a restart recovery transition",
+    );
+  }
+
+  const {
+    checkpointDigest: _checkpointDigest,
+    parentCheckpointDigest: _parentCheckpointDigest,
+    inFlight: _previousInFlight,
+    ...retained
+  } = checkpoint;
+  const body: Omit<WorkflowCheckpointRecord, "checkpointDigest"> = {
+    ...retained,
+    sequence: checkpoint.sequence + 1,
+    status,
+    ...(recoveredInFlight === undefined
+      ? {}
+      : { inFlight: recoveredInFlight }),
+    updatedAt: new Date(currentTime).toISOString(),
+    parentCheckpointDigest: checkpoint.checkpointDigest,
+  };
+  const recovered: WorkflowCheckpointRecord = {
+    ...body,
+    checkpointDigest: computeWorkflowCheckpointDigest(body),
+  };
+  const issues = checkWorkflowCheckpointSemantics(recovered);
+  if (issues.length > 0) {
+    throw checkpointError(
+      "workflow-checkpoint-state-invalid",
+      "$checkpoint",
+      `restart recovery violated ${issues[0]?.code ?? "an invariant"}`,
+    );
+  }
+  const child = retainCheckpoint(recovered);
+  transitionedCheckpointInstances.add(checkpoint);
+  return child;
 }
 
 export function createWorkflowCheckpoint(

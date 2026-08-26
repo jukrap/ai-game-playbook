@@ -480,6 +480,41 @@ test("workflow settlement rejects copied broker settlement and mismatched receip
   );
 });
 
+test("workflow settlement rejects a receipt dated before dispatch", () => {
+  const validated = executionRegistry();
+  const initial = core.createWorkflowCheckpoint(executionRequest(validated));
+  const authorization = authorizeInspect(validated, initial);
+  const admitted = core.beginWorkflowStep({
+    registry: validated,
+    checkpoint: initial,
+    authorization,
+    now: () => now,
+  });
+  const started = core.markWorkflowStepStarted({
+    registry: validated,
+    checkpoint: admitted,
+    now: () => now + 1,
+  });
+  const receipt = receiptFor(started);
+  const settlement = authorization.lease.settle({
+    outcome: "succeeded",
+    mutationUncertain: false,
+    actual: actualEffects(),
+  });
+
+  assert.throws(
+    () =>
+      core.settleWorkflowStep({
+        registry: validated,
+        checkpoint: started,
+        receipt,
+        settlement,
+        now: () => now + 1,
+      }),
+    expectCoreError("workflow-checkpoint-receipt-invalid"),
+  );
+});
+
 test("scope violations after dispatch place the workflow behind an uncertainty barrier", () => {
   const validated = executionRegistry();
   const initial = core.createWorkflowCheckpoint(executionRequest(validated));

@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture. The `contracts` and `registry` foundations and early `core` filesystem, process, mutating-lane, permission, and in-memory workflow-checkpoint boundaries exist; the remaining runtime and bridge boundaries are planned.
+> Status: target architecture. The `contracts` and `registry` foundations and early `core` filesystem, process, mutating-lane, permission, workflow-checkpoint, and durable checkpoint-store boundaries exist; the remaining runtime and bridge boundaries are planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -21,7 +21,7 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Its current generators produce validated design projections for CLI, MCP, help, documentation metadata, and host routing. It also resolves a supported workflow stage into a finite, domain-separated plan bound to the exact registry, workflow, schemas, commands, handlers, lanes, permissions, budgets, failure transitions, and evidence duties. The private permission and workflow-state primitives consume that validated authority, while generated CLI/MCP/host execution consumers and durable workflow storage remain planned. Generated surfaces cannot grant permissions or invent capabilities.
+The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Its current generators produce validated design projections for CLI, MCP, help, documentation metadata, and host routing. It also resolves a supported workflow stage into a finite, domain-separated plan bound to the exact registry, workflow, schemas, commands, handlers, lanes, permissions, budgets, failure transitions, and evidence duties. The private permission and workflow-state primitives consume that validated authority, and the current checkpoint store persists bounded state transitions. Generated CLI/MCP/host execution consumers and durable approval, receipt, and evidence stores remain planned. Generated surfaces cannot grant permissions or invent capabilities.
 
 ## Workspace boundaries
 
@@ -29,7 +29,7 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 | --- | --- | --- |
 | `contracts` | Foundation implemented | Versioned schemas and shared identifiers with no engine runtime dependency |
 | `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, parity checks, and deterministic workflow-plan resolution |
-| `core` | Partial | Canonical project identity, portable path resolution, staged filesystem compare-and-swap, digest-bound direct process execution, root/project-bound mutating leases, in-memory signed permission admission/settlement, and immutable workflow checkpoint transitions exist; dispatcher integration, durable approvals/checkpoints, resume recovery, CPU/memory enforcement, and parallel-read coordination remain planned |
+| `core` | Partial | Canonical project identity, portable path resolution, staged filesystem compare-and-swap, digest-bound direct process execution, root/project-bound mutating leases, in-memory signed permission admission/settlement, immutable workflow checkpoint transitions, append-only checkpoint persistence, bounded chain validation, and restart-safe recovery classification exist; dispatcher integration, durable approvals/receipts/evidence, uncertainty reconciliation, CPU/memory enforcement, and parallel-read coordination remain planned |
 | `cli` | Planned | `agpb` argument parsing, local interaction, stable exit behavior, and help |
 | `mcp` | Planned | Schema-derived tools and resources behind the same permission broker |
 | `codex-adapter` | Planned | Skills, host routing metadata, and project instruction integration |
@@ -56,7 +56,7 @@ Only `contracts`, `registry`, and the partial private `core` currently exist as 
 
 A consuming game project is planned to contain `.ai-game-playbook/`. Commit-worthy state includes the project profile, feature contracts, and policy. Cache, logs, screenshots, locks, receipts containing local details, local secrets, and machine-specific configuration remain ignored.
 
-Writes use owned-path rules and compare-and-swap preimages. The private core now advances a resolved workflow through pre-dispatch, dispatched, settled, rollback, blocked, terminal, and uncertain checkpoints. Each transition re-resolves the exact plan, accepts only same-process permission authority, binds a domain-separated receipt to command and authorization identity, preserves a receipt chain, and aggregates workflow budgets and complete evidence. This state machine is not yet wired to lane acquisition or command dispatch, and its checkpoint records, approval consumption, and uncertainty barrier are not durable across process restart. The core also does not yet discover or control an editor. Pack lifecycle operations and parallel-read coordination remain planned.
+Writes use owned-path rules and compare-and-swap preimages. The private core now advances a resolved workflow through pre-dispatch, dispatched, settled, rollback, blocked, terminal, and uncertain checkpoints. Each transition re-resolves the exact plan, accepts only same-process permission authority, binds a domain-separated receipt to command and authorization identity, preserves a receipt chain, and aggregates workflow budgets and complete evidence. Canonical checkpoint records are append-only under a fixed project-local directory, while a compare-and-swap head selects the current chain. Loading bounds record count and bytes, rechecks every parent transition and current registry/project identity, preserves corrupt state for diagnosis, and refuses competing heads. Restart recovery returns an undispatched admission to a reauthorization state and converts a dispatched but unsettled step to `uncertain`. The state machine is not yet wired to lane acquisition or command dispatch; approval consumption, active leases, full receipts, and evidence payloads are not durable. The core also does not yet discover or control an editor. Pack lifecycle operations and parallel-read coordination remain planned.
 
 ## Host integration
 
@@ -64,4 +64,4 @@ Codex is the first supported host, but contracts do not depend on one chat surfa
 
 ## Failure and recovery
 
-Every mutation is intended to record preconditions, changed paths, engine identity, and recovery status. The implemented lease stops on root/project mismatch, changed lock-directory identity, malformed records, or a live or unverifiable owner. An expired lease is quarantined only after its owner PID is no longer running. The in-memory workflow boundary stops after an uncertain mutation or aggregate budget violation and authorizes a declared rollback as a separate command and receipt. Durable checkpoint recovery and full project/editor reconciliation remain planned; rollback never implies that a failed command made no changes.
+Every mutation is intended to record preconditions, changed paths, engine identity, and recovery status. The implemented lease stops on root/project mismatch, changed lock-directory identity, malformed records, or a live or unverifiable owner. An expired lease is quarantined only after its owner PID is no longer running. The workflow boundary durably preserves an uncertain mutation or aggregate budget violation and authorizes a declared rollback as a separate command and receipt. It can classify restart recovery but cannot yet reconcile or clear uncertainty, restore project/editor state, or dispatch the rollback itself; rollback never implies that a failed command made no changes.

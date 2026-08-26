@@ -20,6 +20,10 @@ import { performance } from "node:perf_hooks";
 import { writeProjectFileCas } from "./cas-write.js";
 import { CoreBoundaryError } from "./errors.js";
 import {
+  BoundedFileReadLimitError,
+  readFileHandleBounded,
+} from "./bounded-file-read.js";
+import {
   assertProjectRootIdentity,
   resolveProjectPath,
   type CanonicalProjectRoot,
@@ -566,7 +570,21 @@ async function readLockSnapshot(
         "project lane lock type, identity, or byte size is invalid",
       );
     }
-    content = await handle.readFile();
+    try {
+      content = await readFileHandleBounded(
+        handle,
+        PROJECT_LANE_MAX_LOCK_BYTES,
+      );
+    } catch (error) {
+      if (error instanceof BoundedFileReadLimitError) {
+        throw new CoreBoundaryError(
+          "project-lane-lock-invalid",
+          "$projectLane.lock",
+          "project lane lock exceeded its byte limit while it was read",
+        );
+      }
+      throw error;
+    }
     const after = await handle.stat({ bigint: true });
     if (
       before.dev !== after.dev ||

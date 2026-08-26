@@ -15,6 +15,7 @@ export type CoreBoundaryErrorCode =
   | "invalid-project-root"
   | "invalid-project-path-options"
   | "invalid-workflow-checkpoint-request"
+  | "invalid-workflow-checkpoint-store-request"
   | "project-path-budget-exceeded"
   | "project-path-case-conflict"
   | "project-path-escape"
@@ -64,7 +65,13 @@ export type CoreBoundaryErrorCode =
   | "workflow-checkpoint-budget-exceeded"
   | "workflow-checkpoint-plan-mismatch"
   | "workflow-checkpoint-receipt-invalid"
+  | "workflow-checkpoint-resume-unsafe"
   | "workflow-checkpoint-state-invalid"
+  | "workflow-checkpoint-store-conflict"
+  | "workflow-checkpoint-store-corrupt"
+  | "workflow-checkpoint-store-mismatch"
+  | "workflow-checkpoint-store-not-found"
+  | "workflow-checkpoint-store-write-failed"
   | "workflow-checkpoint-transition-invalid"
   | "unsafe-project-root";
 

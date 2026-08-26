@@ -1,6 +1,6 @@
 # Evidence and Verification
 
-> Status: the receipt and checkpoint contracts and their in-memory settlement boundary are implemented. Durable product receipts and engine evidence do not exist yet.
+> Status: the receipt and checkpoint contracts, settlement boundary, and durable checkpoint chain are implemented. Durable receipt payloads and engine evidence do not exist yet.
 
 [한국어](evidence-and-verification.ko.md) · [Documentation](README.md)
 
@@ -27,7 +27,7 @@ The implemented receipt contract binds the following to one run identity:
 - Changed files, before/after hashes, dirty-state reconciliation, rollback attempt, and recovery result.
 - Approvals, network destinations, transmitted data classes, provider/model information, and cost when applicable.
 
-The private state machine currently forms a domain-separated, hash-linked receipt chain across immutable checkpoints and accepts only complete artifacts from successful settlements. Restart persistence and hydration remain unimplemented. The planned resume boundary requires matching project and workflow identity, a valid TTL, unchanged approved scope and dirty state, and renewed approval when a session or external action changes.
+The private state machine forms a domain-separated, hash-linked receipt chain across immutable checkpoints and accepts only complete artifacts from successful settlements. Canonical checkpoint records persist append-only with a compare-and-swap head. Loading validates the bounded parent chain, transition legality, record and head digests, current registry plan, project identity, input, feature, dirty-state, and session bindings. It preserves and rejects malformed state instead of replacing it. Safe hydration never revives a serialized authorization: an undispatched admission returns to an authorization checkpoint, and a dispatched unsettled action becomes `uncertain`. Receipt bodies, approval reservations, artifact payloads, and an action that can clear uncertainty are not durable yet.
 
 ## Test authority
 

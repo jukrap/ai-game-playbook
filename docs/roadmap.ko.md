@@ -1,6 +1,6 @@
 ---
 source: docs/roadmap.md
-source_sha256: ed3645f3c85d6d23a860f36091f23b3fba4cc9c0e0b62645f4849fb651d724d4
+source_sha256: 6c7e16ac2373e5cb6659911bf2ec298745db6a3d6e0feb810123c471d41359db
 translated_at: 2026-08-26
 ---
 
@@ -25,9 +25,9 @@ translated_at: 2026-08-26
 
 ## Stage 2: 실행, 증거, 안전
 
-- 구현된 primitive: compare-and-swap write, canonical project-root identity, bounded direct process 실행, 직렬화된 root/project 결합 mutating lease, exact signed grant와 effect settlement를 사용하는 in-memory registry 결합 permission admission, receipt chain·rollback·evidence·누적 budget을 강제하는 immutable resolved-plan checkpoint transition.
-- 남음: durable checkpoint/approval storage, restart hydration과 uncertainty reconciliation, dispatcher/lane integration, 완전한 project/Editor identity attestation, automatic lease heartbeat integration, parallel-read coordination.
-- 현재 bounded state machine을 중심으로 repair/retry limit, cancellation transition, persisted resume validation, reconciliation을 완성합니다.
+- 구현된 primitive: compare-and-swap write, canonical project-root identity, bounded direct process 실행, 직렬화된 root/project 결합 mutating lease, exact signed grant와 effect settlement를 사용하는 in-memory registry 결합 permission admission, receipt chain·rollback·evidence·누적 budget을 강제하는 immutable resolved-plan checkpoint transition, 제한된 chain 검증과 restart-safe hydration을 포함한 append-only checkpoint 영속화.
+- 남음: durable approval/receipt/evidence storage, uncertainty reconciliation, dispatcher/lane integration, 완전한 project/Editor identity attestation, automatic lease heartbeat integration, parallel-read coordination.
+- 현재 bounded state machine을 중심으로 repair/retry와 cancellation transition, dispatcher 소유 checkpoint 영속화, receipt/evidence storage, 명시적 reconciliation을 완성합니다.
 - content-addressed receipt, evidence storage, redacted diagnostic, retention, explicit export를 추가합니다.
 - traversal, symlink escape, invalid token, output growth, timeout, stale process, ambiguous Editor, install lifecycle conflict를 테스트합니다.
 

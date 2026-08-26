@@ -19,9 +19,9 @@ Approval freezes the initial contracts, risks, permission defaults, evidence thr
 
 ## Stage 2: execution, evidence, and safety
 
-- Implemented primitives: compare-and-swap writes, canonical project-root identity, bounded direct process execution, serialized root/project-bound mutating leases, in-memory registry-bound permission admission with exact signed grants and effect settlement, and immutable resolved-plan checkpoint transitions with receipt-chain, rollback, evidence, and cumulative-budget enforcement.
-- Remaining: durable checkpoint/approval storage, restart hydration and uncertainty reconciliation, dispatcher/lane integration, full project/editor identity attestation, automatic lease heartbeat integration, and parallel-read coordination.
-- Complete repair/retry limits, cancellation transitions, persisted resume validation, and reconciliation around the current bounded state machine.
+- Implemented primitives: compare-and-swap writes, canonical project-root identity, bounded direct process execution, serialized root/project-bound mutating leases, in-memory registry-bound permission admission with exact signed grants and effect settlement, immutable resolved-plan checkpoint transitions with receipt-chain, rollback, evidence, and cumulative-budget enforcement, plus append-only checkpoint persistence with bounded chain validation and restart-safe hydration.
+- Remaining: durable approval/receipt/evidence storage, uncertainty reconciliation, dispatcher/lane integration, full project/editor identity attestation, automatic lease heartbeat integration, and parallel-read coordination.
+- Complete repair/retry and cancellation transitions, dispatcher-owned checkpoint persistence, receipt/evidence storage, and explicit reconciliation around the current bounded state machine.
 - Add content-addressed receipts, evidence storage, redacted diagnostics, retention, and explicit export.
 - Test traversal, symlink escape, invalid tokens, output growth, timeouts, stale processes, ambiguous editors, and install lifecycle conflicts.
 

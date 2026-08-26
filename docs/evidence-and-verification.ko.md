@@ -1,12 +1,12 @@
 ---
 source: docs/evidence-and-verification.md
-source_sha256: afd64b8361714cfcd45a76f926303f3faad2d716c8383764299d60888ce5ffa3
+source_sha256: 00233a0097d5d151ab6a15a3ba55045481ce58d1c94c4ed00e0169150553b204
 translated_at: 2026-08-26
 ---
 
 # 증거와 검증
 
-> 상태: receipt/checkpoint 계약과 in-memory settlement 경계를 구현했습니다. durable 제품 receipt와 engine evidence는 아직 없습니다.
+> 상태: receipt/checkpoint 계약, settlement 경계, durable checkpoint chain을 구현했습니다. durable receipt payload와 engine evidence는 아직 없습니다.
 
 [English](evidence-and-verification.md) · [문서](README.ko.md)
 
@@ -33,7 +33,7 @@ translated_at: 2026-08-26
 - changed file, before/after hash, dirty-state reconciliation, rollback attempt, recovery result.
 - 필요 시 approval, network destination, transmitted data class, provider/model information, cost.
 
-private state machine은 현재 immutable checkpoint를 가로질러 domain-separated hash-linked receipt chain을 만들고 성공적으로 정산된 complete artifact만 수용합니다. restart persistence와 hydration은 아직 구현하지 않았습니다. 계획된 resume 경계에는 project/workflow identity 일치, 유효한 TTL, 변경되지 않은 approved scope와 dirty state가 필요하며 session 또는 external action이 바뀌면 approval을 갱신해야 합니다.
+private state machine은 immutable checkpoint를 가로질러 domain-separated hash-linked receipt chain을 만들고 성공적으로 정산된 complete artifact만 수용합니다. canonical checkpoint record는 compare-and-swap head와 함께 append-only로 유지됩니다. load는 제한된 parent chain, transition 적법성, record/head digest, 현재 registry plan, project identity, input, feature, dirty-state, session binding을 검증합니다. malformed state를 대체하지 않고 그대로 보존한 채 거부합니다. safe hydration은 직렬화된 authorization을 되살리지 않습니다. dispatch하지 않은 admission은 authorization checkpoint로 돌아가고 dispatch 후 정산하지 못한 action은 `uncertain`이 됩니다. receipt body, approval reservation, artifact payload, uncertainty를 해제하는 action은 아직 영속화하지 않습니다.
 
 ## Test 판정 기준
 

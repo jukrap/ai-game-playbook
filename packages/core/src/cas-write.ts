@@ -19,6 +19,10 @@ import { dirname, join } from "node:path";
 
 import { CoreBoundaryError } from "./errors.js";
 import {
+  BoundedFileReadLimitError,
+  readFileHandleBounded,
+} from "./bounded-file-read.js";
+import {
   assertProjectRootIdentity,
   resolveProjectPath,
   type CanonicalProjectRoot,
@@ -337,7 +341,19 @@ async function snapshotFile(
         "target identity changed before it could be read",
       );
     }
-    const content = await handle.readFile();
+    let content: Buffer;
+    try {
+      content = await readFileHandleBounded(handle, maxBytes);
+    } catch (error) {
+      if (error instanceof BoundedFileReadLimitError) {
+        throw new CoreBoundaryError(
+          "cas-budget-exceeded",
+          target.relativePath,
+          "existing file exceeded the declared byte budget while it was read",
+        );
+      }
+      throw error;
+    }
     const after = await handle.stat({ bigint: true });
     if (
       before.dev !== after.dev ||

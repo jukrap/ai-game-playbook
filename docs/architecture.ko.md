@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: f9d2dbfdceaa21ab386c28bd47cfc74ad3878b286d8103f72293f75b5c0760e2
+source_sha256: 4ff14a96b453acae6cbf0bdda11af766eca0ea1bba17023fdab229f414eee1fc
 translated_at: 2026-08-26
 ---
 
 # 목표 아키텍처
 
-> 상태: 목표 아키텍처입니다. `contracts`, `registry` 기반과 초기 `core` filesystem/process/mutating-lane/permission/in-memory workflow-checkpoint 경계가 존재하며 나머지 runtime과 bridge 경계는 계획 단계입니다.
+> 상태: 목표 아키텍처입니다. `contracts`, `registry` 기반과 초기 `core` filesystem/process/mutating-lane/permission/workflow-checkpoint/durable checkpoint-store 경계가 존재하며 나머지 runtime과 bridge 경계는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -27,7 +27,7 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 작성 원본입니다. 현재 generator는 CLI, MCP, help, 문서 metadata, host routing용으로 검증된 설계 projection을 생성합니다. 또한 지원되는 workflow stage를 exact registry, workflow, schema, command, handler, lane, permission, budget, failure transition, evidence duty에 결합된 유한하고 domain-separated된 plan으로 해석합니다. private permission과 workflow-state primitive는 검증된 authority를 소비하지만 생성된 CLI/MCP/host 실행 consumer와 durable workflow storage는 아직 계획 단계입니다. 생성 표면은 권한을 부여하거나 capability를 지어낼 수 없습니다.
+typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 작성 원본입니다. 현재 generator는 CLI, MCP, help, 문서 metadata, host routing용으로 검증된 설계 projection을 생성합니다. 또한 지원되는 workflow stage를 exact registry, workflow, schema, command, handler, lane, permission, budget, failure transition, evidence duty에 결합된 유한하고 domain-separated된 plan으로 해석합니다. private permission과 workflow-state primitive는 검증된 authority를 소비하고 현재 checkpoint store는 제한된 state transition을 영속화합니다. 생성된 CLI/MCP/host 실행 consumer와 durable approval, receipt, evidence store는 아직 계획 단계입니다. 생성 표면은 권한을 부여하거나 capability를 지어낼 수 없습니다.
 
 ## Workspace 경계
 
@@ -35,7 +35,7 @@ typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 | --- | --- | --- |
 | `contracts` | 기반 구현 | engine runtime dependency가 없는 versioned schema와 shared identifier |
 | `registry` | 기반 구현 | descriptor validation, generation, digest, routing, parity check, 결정적 workflow-plan 해석 |
-| `core` | 일부 구현 | canonical project identity, portable path 해석, staged filesystem compare-and-swap, digest 결합 direct process 실행, root/project 결합 mutating lease, in-memory signed permission admission/settlement, immutable workflow checkpoint transition이 존재하며 dispatcher integration, durable approval/checkpoint, resume recovery, CPU/memory enforcement, parallel-read coordination은 계획 단계 |
+| `core` | 일부 구현 | canonical project identity, portable path 해석, staged filesystem compare-and-swap, digest 결합 direct process 실행, root/project 결합 mutating lease, in-memory signed permission admission/settlement, immutable workflow checkpoint transition, append-only checkpoint 영속화, 제한된 chain 검증, restart-safe recovery 분류가 존재하며 dispatcher integration, durable approval/receipt/evidence, uncertainty reconciliation, CPU/memory enforcement, parallel-read coordination은 계획 단계 |
 | `cli` | 계획 | `agpb` argument parsing, local interaction, stable exit behavior, help |
 | `mcp` | 계획 | 동일 permission broker 뒤의 schema-derived tool과 resource |
 | `codex-adapter` | 계획 | skill, host routing metadata, project instruction integration |
@@ -62,7 +62,7 @@ typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 
 게임 project에는 `.ai-game-playbook/`을 둘 계획입니다. project profile, feature contract, policy는 commit 대상입니다. cache, log, screenshot, lock, local detail을 포함한 receipt, local secret, machine-specific configuration은 ignore합니다.
 
-write는 owned-path rule과 compare-and-swap preimage를 사용합니다. private core는 이제 resolved workflow를 pre-dispatch, dispatched, settled, rollback, blocked, terminal, uncertain checkpoint로 진행합니다. 각 transition은 exact plan을 다시 해석하고 같은 process에서 발급된 permission authority만 받으며 domain-separated receipt를 command와 authorization identity에 결합하고 receipt chain, 누적 workflow budget, complete evidence를 보존합니다. 이 state machine은 아직 lane 획득이나 command dispatch에 연결되지 않았고 checkpoint record, approval consumption, uncertainty barrier는 process restart 뒤에 유지되지 않습니다. core는 아직 Editor도 탐지하거나 제어하지 않습니다. pack lifecycle operation과 parallel read coordination도 계획 단계입니다.
+write는 owned-path rule과 compare-and-swap preimage를 사용합니다. private core는 이제 resolved workflow를 pre-dispatch, dispatched, settled, rollback, blocked, terminal, uncertain checkpoint로 진행합니다. 각 transition은 exact plan을 다시 해석하고 같은 process에서 발급된 permission authority만 받으며 domain-separated receipt를 command와 authorization identity에 결합하고 receipt chain, 누적 workflow budget, complete evidence를 보존합니다. canonical checkpoint record는 고정된 project-local directory에 append-only로 저장하고 compare-and-swap head가 현재 chain을 선택합니다. load는 record 수와 byte를 제한하고 모든 parent transition과 현재 registry/project identity를 다시 검사하며 손상된 state를 진단용으로 보존하고 경쟁 head를 거부합니다. restart recovery는 dispatch하지 않은 admission을 재승인 상태로 되돌리고 dispatch했지만 정산하지 못한 step을 `uncertain`으로 바꿉니다. state machine은 아직 lane 획득이나 command dispatch에 연결되지 않았고 approval consumption, active lease, 전체 receipt, evidence payload는 영속화하지 않습니다. core는 아직 Editor도 탐지하거나 제어하지 않습니다. pack lifecycle operation과 parallel read coordination도 계획 단계입니다.
 
 ## Host integration
 
@@ -70,4 +70,4 @@ Codex가 첫 지원 host지만 계약은 하나의 chat surface에 의존하지 
 
 ## 실패와 복구
 
-모든 mutation은 precondition, changed path, engine identity, recovery status를 기록하도록 계획합니다. 구현된 lease는 root/project mismatch, lock directory identity 변경, malformed record, live 또는 확인 불가능한 owner에서 중단합니다. 만료된 lease는 owner PID가 더는 실행 중이지 않을 때만 quarantine합니다. in-memory workflow 경계는 uncertain mutation이나 누적 budget 위반 뒤에 중단하고 선언된 rollback을 별도 command와 receipt로 승인합니다. durable checkpoint recovery와 전체 project/Editor reconciliation은 아직 계획 단계이며 rollback은 실패한 command가 아무것도 바꾸지 않았음을 뜻하지 않습니다.
+모든 mutation은 precondition, changed path, engine identity, recovery status를 기록하도록 계획합니다. 구현된 lease는 root/project mismatch, lock directory identity 변경, malformed record, live 또는 확인 불가능한 owner에서 중단합니다. 만료된 lease는 owner PID가 더는 실행 중이지 않을 때만 quarantine합니다. workflow 경계는 uncertain mutation이나 누적 budget 위반을 영속적으로 보존하고 선언된 rollback을 별도 command와 receipt로 승인합니다. restart recovery를 분류할 수 있지만 uncertainty를 reconcile하거나 해제하고 project/Editor state를 복원하거나 rollback을 직접 dispatch하지는 못합니다. rollback은 실패한 command가 아무것도 바꾸지 않았음을 뜻하지 않습니다.

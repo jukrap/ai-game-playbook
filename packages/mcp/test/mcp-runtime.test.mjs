@@ -143,7 +143,7 @@ test("direct invocation validates the exact bound project and emits canonical st
 
       assert.equal(result.isError, undefined);
       assert.equal(result.structuredContent?.commandId, "doctor");
-      assert.equal(result.structuredContent?.project.requestedPath, root);
+      assert.equal(result.structuredContent?.project.requestedPath, plan.projectRoot);
       assert.equal(result.content.length, 1);
       assert.equal(result.content[0]?.type, "text");
       assert.deepEqual(

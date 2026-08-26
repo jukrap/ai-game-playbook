@@ -82,6 +82,22 @@ async function waitForProcessExit(pid) {
   assert.fail(`owned descendant ${pid} remained alive`);
 }
 
+async function waitForFile(path) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    try {
+      await readFile(path);
+      return;
+    } catch (error) {
+      if (error?.code !== "ENOENT") {
+        throw error;
+      }
+    }
+    await delay(20);
+  }
+  assert.fail(`file ${path} was not created by the child process`);
+}
+
 test("process executables are digest-bound with a portable environment allowlist", async () => {
   assert.equal(typeof core.bindProcessExecutable, "function");
   assert.equal(typeof core.assertProcessExecutableIdentity, "function");
@@ -326,8 +342,12 @@ test("timeouts terminate the complete owned process tree", async (t) => {
 });
 
 test("abort and idle timeout are distinct bounded outcomes", async (t) => {
-  const { root } = await fixture(t);
-  const script = "setInterval(() => {}, 1000)";
+  const { project, root } = await fixture(t);
+  const script = [
+    "const { writeFileSync } = require('node:fs');",
+    "writeFileSync('started.flag', 'ready');",
+    "setInterval(() => {}, 1000);",
+  ].join("\n");
 
   const controller = new AbortController();
   const cancellation = core.runBoundedProcess(
@@ -335,7 +355,8 @@ test("abort and idle timeout are distinct bounded outcomes", async (t) => {
       signal: controller.signal,
     }),
   );
-  setTimeout(() => controller.abort(), 200);
+  await waitForFile(join(project, "started.flag"));
+  controller.abort();
   const cancelled = await cancellation;
   assert.equal(cancelled.outcome, "cancelled");
   assert.equal(cancelled.termination.confirmed, true);

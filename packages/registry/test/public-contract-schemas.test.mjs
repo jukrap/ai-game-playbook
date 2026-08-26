@@ -132,6 +132,20 @@ test("contract schemas reject unsafe identity, scope, support, and cost shapes",
       },
     ],
     [
+      "pack-manifest",
+      {
+        ...validPublicContractFixtures["pack-manifest"],
+        license: { status: "declared" },
+      },
+    ],
+    [
+      "pack-manifest",
+      {
+        ...validPublicContractFixtures["pack-manifest"],
+        license: { status: "unresolved", expression: "MIT" },
+      },
+    ],
+    [
       "game-project-profile",
       { ...validPublicContractFixtures["game-project-profile"], teamSize: 6 },
     ],

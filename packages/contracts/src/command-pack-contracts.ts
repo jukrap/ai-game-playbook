@@ -269,11 +269,17 @@ export interface PackManifest {
     readonly keyId: StableId;
     readonly value: string;
   };
-  readonly license: {
-    readonly status: "unresolved" | "declared";
-    readonly expression?: string;
-    readonly noticeDigest?: Sha256Digest;
-  };
+  readonly license:
+    | {
+        readonly status: "unresolved";
+        readonly expression?: never;
+        readonly noticeDigest?: never;
+      }
+    | {
+        readonly status: "declared";
+        readonly expression: string;
+        readonly noticeDigest?: Sha256Digest;
+      };
 }
 
 export interface VersionInterval {
@@ -435,7 +441,7 @@ const signature = closedObject(
   ["algorithm", "keyId", "value"],
 );
 
-const license = closedObject(
+const licenseRoot = closedObject(
   {
     status: enumSchema(["unresolved", "declared"]),
     expression: { type: "string", minLength: 1, maxLength: 256 },
@@ -443,6 +449,40 @@ const license = closedObject(
   },
   ["status"],
 );
+
+const license = {
+  ...licenseRoot,
+  allOf: [
+    {
+      if: {
+        type: "object",
+        properties: { status: { const: "declared" } },
+        required: ["status"],
+      },
+      then: {
+        type: "object",
+        properties: {
+          expression: { type: "string", minLength: 1, maxLength: 256 },
+        },
+        required: ["expression"],
+      },
+    },
+    {
+      if: {
+        type: "object",
+        properties: { status: { const: "unresolved" } },
+        required: ["status"],
+      },
+      then: {
+        type: "object",
+        properties: {
+          expression: false,
+          noticeDigest: false,
+        },
+      },
+    },
+  ],
+};
 
 export const packManifestSchema: VersionedContractSchema =
   defineContractSchema({

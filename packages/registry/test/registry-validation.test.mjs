@@ -359,6 +359,135 @@ test("pack validation rejects duplicate identities and unresolved provisions", (
   expectDiagnostic(missingHook, "pack-lifecycle-command-missing");
 });
 
+test("pack validation binds provided surfaces to manifest authority", () => {
+  const commandAuthority = createValidRegistryDefinition();
+  const commandPack = createPack("pack.command-authority", "1.0.0");
+  commandPack.provides.commands = ["verify"];
+  commandPack.digest = contracts.computePackManifestDigest(commandPack);
+  commandAuthority.packs.push(commandPack);
+  expectDiagnostic(commandAuthority, "pack-permission-underdeclared");
+
+  const skillAuthority = createValidRegistryDefinition();
+  const skillPack = createPack("pack.skill-authority", "1.0.0");
+  skillPack.provides.skills = ["gameplay.vertical-slice"];
+  skillPack.digest = contracts.computePackManifestDigest(skillPack);
+  skillAuthority.packs.push(skillPack);
+  expectDiagnostic(skillAuthority, "pack-permission-underdeclared");
+
+  const hookAuthority = createValidRegistryDefinition();
+  const hookPack = createPack("pack.hook-authority", "1.0.0");
+  hookPack.lifecycleHooks = { remove: "engine.rollback" };
+  hookPack.digest = contracts.computePackManifestDigest(hookPack);
+  hookAuthority.packs.push(hookPack);
+  expectDiagnostic(hookAuthority, "pack-permission-underdeclared");
+
+  const missingCapability = createValidRegistryDefinition();
+  const missingCapabilityPack = createPack("pack.capability-missing", "1.0.0");
+  missingCapabilityPack.provides.capabilities = ["engine.capability-missing"];
+  missingCapabilityPack.digest =
+    contracts.computePackManifestDigest(missingCapabilityPack);
+  missingCapability.packs.push(missingCapabilityPack);
+  expectDiagnostic(missingCapability, "pack-provision-missing");
+
+  const capabilityCollision = createValidRegistryDefinition();
+  const firstCapabilityPack = createPack("pack.capability-first", "1.0.0");
+  const secondCapabilityPack = createPack("pack.capability-second", "1.0.0");
+  firstCapabilityPack.provides.capabilities = ["project.inspect"];
+  secondCapabilityPack.provides.capabilities = ["project.inspect"];
+  firstCapabilityPack.digest =
+    contracts.computePackManifestDigest(firstCapabilityPack);
+  secondCapabilityPack.digest =
+    contracts.computePackManifestDigest(secondCapabilityPack);
+  capabilityCollision.packs.push(firstCapabilityPack, secondCapabilityPack);
+  expectDiagnostic(capabilityCollision, "pack-provision-collision");
+});
+
+test("pack validation requires explicit bounded network authority", () => {
+  const requiredWithoutDestination = createValidRegistryDefinition();
+  const requiredPack = createPack("pack.network-required", "1.0.0");
+  requiredPack.network.required = true;
+  requiredPack.digest = contracts.computePackManifestDigest(requiredPack);
+  requiredWithoutDestination.packs.push(requiredPack);
+  expectDiagnostic(
+    requiredWithoutDestination,
+    "pack-network-declaration-invalid",
+  );
+
+  const destinationWithoutPermission = createValidRegistryDefinition();
+  const destinationPack = createPack("pack.network-destination", "1.0.0");
+  destinationPack.network.destinations = [
+    { host: "assets.example.invalid", port: 443, purpose: "Fetch assets." },
+  ];
+  destinationPack.digest = contracts.computePackManifestDigest(destinationPack);
+  destinationWithoutPermission.packs.push(destinationPack);
+  expectDiagnostic(
+    destinationWithoutPermission,
+    "pack-network-declaration-invalid",
+  );
+
+  const permissionWithoutDestination = createValidRegistryDefinition();
+  const permissionPack = createPack("pack.network-permission", "1.0.0");
+  permissionPack.permissions.push("network");
+  permissionPack.digest = contracts.computePackManifestDigest(permissionPack);
+  permissionWithoutDestination.packs.push(permissionPack);
+  expectDiagnostic(
+    permissionWithoutDestination,
+    "pack-network-declaration-invalid",
+  );
+
+  const declaredOptionalNetwork = createValidRegistryDefinition();
+  const declaredPack = createPack("pack.network-optional", "1.0.0");
+  declaredPack.permissions.push("network");
+  declaredPack.network.destinations = [
+    { host: "assets.example.invalid", port: 443, purpose: "Fetch assets." },
+  ];
+  declaredPack.digest = contracts.computePackManifestDigest(declaredPack);
+  declaredOptionalNetwork.packs.push(declaredPack);
+  assert.equal(registry.validateRegistry(declaredOptionalNetwork).packs.length, 1);
+});
+
+test("pack validation binds artifacts to unique owned paths", () => {
+  const duplicateTarget = createValidRegistryDefinition();
+  const duplicateTargetPack = createPack("pack.duplicate-target", "1.0.0");
+  duplicateTargetPack.artifacts.push(
+    structuredClone(duplicateTargetPack.artifacts[0]),
+  );
+  duplicateTargetPack.digest =
+    contracts.computePackManifestDigest(duplicateTargetPack);
+  duplicateTarget.packs.push(duplicateTargetPack);
+  expectDiagnostic(duplicateTarget, "pack-owned-path-invalid");
+
+  const duplicateOwnership = createValidRegistryDefinition();
+  const duplicateOwnershipPack = createPack(
+    "pack.duplicate-ownership",
+    "1.0.0",
+  );
+  duplicateOwnershipPack.ownedPaths.push(
+    structuredClone(duplicateOwnershipPack.ownedPaths[0]),
+  );
+  duplicateOwnershipPack.digest =
+    contracts.computePackManifestDigest(duplicateOwnershipPack);
+  duplicateOwnership.packs.push(duplicateOwnershipPack);
+  expectDiagnostic(duplicateOwnership, "pack-owned-path-invalid");
+
+  const unownedArtifact = createValidRegistryDefinition();
+  const unownedArtifactPack = createPack("pack.unowned-artifact", "1.0.0");
+  unownedArtifactPack.artifacts[0].target =
+    ".ai-game-playbook/packs/unowned/index.js";
+  unownedArtifactPack.digest =
+    contracts.computePackManifestDigest(unownedArtifactPack);
+  unownedArtifact.packs.push(unownedArtifactPack);
+  expectDiagnostic(unownedArtifact, "pack-owned-path-invalid");
+
+  const conflictingDigest = createValidRegistryDefinition();
+  const conflictingDigestPack = createPack("pack.digest-conflict", "1.0.0");
+  conflictingDigestPack.ownedPaths[0].digest = `sha256:${"b".repeat(64)}`;
+  conflictingDigestPack.digest =
+    contracts.computePackManifestDigest(conflictingDigestPack);
+  conflictingDigest.packs.push(conflictingDigestPack);
+  expectDiagnostic(conflictingDigest, "pack-owned-path-invalid");
+});
+
 test("registry validation rejects duplicate IDs and CLI path collisions", () => {
   const duplicate = createValidRegistryDefinition();
   duplicate.commands.push(structuredClone(duplicate.commands[0]));

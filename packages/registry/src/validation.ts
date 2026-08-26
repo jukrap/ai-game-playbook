@@ -1471,6 +1471,159 @@ function validateProvidedIds(
   }
 }
 
+function validatePackPermissionCoverage(
+  required: readonly PermissionClass[],
+  declared: ReadonlySet<PermissionClass>,
+  path: string,
+  diagnostics: RegistryDiagnostic[],
+): void {
+  for (const permission of required) {
+    if (!declared.has(permission)) {
+      appendDiagnostic(
+        diagnostics,
+        diagnostic(
+          "pack-permission-underdeclared",
+          path,
+          `pack permissions do not include required permission ${permission}`,
+        ),
+      );
+    }
+  }
+}
+
+function validatePackNetworkDeclaration(
+  pack: PackManifest,
+  path: string,
+  diagnostics: RegistryDiagnostic[],
+): void {
+  const hasNetworkPermission = pack.permissions.includes("network");
+  const hasExternalTransmission = pack.permissions.includes(
+    "external-transmission",
+  );
+  const hasDestinations = pack.network.destinations.length > 0;
+
+  if (pack.network.required && !hasDestinations) {
+    appendDiagnostic(
+      diagnostics,
+      diagnostic(
+        "pack-network-declaration-invalid",
+        `${path}.network.destinations`,
+        "required network access must declare at least one destination",
+      ),
+    );
+  }
+  if ((pack.network.required || hasDestinations) && !hasNetworkPermission) {
+    appendDiagnostic(
+      diagnostics,
+      diagnostic(
+        "pack-network-declaration-invalid",
+        `${path}.permissions`,
+        "declared network access requires the network permission",
+      ),
+    );
+  }
+  if ((hasNetworkPermission || hasExternalTransmission) && !hasDestinations) {
+    appendDiagnostic(
+      diagnostics,
+      diagnostic(
+        "pack-network-declaration-invalid",
+        `${path}.network.destinations`,
+        "network and external transmission permissions require an explicit bounded destination",
+      ),
+    );
+  }
+  if (hasExternalTransmission && !hasNetworkPermission) {
+    appendDiagnostic(
+      diagnostics,
+      diagnostic(
+        "pack-network-declaration-invalid",
+        `${path}.permissions`,
+        "external transmission requires the network permission",
+      ),
+    );
+  }
+}
+
+function validatePackArtifactOwnership(
+  pack: PackManifest,
+  path: string,
+  diagnostics: RegistryDiagnostic[],
+): void {
+  const artifactTargets = new Map<string, number>();
+  const ownedPaths = new Map<
+    string,
+    { readonly index: number; readonly digest?: string }
+  >();
+
+  for (let index = 0; index < pack.ownedPaths.length; index += 1) {
+    const ownedPath = pack.ownedPaths[index];
+    if (ownedPath === undefined) {
+      continue;
+    }
+    const previous = ownedPaths.get(ownedPath.path);
+    if (previous !== undefined) {
+      appendDiagnostic(
+        diagnostics,
+        diagnostic(
+          "pack-owned-path-invalid",
+          `${path}.ownedPaths[${index}].path`,
+          `owned path duplicates ownedPaths[${previous.index}]`,
+        ),
+      );
+    } else {
+      ownedPaths.set(ownedPath.path, {
+        index,
+        ...(ownedPath.digest === undefined ? {} : { digest: ownedPath.digest }),
+      });
+    }
+  }
+
+  for (let index = 0; index < pack.artifacts.length; index += 1) {
+    const artifact = pack.artifacts[index];
+    if (artifact === undefined) {
+      continue;
+    }
+    const previous = artifactTargets.get(artifact.target);
+    if (previous !== undefined) {
+      appendDiagnostic(
+        diagnostics,
+        diagnostic(
+          "pack-owned-path-invalid",
+          `${path}.artifacts[${index}].target`,
+          `artifact target duplicates artifacts[${previous}]`,
+        ),
+      );
+    } else {
+      artifactTargets.set(artifact.target, index);
+    }
+
+    const ownership = ownedPaths.get(artifact.target);
+    if (ownership === undefined) {
+      appendDiagnostic(
+        diagnostics,
+        diagnostic(
+          "pack-owned-path-invalid",
+          `${path}.artifacts[${index}].target`,
+          "artifact target is not declared as an owned path",
+        ),
+      );
+    } else if (
+      artifact.mode !== "directory" &&
+      ownership.digest !== undefined &&
+      ownership.digest !== artifact.digest
+    ) {
+      appendDiagnostic(
+        diagnostics,
+        diagnostic(
+          "pack-owned-path-invalid",
+          `${path}.ownedPaths[${ownership.index}].digest`,
+          "owned path digest conflicts with its artifact digest",
+        ),
+      );
+    }
+  }
+}
+
 function validatePackProvisions(
   definition: RegistryDefinition,
   diagnostics: RegistryDiagnostic[],
@@ -1479,9 +1632,27 @@ function validatePackProvisions(
   const skills = new Set(definition.skills.map(({ id }) => id));
   const workflows = new Set(definition.workflows.map(({ id }) => id));
   const schemas = new Set(definition.schemas.map(({ schemaId }) => schemaId));
+  const capabilities = new Set<string>();
+  const commandById = new Map(
+    definition.commands.map((command) => [command.id, command]),
+  );
+  const skillById = new Map(
+    definition.skills.map((skill) => [skill.id, skill]),
+  );
+  for (const command of definition.commands) {
+    for (const capability of command.capabilities) {
+      capabilities.add(capability);
+    }
+  }
+  for (const skill of definition.skills) {
+    for (const capability of skill.capabilities) {
+      capabilities.add(capability);
+    }
+  }
   const commandProviders = new Map<string, string>();
   const skillProviders = new Map<string, string>();
   const workflowProviders = new Map<string, string>();
+  const capabilityProviders = new Map<string, string>();
   const schemaProviders = new Map<string, string>();
 
   for (let packIndex = 0; packIndex < definition.packs.length; packIndex += 1) {
@@ -1512,6 +1683,13 @@ function validatePackProvisions(
       diagnostics,
     );
     validateProvidedIds(
+      pack.provides.capabilities,
+      capabilities,
+      capabilityProviders,
+      `${basePath}.provides.capabilities`,
+      diagnostics,
+    );
+    validateProvidedIds(
       pack.provides.schemas.map(({ schemaId }) => schemaId),
       schemas,
       schemaProviders,
@@ -1519,8 +1697,36 @@ function validatePackProvisions(
       diagnostics,
     );
 
+    const declaredPermissions = new Set(pack.permissions);
+    for (let index = 0; index < pack.provides.commands.length; index += 1) {
+      const commandId = pack.provides.commands[index];
+      const command =
+        commandId === undefined ? undefined : commandById.get(commandId);
+      if (command !== undefined) {
+        validatePackPermissionCoverage(
+          command.permissions,
+          declaredPermissions,
+          `${basePath}.provides.commands[${index}]`,
+          diagnostics,
+        );
+      }
+    }
+    for (let index = 0; index < pack.provides.skills.length; index += 1) {
+      const skillId = pack.provides.skills[index];
+      const skill = skillId === undefined ? undefined : skillById.get(skillId);
+      if (skill !== undefined) {
+        validatePackPermissionCoverage(
+          skill.requiredPermissions,
+          declaredPermissions,
+          `${basePath}.provides.skills[${index}]`,
+          diagnostics,
+        );
+      }
+    }
+
     for (const [hook, commandId] of Object.entries(pack.lifecycleHooks)) {
-      if (!commands.has(commandId)) {
+      const command = commandById.get(commandId);
+      if (command === undefined) {
         appendDiagnostic(
           diagnostics,
           diagnostic(
@@ -1529,8 +1735,18 @@ function validatePackProvisions(
             `lifecycle command ${commandId} is not registered`,
           ),
         );
+      } else {
+        validatePackPermissionCoverage(
+          command.permissions,
+          declaredPermissions,
+          `${basePath}.lifecycleHooks[${JSON.stringify(hook)}]`,
+          diagnostics,
+        );
       }
     }
+
+    validatePackNetworkDeclaration(pack, basePath, diagnostics);
+    validatePackArtifactOwnership(pack, basePath, diagnostics);
   }
 }
 

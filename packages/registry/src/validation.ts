@@ -16,6 +16,7 @@ import {
   skillDescriptorSchema,
   workflowDescriptorSchema,
   type CommandDescriptor,
+  type CanonicalJsonValue,
   type PackManifest,
   type PermissionClass,
   type SchemaReference,
@@ -37,6 +38,7 @@ import {
   type RegistryDiagnostic,
   type RegistryDiagnosticCode,
 } from "./errors.js";
+import { RegistryContractValueError } from "./contract-value-errors.js";
 import type { RegistryDefinition, ValidatedRegistry } from "./types.js";
 
 const REGISTRY_SCHEMA_VERSION = "1.0.0";
@@ -49,6 +51,10 @@ const SCHEMA_MAX_DEPTH = 64;
 const SCHEMA_MAX_OBJECTS = 10_000;
 const SCHEMA_MAX_PATTERN_LENGTH = 512;
 const validatedRegistryInstances = new WeakSet<object>();
+const registeredValueValidators = new WeakMap<
+  object,
+  Map<string, ValidateFunction>
+>();
 const moduleRequire = createRequire(import.meta.url);
 const addFormats = moduleRequire("ajv-formats") as FormatsPlugin;
 
@@ -1000,6 +1006,33 @@ function validateCommandSemantics(
           ),
         );
       }
+    }
+    if (
+      effectKinds.has("filesystem") &&
+      !hasAnyPermission(command, projectWritePermissions)
+    ) {
+      appendDiagnostic(
+        diagnostics,
+        diagnostic(
+          "side-effect-permission-mismatch",
+          `${path}.permissions`,
+          "filesystem side effects require project write, install, or destructive authority",
+        ),
+      );
+    }
+    if (
+      command.permissions.includes("paid-call") &&
+      (!command.permissions.includes("network") ||
+        !command.permissions.includes("external-transmission"))
+    ) {
+      appendDiagnostic(
+        diagnostics,
+        diagnostic(
+          "side-effect-permission-mismatch",
+          `${path}.permissions`,
+          "paid provider calls require separate network and external-transmission authority",
+        ),
+      );
     }
     for (const effect of command.sideEffects) {
       if (
@@ -2098,4 +2131,100 @@ export function assertValidatedRegistry(
       "registry must be produced by validateRegistry in this process",
     );
   }
+}
+
+export function validateRegisteredContractValue(
+  registry: ValidatedRegistry,
+  reference: SchemaReference,
+  input: unknown,
+): CanonicalJsonValue {
+  assertValidatedRegistry(registry);
+  const referenceNames =
+    reference === null || typeof reference !== "object"
+      ? []
+      : Object.getOwnPropertyNames(reference).sort(compareCanonicalText);
+  const referenceDescriptors = referenceNames.map((name) =>
+    Object.getOwnPropertyDescriptor(reference, name),
+  );
+  if (
+    reference === null ||
+    typeof reference !== "object" ||
+    Array.isArray(reference) ||
+    Object.getPrototypeOf(reference) !== Object.prototype ||
+    Object.getOwnPropertySymbols(reference).length !== 0 ||
+    referenceNames.length !== 2 ||
+    referenceNames[0] !== "digest" ||
+    referenceNames[1] !== "schemaId" ||
+    referenceDescriptors.some(
+      (descriptor) =>
+        descriptor === undefined ||
+        !("value" in descriptor) ||
+        descriptor.enumerable !== true,
+    ) ||
+    typeof reference.schemaId !== "string" ||
+    !isSha256Digest(reference.digest)
+  ) {
+    throw new RegistryContractValueError(
+      "registered-schema-not-found",
+      "$reference",
+      "expected an exact registered schema reference",
+    );
+  }
+
+  const schema = registry.schemas.find(
+    (candidate) => candidate.schemaId === reference.schemaId,
+  );
+  if (schema === undefined) {
+    throw new RegistryContractValueError(
+      "registered-schema-not-found",
+      "$reference.schemaId",
+      "schema is not registered",
+    );
+  }
+  if (schema.digest !== reference.digest) {
+    throw new RegistryContractValueError(
+      "registered-schema-digest-mismatch",
+      "$reference.digest",
+      "schema digest does not match the validated registry",
+    );
+  }
+
+  let validators = registeredValueValidators.get(registry);
+  if (validators === undefined) {
+    validators = new Map<string, ValidateFunction>();
+    registeredValueValidators.set(registry, validators);
+  }
+  const cacheKey = `${schema.schemaId}\u0000${schema.digest}`;
+  let validate = validators.get(cacheKey);
+  if (validate === undefined) {
+    try {
+      validate = createAjv().compile(schema.schema as AnySchemaObject);
+    } catch {
+      throw new RegistryContractValueError(
+        "registered-schema-invalid",
+        "$reference.schemaId",
+        "registered schema could not be compiled",
+      );
+    }
+    validators.set(cacheKey, validate);
+  }
+
+  let clone: unknown;
+  try {
+    clone = cloneBoundedInput(input);
+  } catch {
+    throw new RegistryContractValueError(
+      "registered-value-invalid",
+      "$value",
+      "value is not bounded canonical JSON",
+    );
+  }
+  if (!validate(clone)) {
+    throw new RegistryContractValueError(
+      "registered-value-invalid",
+      `$value${validate.errors?.[0]?.instancePath ?? ""}`,
+      ajvErrorMessage(validate.errors),
+    );
+  }
+  return deepFreeze(clone as CanonicalJsonValue);
 }

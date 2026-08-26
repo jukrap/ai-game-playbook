@@ -536,6 +536,26 @@ test("registry validation enforces command authority, lane, and retry invariants
   wrongLane.commands[2].permissions = ["write-project-source"];
   expectDiagnostic(wrongLane, "lane-permission-mismatch");
 
+  const filesystemWithoutWriteAuthority = createValidRegistryDefinition();
+  filesystemWithoutWriteAuthority.commands[2].permissions = ["editor-control"];
+  expectDiagnostic(
+    filesystemWithoutWriteAuthority,
+    "side-effect-permission-mismatch",
+  );
+
+  const paidCallWithoutRemoteAuthority = createValidRegistryDefinition();
+  paidCallWithoutRemoteAuthority.commands[0].permissions = [
+    "external-transmission",
+    "paid-call",
+  ];
+  paidCallWithoutRemoteAuthority.commands[0].sideEffects = [
+    { kind: "external", scope: "provider-request", boundary: "external" },
+  ];
+  expectDiagnostic(
+    paidCallWithoutRemoteAuthority,
+    "side-effect-permission-mismatch",
+  );
+
   const unsafeRetry = createValidRegistryDefinition();
   unsafeRetry.commands[2].retry = {
     mode: "read-only",

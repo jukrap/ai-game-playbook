@@ -3,6 +3,8 @@ export type {
   RegistryDiagnostic,
   RegistryDiagnosticCode,
 } from "./errors.js";
+export { RegistryContractValueError } from "./contract-value-errors.js";
+export type { RegistryContractValueErrorCode } from "./contract-value-errors.js";
 export { TaskRoutingSelectionError } from "./routing-errors.js";
 export type {
   TaskRoutingDiagnostic,
@@ -47,4 +49,8 @@ export type {
   SkillRoutingSurface,
   ValidatedRegistry,
 } from "./types.js";
-export { validateRegistry } from "./validation.js";
+export {
+  assertValidatedRegistry,
+  validateRegisteredContractValue,
+  validateRegistry,
+} from "./validation.js";

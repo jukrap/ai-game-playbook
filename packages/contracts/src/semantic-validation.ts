@@ -1,12 +1,21 @@
 import {
   isFeatureContractApprovalDigestValid,
   computeRunReceiptDigest,
+  type AssetProvenance,
   type FeatureContract,
   type RunReceipt,
 } from "./feature-evidence-contracts.js";
 import type { EngineCapabilityReport } from "./project-engine-contracts.js";
 
 export type ContractSemanticIssueCode =
+  | "asset-provenance-approval-missing"
+  | "asset-provenance-cost-overrun"
+  | "asset-provenance-current-file-invalid"
+  | "asset-provenance-hosted-provider-incomplete"
+  | "asset-provenance-lineage-invalid"
+  | "asset-provenance-promotion-invalid"
+  | "asset-provenance-qa-invalid"
+  | "asset-provenance-rights-invalid"
   | "feature-contract-approval-required"
   | "feature-contract-approval-timestamp-invalid"
   | "feature-contract-approval-window-invalid"
@@ -54,6 +63,284 @@ function freezeIssues(
 function timestampMillis(value: string): number | undefined {
   const milliseconds = Date.parse(value);
   return Number.isFinite(milliseconds) ? milliseconds : undefined;
+}
+
+function decimalMicros(value: string): bigint | undefined {
+  const match = /^(0|[1-9][0-9]{0,11})(?:\.([0-9]{1,6}))?$/.exec(value);
+  if (match === null || match[1] === undefined) {
+    return undefined;
+  }
+  const fraction = (match[2] ?? "").padEnd(6, "0");
+  return BigInt(match[1]) * 1_000_000n + BigInt(fraction || "0");
+}
+
+export function checkAssetProvenanceSemantics(
+  asset: AssetProvenance,
+): readonly ContractSemanticIssue[] {
+  const issues: ContractSemanticIssue[] = [];
+  const approvals = new Set(asset.approvals);
+  const promoted = asset.state === "approved" || asset.state === "production";
+
+  if (
+    asset.source.kind === "hosted-provider" &&
+    (asset.generation === undefined ||
+      asset.transfer === undefined ||
+      asset.cost === undefined)
+  ) {
+    issues.push(
+      issue(
+        "asset-provenance-hosted-provider-incomplete",
+        "/source/kind",
+        "Hosted-provider assets require generation, transfer, and cost records.",
+      ),
+    );
+  }
+
+  const requiredApprovals: Array<{
+    readonly approvalId: AssetProvenance["approvals"][number];
+    readonly path: string;
+  }> = [];
+  if (asset.transfer !== undefined) {
+    requiredApprovals.push({
+      approvalId: asset.transfer.approvalId,
+      path: "/transfer/approvalId",
+    });
+  }
+  if (asset.cost !== undefined) {
+    requiredApprovals.push({
+      approvalId: asset.cost.approvalId,
+      path: "/cost/approvalId",
+    });
+    if (asset.cost.actual !== undefined) {
+      const estimated = decimalMicros(asset.cost.estimated);
+      const actual = decimalMicros(asset.cost.actual);
+      if (estimated !== undefined && actual !== undefined && actual > estimated) {
+        issues.push(
+          issue(
+            "asset-provenance-cost-overrun",
+            "/cost/actual",
+            "Actual provider cost exceeds the approved estimate.",
+          ),
+        );
+      }
+    }
+  }
+
+  const stageIds = new Set<string>();
+  const knownLineageHashes = new Set<string>();
+  const promotionHashes = new Set<string>();
+  let previousStageStart: number | undefined;
+  let hasPromotionStage = false;
+  for (const [index, stage] of asset.lineage.entries()) {
+    const path = `/lineage/${index}`;
+    if (stageIds.has(stage.stageId)) {
+      issues.push(
+        issue(
+          "asset-provenance-lineage-invalid",
+          `${path}/stageId`,
+          "Lineage stage IDs must be unique.",
+        ),
+      );
+    }
+    stageIds.add(stage.stageId);
+
+    const startedAt = timestampMillis(stage.startedAt);
+    const endedAt = timestampMillis(stage.endedAt);
+    if (
+      startedAt === undefined ||
+      endedAt === undefined ||
+      startedAt > endedAt ||
+      (previousStageStart !== undefined && startedAt < previousStageStart)
+    ) {
+      issues.push(
+        issue(
+          "asset-provenance-lineage-invalid",
+          path,
+          "Lineage stages must have valid timestamps in chronological order.",
+        ),
+      );
+    }
+    if (startedAt !== undefined) {
+      previousStageStart = startedAt;
+    }
+
+    if (index === 0) {
+      for (const hash of stage.inputHashes) {
+        knownLineageHashes.add(hash);
+      }
+    } else if (
+      stage.inputHashes.length === 0 ||
+      stage.inputHashes.some((hash) => !knownLineageHashes.has(hash))
+    ) {
+      issues.push(
+        issue(
+          "asset-provenance-lineage-invalid",
+          `${path}/inputHashes`,
+          "Every later lineage stage must consume an earlier known hash.",
+        ),
+      );
+    }
+    for (const hash of stage.outputHashes) {
+      knownLineageHashes.add(hash);
+      if (stage.operation === "promote") {
+        promotionHashes.add(hash);
+      }
+    }
+    hasPromotionStage ||= stage.operation === "promote";
+  }
+
+  const acquiredAt = timestampMillis(asset.source.acquiredAt);
+  const firstStageStartedAt =
+    asset.lineage[0] === undefined
+      ? undefined
+      : timestampMillis(asset.lineage[0].startedAt);
+  if (
+    acquiredAt !== undefined &&
+    firstStageStartedAt !== undefined &&
+    acquiredAt > firstStageStartedAt
+  ) {
+    issues.push(
+      issue(
+        "asset-provenance-lineage-invalid",
+        "/source/acquiredAt",
+        "Asset acquisition cannot occur after lineage processing begins.",
+      ),
+    );
+  }
+
+  const currentPaths = new Set<string>();
+  for (const [index, file] of asset.currentFiles.entries()) {
+    if (currentPaths.has(file.path)) {
+      issues.push(
+        issue(
+          "asset-provenance-current-file-invalid",
+          `/currentFiles/${index}/path`,
+          "Current asset file paths must be unique.",
+        ),
+      );
+    }
+    currentPaths.add(file.path);
+    if (promoted && !promotionHashes.has(file.digest)) {
+      issues.push(
+        issue(
+          "asset-provenance-promotion-invalid",
+          `/currentFiles/${index}/digest`,
+          "Promoted current files must be produced by the recorded lineage.",
+        ),
+      );
+    }
+  }
+
+  const qaIds = new Set<string>();
+  for (const [index, result] of asset.qa.entries()) {
+    const path = `/qa/${index}`;
+    if (qaIds.has(result.checkId)) {
+      issues.push(
+        issue(
+          "asset-provenance-qa-invalid",
+          `${path}/checkId`,
+          "QA check IDs must be unique.",
+        ),
+      );
+    }
+    qaIds.add(result.checkId);
+    if (
+      (result.outcome === "pass" || result.outcome === "waived") &&
+      result.artifactHashes.length === 0
+    ) {
+      issues.push(
+        issue(
+          "asset-provenance-qa-invalid",
+          `${path}/artifactHashes`,
+          "Passing and waived QA must identify the checked artifacts.",
+        ),
+      );
+    }
+    if (
+      result.artifactHashes.some((hash) => !knownLineageHashes.has(hash))
+    ) {
+      issues.push(
+        issue(
+          "asset-provenance-qa-invalid",
+          `${path}/artifactHashes`,
+          "QA artifacts must occur in the recorded lineage.",
+        ),
+      );
+    }
+    if (result.outcome === "waived") {
+      if (result.waiverApprovalId === undefined) {
+        issues.push(
+          issue(
+            "asset-provenance-qa-invalid",
+            `${path}/waiverApprovalId`,
+            "Waived QA requires a dedicated approval.",
+          ),
+        );
+      } else {
+        requiredApprovals.push({
+          approvalId: result.waiverApprovalId,
+          path: `${path}/waiverApprovalId`,
+        });
+      }
+    }
+  }
+
+  for (const required of requiredApprovals) {
+    if (!approvals.has(required.approvalId)) {
+      issues.push(
+        issue(
+          "asset-provenance-approval-missing",
+          required.path,
+          `Approval ${required.approvalId} is not retained by the asset record.`,
+        ),
+      );
+    }
+  }
+
+  if (promoted) {
+    const hasRightsEvidence =
+      asset.rights.identifier !== undefined ||
+      asset.rights.textDigest !== undefined ||
+      asset.rights.userAssertion !== undefined;
+    if (
+      asset.rights.commercialUse !== "allowed" ||
+      asset.rights.redistribution === "unknown" ||
+      !hasRightsEvidence
+    ) {
+      issues.push(
+        issue(
+          "asset-provenance-rights-invalid",
+          "/rights",
+          "Approved and production assets require explicit commercial rights evidence.",
+        ),
+      );
+    }
+    if (!hasPromotionStage || asset.approvals.length === 0) {
+      issues.push(
+        issue(
+          "asset-provenance-promotion-invalid",
+          "/state",
+          "Approved and production assets require a promotion stage and retained approval.",
+        ),
+      );
+    }
+    if (
+      !asset.qa.some(({ outcome }) => outcome === "pass") ||
+      asset.qa.some(
+        ({ outcome }) => outcome === "fail" || outcome === "unverified",
+      )
+    ) {
+      issues.push(
+        issue(
+          "asset-provenance-qa-invalid",
+          "/qa",
+          "Approved and production assets require passing QA with no failed or unverified result.",
+        ),
+      );
+    }
+  }
+
+  return freezeIssues(issues);
 }
 
 export function checkFeatureContractSemantics(

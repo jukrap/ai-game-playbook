@@ -975,7 +975,7 @@ const assetCost = closedObject(
   ["currency", "estimated", "approvalId"],
 );
 
-const assetQa = closedObject(
+const assetQaRoot = closedObject(
   {
     checkId: reference("stableId"),
     scope: enumSchema([
@@ -998,6 +998,80 @@ const assetQa = closedObject(
   ["checkId", "scope", "outcome", "artifactHashes", "findings"],
 );
 
+const assetQa = {
+  ...assetQaRoot,
+  allOf: [
+    {
+      if: {
+        type: "object",
+        properties: { outcome: { const: "waived" } },
+        required: ["outcome"],
+      },
+      then: {
+        type: "object",
+        properties: { waiverApprovalId: reference("stableId") },
+        required: ["waiverApprovalId"],
+      },
+    },
+    {
+      if: {
+        type: "object",
+        properties: {
+          outcome: { enum: ["pass", "fail", "unverified"] },
+        },
+        required: ["outcome"],
+      },
+      then: {
+        type: "object",
+        properties: { waiverApprovalId: false },
+      },
+    },
+    {
+      if: {
+        type: "object",
+        properties: { outcome: { enum: ["pass", "waived"] } },
+        required: ["outcome"],
+      },
+      then: {
+        type: "object",
+        properties: {
+          artifactHashes: { type: "array", minItems: 1 },
+        },
+        required: ["artifactHashes"],
+      },
+    },
+    {
+      if: {
+        type: "object",
+        properties: { outcome: { enum: ["fail", "unverified"] } },
+        required: ["outcome"],
+      },
+      then: {
+        type: "object",
+        properties: { findings: { type: "array", minItems: 1 } },
+        required: ["findings"],
+      },
+    },
+    {
+      if: {
+        type: "object",
+        properties: {
+          scope: {
+            enum: ["engine-import", "runtime", "performance", "visual"],
+          },
+          outcome: { enum: ["pass", "fail"] },
+        },
+        required: ["scope", "outcome"],
+      },
+      then: {
+        type: "object",
+        properties: { environmentDigest: reference("sha256Digest") },
+        required: ["environmentDigest"],
+      },
+    },
+  ],
+};
+
 const currentAssetFile = closedObject(
   {
     path: reference("portablePath"),
@@ -1014,47 +1088,162 @@ export const assetProvenanceSchema: VersionedContractSchema =
     title: "Asset Provenance",
     description:
       "Records asset lifecycle, source, lineage, rights, transfer, cost, QA, approval, and current file identity.",
-    schema: contractRoot(
-      {
-        schemaVersion: reference("semanticVersion"),
-        assetId: reference("stableId"),
-        slotId: reference("stableId"),
-        state: enumSchema([
-          "placeholder",
-          "user-licensed",
-          "candidate",
+    schema: {
+      ...contractRoot(
+        {
+          schemaVersion: reference("semanticVersion"),
+          assetId: reference("stableId"),
+          slotId: reference("stableId"),
+          state: enumSchema([
+            "placeholder",
+            "user-licensed",
+            "candidate",
+            "qa",
+            "approved",
+            "production",
+            "rejected",
+          ]),
+          source: assetSource,
+          lineage: boundedArray(lineageStage, { maximum: 1024 }),
+          rights: assetRights,
+          generation: assetGeneration,
+          transfer: assetTransfer,
+          cost: assetCost,
+          qa: boundedArray(assetQa, { maximum: 1024 }),
+          approvals: boundedArray(reference("stableId"), {
+            maximum: 256,
+            unique: true,
+          }),
+          currentFiles: boundedArray(currentAssetFile, {
+            minimum: 1,
+            maximum: 10000,
+          }),
+        },
+        [
+          "schemaVersion",
+          "assetId",
+          "slotId",
+          "state",
+          "source",
+          "lineage",
+          "rights",
           "qa",
-          "approved",
-          "production",
-          "rejected",
-        ]),
-        source: assetSource,
-        lineage: boundedArray(lineageStage, { maximum: 1024 }),
-        rights: assetRights,
-        generation: assetGeneration,
-        transfer: assetTransfer,
-        cost: assetCost,
-        qa: boundedArray(assetQa, { maximum: 1024 }),
-        approvals: boundedArray(reference("stableId"), {
-          maximum: 256,
-          unique: true,
-        }),
-        currentFiles: boundedArray(currentAssetFile, {
-          minimum: 1,
-          maximum: 10000,
-        }),
-      },
-      [
-        "schemaVersion",
-        "assetId",
-        "slotId",
-        "state",
-        "source",
-        "lineage",
-        "rights",
-        "qa",
-        "approvals",
-        "currentFiles",
+          "approvals",
+          "currentFiles",
+        ],
+      ),
+      allOf: [
+        {
+          if: {
+            type: "object",
+            properties: {
+              source: {
+                type: "object",
+                properties: { kind: { const: "hosted-provider" } },
+                required: ["kind"],
+              },
+            },
+            required: ["source"],
+          },
+          then: {
+            type: "object",
+            properties: {
+              generation: assetGeneration,
+              transfer: assetTransfer,
+              cost: assetCost,
+              approvals: { type: "array", minItems: 1 },
+            },
+            required: ["generation", "transfer", "cost", "approvals"],
+          },
+        },
+        {
+          if: {
+            type: "object",
+            properties: {
+              source: {
+                type: "object",
+                properties: { kind: { const: "local-tool" } },
+                required: ["kind"],
+              },
+            },
+            required: ["source"],
+          },
+          then: {
+            type: "object",
+            properties: { generation: assetGeneration },
+            required: ["generation"],
+          },
+        },
+        {
+          if: {
+            type: "object",
+            properties: { state: { enum: ["approved", "production"] } },
+            required: ["state"],
+          },
+          then: {
+            type: "object",
+            properties: {
+              rights: {
+                type: "object",
+                properties: {
+                  identifier: {},
+                  textDigest: {},
+                  userAssertion: {},
+                  redistribution: { enum: ["allowed", "restricted"] },
+                  commercialUse: { const: "allowed" },
+                },
+                required: ["redistribution", "commercialUse"],
+                anyOf: [
+                  {
+                    type: "object",
+                    properties: { identifier: {} },
+                    required: ["identifier"],
+                  },
+                  {
+                    type: "object",
+                    properties: { textDigest: {} },
+                    required: ["textDigest"],
+                  },
+                  {
+                    type: "object",
+                    properties: { userAssertion: {} },
+                    required: ["userAssertion"],
+                  },
+                ],
+              },
+              lineage: {
+                type: "array",
+                contains: {
+                  type: "object",
+                  properties: { operation: { const: "promote" } },
+                  required: ["operation"],
+                },
+                minContains: 1,
+              },
+              qa: {
+                type: "array",
+                minItems: 1,
+                contains: {
+                  type: "object",
+                  properties: { outcome: { const: "pass" } },
+                  required: ["outcome"],
+                },
+                minContains: 1,
+                not: {
+                  contains: {
+                    type: "object",
+                    properties: {
+                      outcome: { enum: ["fail", "unverified"] },
+                    },
+                    required: ["outcome"],
+                  },
+                },
+              },
+              approvals: { type: "array", minItems: 1 },
+            },
+            required: ["rights", "lineage", "qa", "approvals"],
+          },
+        },
       ],
-    ),
+    },
   });

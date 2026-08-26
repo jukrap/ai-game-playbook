@@ -161,6 +161,7 @@ export type {
   RunHandleStatus,
 } from "./run-engine-contracts.js";
 export {
+  checkAssetProvenanceSemantics,
   checkEngineCapabilityReportSemantics,
   checkFeatureContractSemantics,
   checkRunReceiptSemantics,

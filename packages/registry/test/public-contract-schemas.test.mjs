@@ -402,6 +402,64 @@ test("contract schemas reject unsafe identity, scope, support, and cost shapes",
       },
     ],
     [
+      "asset-provenance",
+      (() => {
+        const { generation: _, transfer: __, cost: ___, ...withoutHostedProof } =
+          structuredClone(validPublicContractFixtures["asset-provenance"]);
+        return {
+          ...withoutHostedProof,
+          source: {
+            ...withoutHostedProof.source,
+            kind: "hosted-provider",
+          },
+        };
+      })(),
+    ],
+    [
+      "asset-provenance",
+      {
+        ...validPublicContractFixtures["asset-provenance"],
+        qa: [
+          {
+            ...validPublicContractFixtures["asset-provenance"].qa[0],
+            outcome: "waived",
+          },
+        ],
+      },
+    ],
+    [
+      "asset-provenance",
+      {
+        ...validPublicContractFixtures["asset-provenance"],
+        rights: {
+          ...validPublicContractFixtures["asset-provenance"].rights,
+          commercialUse: "unknown",
+        },
+      },
+    ],
+    [
+      "asset-provenance",
+      {
+        ...validPublicContractFixtures["asset-provenance"],
+        qa: [
+          {
+            ...validPublicContractFixtures["asset-provenance"].qa[0],
+            outcome: "unverified",
+            findings: ["Runtime QA has not run."],
+          },
+        ],
+      },
+    ],
+    [
+      "asset-provenance",
+      {
+        ...validPublicContractFixtures["asset-provenance"],
+        lineage: validPublicContractFixtures["asset-provenance"].lineage.filter(
+          ({ operation }) => operation !== "promote",
+        ),
+      },
+    ],
+    [
       "skill-descriptor",
       {
         ...validOrchestrationDescriptorFixtures["skill-descriptor"],
@@ -453,4 +511,28 @@ test("feature contracts allow a rollback-free draft without approval", () => {
   };
 
   assert.equal(validate(draft), true, JSON.stringify(validate.errors));
+});
+
+test("asset provenance accepts an explicitly approved hosted-provider flow", () => {
+  const ajv = createValidator();
+  const validate = ajv.compile(
+    contracts.ALL_CONTRACT_SCHEMAS["asset-provenance"].schema,
+  );
+  const hosted = structuredClone(
+    validPublicContractFixtures["asset-provenance"],
+  );
+  hosted.source.kind = "hosted-provider";
+  hosted.generation = {
+    provider: "provider.example",
+    model: "image-model-v1",
+    deterministic: false,
+    promptDigest: hosted.currentFiles[0].digest,
+  };
+  hosted.transfer = {
+    destination: "provider.example",
+    fields: ["prompt", "source-image"],
+    approvalId: hosted.approvals[0],
+  };
+
+  assert.equal(validate(hosted), true, JSON.stringify(validate.errors));
 });

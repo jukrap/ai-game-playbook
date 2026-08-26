@@ -310,6 +310,17 @@ export const validPublicContractFixtures = {
         startedAt,
         endedAt,
       },
+      {
+        stageId: "stage.promote",
+        operation: "promote",
+        toolId: "asset.promote",
+        toolVersion: "1.0.0",
+        inputHashes: [secondDigest],
+        outputHashes: [secondDigest],
+        parametersDigest: digest,
+        startedAt: endedAt,
+        endedAt,
+      },
     ],
     rights: {
       identifier: "LicenseRef-Proprietary",

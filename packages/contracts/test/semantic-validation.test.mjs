@@ -93,6 +93,96 @@ const featureContract = {
 featureContract.approval.contractDigest =
   contracts.computeFeatureContractApprovalDigest(featureContract);
 
+const assetProvenance = {
+  schemaVersion: "1.0.0",
+  assetId: "asset.collectible-concept",
+  slotId: "slot.collectible",
+  state: "production",
+  source: {
+    kind: "hosted-provider",
+    label: "Collectible concept image",
+    acquiredAt: startedAt,
+  },
+  lineage: [
+    {
+      stageId: "stage.generate",
+      operation: "generate",
+      toolId: "asset.image-provider",
+      toolVersion: "1.0.0",
+      inputHashes: [],
+      outputHashes: [secondDigest],
+      parametersDigest: digest,
+      startedAt,
+      endedAt,
+    },
+    {
+      stageId: "stage.qa",
+      operation: "qa",
+      toolId: "asset.qa",
+      toolVersion: "1.0.0",
+      inputHashes: [secondDigest],
+      outputHashes: [secondDigest],
+      parametersDigest: digest,
+      startedAt: endedAt,
+      endedAt: "2026-08-26T01:02:05.000Z",
+    },
+    {
+      stageId: "stage.promote",
+      operation: "promote",
+      toolId: "asset.promote",
+      toolVersion: "1.0.0",
+      inputHashes: [secondDigest],
+      outputHashes: [secondDigest],
+      parametersDigest: digest,
+      startedAt: "2026-08-26T01:02:05.000Z",
+      endedAt: "2026-08-26T01:02:06.000Z",
+    },
+  ],
+  rights: {
+    identifier: "LicenseRef-Provider-Terms",
+    redistribution: "restricted",
+    commercialUse: "allowed",
+  },
+  generation: {
+    provider: "provider.example",
+    model: "image-model-v1",
+    deterministic: false,
+    promptDigest: digest,
+  },
+  transfer: {
+    destination: "provider.example",
+    fields: ["prompt"],
+    approvalId: "approval.asset-transfer",
+  },
+  cost: {
+    currency: "USD",
+    estimated: "1.00",
+    actual: "0.75",
+    approvalId: "approval.asset-cost",
+  },
+  qa: [
+    {
+      checkId: "qa.asset-content",
+      scope: "content",
+      outcome: "pass",
+      artifactHashes: [secondDigest],
+      findings: [],
+    },
+  ],
+  approvals: [
+    "approval.asset-transfer",
+    "approval.asset-cost",
+    "approval.asset-promote",
+  ],
+  currentFiles: [
+    {
+      path: "assets/collectibles/concept.png",
+      digest: secondDigest,
+      bytes: 4096,
+    },
+  ],
+};
+
 const runReceipt = {
   schemaVersion: "1.0.0",
   receiptId: "018f6f35-2c9e-7d1a-8a4b-123456789abc",
@@ -203,6 +293,53 @@ test("feature contract semantics reject stale approval and rollback contradictio
       .map(({ code }) => code),
     ["feature-contract-approval-required"],
   );
+});
+
+test("asset provenance semantics accept a complete promoted provider asset", () => {
+  assert.deepEqual(contracts.checkAssetProvenanceSemantics(assetProvenance), []);
+});
+
+test("asset provenance semantics reject missing consent, weak QA, and broken lineage", () => {
+  const incomplete = structuredClone(assetProvenance);
+  delete incomplete.generation;
+  delete incomplete.transfer;
+  delete incomplete.cost;
+  assert.equal(
+    contracts
+      .checkAssetProvenanceSemantics(incomplete)
+      .some(({ code }) => code === "asset-provenance-hosted-provider-incomplete"),
+    true,
+  );
+
+  const waived = structuredClone(assetProvenance);
+  waived.qa[0].outcome = "waived";
+  waived.qa[0].waiverApprovalId = "approval.asset-waiver";
+  assert.equal(
+    contracts
+      .checkAssetProvenanceSemantics(waived)
+      .some(({ code }) => code === "asset-provenance-approval-missing"),
+    true,
+  );
+
+  const broken = structuredClone(assetProvenance);
+  broken.rights.commercialUse = "unknown";
+  broken.qa[0].outcome = "fail";
+  broken.qa[0].findings = ["Artifact failed content QA."];
+  broken.cost.actual = "2.00";
+  broken.lineage[1].startedAt = startedAt;
+  broken.lineage[1].inputHashes = [digest];
+  broken.lineage[2].operation = "edit";
+
+  const codes = new Set(
+    contracts
+      .checkAssetProvenanceSemantics(broken)
+      .map(({ code }) => code),
+  );
+  assert.equal(codes.has("asset-provenance-cost-overrun"), true);
+  assert.equal(codes.has("asset-provenance-lineage-invalid"), true);
+  assert.equal(codes.has("asset-provenance-promotion-invalid"), true);
+  assert.equal(codes.has("asset-provenance-qa-invalid"), true);
+  assert.equal(codes.has("asset-provenance-rights-invalid"), true);
 });
 
 test("run receipt semantic checks reject count and duration contradictions", () => {

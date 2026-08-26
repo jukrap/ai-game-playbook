@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, durable private receipt records and artifact objects, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions, plan-only `agpb init`, read-only `agpb doctor`, static read-only `agpb project inspect`, a project-bound read-only STDIO MCP runtime, a registry-derived project-inspection skill artifact, and a write-free Codex setup planner exist. General mutation dispatch, evidence export, applied host installation, engines, and bridges remain planned.
+> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, durable private receipt records and artifact objects, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions, five write-free `agpb` commands including skill catalog inspection, a project-bound read-only STDIO MCP runtime, a registry-derived project-inspection skill artifact, and a write-free Codex setup planner exist. General mutation dispatch, evidence export, applied host installation, engines, and bridges remain planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -21,7 +21,7 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Generation creates CLI, MCP, documentation, and skill-routing metadata from the same validated identity. The runtime registry currently contains `init`, `doctor`, and `project.inspect`; CLI help, parsing, input/output validation, and dispatch consume those exact descriptors. The experimental MCP runtime registers an explicitly selected read-only subset from the same generated MCP metadata and exact schemas. The public foundation plan records the runtime-registry digest and keeps unimplemented commands separate.
+The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Generation creates CLI, MCP, documentation, and skill-routing metadata from the same validated identity. The runtime registry currently contains `init`, `doctor`, `project.inspect`, `skill.list`, and `skill.check`; CLI help, parsing, input/output validation, and dispatch consume those exact descriptors. The experimental MCP runtime registers an explicitly selected read-only subset from the same generated MCP metadata and exact schemas. The public foundation plan records the runtime-registry digest and keeps unimplemented commands separate.
 
 ## Workspace boundaries
 
@@ -31,7 +31,8 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 | `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, workflow-plan resolution, and exact implemented-command inventory |
 | `core` | Partial | Canonical project identity, safe paths, compare-and-swap filesystem operations, bounded processes, mutation leases, in-memory permission admission, workflow state, durable checkpoints, append-only run receipts, bounded receipt-head queries, and private artifact promotion |
 | `pack-runtime` | Partial | Write-free preflight, exact ownership, local lifecycle transactions, journals, active barriers, rollback, directory ownership, recovery inspection, and approved stable-state finalization |
-| `cli` | Experimental partial | Registry-derived help/version, fail-closed parsing, stable exit categories, human/JSON output, plan-only `init`, read-only `doctor`, and static `project inspect` |
+| `skill-runtime` | Partial private foundation | Registry-bound packaged skill catalog, bounded artifact validation, same-process project plans, and write-free target inspection; materialization is unavailable |
+| `cli` | Experimental partial | Registry-derived help/version, fail-closed parsing, stable exit categories, human/JSON output, plan-only `init`, and read-only `doctor`, `project inspect`, `skill list`, and `skill check` |
 | `evidence` | Partial private foundation | Pure bounded-process and structured-test normalization plus limited retained-artifact format/provenance assessment exist alongside canonical receipt records, content-addressed bytes, and producer-bound manifests; engine report parsing, assessment persistence, retention, migration, CLI/MCP listing, and explicit export remain planned |
 | `mcp` | Experimental private runtime | Modern STDIO transport for an explicit generated read-only tool allowlist, exact project binding, schema parity, bounded messages, and canonical results; mutation and network tools are unavailable |
 | `codex-adapter` | Partial private planner | Deterministic local-only project MCP configuration and project-inspection skill target planning plus create/retain/conflict inspection without writes, merge, trust changes, or skill materialization |
@@ -45,10 +46,10 @@ A partial package is not a claim that its full product surface exists. No curren
 
 The implemented CLI path is deliberately narrow:
 
-1. Parse only global help/version or the exact `init`, `doctor`, and `project inspect` commands with their declared flags.
+1. Parse only global help/version or the exact `init`, `doctor`, `project inspect`, `skill list`, and `skill check` commands with their declared flags.
 2. Obtain the selected command descriptor from the validated runtime registry.
 3. Validate the request against the descriptor-bound input schema.
-4. For `init`, bind one canonical root and classify the fixed 16-target layout without writing. For `doctor`, inspect registry parity, Node.js version, project identity, fixed state directories, installed-pack state, and active transaction marker without writing. For `project inspect`, list the root deterministically, resolve selected marker paths through the bound root, read bounded marker/profile files twice through stable identities, and preserve dirty/process gaps without external execution.
+4. For `init`, bind one canonical root and classify the fixed 16-target layout without writing. For `doctor`, inspect registry parity, Node.js version, project identity, fixed state directories, installed-pack state, and active transaction marker without writing. For `project inspect`, list the root deterministically, resolve selected marker paths through the bound root, read bounded marker/profile files twice through stable identities, and preserve dirty/process gaps without external execution. For `skill list` and `skill check`, bind the generated stable skill route, validate the packaged artifact, and expose only bounded catalog metadata or target observations without materialization.
 5. Derive plan or diagnostic status from bounded target/check outcomes.
 6. Validate semantic counts, identity and digest bindings where applicable, then validate the complete report against the descriptor-bound output schema.
 7. Render human or canonical JSON output and map it to a stable exit category.
@@ -57,7 +58,7 @@ Handler digests attest the compiled init, doctor, and project-inspection modules
 
 The current MCP path is also write-free. Startup requires one project root, one or more explicit generated tool names, and acknowledgement that selected project diagnostics may enter the active host context. The runtime binds the canonical project identity, registers only read-only closed-world tools, limits each STDIO message to 1 MiB, validates exact registered input and output schemas, and returns canonical bounded results. It has no HTTP transport, network access, editor control, or mutation route.
 
-The Codex adapter derives the current supported Node.js executable and this installation's MCP entry point rather than accepting caller-selected runtime code. It produces immutable bytes for one project-local `.codex/config.toml` and one `.agents/skills/project-inspection/SKILL.md` target, then classifies each target as create, retain, or conflict while rechecking project and runtime identities. The packaged skill source must be a bounded canonical regular file whose UTF-8, LF-only frontmatter, name, and SHA-256 digest match the generated registry route. The adapter never creates a parent directory, writes or merges a target, changes project trust, or installs a skill.
+The shared skill runtime owns packaged artifact validation and write-free project-target observation. The Codex adapter consumes that same plan, derives the current supported Node.js executable and this installation's MCP entry point rather than accepting caller-selected runtime code, and produces immutable bytes for one project-local `.codex/config.toml` and one `.agents/skills/project-inspection/SKILL.md` target. It classifies each target as create, retain, or conflict while rechecking project and runtime identities. The packaged skill source must be a bounded canonical regular file whose UTF-8, LF-only frontmatter, name, and SHA-256 digest match the generated registry route. Neither runtime creates a parent directory, writes or merges a target, changes project trust, or installs a skill.
 
 ## Planned mutating execution flow
 
@@ -99,7 +100,7 @@ Execution lanes are:
 - `editor-bound` for one exact editor session inside project serialization; and
 - `build-bound` for approved test and build work.
 
-The current `init`, `doctor`, and `project inspect` descriptors declare `parallel-read`, but general parallel-reader coordination is not yet implemented. Mutating lanes remain one lease per project and require explicit renewal.
+The current `init`, `doctor`, `project inspect`, `skill list`, and `skill check` descriptors declare `parallel-read`, but general parallel-reader coordination is not yet implemented. Mutating lanes remain one lease per project and require explicit renewal.
 
 ## Engine adapter boundary
 

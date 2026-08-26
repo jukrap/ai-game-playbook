@@ -1,12 +1,12 @@
 ---
 source: README.md
-source_sha256: c81a4e0a6204ec05eabe1a7982afd81c6500b539e91f3fee59118b01abc03db1
+source_sha256: 28c7f9e1350d3d733a09c0a75e245ca4518d3aca47032db7f4f4aaf545f55648
 translated_at: 2026-08-27
 ---
 
 # AI Game Playbook
 
-> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction, durable private receipt와 artifact byte, bounded private receipt-head query, 제한된 private artifact assessment, 소스 빌드 방식의 실험적 read-only command 세 개, project-bound modern STDIO MCP runtime, registry-derived project-inspection skill artifact 하나, write-free Codex setup planner를 구현하고 있습니다. 설치 가능한 package와 engine adapter는 아직 없습니다.
+> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction, durable private receipt와 artifact byte, bounded private receipt-head query, 제한된 private artifact assessment, 소스 빌드 방식의 실험적 write-free command 다섯 개, project-bound modern STDIO MCP runtime, registry-derived project-inspection skill artifact 하나, write-free Codex setup planner를 구현하고 있습니다. 설치 가능한 package와 engine adapter는 아직 없습니다.
 
 [English](README.md)
 
@@ -19,13 +19,13 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine을 사용하는 개인과 
 - canonical project identity, link-safe path resolution, bounded file read, staged compare-and-swap write/delete, bounded direct process execution, project mutation lease, scoped signed approval, workflow state, durable checkpoint, append-only run receipt, receipt-attested manifest가 있는 immutable content-addressed artifact object 안전 primitive.
 - 고정 limit 안에서 canonical receipt head를 조회하고, bounded process와 structured test observation을 정규화하며, raw content를 반환하지 않으면서 보존된 UTF-8 text, canonical JSON, non-interlaced PNG byte와 등록된 asset provenance를 평가하는 private evidence 경계.
 - write-free preflight, exact ownership, add/update/remove transaction, append-only journal, active-transaction barrier, 명확한 실패 뒤 rollback, marker 결합 directory ownership, 별도 승인 recovery finalization을 제공하는 private managed-pack runtime.
-- 실험적 private CLI package와 repository-local `agpb` entry point. 구현된 명령은 plan-only `agpb init`, read-only `agpb doctor`, static read-only `agpb project inspect`입니다.
+- 실험적 private CLI package와 repository-local `agpb` entry point. 구현된 명령은 plan-only `agpb init`, read-only `agpb doctor`와 `agpb project inspect`, read-only `agpb skill list`와 `agpb skill check`입니다.
 - 명시적으로 enable한 registry-generated read-only tool만 modern STDIO로 노출하는 실험적 private MCP package. Project identity 하나를 bind하고 exact input/output schema와 transport/result byte limit을 강제하며 network access나 project mutation을 수행하지 않습니다.
-- Machine-specific local-only project MCP configuration 하나와 deterministic project-inspection skill target 하나를 render하고 inspect하는 private Codex adapter. Packaged skill byte를 generated registry digest에 bind하며 어느 target도 write하거나 merge하지 않고 project skill을 materialize하지 않습니다.
-- `init`, `doctor`, `project inspect`를 available로 표시하고 나머지 모든 명령과 엔진 capability를 planned로 유지하는 digest 결합 공개 surface.
+- Deterministic project-inspection skill artifact 하나를 generated registry에 bind하고 project target을 inspect하며 machine-specific local-only MCP configuration 하나를 render/inspect하는 private skill runtime과 Codex adapter. 어느 target도 write하거나 merge하지 않고 project skill을 materialize하지 않습니다.
+- `init`, `doctor`, `project inspect`, `skill list`, `skill check`를 available로 표시하고 mutating skill command와 모든 engine capability를 planned로 유지하는 digest 결합 공개 surface.
 - 영어 공개 문서와 한국어 mirror, Windows/Linux conformance check.
 
-현재 CLI slice는 고정된 16개 `.ai-game-playbook/` target layout을 계획하고, 지원 Node.js 범위, runtime-registry parity, project state, installed-pack state, active transaction marker를 진단하며, bounded Godot/Unity/Unreal project marker와 canonical committed project profile을 검사합니다. Project inspection은 `.git` marker만 관찰하면 dirty state를 unknown으로 유지하고 static lock을 process나 선택 가능한 Editor session으로 간주하지 않습니다. 세 명령 모두 간결한 human output 또는 등록된 canonical JSON을 출력하며 write, process launch, network access, Editor control을 수행하지 않습니다.
+현재 CLI slice는 고정된 16개 `.ai-game-playbook/` target layout을 계획하고, 지원 Node.js 범위, runtime-registry parity, project state, installed-pack state, active transaction marker를 진단하며, bounded Godot/Unity/Unreal project marker와 canonical committed project profile을 검사합니다. 또한 bounded registry skill catalog를 나열하고 대응하는 project skill target을 missing, current, conflicting, oversized, unsafe로 분류합니다. Project inspection은 `.git` marker만 관찰하면 dirty state를 unknown으로 유지하고 static lock을 process나 선택 가능한 Editor session으로 간주하지 않습니다. 다섯 명령 모두 간결한 human output 또는 등록된 canonical JSON을 출력하며 write, process launch, network access, Editor control을 수행하지 않습니다.
 
 대부분의 runtime component는 여전히 private library입니다. Pack mutation에는 exact same-process plan, broker가 발급한 `install` authorization, attest된 project-write lease가 필요합니다. Recovery finalizer는 bounded inspector가 이미 분류한 stable state만 닫을 수 있으며 pack artifact를 repair하거나 mixed state를 해결할 수 없습니다. Private promotion API는 complete project-local artifact마다 stable snapshot을 immutable SHA-256 object로 저장합니다. Receipt는 각 canonical manifest digest와 원본 source path를 직접 증명하고, 각 manifest는 보존 object와 source를 receipt 실행 context, project, runtime, registry, command, handler에 결합합니다. Receipt persistence와 reload는 해당 byte와 manifest가 exact하게 유지될 것을 요구합니다. Bounded private query는 caller가 선택한 cap 안에서 fixed receipt-directory inventory, canonical head, latest-record 존재를 검증합니다. Frozen summary를 반환하고 기존 full-chain loader가 선택한 run을 읽기 전에 원본 same-process witness를 요구하며, malformed record content를 summary에서 검증된 것으로 취급하지 않습니다. 별도 private assessment는 target 하나를 읽기 전후에 receipt, 보존 object, manifest를 다시 검증한 뒤 bounded UTF-8, canonical JSON 또는 non-interlaced PNG inspection과 선택적 current-registry `AssetProvenance` 일치를 평가합니다. 결과는 영속화하지 않습니다. Interlaced PNG, 다른 format, runtime-frame provenance, engine-backed QA, retention/cleanup, CLI 또는 MCP list/show/export operation, migration-ready historical access는 아직 없습니다. Approval reservation과 active lease는 memory-only이고 general mutation dispatcher나 approval UI는 없습니다.
 
@@ -42,9 +42,13 @@ pnpm run agpb -- doctor --project <project-path>
 pnpm run agpb -- doctor --project <project-path> --json
 pnpm run agpb -- project inspect --project <project-path>
 pnpm run agpb -- project inspect --project <project-path> --json
+pnpm run agpb -- skill list --project <project-path>
+pnpm run agpb -- skill list --project <project-path> --json
+pnpm run agpb -- skill check --project <project-path>
+pnpm run agpb -- skill check --project <project-path> --json
 ```
 
-`init`은 write-free layout plan에 path conflict가 없으면 exit code `0`, 선택한 root나 계획 target이 blocked이면 `3`을 반환합니다. `doctor`는 project state 미초기화 같은 attention-level warning을 포함해 blocking finding 없이 진단을 마치면 `0`, blocking finding이 있으면 `3`을 반환합니다. `project inspect`는 nonblocking unknown을 포함한 validated static report에 `0`, unavailable root, invalid/mismatched profile, ambiguous engine selection에 `3`을 반환합니다. 세 명령 모두 잘못된 CLI 사용은 `2`, validated report를 만들지 못한 내부 실패는 `1`입니다.
+`init`은 write-free layout plan에 path conflict가 없으면 exit code `0`, 선택한 root나 계획 target이 blocked이면 `3`을 반환합니다. `doctor`는 project state 미초기화 같은 attention-level warning을 포함해 blocking finding 없이 진단을 마치면 `0`, blocking finding이 있으면 `3`을 반환합니다. `project inspect`는 nonblocking unknown을 포함한 validated static report에 `0`, unavailable root, invalid/mismatched profile, ambiguous engine selection에 `3`을 반환합니다. `skill list`는 bound catalog에 `0`, unavailable project에 `3`을 반환합니다. `skill check`는 missing/current target에 `0`, conflict, unsafe path, oversized target, unavailable project에 `3`을 반환합니다. 다섯 명령 모두 잘못된 CLI 사용은 `2`, validated report를 만들지 못한 내부 실패는 `1`입니다.
 
 ## 제품 방향
 

@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: 47938fac56ccd7b74cd68f444421a383a064e00e8efde4ec6c46ab75f7dcd202
+source_sha256: 92e68cc273e1a0b19a17da854636eb2d69d2de7dc21474859c172e6d83fe00cd
 translated_at: 2026-08-27
 ---
 
 # 목표 아키텍처
 
-> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, core 안전 primitive, durable private receipt record와 artifact object, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, managed-pack transaction, plan-only `agpb init`, read-only `agpb doctor`, static read-only `agpb project inspect`, project-bound read-only STDIO MCP runtime, registry-derived project-inspection skill artifact, write-free Codex setup planner가 존재합니다. General mutation dispatch, evidence export, 실제 host installation, engine, bridge는 계획 단계입니다.
+> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, core 안전 primitive, durable private receipt record와 artifact object, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, managed-pack transaction, skill catalog 검사를 포함한 write-free `agpb` command 다섯 개, project-bound read-only STDIO MCP runtime, registry-derived project-inspection skill artifact, write-free Codex setup planner가 존재합니다. General mutation dispatch, evidence export, 실제 host installation, engine, bridge는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -27,7 +27,7 @@ flowchart TD
     W --> F[Safe filesystem와 process layer]
 ```
 
-Typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 authoring source입니다. Generation은 같은 validated identity에서 CLI, MCP, 문서, skill-routing metadata를 만듭니다. Runtime registry에는 현재 `init`, `doctor`, `project.inspect`가 있으며 CLI help, parsing, input/output validation, dispatch가 그 exact descriptor를 사용합니다. 실험적 MCP runtime은 같은 generated MCP metadata와 exact schema에서 명시적으로 선택한 read-only subset만 등록합니다. 공개 foundation plan은 runtime-registry digest를 기록하고 미구현 command를 분리합니다.
+Typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 authoring source입니다. Generation은 같은 validated identity에서 CLI, MCP, 문서, skill-routing metadata를 만듭니다. Runtime registry에는 현재 `init`, `doctor`, `project.inspect`, `skill.list`, `skill.check`가 있으며 CLI help, parsing, input/output validation, dispatch가 그 exact descriptor를 사용합니다. 실험적 MCP runtime은 같은 generated MCP metadata와 exact schema에서 명시적으로 선택한 read-only subset만 등록합니다. 공개 foundation plan은 runtime-registry digest를 기록하고 미구현 command를 분리합니다.
 
 ## Workspace 경계
 
@@ -37,7 +37,8 @@ Typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 | `registry` | 기반 구현 | Descriptor validation, generation, digest, routing, workflow-plan resolution, exact implemented-command inventory |
 | `core` | 일부 구현 | Canonical project identity, safe path, compare-and-swap filesystem operation, bounded process, mutation lease, in-memory permission admission, workflow state, durable checkpoint, append-only run receipt, bounded receipt-head query, private artifact promotion |
 | `pack-runtime` | 일부 구현 | Write-free preflight, exact ownership, local lifecycle transaction, journal, active barrier, rollback, directory ownership, recovery inspection, approved stable-state finalization |
-| `cli` | 실험적 일부 구현 | Registry-derived help/version, fail-closed parsing, stable exit category, human/JSON output, plan-only `init`, read-only `doctor`, static `project inspect` |
+| `skill-runtime` | Private 기반 일부 구현 | Registry-bound packaged skill catalog, bounded artifact validation, same-process project plan, write-free target inspection. Materialization은 사용할 수 없음 |
+| `cli` | 실험적 일부 구현 | Registry-derived help/version, fail-closed parsing, stable exit category, human/JSON output, plan-only `init`, read-only `doctor`, `project inspect`, `skill list`, `skill check` |
 | `evidence` | Private 기반 일부 구현 | Pure bounded-process/structured-test normalization, 제한된 retained-artifact format/provenance assessment, canonical receipt record, content-addressed byte, producer-bound manifest가 존재하며 engine report parsing, assessment persistence, retention, migration, CLI/MCP listing, explicit export는 계획 단계 |
 | `mcp` | 실험적 private runtime | Explicit generated read-only tool allowlist, exact project binding, schema parity, bounded message, canonical result를 제공하는 modern STDIO transport. Mutation/network tool은 사용할 수 없음 |
 | `codex-adapter` | Private planner 일부 구현 | Write, merge, trust 변경, skill materialization 없이 deterministic local-only project MCP configuration과 project-inspection skill target 계획 및 create/retain/conflict 검사 |
@@ -51,10 +52,10 @@ Partial package가 존재한다고 전체 product surface가 존재하는 것은
 
 구현된 CLI 경로는 의도적으로 좁습니다.
 
-1. Global help/version 또는 exact `init`, `doctor`, `project inspect` command와 선언된 flag만 parse합니다.
+1. Global help/version 또는 exact `init`, `doctor`, `project inspect`, `skill list`, `skill check` command와 선언된 flag만 parse합니다.
 2. Validated runtime registry에서 선택한 command descriptor를 얻습니다.
 3. Descriptor 결합 input schema로 request를 검증합니다.
-4. `init`은 canonical root 하나를 bind하고 고정된 target 16개를 write 없이 분류합니다. `doctor`는 registry parity, Node.js version, project identity, fixed state directory, installed-pack state, active transaction marker를 write 없이 검사합니다. `project inspect`는 root를 deterministic하게 열거하고 선택한 marker path를 bound root로 resolve하며 stable identity를 통해 bounded marker/profile file을 두 번 읽고 external execution 없이 dirty/process gap을 보존합니다.
+4. `init`은 canonical root 하나를 bind하고 고정된 target 16개를 write 없이 분류합니다. `doctor`는 registry parity, Node.js version, project identity, fixed state directory, installed-pack state, active transaction marker를 write 없이 검사합니다. `project inspect`는 root를 deterministic하게 열거하고 선택한 marker path를 bound root로 resolve하며 stable identity를 통해 bounded marker/profile file을 두 번 읽고 external execution 없이 dirty/process gap을 보존합니다. `skill list`와 `skill check`는 generated stable skill route를 bind하고 packaged artifact를 검증하며 materialization 없이 bounded catalog metadata 또는 target observation만 노출합니다.
 5. Bounded target/check outcome에서 plan 또는 diagnostic status를 계산합니다.
 6. 해당되는 semantic count, identity, digest binding을 검증한 뒤 완성된 report를 descriptor 결합 output schema로 검증합니다.
 7. Human 또는 canonical JSON output을 만들고 stable exit category로 매핑합니다.
@@ -63,7 +64,7 @@ Handler digest는 compiled init, doctor, project-inspection module을 각각 att
 
 현재 MCP 경로도 write-free입니다. Startup에는 project root 하나, 명시적인 generated tool name 하나 이상, 선택한 project diagnostic이 active host context에 들어갈 수 있다는 acknowledgement가 필요합니다. Runtime은 canonical project identity를 bind하고 read-only closed-world tool만 등록하며 STDIO message 하나를 1 MiB로 제한하고 exact registered input/output schema를 검증한 뒤 canonical bounded result를 반환합니다. HTTP transport, network access, Editor control, mutation route는 없습니다.
 
-Codex adapter는 caller가 선택한 runtime code를 받지 않고 현재 지원 Node.js executable과 이 installation의 MCP entry point를 자체 결정합니다. Project-local `.codex/config.toml` 하나와 `.agents/skills/project-inspection/SKILL.md` target 하나의 immutable byte를 만들고 project/runtime identity를 다시 확인하면서 각 target을 create, retain, conflict로 분류합니다. Packaged skill source는 bounded canonical regular file이어야 하며 UTF-8, LF-only frontmatter, name, SHA-256 digest가 generated registry route와 일치해야 합니다. Adapter는 parent directory를 만들거나 target을 write/merge하거나 project trust를 변경하거나 skill을 설치하지 않습니다.
+Shared skill runtime이 packaged artifact validation과 write-free project-target observation을 소유합니다. Codex adapter는 같은 plan을 소비하고 caller가 선택한 runtime code를 받지 않으며 현재 지원 Node.js executable과 이 installation의 MCP entry point를 자체 결정합니다. Project-local `.codex/config.toml` 하나와 `.agents/skills/project-inspection/SKILL.md` target 하나의 immutable byte를 만들고 project/runtime identity를 다시 확인하면서 각 target을 create, retain, conflict로 분류합니다. Packaged skill source는 bounded canonical regular file이어야 하며 UTF-8, LF-only frontmatter, name, SHA-256 digest가 generated registry route와 일치해야 합니다. 두 runtime 모두 parent directory를 만들거나 target을 write/merge하거나 project trust를 변경하거나 skill을 설치하지 않습니다.
 
 ## 계획된 mutation 실행 흐름
 
@@ -105,7 +106,7 @@ Execution lane은 다음과 같습니다.
 - project serialization 안의 exact Editor session용 `editor-bound`;
 - approved test/build work용 `build-bound`.
 
-현재 `init`, `doctor`, `project inspect` descriptor는 `parallel-read`를 선언하지만 general parallel-reader coordination은 아직 구현하지 않았습니다. Mutation lane은 project마다 lease 하나이며 명시적 renew가 필요합니다.
+현재 `init`, `doctor`, `project inspect`, `skill list`, `skill check` descriptor는 `parallel-read`를 선언하지만 general parallel-reader coordination은 아직 구현하지 않았습니다. Mutation lane은 project마다 lease 하나이며 명시적 renew가 필요합니다.
 
 ## Engine adapter 경계
 

@@ -4,7 +4,7 @@
   "reviewedAt": "2026-08-27",
   "implementationStatus": "partial",
   "executableAvailable": true,
-  "runtimeRegistryDigest": "sha256:372417bc8dd01a1603cabeeb075c01fe78fa37f2b9054f9288adc1ea4d49380a",
+  "runtimeRegistryDigest": "sha256:fbae3ebb02684535e24f0934151caebdd35591d1e16c2e91cb22554ba92de215",
   "package": {
     "npm": "ai-game-playbook",
     "executable": "agpb"
@@ -34,7 +34,9 @@
   "availableCommands": [
     "agpb init",
     "agpb doctor",
-    "agpb project inspect"
+    "agpb project inspect",
+    "agpb skill list",
+    "agpb skill check"
   ],
   "publicTypes": [
     "CommandDescriptor",

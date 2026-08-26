@@ -1,12 +1,12 @@
 ---
 source: docs/README.md
-source_sha256: 6fba1cfbab11f97f4e24e0dbc07ec1bcbdd4d8a1bffca2b4cc79edd64fe1028e
-translated_at: 2026-08-26
+source_sha256: 902f9345d58c83aad648a14df3a0eea4e74aeec867cd10e4fe6dad01d6623b23
+translated_at: 2026-08-27
 ---
 
 # 문서
 
-> 상태: 2026-08-26에 검토한 공개 설계 및 구현 상태 문서 묶음입니다. Control plane 기반과 source-built write-free CLI 명령 세 개를 구현하고 있습니다.
+> 상태: 2026-08-27에 검토한 공개 설계 및 구현 상태 문서 묶음입니다. Control plane 기반과 source-built write-free CLI 명령 다섯 개를 구현하고 있습니다.
 
 [English](README.md) · [프로젝트 소개](../README.ko.md)
 
@@ -20,7 +20,7 @@ translated_at: 2026-08-26
 | --- | --- |
 | [상태와 범위](status-and-scope.ko.md) | 현재 저장소 상태, 초기 사용자, 포함 작업과 제외 범위 |
 | [개념](concepts.ko.md) | 공통 lifecycle, 공개 type, support grade와 run outcome |
-| [CLI 상태](planned-cli.ko.md) | 사용 가능한 `agpb init`, `agpb doctor`, `agpb project inspect` 동작과 나머지 계획 명령군 |
+| [CLI 상태](planned-cli.ko.md) | 사용 가능한 `agpb init`, `agpb doctor`, `agpb project inspect`, `agpb skill list`, `agpb skill check` 동작과 나머지 계획 명령군 |
 | [아키텍처](architecture.ko.md) | Control plane, adapter, bridge, project state와 generated surface |
 | [엔진 지원](engine-support.ko.md) | 공통 engine contract와 엔진별 검증 임계값 |
 | [보안과 권한](security-and-permissions.ko.md) | 승인 class, stop condition, isolation과 data movement |

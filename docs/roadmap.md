@@ -6,16 +6,17 @@
 
 ## Current checkpoint
 
-Completed foundations include versioned contracts, strict registry validation, generated surfaces, deterministic workflow plans, canonical project/path handling, compare-and-swap filesystem operations, bounded processes, project mutation leases, signed scoped permission admission, workflow checkpoints, durable private receipt records, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions with recovery boundaries, a project-bound read-only STDIO MCP runtime, one registry-derived project-inspection skill artifact, and write-free Codex project-configuration and skill-target planning.
+Completed foundations include versioned contracts, strict registry validation, generated surfaces, deterministic workflow plans, canonical project/path handling, compare-and-swap filesystem operations, bounded processes, project mutation leases, signed scoped permission admission, workflow checkpoints, durable private receipt records, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions with recovery boundaries, a project-bound read-only STDIO MCP runtime, one registry-derived project-inspection skill artifact with a shared read-only runtime, and write-free Codex project-configuration and skill-target planning.
 
 The current Stage 2 product slice adds:
 
 - an executable repository-local CLI with stable help, version, parsing, output, and exit behavior;
 - an exact runtime registry that exposes only implemented commands;
-- `InitRequest`, `InitReport`, `DoctorRequest`, `DoctorReport`, `ProjectInspectRequest`, and `ProjectInspectReport` schemas;
+- `InitRequest`, `InitReport`, `DoctorRequest`, `DoctorReport`, `ProjectInspectRequest`, `ProjectInspectReport`, skill-list, and skill-check schemas;
 - write-free `agpb init` classification for a fixed 16-target project-local layout;
 - read-only `agpb doctor` checks for runtime, registry, project-state, installed-pack-state, and active-marker safety;
 - static read-only `agpb project inspect` for bounded engine markers, canonical profile compatibility, marker-only dirty state, and unbound Editor signals;
+- read-only `agpb skill list` and `agpb skill check` for a bounded registry catalog and missing/current/conflicting/oversized/unsafe project-target observations without materialization;
 - canonical append-only run-receipt persistence with exact runtime and registry authority, compare-and-swap heads, redaction checks, and complete project-local artifact-locator verification;
 - private whole-directory receipt-head query with fixed entry/head/byte limits, explicit summary validation level, and same-process detailed-load witnesses;
 - private promotion of complete artifact snapshots into immutable SHA-256 objects with receipt-attested canonical manifests;
@@ -33,7 +34,7 @@ This does not make the package installable and does not raise any engine capabil
 The next control-plane work is:
 
 1. Bind mutation behind the existing write-plan-only `init` to explicit project-metadata authority, fresh plan validation, staged writes, and rollback.
-2. Add pack and skill list/check commands before any mutation command.
+2. Add write-free pack listing and diagnostics before any public pack mutation command.
 3. Connect approved pack add/update/remove and recovery finalization through a general dispatcher without weakening the existing plan, approval, lane, CAS, journal, or rollback requirements.
 4. Add approval interaction and stable error envelopes, then connect command deadlines and settlements to the durable receipt store.
 5. Verify clean install, reinstall, update, conflict, interruption, rollback, recovery, and uninstall behavior from the executable surface.
@@ -42,7 +43,7 @@ No command may be marked available merely because a private library function exi
 
 ## Stage 3 — evidence, MCP, and Codex integration
 
-The process/test normalization, limited artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, one registry-derived project-inspection skill artifact, and plan-only Codex project-configuration and skill-target foundations are implemented. Engine report parsers, required-test selection, gameplay/capture/performance/build normalizers, broader artifact formats, runtime-frame provenance, assessment persistence, and runtime-to-receipt integration remain planned. Other planned work includes filtered and persistent evidence indexing, receipt-history migration and forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export commands, approved Codex configuration and skill materialization, and public skill lifecycle commands.
+The process/test normalization, limited artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, one registry-derived project-inspection skill artifact, public read-only skill list/check commands, and plan-only Codex project-configuration and skill-target foundations are implemented. Engine report parsers, required-test selection, gameplay/capture/performance/build normalizers, broader artifact formats, runtime-frame provenance, assessment persistence, and runtime-to-receipt integration remain planned. Other planned work includes filtered and persistent evidence indexing, receipt-history migration and forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export commands, approved Codex configuration and skill materialization, and an approved mutating skill lifecycle.
 
 CLI, MCP, documentation, and skill routing must preserve identical command IDs, schema digests, permissions, and handler identities. MCP annotations remain hints and can never override the permission broker. No background upload or telemetry path is planned.
 

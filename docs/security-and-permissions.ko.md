@@ -1,12 +1,12 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: ec55258097e44bad1fc025ba0f975a50dd7234636b6e7295d4b3c622f81ef459
+source_sha256: feed8b3f488c534780e3fce2835d07d784fa2102fa135ad8a57125cab743fb10
 translated_at: 2026-08-27
 ---
 
 # 보안과 권한
 
-> 상태: private admission, workflow checkpoint, durable receipt/artifact record, bounded private receipt-head query, managed-pack transaction, read-only CLI diagnostic, read-only STDIO MCP 경계, write-free Codex configuration/skill-target planning이 구현된 계획 permission policy입니다. General mutation dispatch와 engine enforcement는 아직 없습니다.
+> 상태: private admission, workflow checkpoint, durable receipt/artifact record, bounded private receipt-head query, managed-pack transaction, write-free CLI command 다섯 개, read-only STDIO MCP 경계, write-free skill-target/Codex configuration planning이 구현된 계획 permission policy입니다. General mutation dispatch와 engine enforcement는 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
@@ -16,11 +16,11 @@ translated_at: 2026-08-27
 
 Authorization 자체는 execution이 아닙니다. Broker는 general mutation dispatcher, process workflow, engine bridge와 연결되지 않았습니다. 현재 MCP runtime은 generated metadata와 registered descriptor가 read-only, closed-world, non-mutating임을 증명하는 command만 노출하며 broker의 elevated permission path를 갖지 않습니다. 좁은 pack executor와 stable-state recovery finalizer는 각각 same-process plan, exact `install` decision, attest된 project-write lease를 요구합니다. Grant reservation과 active lease는 memory-only이며 restart 뒤 유지되지 않습니다.
 
-현재 CLI는 plan-only `init`, read-only `doctor`, static read-only `project inspect`를 dispatch합니다. 세 descriptor 모두 `read-project`, side effect 없음, `parallel-read` lane, changed-file/changed-byte budget 0을 선언합니다. 어느 명령도 elevated authority를 요청하거나 repair를 호출하거나 mutation lane에 진입할 수 없습니다.
+현재 CLI는 plan-only `init`, read-only `doctor`와 static `project inspect`, read-only `skill list`와 `skill check`를 dispatch합니다. 다섯 descriptor 모두 `read-project`, side effect 없음, `parallel-read` lane, changed-file/changed-byte budget 0을 선언합니다. 어느 명령도 elevated authority를 요청하거나 repair를 호출하거나 skill을 materialize하거나 mutation lane에 진입할 수 없습니다.
 
 MCP startup에는 bounded project root 하나, explicit generated tool name 하나 이상, 선택한 project diagnostic이 active host에 disclose될 수 있다는 acknowledgement가 필요합니다. Runtime은 canonical path와 filesystem identity를 bind하고 모든 command input을 그 exact project에 다시 bind하며 duplicated, unknown, write-capable, destructive, open-world tool을 거부합니다. 최대 1 MiB인 modern STDIO message만 받고 registered input/output schema와 command deadline을 강제하며 bounded canonical result를 출력하고 HTTP/network access를 노출하지 않습니다. Host approval UI는 host 책임이며 이 acknowledgement는 evidence export나 telemetry consent가 아닙니다.
 
-Codex setup planner는 caller가 선택한 executable, script, skill path를 받지 않습니다. 현재 지원 Node.js executable, 이 installation의 MCP entry point, generated registry의 유일한 stable model-invoked skill route를 bind합니다. Deterministic project-skill byte를 반환하기 전에 packaged source가 64 KiB 상한 안의 canonical regular file이며 선언한 name, UTF-8/LF 형식, frontmatter, SHA-256 digest와 일치하는지 확인합니다. Inspection은 해당 runtime identity를 다시 확인하고 configuration/skill target을 분류하면서 linked, case-aliased, type-conflicted, oversized path를 거부합니다. Directory 생성, file write, merge, trust 변경, skill materialization을 수행하지 않습니다.
+Shared skill runtime과 Codex setup planner는 caller가 선택한 script/skill path를 받지 않습니다. Skill runtime은 generated registry의 유일한 stable model-invoked skill route를 bind하고 packaged source가 64 KiB 상한 안의 canonical regular file이며 선언 name, UTF-8/LF 형식, frontmatter, SHA-256 digest와 일치하도록 요구합니다. CLI와 MCP는 이 authority에서 bounded catalog metadata와 target observation만 반환합니다. Codex setup은 deterministic project-skill/configuration byte를 반환하기 전에 현재 지원 Node.js executable과 이 installation의 MCP entry point도 bind합니다. Inspection은 runtime identity를 다시 확인하고 linked, case-aliased, type-conflicted, oversized path를 거부하며 target을 분류합니다. 이 경로들은 directory 생성, file write, merge, trust 변경, skill materialization을 수행하지 않습니다.
 
 Static project inspection은 local root 하나를 bind하고 directory observation과 file byte를 제한하며 unsafe link와 case ambiguity를 거부하고 read 전후 identity를 다시 확인합니다. `.git` marker는 Git 실행 permission을 부여하지 않으며 Editor lock은 process, session, liveness, connection, mutation authority를 부여하지 않습니다. Report는 mutation, process launch, network access가 없음을 명시합니다. Invalid profile과 ambiguous engine candidate는 그럴듯한 target을 선택하지 않고 이후 authority를 차단합니다.
 

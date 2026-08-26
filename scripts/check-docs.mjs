@@ -33,7 +33,13 @@ const reviewDesignSurface = {
     "agpb evidence export",
     "agpb docs check"
   ],
-  availableCommands: ["agpb init", "agpb doctor", "agpb project inspect"],
+  availableCommands: [
+    "agpb init",
+    "agpb doctor",
+    "agpb project inspect",
+    "agpb skill list",
+    "agpb skill check"
+  ],
   publicTypes: [
     "CommandDescriptor",
     "PackManifest",
@@ -434,7 +440,7 @@ const readme = readText("README.md");
 const statusDoc = readText("docs/status-and-scope.md");
 if (
   !readme.includes("No installable package") ||
-  !readme.includes("The implemented commands are plan-only `agpb init`, read-only `agpb doctor`, and static read-only `agpb project inspect`") ||
+  !readme.includes("The implemented commands are plan-only `agpb init`; read-only `agpb doctor` and `agpb project inspect`; and read-only `agpb skill list` and `agpb skill check`") ||
   !readme.includes("all engine capabilities planned")
 ) {
   fail("README.md: executable availability limits must remain explicit");

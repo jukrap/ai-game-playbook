@@ -1,6 +1,6 @@
 ---
 source: docs/roadmap.md
-source_sha256: 344372beb589fa3fd66a1825c719eea8d3ec88b7f756fedac548c0663e9fe1b8
+source_sha256: 872e1f1b79e1ab689f13925ad0ad430e24c5c93a1f0e240a3df75dcadab1f298
 translated_at: 2026-08-27
 ---
 
@@ -12,16 +12,17 @@ translated_at: 2026-08-27
 
 ## 현재 체크포인트
 
-완료된 기반에는 versioned contract, strict registry validation, generated surface, deterministic workflow plan, canonical project/path handling, compare-and-swap filesystem operation, bounded process, project mutation lease, signed scoped permission admission, workflow checkpoint, durable private receipt record, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, recovery boundary가 있는 managed-pack transaction, project-bound read-only STDIO MCP runtime, registry-derived project-inspection skill artifact 하나, write-free Codex project-configuration/skill-target planning이 포함됩니다.
+완료된 기반에는 versioned contract, strict registry validation, generated surface, deterministic workflow plan, canonical project/path handling, compare-and-swap filesystem operation, bounded process, project mutation lease, signed scoped permission admission, workflow checkpoint, durable private receipt record, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, recovery boundary가 있는 managed-pack transaction, project-bound read-only STDIO MCP runtime, shared read-only runtime을 둔 registry-derived project-inspection skill artifact 하나, write-free Codex project-configuration/skill-target planning이 포함됩니다.
 
 현재 Stage 2 product slice에는 다음이 추가됐습니다.
 
 - stable help, version, parsing, output, exit behavior를 가진 executable repository-local CLI;
 - implemented command만 노출하는 exact runtime registry;
-- `InitRequest`, `InitReport`, `DoctorRequest`, `DoctorReport`, `ProjectInspectRequest`, `ProjectInspectReport` schema;
+- `InitRequest`, `InitReport`, `DoctorRequest`, `DoctorReport`, `ProjectInspectRequest`, `ProjectInspectReport`, skill-list, skill-check schema;
 - 고정된 project-local target 16개를 분류하는 write-free `agpb init`;
 - runtime, registry, project state, installed-pack state, active marker를 검사하는 read-only `agpb doctor`;
 - bounded engine marker, canonical profile compatibility, marker-only dirty state, unbound Editor signal을 검사하는 static read-only `agpb project inspect`;
+- bounded registry catalog와 materialization 없는 missing/current/conflicting/oversized/unsafe project-target observation을 제공하는 read-only `agpb skill list`와 `agpb skill check`;
 - exact runtime/registry authority, compare-and-swap head, redaction check, complete project-local artifact-locator 검증을 포함한 canonical append-only run-receipt persistence;
 - 고정 entry/head/byte limit, explicit summary validation level, same-process detailed-load witness를 포함한 private whole-directory receipt-head query;
 - complete artifact snapshot을 receipt가 증명하는 canonical manifest와 함께 immutable SHA-256 object로 승격하는 private promotion;
@@ -39,7 +40,7 @@ translated_at: 2026-08-27
 다음 control-plane 작업은 다음과 같습니다.
 
 1. 기존 write-plan-only `init` 뒤의 mutation을 explicit project-metadata authority, fresh plan validation, staged write, rollback에 결합합니다.
-2. Mutation command보다 먼저 pack/skill list와 check command를 추가합니다.
+2. Public pack mutation command보다 먼저 write-free pack list와 diagnostic을 추가합니다.
 3. 기존 plan, approval, lane, CAS, journal, rollback 요구를 약화하지 않고 approved pack add/update/remove와 recovery finalization을 general dispatcher에 연결합니다.
 4. Approval interaction과 stable error envelope를 추가한 뒤 command deadline과 settlement를 durable receipt store에 연결합니다.
 5. Executable surface에서 clean install, reinstall, update, conflict, interruption, rollback, recovery, uninstall을 검증합니다.
@@ -48,7 +49,7 @@ Private library function이 있다는 이유만으로 command를 available로 �
 
 ## Stage 3 — evidence, MCP, Codex integration
 
-Process/test normalization, 제한된 artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, registry-derived project-inspection skill artifact 하나, plan-only Codex project-configuration/skill-target 기반은 구현했습니다. Engine report parser, required-test selection, gameplay/capture/performance/build normalizer, 더 넓은 artifact format, runtime-frame provenance, assessment persistence, runtime-to-receipt integration은 계획 단계입니다. 그 밖에 filtered/persistent evidence indexing, receipt-history migration/forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export command, 승인된 Codex configuration/skill materialization, public skill lifecycle command를 계획합니다.
+Process/test normalization, 제한된 artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, registry-derived project-inspection skill artifact 하나, public read-only skill list/check command, plan-only Codex project-configuration/skill-target 기반은 구현했습니다. Engine report parser, required-test selection, gameplay/capture/performance/build normalizer, 더 넓은 artifact format, runtime-frame provenance, assessment persistence, runtime-to-receipt integration은 계획 단계입니다. 그 밖에 filtered/persistent evidence indexing, receipt-history migration/forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export command, 승인된 Codex configuration/skill materialization, approved mutating skill lifecycle을 계획합니다.
 
 CLI, MCP, 문서, skill routing은 동일한 command ID, schema digest, permission, handler identity를 유지해야 합니다. MCP annotation은 hint이며 permission broker를 override할 수 없습니다. Background upload나 telemetry path는 계획하지 않습니다.
 

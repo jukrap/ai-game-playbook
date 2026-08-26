@@ -35,6 +35,9 @@ importers:
       '@ai-game-playbook/pack-runtime':
         specifier: workspace:*
         version: link:../pack-runtime
+      '@ai-game-playbook/project-runtime':
+        specifier: workspace:*
+        version: link:../project-runtime
       '@ai-game-playbook/registry':
         specifier: workspace:*
         version: link:../registry
@@ -94,6 +97,9 @@ importers:
       '@ai-game-playbook/core':
         specifier: workspace:*
         version: link:../core
+      '@ai-game-playbook/project-runtime':
+        specifier: workspace:*
+        version: link:../project-runtime
       '@ai-game-playbook/registry':
         specifier: workspace:*
         version: link:../registry
@@ -106,6 +112,18 @@ importers:
         version: 2.0.0
 
   packages/pack-runtime:
+    dependencies:
+      '@ai-game-playbook/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@ai-game-playbook/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ai-game-playbook/registry':
+        specifier: workspace:*
+        version: link:../registry
+
+  packages/project-runtime:
     dependencies:
       '@ai-game-playbook/contracts':
         specifier: workspace:*

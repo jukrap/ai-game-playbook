@@ -69,7 +69,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     inspect.output.schemaId,
     contracts.projectInspectReportSchema.schemaId,
   );
-  assert.equal(inspect.handler.package, "@ai-game-playbook/cli");
+  assert.equal(inspect.handler.package, "@ai-game-playbook/project-runtime");
   assert.equal(inspect.handler.export, "runProjectInspect");
   assert.match(inspect.handler.digest, digestPattern);
   assert.equal(

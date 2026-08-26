@@ -178,7 +178,7 @@ const projectInspectCommand: CommandDescriptor = Object.freeze({
   }),
   requiredEvidence: Object.freeze([parseStableId("project-inspection")]),
   handler: Object.freeze({
-    package: "@ai-game-playbook/cli",
+    package: "@ai-game-playbook/project-runtime",
     export: "runProjectInspect",
     digest: parseSha256Digest(
       "sha256:53fb471f5f4da4bcd79b8cba4420e66568aee517998f2384227cac78ea239b38",

@@ -11,10 +11,10 @@ import {
 import {
   runDoctor,
   runInit,
-  runProjectInspect,
   runSkillCheck,
   runSkillList,
 } from "@ai-game-playbook/cli";
+import { runProjectInspect } from "@ai-game-playbook/project-runtime";
 import {
   assertValidatedRegistry,
   BUILTIN_REGISTRY,
@@ -75,7 +75,9 @@ interface RuntimePlanState {
 type CommandHandler = (input: unknown) => Promise<unknown>;
 
 interface HandlerBinding {
-  readonly packageName: "@ai-game-playbook/cli";
+  readonly packageName:
+    | "@ai-game-playbook/cli"
+    | "@ai-game-playbook/project-runtime";
   readonly exportName:
     | "runDoctor"
     | "runInit"
@@ -123,7 +125,7 @@ const HANDLERS: ReadonlyMap<string, HandlerBinding> = new Map<
   [
     "project.inspect",
     Object.freeze({
-      packageName: "@ai-game-playbook/cli",
+      packageName: "@ai-game-playbook/project-runtime",
       exportName: "runProjectInspect",
       invoke: (input: unknown): Promise<unknown> => runProjectInspect(input),
     }),

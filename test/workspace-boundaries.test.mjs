@@ -24,6 +24,9 @@ test("workspace packages stay private and follow the foundation dependency direc
   const skillRuntime = await readJson(
     new URL("../packages/skill-runtime/package.json", import.meta.url),
   );
+  const projectRuntime = await readJson(
+    new URL("../packages/project-runtime/package.json", import.meta.url),
+  );
   const cli = await readJson(
     new URL("../packages/cli/package.json", import.meta.url),
   );
@@ -74,6 +77,13 @@ test("workspace packages stay private and follow the foundation dependency direc
     "@ai-game-playbook/core": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
   });
+  assert.equal(projectRuntime.private, true);
+  assert.equal(projectRuntime.license, "UNLICENSED");
+  assert.deepEqual(projectRuntime.dependencies, {
+    "@ai-game-playbook/contracts": "workspace:*",
+    "@ai-game-playbook/core": "workspace:*",
+    "@ai-game-playbook/registry": "workspace:*",
+  });
   assert.equal(cli.private, true);
   assert.equal(cli.license, "UNLICENSED");
   assert.deepEqual(cli.bin, { agpb: "./dist/bin.js" });
@@ -81,6 +91,7 @@ test("workspace packages stay private and follow the foundation dependency direc
     "@ai-game-playbook/contracts": "workspace:*",
     "@ai-game-playbook/core": "workspace:*",
     "@ai-game-playbook/pack-runtime": "workspace:*",
+    "@ai-game-playbook/project-runtime": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
     "@ai-game-playbook/skill-runtime": "workspace:*",
   });
@@ -121,6 +132,9 @@ test("package-local compiler paths are not inherited from the root config", asyn
   const skillRuntime = await readJson(
     new URL("../packages/skill-runtime/tsconfig.json", import.meta.url),
   );
+  const projectRuntime = await readJson(
+    new URL("../packages/project-runtime/tsconfig.json", import.meta.url),
+  );
   const cli = await readJson(
     new URL("../packages/cli/tsconfig.json", import.meta.url),
   );
@@ -132,5 +146,6 @@ test("package-local compiler paths are not inherited from the root config", asyn
   assert.equal(evidence.compilerOptions.rootDir, "src");
   assert.equal(packRuntime.compilerOptions.rootDir, "src");
   assert.equal(skillRuntime.compilerOptions.rootDir, "src");
+  assert.equal(projectRuntime.compilerOptions.rootDir, "src");
   assert.equal(cli.compilerOptions.rootDir, "src");
 });

@@ -142,20 +142,31 @@ export type {
   ProjectRootEntryKindHint,
 } from "./project-root-listing.js";
 export {
+  loadQueriedRunReceiptChain,
   loadRunReceiptChain,
   persistRunReceipt,
+  queryRunReceiptHeads,
   RUN_RECEIPT_MAX_ARTIFACT_BYTES,
   RUN_RECEIPT_MAX_ARTIFACTS,
   RUN_RECEIPT_MAX_CHAIN_BYTES,
   RUN_RECEIPT_MAX_CHAIN_LENGTH,
   RUN_RECEIPT_MAX_HEAD_BYTES,
   RUN_RECEIPT_MAX_RECORD_BYTES,
+  RUN_RECEIPT_QUERY_MAX_ENTRIES,
+  RUN_RECEIPT_QUERY_MAX_HEADS,
+  RUN_RECEIPT_QUERY_MAX_TOTAL_HEAD_BYTES,
   RUN_RECEIPT_STORE_PATH,
 } from "./run-receipt-store.js";
 export type {
+  LoadQueriedRunReceiptChainRequest,
   LoadRunReceiptChainRequest,
   LoadedRunReceiptChain,
   PersistRunReceiptRequest,
+  QueryRunReceiptHeadsRequest,
+  RunReceiptHeadQuery,
+  RunReceiptHeadSummary,
+  RunReceiptProjectAuthority,
+  RunReceiptRegistryAuthority,
   StoredRunReceipt,
 } from "./run-receipt-store.js";
 export {

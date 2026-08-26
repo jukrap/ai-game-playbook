@@ -16,6 +16,7 @@ import {
   validateRegisteredContractValue,
   type ValidatedRegistry,
 } from "@ai-game-playbook/registry";
+import { opendir } from "node:fs/promises";
 
 import {
   CAS_MAX_WRITE_BYTES,
@@ -38,11 +39,18 @@ export const RUN_RECEIPT_MAX_CHAIN_LENGTH = 4096;
 export const RUN_RECEIPT_MAX_CHAIN_BYTES: number = 64 * 1024 * 1024;
 export const RUN_RECEIPT_MAX_ARTIFACTS = 256;
 export const RUN_RECEIPT_MAX_ARTIFACT_BYTES: number = CAS_MAX_WRITE_BYTES;
+export const RUN_RECEIPT_QUERY_MAX_ENTRIES = 16_384;
+export const RUN_RECEIPT_QUERY_MAX_HEADS = 1_024;
+export const RUN_RECEIPT_QUERY_MAX_TOTAL_HEAD_BYTES: number = 16 * 1024 * 1024;
 
 const HEAD_SCHEMA_VERSION = "1.0.0" as const;
 const HEAD_KIND = "run-receipt-head" as const;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const HEAD_FILE_PATTERN =
+  /^([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.head\.json$/;
+const RECORD_FILE_PATTERN =
+  /^([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.([0-9a-f]{64})\.receipt\.json$/;
 const LOCAL_DETAIL_PATTERN =
   /(?:[a-zA-Z]:[\\/]|\\\\[^\\\r\n]+\\|(?:^|[\s"'(=])\/(?:bin|boot|dev|etc|home|media|mnt|opt|private|proc|root|run|srv|sys|tmp|usr|var|workspace|workspaces)(?:\/|\b))/u;
 const SECRET_DETAIL_PATTERN =
@@ -123,6 +131,44 @@ export interface LoadRunReceiptChainRequest {
   readonly maxArtifactBytes: number;
 }
 
+export interface QueryRunReceiptHeadsRequest {
+  readonly root: CanonicalProjectRoot;
+  readonly registry: ValidatedRegistry;
+  readonly maxEntries: number;
+  readonly maxHeads: number;
+  readonly maxTotalHeadBytes: number;
+}
+
+export type RunReceiptProjectAuthority = "current" | "foreign";
+export type RunReceiptRegistryAuthority = "current" | "stale";
+
+export interface RunReceiptHeadSummary extends RunReceiptChainIdentity {
+  readonly projectAuthority: RunReceiptProjectAuthority;
+  readonly registryAuthority: RunReceiptRegistryAuthority;
+  readonly receiptId: string;
+  readonly sequence: number;
+  readonly chainLength: number;
+  readonly receiptDigest: Sha256Digest;
+  readonly endedAt: string;
+  readonly headDigest: Sha256Digest;
+}
+
+export interface RunReceiptHeadQuery {
+  readonly validationLevel: "head-and-latest-record-presence";
+  readonly rootIdentityDigest: Sha256Digest;
+  readonly registryDigest: Sha256Digest;
+  readonly entriesObserved: number;
+  readonly headFilesObserved: number;
+  readonly recordFilesObserved: number;
+  readonly heads: readonly RunReceiptHeadSummary[];
+}
+
+export interface LoadQueriedRunReceiptChainRequest {
+  readonly query: RunReceiptHeadQuery;
+  readonly runId: string;
+  readonly maxArtifactBytes: number;
+}
+
 interface NormalizedLoadRequest extends RunReceiptChainIdentity {
   readonly root: CanonicalProjectRoot;
   readonly registry: ValidatedRegistry;
@@ -138,8 +184,41 @@ interface NormalizedPersistRequest {
   readonly maxArtifactBytes: number;
 }
 
+interface NormalizedQueryRequest {
+  readonly root: CanonicalProjectRoot;
+  readonly registry: ValidatedRegistry;
+  readonly maxEntries: number;
+  readonly maxHeads: number;
+  readonly maxTotalHeadBytes: number;
+}
+
+interface ReceiptStoreInventory {
+  readonly entries: readonly string[];
+  readonly headFiles: readonly string[];
+  readonly recordFiles: readonly string[];
+}
+
+interface QueriedHeadWitness {
+  readonly head: RunReceiptHead;
+  readonly headFileDigest: Sha256Digest;
+}
+
+interface RunReceiptHeadQueryMetadata {
+  readonly root: CanonicalProjectRoot;
+  readonly registry: ValidatedRegistry;
+  readonly heads: ReadonlyMap<string, QueriedHeadWitness>;
+}
+
+interface NormalizedQueriedLoadRequest {
+  readonly metadata: RunReceiptHeadQueryMetadata;
+  readonly witness: QueriedHeadWitness;
+  readonly runId: string;
+  readonly maxArtifactBytes: number;
+}
+
 const storedMetadata = new WeakMap<object, StoredMetadata>();
 const persistedSuccessors = new WeakMap<object, StoredRunReceipt>();
+const queriedHeadMetadata = new WeakMap<object, RunReceiptHeadQueryMetadata>();
 
 function storeError(
   code: Extract<
@@ -238,6 +317,121 @@ function artifactBudget(value: unknown): number {
     );
   }
   return value as number;
+}
+
+function queryBudget(
+  value: unknown,
+  maximum: number,
+  path: string,
+): number {
+  if (
+    !Number.isSafeInteger(value) ||
+    (value as number) < 1 ||
+    (value as number) > maximum
+  ) {
+    throw storeError(
+      "invalid-run-receipt-store-request",
+      path,
+      "query budget is outside the fixed runtime boundary",
+    );
+  }
+  return value as number;
+}
+
+function normalizeQueryRequest(
+  value: QueryRunReceiptHeadsRequest,
+): NormalizedQueryRequest {
+  const request = plainRecord(
+    value,
+    "invalid-run-receipt-store-request",
+    "$request",
+  );
+  exactKeys(
+    request,
+    ["root", "registry", "maxEntries", "maxHeads", "maxTotalHeadBytes"],
+    ["root", "registry", "maxEntries", "maxHeads", "maxTotalHeadBytes"],
+    "invalid-run-receipt-store-request",
+    "$request",
+  );
+  assertRegistry(request["registry"]);
+  const maxEntries = queryBudget(
+    request["maxEntries"],
+    RUN_RECEIPT_QUERY_MAX_ENTRIES,
+    "$request.maxEntries",
+  );
+  const maxHeads = queryBudget(
+    request["maxHeads"],
+    RUN_RECEIPT_QUERY_MAX_HEADS,
+    "$request.maxHeads",
+  );
+  const maxTotalHeadBytes = queryBudget(
+    request["maxTotalHeadBytes"],
+    RUN_RECEIPT_QUERY_MAX_TOTAL_HEAD_BYTES,
+    "$request.maxTotalHeadBytes",
+  );
+  return Object.freeze({
+    root: request["root"] as CanonicalProjectRoot,
+    registry: request["registry"],
+    maxEntries,
+    maxHeads,
+    maxTotalHeadBytes,
+  });
+}
+
+function normalizeQueriedLoadRequest(
+  value: LoadQueriedRunReceiptChainRequest,
+): NormalizedQueriedLoadRequest {
+  const request = plainRecord(
+    value,
+    "invalid-run-receipt-store-request",
+    "$request",
+  );
+  exactKeys(
+    request,
+    ["query", "runId", "maxArtifactBytes"],
+    ["query", "runId", "maxArtifactBytes"],
+    "invalid-run-receipt-store-request",
+    "$request",
+  );
+  const query = request["query"];
+  if (typeof query !== "object" || query === null) {
+    throw storeError(
+      "invalid-run-receipt-store-request",
+      "$request.query",
+      "query must be issued by this runtime",
+    );
+  }
+  const metadata = queriedHeadMetadata.get(query);
+  if (metadata === undefined) {
+    throw storeError(
+      "invalid-run-receipt-store-request",
+      "$request.query",
+      "query must be issued by this runtime",
+    );
+  }
+  const runId = request["runId"];
+  if (typeof runId !== "string" || !UUID_PATTERN.test(runId)) {
+    throw storeError(
+      "invalid-run-receipt-store-request",
+      "$request.runId",
+      "run ID must use the lowercase path-safe UUID spelling",
+    );
+  }
+  const maxArtifactBytes = artifactBudget(request["maxArtifactBytes"]);
+  const witness = metadata.heads.get(runId);
+  if (witness === undefined) {
+    throw storeError(
+      "run-receipt-store-not-found",
+      headPath(runId),
+      "queried receipt head does not exist",
+    );
+  }
+  return Object.freeze({
+    metadata,
+    witness,
+    runId,
+    maxArtifactBytes,
+  });
 }
 
 function unsafeDurableText(value: string): boolean {
@@ -567,9 +761,9 @@ function parseCanonicalJson(text: string, path: string): unknown {
   return parsed;
 }
 
-async function ensureStoreDirectory(root: CanonicalProjectRoot): Promise<void> {
+async function resolveStoreDirectory(root: CanonicalProjectRoot) {
   try {
-    await resolveProjectPath(root, RUN_RECEIPT_STORE_PATH, {
+    return await resolveProjectPath(root, RUN_RECEIPT_STORE_PATH, {
       expectedType: "directory",
       existence: "required",
     });
@@ -600,6 +794,10 @@ async function ensureStoreDirectory(root: CanonicalProjectRoot): Promise<void> {
       "receipt storage is not an exact project-local directory",
     );
   }
+}
+
+async function ensureStoreDirectory(root: CanonicalProjectRoot): Promise<void> {
+  await resolveStoreDirectory(root);
 }
 
 function computeHeadDigest(head: RunReceiptHeadBody): Sha256Digest {
@@ -731,6 +929,359 @@ function recordPath(runId: string, receiptDigest: Sha256Digest): string {
 
 function headPath(runId: string): string {
   return `${RUN_RECEIPT_STORE_PATH}/${runId}.head.json`;
+}
+
+function queryStoreFailure(path: string, error: unknown): never {
+  if (error instanceof CoreBoundaryError) {
+    throw error;
+  }
+  throw storeError(
+    "run-receipt-store-corrupt",
+    path,
+    "receipt store inventory could not be read within its boundary",
+  );
+}
+
+async function enumerateReceiptStore(
+  absolutePath: string,
+  request: NormalizedQueryRequest,
+): Promise<ReceiptStoreInventory> {
+  const entries = new Set<string>();
+  const headFiles: string[] = [];
+  const recordFiles: string[] = [];
+  let observed = 0;
+  let directory: Awaited<ReturnType<typeof opendir>> | undefined;
+  let failure: unknown;
+
+  try {
+    directory = await opendir(absolutePath);
+    while (true) {
+      const entry = await directory.read();
+      if (entry === null) break;
+      observed += 1;
+      if (observed > request.maxEntries) {
+        throw storeError(
+          "run-receipt-store-budget-exceeded",
+          RUN_RECEIPT_STORE_PATH,
+          "receipt store entry budget was exceeded",
+        );
+      }
+      if (entries.has(entry.name)) {
+        throw storeError(
+          "run-receipt-store-conflict",
+          RUN_RECEIPT_STORE_PATH,
+          "receipt store returned a duplicate entry during inspection",
+        );
+      }
+      entries.add(entry.name);
+      if (!entry.isFile()) {
+        throw storeError(
+          "run-receipt-store-corrupt",
+          RUN_RECEIPT_STORE_PATH,
+          "receipt store entries must be regular files",
+        );
+      }
+      if (HEAD_FILE_PATTERN.test(entry.name)) {
+        headFiles.push(entry.name);
+        if (headFiles.length > request.maxHeads) {
+          throw storeError(
+            "run-receipt-store-budget-exceeded",
+            RUN_RECEIPT_STORE_PATH,
+            "receipt head budget was exceeded",
+          );
+        }
+      } else if (RECORD_FILE_PATTERN.test(entry.name)) {
+        recordFiles.push(entry.name);
+      } else {
+        throw storeError(
+          "run-receipt-store-corrupt",
+          RUN_RECEIPT_STORE_PATH,
+          "receipt store entry does not use a canonical filename",
+        );
+      }
+    }
+  } catch (error) {
+    failure = error;
+  }
+
+  if (directory !== undefined) {
+    try {
+      await directory.close();
+    } catch (error) {
+      failure ??= error;
+    }
+  }
+  if (failure !== undefined) {
+    queryStoreFailure(RUN_RECEIPT_STORE_PATH, failure);
+  }
+
+  const sortNames = (values: string[]): readonly string[] =>
+    Object.freeze(values.sort(compareCanonicalText));
+  return Object.freeze({
+    entries: sortNames([...entries]),
+    headFiles: sortNames(headFiles),
+    recordFiles: sortNames(recordFiles),
+  });
+}
+
+function sameStringList(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
+function sameInventory(
+  left: ReceiptStoreInventory,
+  right: ReceiptStoreInventory,
+): boolean {
+  return (
+    sameStringList(left.entries, right.entries) &&
+    sameStringList(left.headFiles, right.headFiles) &&
+    sameStringList(left.recordFiles, right.recordFiles)
+  );
+}
+
+function sameStoreDirectory(
+  left: Awaited<ReturnType<typeof resolveStoreDirectory>>,
+  right: Awaited<ReturnType<typeof resolveStoreDirectory>>,
+): boolean {
+  return (
+    left.absolutePath === right.absolutePath &&
+    left.targetIdentity !== undefined &&
+    right.targetIdentity !== undefined &&
+    left.targetIdentity.device === right.targetIdentity.device &&
+    left.targetIdentity.inode === right.targetIdentity.inode
+  );
+}
+
+function headSummary(
+  root: CanonicalProjectRoot,
+  registry: ValidatedRegistry,
+  head: RunReceiptHead,
+): RunReceiptHeadSummary {
+  return Object.freeze({
+    runId: head.runId,
+    projectId: head.projectId,
+    projectIdentityDigest: head.projectIdentityDigest,
+    projectAuthority:
+      head.projectIdentityDigest === root.identityDigest ? "current" : "foreign",
+    workflowId: head.workflowId,
+    resolvedPlanDigest: head.resolvedPlanDigest,
+    registryDigest: head.registryDigest,
+    registryAuthority:
+      head.registryDigest === registry.digest ? "current" : "stale",
+    ...(head.featureId === undefined
+      ? {}
+      : {
+          featureId: head.featureId,
+          featureContractDigest: head.featureContractDigest,
+        }),
+    receiptId: head.receiptId,
+    sequence: head.sequence,
+    chainLength: head.sequence + 1,
+    receiptDigest: head.receiptDigest,
+    endedAt: head.endedAt,
+    headDigest: head.headDigest,
+  });
+}
+
+async function rereadQueriedHead(
+  root: CanonicalProjectRoot,
+  path: string,
+  expectedDigest: Sha256Digest,
+): Promise<void> {
+  let current: SafeTextFile | undefined;
+  try {
+    current = await readTextFile(root, path, RUN_RECEIPT_MAX_HEAD_BYTES);
+  } catch (error) {
+    if (
+      error instanceof CoreBoundaryError &&
+      error.code === "run-receipt-store-mismatch"
+    ) {
+      throw error;
+    }
+    throw storeError(
+      "run-receipt-store-conflict",
+      path,
+      "receipt head changed after it was queried",
+    );
+  }
+  if (current === undefined || current.digest !== expectedDigest) {
+    throw storeError(
+      "run-receipt-store-conflict",
+      path,
+      "receipt head changed after it was queried",
+    );
+  }
+}
+
+export async function queryRunReceiptHeads(
+  value: QueryRunReceiptHeadsRequest,
+): Promise<RunReceiptHeadQuery> {
+  const request = normalizeQueryRequest(value);
+  await assertProjectRootIdentity(request.root);
+  const firstDirectory = await resolveStoreDirectory(request.root);
+  const firstInventory = await enumerateReceiptStore(
+    firstDirectory.absolutePath,
+    request,
+  );
+  const recordFiles = new Set(firstInventory.recordFiles);
+  const summaries: RunReceiptHeadSummary[] = [];
+  const witnesses = new Map<string, QueriedHeadWitness>();
+  let totalHeadBytes = 0;
+
+  for (const filename of firstInventory.headFiles) {
+    const match = HEAD_FILE_PATTERN.exec(filename);
+    const filenameRunId = match?.[1];
+    if (filenameRunId === undefined) {
+      throw storeError(
+        "run-receipt-store-corrupt",
+        `${RUN_RECEIPT_STORE_PATH}/${filename}`,
+        "receipt head filename is not canonical",
+      );
+    }
+    const path = `${RUN_RECEIPT_STORE_PATH}/${filename}`;
+    const file = await readTextFile(
+      request.root,
+      path,
+      RUN_RECEIPT_MAX_HEAD_BYTES,
+    );
+    if (file === undefined) {
+      throw storeError(
+        "run-receipt-store-conflict",
+        path,
+        "receipt head disappeared during query",
+      );
+    }
+    totalHeadBytes += file.bytes;
+    if (totalHeadBytes > request.maxTotalHeadBytes) {
+      throw storeError(
+        "run-receipt-store-budget-exceeded",
+        RUN_RECEIPT_STORE_PATH,
+        "aggregate receipt head byte budget was exceeded",
+      );
+    }
+    const head = parseHead(parseCanonicalJson(file.text, path), path);
+    if (head.runId !== filenameRunId) {
+      throw storeError(
+        "run-receipt-store-corrupt",
+        path,
+        "receipt head run identity differs from its filename",
+      );
+    }
+    const latestRecord = `${head.runId}.${head.receiptDigest.slice("sha256:".length)}.receipt.json`;
+    if (!recordFiles.has(latestRecord)) {
+      throw storeError(
+        "run-receipt-store-corrupt",
+        recordPath(head.runId, head.receiptDigest),
+        "receipt head latest record is missing from the store inventory",
+      );
+    }
+    summaries.push(headSummary(request.root, request.registry, head));
+    witnesses.set(
+      head.runId,
+      Object.freeze({ head, headFileDigest: file.digest }),
+    );
+  }
+
+  for (const [runId, witness] of witnesses) {
+    await rereadQueriedHead(
+      request.root,
+      headPath(runId),
+      witness.headFileDigest,
+    );
+  }
+  const secondDirectory = await resolveStoreDirectory(request.root);
+  if (!sameStoreDirectory(firstDirectory, secondDirectory)) {
+    throw storeError(
+      "run-receipt-store-conflict",
+      RUN_RECEIPT_STORE_PATH,
+      "receipt store directory changed during query",
+    );
+  }
+  const secondInventory = await enumerateReceiptStore(
+    secondDirectory.absolutePath,
+    request,
+  );
+  if (!sameInventory(firstInventory, secondInventory)) {
+    throw storeError(
+      "run-receipt-store-conflict",
+      RUN_RECEIPT_STORE_PATH,
+      "receipt store inventory changed during query",
+    );
+  }
+  const finalDirectory = await resolveStoreDirectory(request.root);
+  if (!sameStoreDirectory(firstDirectory, finalDirectory)) {
+    throw storeError(
+      "run-receipt-store-conflict",
+      RUN_RECEIPT_STORE_PATH,
+      "receipt store directory changed during query",
+    );
+  }
+  await assertProjectRootIdentity(request.root);
+
+  const heads = Object.freeze(
+    summaries.sort((left, right) =>
+      compareCanonicalText(left.runId, right.runId),
+    ),
+  );
+  const query: RunReceiptHeadQuery = Object.freeze({
+    validationLevel: "head-and-latest-record-presence",
+    rootIdentityDigest: request.root.identityDigest,
+    registryDigest: request.registry.digest,
+    entriesObserved: firstInventory.entries.length,
+    headFilesObserved: firstInventory.headFiles.length,
+    recordFilesObserved: firstInventory.recordFiles.length,
+    heads,
+  });
+  queriedHeadMetadata.set(
+    query,
+    Object.freeze({
+      root: request.root,
+      registry: request.registry,
+      heads: witnesses,
+    }),
+  );
+  return query;
+}
+
+export async function loadQueriedRunReceiptChain(
+  value: LoadQueriedRunReceiptChainRequest,
+): Promise<LoadedRunReceiptChain> {
+  const request = normalizeQueriedLoadRequest(value);
+  const { root, registry } = request.metadata;
+  const { head, headFileDigest } = request.witness;
+  if (
+    head.projectIdentityDigest !== root.identityDigest ||
+    head.registryDigest !== registry.digest
+  ) {
+    throw storeError(
+      "run-receipt-store-mismatch",
+      headPath(request.runId),
+      "queried receipt head is outside the current project or registry authority",
+    );
+  }
+  await rereadQueriedHead(root, headPath(request.runId), headFileDigest);
+  const loaded = await loadRunReceiptChainInternal(
+    loadRequestFromIdentity(
+      root,
+      registry,
+      head,
+      request.maxArtifactBytes,
+    ),
+  );
+  if (loaded.stored.headDigest !== head.headDigest) {
+    throw storeError(
+      "run-receipt-store-conflict",
+      headPath(request.runId),
+      "receipt head advanced beyond the queried witness",
+    );
+  }
+  return loaded;
 }
 
 async function writeImmutableRecord(

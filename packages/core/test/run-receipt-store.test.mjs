@@ -17,6 +17,7 @@ import * as registry from "@ai-game-playbook/registry";
 import * as core from "../dist/index.js";
 
 const RUN_ID = "123e4567-e89b-42d3-a456-426614174000";
+const SECOND_RUN_ID = "223e4567-e89b-42d3-a456-426614174000";
 const PROJECT_ID = "project.evidence-fixture";
 const WORKFLOW_ID = "workflow.evidence-fixture";
 const PLAN_DIGEST = contracts.sha256Digest("evidence fixture plan");
@@ -68,6 +69,9 @@ function command() {
 
 function receipt({
   ordinal = 0,
+  runId = RUN_ID,
+  receiptId = RECEIPT_IDS[ordinal],
+  authorizationId = AUTHORIZATION_IDS[ordinal],
   projectIdentityDigest,
   previousReceiptDigest,
   artifacts = [],
@@ -79,11 +83,11 @@ function receipt({
   const ended = started + 10;
   const value = {
     schemaVersion: "1.0.0",
-    receiptId: RECEIPT_IDS[ordinal],
+    receiptId,
     ...(previousReceiptDigest === undefined ? {} : { previousReceiptDigest }),
     status: "succeeded",
     identity: {
-      runId: RUN_ID,
+      runId,
       workflowId: WORKFLOW_ID,
       stepId: `step.receipt-${ordinal + 1}`,
       attempt: ordinal + 1,
@@ -100,7 +104,7 @@ function receipt({
       registryDigest: registry.BUILTIN_REGISTRY.digest,
       handlerDigest: descriptor.handler.digest,
       inputDigest: INPUT_DIGEST,
-      authorizationId: AUTHORIZATION_IDS[ordinal],
+      authorizationId,
       authorizationRequestDigest: contracts.sha256Digest(
         `authorization request ${ordinal}`,
       ),
@@ -159,6 +163,41 @@ function loadRequest(root, maxArtifactBytes = 0) {
     resolvedPlanDigest: PLAN_DIGEST,
     maxArtifactBytes,
   };
+}
+
+function queryRequest(root, overrides = {}) {
+  return {
+    root,
+    registry: registry.BUILTIN_REGISTRY,
+    maxEntries: 32,
+    maxHeads: 8,
+    maxTotalHeadBytes: 128 * 1024,
+    ...overrides,
+  };
+}
+
+function receiptStoreDirectory(project) {
+  return join(project, ".ai-game-playbook", "evidence", "receipts");
+}
+
+async function currentHeadFile(project, runId = RUN_ID) {
+  return join(receiptStoreDirectory(project), `${runId}.head.json`);
+}
+
+async function rewriteHead(project, mutate, runId = RUN_ID) {
+  const path = await currentHeadFile(project, runId);
+  const parsed = JSON.parse(await readFile(path, "utf8"));
+  const { headDigest: _headDigest, ...body } = parsed;
+  const changedBody = mutate(body);
+  const changed = {
+    ...changedBody,
+    headDigest: contracts.digestCanonicalJson({
+      domain: "ai-game-playbook.run-receipt-head",
+      version: "1",
+      subject: changedBody,
+    }),
+  };
+  await writeFile(path, `${contracts.canonicalizeJson(changed)}\n`);
 }
 
 test("run receipts persist as a canonical append-only head and reload", async (t) => {
@@ -975,4 +1014,361 @@ test("receipt storage refuses a directory relocated outside the project", async 
     expectCoreError("run-receipt-store-corrupt"),
   );
   assert.deepEqual(await readdir(outside), []);
+});
+
+test("receipt head queries are bounded, deterministic, and explicit about validation level", async (t) => {
+  assert.equal(typeof core.queryRunReceiptHeads, "function");
+  assert.equal(typeof core.loadQueriedRunReceiptChain, "function");
+  assert.equal(core.RUN_RECEIPT_QUERY_MAX_ENTRIES, 16_384);
+  assert.equal(core.RUN_RECEIPT_QUERY_MAX_HEADS, 1_024);
+  assert.equal(core.RUN_RECEIPT_QUERY_MAX_TOTAL_HEAD_BYTES, 16 * 1024 * 1024);
+
+  const { project, root } = await fixture(t);
+  const empty = await core.queryRunReceiptHeads(queryRequest(root));
+  assert.deepEqual(empty, {
+    validationLevel: "head-and-latest-record-presence",
+    rootIdentityDigest: root.identityDigest,
+    registryDigest: registry.BUILTIN_REGISTRY.digest,
+    entriesObserved: 0,
+    headFilesObserved: 0,
+    recordFilesObserved: 0,
+    heads: [],
+  });
+  assert.equal(Object.isFrozen(empty), true);
+  assert.equal(Object.isFrozen(empty.heads), true);
+
+  const value = receipt({ projectIdentityDigest: root.identityDigest });
+  const stored = await core.persistRunReceipt({
+    root,
+    registry: registry.BUILTIN_REGISTRY,
+    receipt: value,
+    maxArtifactBytes: 0,
+  });
+  const query = await core.queryRunReceiptHeads(queryRequest(root));
+  assert.deepEqual(query, {
+    validationLevel: "head-and-latest-record-presence",
+    rootIdentityDigest: root.identityDigest,
+    registryDigest: registry.BUILTIN_REGISTRY.digest,
+    entriesObserved: 2,
+    headFilesObserved: 1,
+    recordFilesObserved: 1,
+    heads: [
+      {
+        runId: RUN_ID,
+        projectId: PROJECT_ID,
+        projectIdentityDigest: root.identityDigest,
+        projectAuthority: "current",
+        workflowId: WORKFLOW_ID,
+        resolvedPlanDigest: PLAN_DIGEST,
+        registryDigest: registry.BUILTIN_REGISTRY.digest,
+        registryAuthority: "current",
+        receiptId: value.receiptId,
+        sequence: 0,
+        chainLength: 1,
+        receiptDigest: value.receiptDigest,
+        endedAt: value.timing.endedAt,
+        headDigest: stored.headDigest,
+      },
+    ],
+  });
+  assert.equal(Object.isFrozen(query), true);
+  assert.equal(Object.isFrozen(query.heads), true);
+  assert.equal(Object.isFrozen(query.heads[0]), true);
+  assert.equal("receipts" in query, false);
+  assert.equal(JSON.stringify(query).includes(project), false);
+
+  const loaded = await core.loadQueriedRunReceiptChain({
+    query,
+    runId: RUN_ID,
+    maxArtifactBytes: 0,
+  });
+  assert.deepEqual(loaded.receipts, [value]);
+
+  const repeated = await core.queryRunReceiptHeads(queryRequest(root));
+  assert.deepEqual(repeated, query);
+});
+
+test("receipt head query requests and query witnesses cannot be forged", async (t) => {
+  const { root } = await fixture(t);
+  await assert.rejects(
+    core.queryRunReceiptHeads({
+      ...queryRequest(root),
+      unexpected: true,
+    }),
+    expectCoreError("invalid-run-receipt-store-request"),
+  );
+  await assert.rejects(
+    core.queryRunReceiptHeads(
+      queryRequest(root, {
+        maxEntries: core.RUN_RECEIPT_QUERY_MAX_ENTRIES + 1,
+      }),
+    ),
+    expectCoreError("invalid-run-receipt-store-request"),
+  );
+  await assert.rejects(
+    core.queryRunReceiptHeads(
+      queryRequest(root, {
+        registry: JSON.parse(JSON.stringify(registry.BUILTIN_REGISTRY)),
+      }),
+    ),
+    expectCoreError("invalid-run-receipt-store-request"),
+  );
+
+  const value = receipt({ projectIdentityDigest: root.identityDigest });
+  await core.persistRunReceipt({
+    root,
+    registry: registry.BUILTIN_REGISTRY,
+    receipt: value,
+    maxArtifactBytes: 0,
+  });
+  const query = await core.queryRunReceiptHeads(queryRequest(root));
+  const copied = JSON.parse(JSON.stringify(query));
+  await assert.rejects(
+    core.loadQueriedRunReceiptChain({
+      query: copied,
+      runId: RUN_ID,
+      maxArtifactBytes: 0,
+    }),
+    expectCoreError("invalid-run-receipt-store-request"),
+  );
+  await assert.rejects(
+    core.loadQueriedRunReceiptChain({
+      query,
+      runId: SECOND_RUN_ID,
+      maxArtifactBytes: 0,
+    }),
+    expectCoreError("run-receipt-store-not-found"),
+  );
+  await assert.rejects(
+    core.loadQueriedRunReceiptChain({
+      query,
+      runId: RUN_ID,
+      maxArtifactBytes: 0,
+      unexpected: true,
+    }),
+    expectCoreError("invalid-run-receipt-store-request"),
+  );
+});
+
+test("receipt head query budgets fail without partial results", async (t) => {
+  const { root } = await fixture(t);
+  await core.persistRunReceipt({
+    root,
+    registry: registry.BUILTIN_REGISTRY,
+    receipt: receipt({ projectIdentityDigest: root.identityDigest }),
+    maxArtifactBytes: 0,
+  });
+  await core.persistRunReceipt({
+    root,
+    registry: registry.BUILTIN_REGISTRY,
+    receipt: receipt({
+      runId: SECOND_RUN_ID,
+      receiptId: "723e4567-e89b-42d3-a456-426614174000",
+      authorizationId: "823e4567-e89b-42d3-a456-426614174000",
+      projectIdentityDigest: root.identityDigest,
+    }),
+    maxArtifactBytes: 0,
+  });
+
+  await assert.rejects(
+    core.queryRunReceiptHeads(queryRequest(root, { maxEntries: 1 })),
+    expectCoreError("run-receipt-store-budget-exceeded"),
+  );
+  await assert.rejects(
+    core.queryRunReceiptHeads(queryRequest(root, { maxHeads: 1 })),
+    expectCoreError("run-receipt-store-budget-exceeded"),
+  );
+  await assert.rejects(
+    core.queryRunReceiptHeads(queryRequest(root, { maxTotalHeadBytes: 1 })),
+    expectCoreError("run-receipt-store-budget-exceeded"),
+  );
+  const complete = await core.queryRunReceiptHeads(queryRequest(root));
+  assert.deepEqual(
+    complete.heads.map((head) => head.runId),
+    [RUN_ID, SECOND_RUN_ID],
+  );
+});
+
+test("receipt head query preserves stale and foreign authority without loading it", async (t) => {
+  const stale = await fixture(t);
+  await core.persistRunReceipt({
+    root: stale.root,
+    registry: registry.BUILTIN_REGISTRY,
+    receipt: receipt({ projectIdentityDigest: stale.root.identityDigest }),
+    maxArtifactBytes: 0,
+  });
+  const staleRegistryDigest = contracts.sha256Digest("stale registry");
+  await rewriteHead(stale.project, (head) => ({
+    ...head,
+    registryDigest: staleRegistryDigest,
+  }));
+  const staleQuery = await core.queryRunReceiptHeads(queryRequest(stale.root));
+  assert.equal(staleQuery.heads[0].projectAuthority, "current");
+  assert.equal(staleQuery.heads[0].registryAuthority, "stale");
+  await assert.rejects(
+    core.loadQueriedRunReceiptChain({
+      query: staleQuery,
+      runId: RUN_ID,
+      maxArtifactBytes: 0,
+    }),
+    expectCoreError("run-receipt-store-mismatch"),
+  );
+
+  const foreign = await fixture(t);
+  await core.persistRunReceipt({
+    root: foreign.root,
+    registry: registry.BUILTIN_REGISTRY,
+    receipt: receipt({ projectIdentityDigest: foreign.root.identityDigest }),
+    maxArtifactBytes: 0,
+  });
+  const foreignDigest = contracts.sha256Digest("foreign project root");
+  await rewriteHead(foreign.project, (head) => ({
+    ...head,
+    projectIdentityDigest: foreignDigest,
+  }));
+  const foreignQuery = await core.queryRunReceiptHeads(queryRequest(foreign.root));
+  assert.equal(foreignQuery.heads[0].projectAuthority, "foreign");
+  assert.equal(foreignQuery.heads[0].registryAuthority, "current");
+  await assert.rejects(
+    core.loadQueriedRunReceiptChain({
+      query: foreignQuery,
+      runId: RUN_ID,
+      maxArtifactBytes: 0,
+    }),
+    expectCoreError("run-receipt-store-mismatch"),
+  );
+});
+
+test("receipt head query rejects unknown, non-file, mismatched, and incomplete entries", async (t) => {
+  const unknown = await fixture(t);
+  await writeFile(join(receiptStoreDirectory(unknown.project), "unexpected.tmp"), "x");
+  await assert.rejects(
+    core.queryRunReceiptHeads(queryRequest(unknown.root)),
+    expectCoreError("run-receipt-store-corrupt"),
+  );
+
+  const nonFile = await fixture(t);
+  await mkdir(
+    join(receiptStoreDirectory(nonFile.project), `${SECOND_RUN_ID}.head.json`),
+  );
+  await assert.rejects(
+    core.queryRunReceiptHeads(queryRequest(nonFile.root)),
+    expectCoreError("run-receipt-store-corrupt"),
+  );
+
+  const mismatched = await fixture(t);
+  await core.persistRunReceipt({
+    root: mismatched.root,
+    registry: registry.BUILTIN_REGISTRY,
+    receipt: receipt({ projectIdentityDigest: mismatched.root.identityDigest }),
+    maxArtifactBytes: 0,
+  });
+  const originalHead = await readFile(
+    await currentHeadFile(mismatched.project),
+    "utf8",
+  );
+  await writeFile(
+    await currentHeadFile(mismatched.project, SECOND_RUN_ID),
+    originalHead,
+  );
+  await assert.rejects(
+    core.queryRunReceiptHeads(queryRequest(mismatched.root)),
+    expectCoreError("run-receipt-store-corrupt"),
+  );
+
+  const incomplete = await fixture(t);
+  await core.persistRunReceipt({
+    root: incomplete.root,
+    registry: registry.BUILTIN_REGISTRY,
+    receipt: receipt({ projectIdentityDigest: incomplete.root.identityDigest }),
+    maxArtifactBytes: 0,
+  });
+  const record = (await readdir(receiptStoreDirectory(incomplete.project))).find(
+    (name) => name.endsWith(".receipt.json"),
+  );
+  assert.ok(record);
+  await rm(join(receiptStoreDirectory(incomplete.project), record));
+  await assert.rejects(
+    core.queryRunReceiptHeads(queryRequest(incomplete.root)),
+    expectCoreError("run-receipt-store-corrupt"),
+  );
+});
+
+test("receipt head query does not promote malformed record content to full validation", async (t) => {
+  const { project, root } = await fixture(t);
+  await core.persistRunReceipt({
+    root,
+    registry: registry.BUILTIN_REGISTRY,
+    receipt: receipt({ projectIdentityDigest: root.identityDigest }),
+    maxArtifactBytes: 0,
+  });
+  const record = (await readdir(receiptStoreDirectory(project))).find((name) =>
+    name.endsWith(".receipt.json"),
+  );
+  assert.ok(record);
+  await writeFile(
+    join(receiptStoreDirectory(project), record),
+    '{"schemaVersion":"1.0.0"}\n',
+  );
+
+  const query = await core.queryRunReceiptHeads(queryRequest(root));
+  assert.equal(query.validationLevel, "head-and-latest-record-presence");
+  await assert.rejects(
+    core.loadQueriedRunReceiptChain({
+      query,
+      runId: RUN_ID,
+      maxArtifactBytes: 0,
+    }),
+    expectCoreError("run-receipt-store-corrupt"),
+  );
+});
+
+test("receipt head query counts canonical records without claiming reachability", async (t) => {
+  const { project, root } = await fixture(t);
+  await core.persistRunReceipt({
+    root,
+    registry: registry.BUILTIN_REGISTRY,
+    receipt: receipt({ projectIdentityDigest: root.identityDigest }),
+    maxArtifactBytes: 0,
+  });
+  await rm(await currentHeadFile(project));
+
+  const query = await core.queryRunReceiptHeads(queryRequest(root));
+  assert.equal(query.entriesObserved, 1);
+  assert.equal(query.headFilesObserved, 0);
+  assert.equal(query.recordFilesObserved, 1);
+  assert.deepEqual(query.heads, []);
+});
+
+test("receipt chain load rejects a query made stale by an accepted append", async (t) => {
+  const { root } = await fixture(t);
+  const firstReceipt = receipt({ projectIdentityDigest: root.identityDigest });
+  const first = await core.persistRunReceipt({
+    root,
+    registry: registry.BUILTIN_REGISTRY,
+    receipt: firstReceipt,
+    maxArtifactBytes: 0,
+  });
+  const query = await core.queryRunReceiptHeads(queryRequest(root));
+  const secondReceipt = receipt({
+    ordinal: 1,
+    projectIdentityDigest: root.identityDigest,
+    previousReceiptDigest: firstReceipt.receiptDigest,
+  });
+  await core.persistRunReceipt({
+    root,
+    registry: registry.BUILTIN_REGISTRY,
+    receipt: secondReceipt,
+    previous: first,
+    maxArtifactBytes: 0,
+  });
+
+  await assert.rejects(
+    core.loadQueriedRunReceiptChain({
+      query,
+      runId: RUN_ID,
+      maxArtifactBytes: 0,
+    }),
+    expectCoreError("run-receipt-store-conflict"),
+  );
 });

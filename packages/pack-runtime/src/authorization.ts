@@ -14,6 +14,10 @@ import {
 } from "@ai-game-playbook/core";
 
 import { PackRuntimeError } from "./errors.js";
+import {
+  PACK_ACTIVE_TRANSACTION_MAX_BYTES,
+  PACK_ACTIVE_TRANSACTION_PATH,
+} from "./active-transaction.js";
 import { internalsForPreparedPackOperation } from "./prepared-plan.js";
 import {
   PACK_INSTALLED_STATE_MAX_BYTES,
@@ -99,6 +103,7 @@ export function packOperationAuthorizationPaths(
   plan: PreparedPackOperation,
 ): readonly string[] {
   const paths = new Set<string>([
+    PACK_ACTIVE_TRANSACTION_PATH,
     PACK_INSTALLED_STATE_PATH,
     packTransactionRecordPath(plan.runId, 0),
     packTransactionRecordPath(plan.runId, 1),
@@ -155,6 +160,7 @@ function requiredChangedByteBudget(plan: PreparedPackOperation): number {
   }
   const required =
     artifactBytes +
+    PACK_ACTIVE_TRANSACTION_MAX_BYTES * 2 +
     PACK_INSTALLED_STATE_MAX_BYTES +
     PACK_TRANSACTION_MAX_RECORD_BYTES * 2;
   if (!Number.isSafeInteger(required)) {

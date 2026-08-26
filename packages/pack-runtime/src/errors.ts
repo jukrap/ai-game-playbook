@@ -1,6 +1,7 @@
 export type PackRuntimeErrorCode =
   | "invalid-pack-request"
   | "invalid-pack-execution-request"
+  | "invalid-pack-recovery-request"
   | "pack-artifact-budget-exceeded"
   | "pack-artifact-digest-mismatch"
   | "pack-authorization-invalid"
@@ -12,6 +13,7 @@ export type PackRuntimeErrorCode =
   | "pack-plan-not-executable"
   | "pack-plan-untrusted"
   | "pack-registry-untrusted"
+  | "pack-recovery-budget-exceeded"
   | "pack-state-corrupt"
   | "pack-storage-not-initialized"
   | "pack-surface-unsupported"

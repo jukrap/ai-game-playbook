@@ -1,6 +1,17 @@
 export { PackRuntimeError } from "./errors.js";
 export type { PackRuntimeErrorCode } from "./errors.js";
 export {
+  computeActivePackTransactionRecordDigest,
+  loadActivePackTransactionRecord,
+  PACK_ACTIVE_TRANSACTION_MAX_BYTES,
+  PACK_ACTIVE_TRANSACTION_PATH,
+} from "./active-transaction.js";
+export type {
+  ActivePackTransactionRecord,
+  LoadedActivePackTransaction,
+  LoadActivePackTransactionRequest,
+} from "./active-transaction.js";
+export {
   assertPreparedPackOperation,
 } from "./prepared-plan.js";
 export {
@@ -11,6 +22,15 @@ export {
 } from "./authorization.js";
 export { executePreparedPackOperation } from "./execute.js";
 export { preparePackOperation } from "./prepare.js";
+export { inspectPackTransactionRecovery } from "./recovery.js";
+export type {
+  InspectPackTransactionRecoveryRequest,
+  PackRecoveryActualFile,
+  PackRecoveryExpectedFile,
+  PackRecoveryObservation,
+  PackRecoveryObservationMatch,
+  PackTransactionRecoveryReport,
+} from "./recovery.js";
 export {
   computeInstalledPackStateDigest,
   createEmptyInstalledPackState,

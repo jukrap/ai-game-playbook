@@ -10,6 +10,7 @@ import {
   stageProjectFileCas,
   stageProjectFileCasDelete,
   writeProjectFileCas,
+  resolveProjectPath,
   type PermissionSettlement,
   type ProjectFileCasResult,
   type ProjectLaneLease,
@@ -22,6 +23,14 @@ import {
   assertPackAuthorizationActive,
   validatePackExecutionAuthority,
 } from "./authorization.js";
+import {
+  clearActivePackTransactionRecord,
+  createActivePackTransactionRecord,
+  PACK_ACTIVE_TRANSACTION_MAX_BYTES,
+  PACK_ACTIVE_TRANSACTION_PATH,
+  writeActivePackTransactionRecord,
+  type LoadedActivePackTransaction,
+} from "./active-transaction.js";
 import { PackRuntimeError } from "./errors.js";
 import {
   assertPreparedPackOperation,
@@ -39,6 +48,7 @@ import {
 import {
   createStartedPackTransaction,
   createTerminalPackTransaction,
+  PACK_TRANSACTION_DIRECTORY,
   packTransactionRecordPath,
   serializePackTransactionRecord,
   writePackTransactionRecord,
@@ -513,6 +523,80 @@ async function writeTerminalRecord(
   }
 }
 
+async function clearActiveTransaction(
+  plan: PreparedPackOperation,
+  root: ReturnType<typeof internalsForPreparedPackOperation>["targetRoot"],
+  lane: ProjectLaneLease,
+  active: LoadedActivePackTransaction,
+  tracker: ExecutionTracker,
+): Promise<ExecutionFailure | undefined> {
+  try {
+    await assertLaneOwned(lane);
+    const result = await clearActivePackTransactionRecord({
+      root,
+      active,
+      maxDirectoryEntries: plan.limits.maxDirectoryEntries,
+    });
+    tracker.touchedPaths.add(PACK_ACTIVE_TRANSACTION_PATH);
+    tracker.changedBytes += result.bytes;
+    return undefined;
+  } catch (error) {
+    const failure = summarizeFailure(error, PACK_ACTIVE_TRANSACTION_PATH);
+    tracker.touchedPaths.add(PACK_ACTIVE_TRANSACTION_PATH);
+    tracker.changedBytes += active.bytes;
+    return Object.freeze({
+      ...failure,
+      mutationUncertain: true,
+    });
+  }
+}
+
+async function closeTransaction(
+  plan: PreparedPackOperation,
+  started: PackTransactionStartedRecord,
+  outcome: PackTransactionOutcome,
+  mutationUncertain: boolean,
+  tracker: ExecutionTracker,
+  installedStateAfterDigest: Sha256Digest | undefined,
+  failure: ExecutionFailure | undefined,
+  root: ReturnType<typeof internalsForPreparedPackOperation>["targetRoot"],
+  lane: ProjectLaneLease,
+  active: LoadedActivePackTransaction,
+): Promise<TerminalWriteResult> {
+  const terminal = await writeTerminalRecord(
+    plan,
+    started,
+    outcome,
+    mutationUncertain,
+    tracker,
+    installedStateAfterDigest,
+    failure,
+    root,
+    lane,
+  );
+  if (
+    terminal.recordDigest === undefined ||
+    terminal.mutationUncertain ||
+    outcome === "recovery-required"
+  ) {
+    return terminal;
+  }
+  const clearFailure = await clearActiveTransaction(
+    plan,
+    root,
+    lane,
+    active,
+    tracker,
+  );
+  if (clearFailure === undefined) return terminal;
+  return Object.freeze({
+    recordDigest: terminal.recordDigest,
+    outcome: "recovery-required",
+    mutationUncertain: true,
+    failure: clearFailure,
+  });
+}
+
 function executedResult(
   plan: PreparedPackOperation,
   status: Exclude<PackExecutionResult["status"], "no-op">,
@@ -726,6 +810,11 @@ export async function executePreparedPackOperation(
       plan,
       authorizationId: authority.authorization.lease.authorizationId,
       requestDigest: authority.authorization.challenge.requestDigest,
+      installedStateAfter: {
+        revision: nextState.revision,
+        digest: nextState.stateDigest,
+        fileDigest: sha256Digest(stateContent),
+      },
       startedAt,
     });
   } catch (error) {
@@ -741,6 +830,75 @@ export async function executePreparedPackOperation(
       plan,
       "failed",
       false,
+      tracker,
+      settlement,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      failure,
+    );
+  }
+  try {
+    await assertForwardAuthority(authority);
+    await resolveProjectPath(
+      internals.targetRoot,
+      PACK_TRANSACTION_DIRECTORY,
+      {
+        expectedType: "directory",
+        existence: "required",
+        maxDirectoryEntries: plan.limits.maxDirectoryEntries,
+      },
+    );
+  } catch (error) {
+    const failure = summarizeFailure(error, PACK_TRANSACTION_DIRECTORY);
+    const settlement = settleAuthorization(
+      authority.authorization,
+      tracker,
+      startedClock,
+      "failed",
+      false,
+    );
+    return executedResult(
+      plan,
+      "failed",
+      false,
+      tracker,
+      settlement,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      failure,
+    );
+  }
+  let active: LoadedActivePackTransaction;
+  try {
+    await assertForwardAuthority(authority);
+    active = await writeActivePackTransactionRecord({
+      root: internals.targetRoot,
+      record: createActivePackTransactionRecord(started),
+      maxDirectoryEntries: plan.limits.maxDirectoryEntries,
+    });
+    tracker.touchedPaths.add(PACK_ACTIVE_TRANSACTION_PATH);
+    tracker.changedBytes += active.bytes;
+  } catch (error) {
+    const failure = summarizeFailure(error, PACK_ACTIVE_TRANSACTION_PATH);
+    if (failure.mutationUncertain) {
+      tracker.touchedPaths.add(PACK_ACTIVE_TRANSACTION_PATH);
+      tracker.changedBytes += PACK_ACTIVE_TRANSACTION_MAX_BYTES;
+    }
+    const settlement = settleAuthorization(
+      authority.authorization,
+      tracker,
+      startedClock,
+      failure.mutationUncertain ? "uncertain" : "failed",
+      failure.mutationUncertain,
+    );
+    return executedResult(
+      plan,
+      failure.mutationUncertain ? "recovery-required" : "failed",
+      failure.mutationUncertain,
       tracker,
       settlement,
       undefined,
@@ -768,24 +926,36 @@ export async function executePreparedPackOperation(
       tracker.touchedPaths.add(startedPath);
       tracker.changedBytes += serializePackTransactionRecord(started).byteLength;
     }
+    const activeClearFailure = failure.mutationUncertain
+      ? undefined
+      : await clearActiveTransaction(
+          plan,
+          internals.targetRoot,
+          authority.lane,
+          active,
+          tracker,
+        );
+    const finalFailure = activeClearFailure ?? failure;
+    const finalUncertain =
+      failure.mutationUncertain || activeClearFailure !== undefined;
     const settlement = settleAuthorization(
       authority.authorization,
       tracker,
       startedClock,
-      failure.mutationUncertain ? "uncertain" : "failed",
-      failure.mutationUncertain,
+      finalUncertain ? "uncertain" : "failed",
+      finalUncertain,
     );
     return executedResult(
       plan,
-      failure.mutationUncertain ? "recovery-required" : "failed",
-      failure.mutationUncertain,
+      finalUncertain ? "recovery-required" : "failed",
+      finalUncertain,
       tracker,
       settlement,
       undefined,
       undefined,
       undefined,
       undefined,
-      failure,
+      finalFailure,
     );
   }
 
@@ -839,7 +1009,7 @@ export async function executePreparedPackOperation(
     const failure = abortFailure ?? stagingFailure;
     const uncertain =
       stagingFailure.mutationUncertain || abortFailure !== undefined;
-    const terminal = await writeTerminalRecord(
+    const terminal = await closeTransaction(
       plan,
       started,
       uncertain ? "recovery-required" : "failed",
@@ -849,6 +1019,7 @@ export async function executePreparedPackOperation(
       failure,
       internals.targetRoot,
       authority.lane,
+      active,
     );
     const finalUncertain = uncertain || terminal.mutationUncertain;
     const settlement = settleAuthorization(
@@ -1005,7 +1176,7 @@ export async function executePreparedPackOperation(
         ? "rolled-back"
         : "failed";
     const failure = rollbackFailure ?? abortFailure ?? commitFailure;
-    const terminal = await writeTerminalRecord(
+    const terminal = await closeTransaction(
       plan,
       started,
       outcome,
@@ -1015,6 +1186,7 @@ export async function executePreparedPackOperation(
       failure,
       internals.targetRoot,
       authority.lane,
+      active,
     );
     const finalUncertain = uncertain || terminal.mutationUncertain;
     const status = finalUncertain
@@ -1043,7 +1215,7 @@ export async function executePreparedPackOperation(
     );
   }
 
-  const terminal = await writeTerminalRecord(
+  const terminal = await closeTransaction(
     plan,
     started,
     "committed",
@@ -1053,6 +1225,7 @@ export async function executePreparedPackOperation(
     undefined,
     internals.targetRoot,
     authority.lane,
+    active,
   );
   const mutationUncertain = terminal.mutationUncertain;
   const settlement = settleAuthorization(

@@ -1,6 +1,6 @@
 ---
 source: docs/roadmap.md
-source_sha256: d49530a226cef33d5a74bfa028841af465b4049f90718efa019c82c4aee14991
+source_sha256: 168fa069f6632e4ee11bb4448ac90f4457226921c0ba6855bb74c981433ca0e1
 translated_at: 2026-08-26
 ---
 
@@ -18,14 +18,14 @@ translated_at: 2026-08-26
 
 ## Stage 1: 공통 기반 — 진행 중
 
-- 완료: pnpm workspace, versioned contract schema, semantic validation, typed registry 검증 및 projection, pack dependency graph 검증, 결정적 resolved workflow-plan attestation, 추적 가능한 digest 결합 foundation plan, 고정 레이아웃 project-state bootstrap, private managed-pack preflight와 transaction executor.
+- 완료: pnpm workspace, versioned contract schema, semantic validation, typed registry 검증 및 projection, pack dependency graph 검증, 결정적 resolved workflow-plan attestation, 추적 가능한 digest 결합 foundation plan, 고정 레이아웃 project-state bootstrap, active barrier와 read-only recovery 분류를 갖춘 private managed-pack preflight와 transaction executor.
 - 남음: core runtime, 실행 가능한 CLI, MCP server, Codex adapter, runtime parity generation.
-- 남음: 실행 가능한 pack CLI와 registry parity, pack 소유 artifact directory lifecycle, 중단 transaction reconciliation과 doctor flow, 더 넓은 lifecycle evaluation, pack distribution. 고정 runtime directory bootstrap과 local approval/lane 결합 add, update, installed-state 소유권 기반 remove, journal, 명확한 실패의 rollback, conflict 검사는 private library primitive로 구현했습니다.
+- 남음: 실행 가능한 pack CLI와 registry parity, pack 소유 artifact directory lifecycle, 승인 결합 recovery finalization과 doctor flow, 더 넓은 lifecycle evaluation, pack distribution. 고정 runtime directory bootstrap과 local approval/lane 결합 add, update, installed-state 소유권 기반 remove, active-marker blocking, journal, read-only recovery inspection, 명확한 실패의 rollback, conflict 검사는 private library primitive로 구현했습니다.
 - package는 private으로 유지하고 publish를 별도로 승인하기 전까지 `ai-game-playbook`과 `agpb`를 예약된 interface 이름으로만 사용합니다.
 
 ## Stage 2: 실행, 증거, 안전
 
-- 구현된 primitive: compare-and-swap write와 단일 파일 삭제, canonical project-root identity, bounded direct process 실행, 직렬화된 root/project 결합 mutating lease, exact signed grant와 effect settlement를 사용하는 in-memory registry 결합 permission admission, receipt chain·rollback·evidence·누적 budget을 강제하는 immutable resolved-plan checkpoint transition, 제한된 chain 검증과 restart-safe hydration을 포함한 append-only checkpoint 영속화, immutable local pack plan, append-only started/terminal record와 제한된 역순 rollback을 갖춘 authorization/lane 결합 transaction executor.
+- 구현된 primitive: compare-and-swap write와 단일 파일 삭제, canonical project-root identity, 고정 project-state bootstrap, bounded direct process 실행, 직렬화된 root/project 결합 mutating lease, exact signed grant와 effect settlement를 사용하는 in-memory registry 결합 permission admission, receipt chain·rollback·evidence·누적 budget을 강제하는 immutable resolved-plan checkpoint transition, 제한된 chain 검증과 restart-safe hydration을 포함한 append-only checkpoint 영속화, immutable local pack plan, active marker·append-only started/terminal record·제한된 역순 rollback·two-pass read-only recovery observation을 갖춘 authorization/lane 결합 transaction executor.
 - 남음: durable approval/receipt/evidence storage, uncertainty reconciliation, 일반 workflow dispatcher 통합, 완전한 project/Editor identity attestation, automatic lease heartbeat integration, parallel-read coordination.
 - 현재 bounded state machine을 중심으로 repair/retry와 cancellation transition, dispatcher 소유 checkpoint 영속화, receipt/evidence storage, 명시적 reconciliation을 완성합니다.
 - content-addressed receipt, evidence storage, redacted diagnostic, retention, explicit export를 추가합니다.

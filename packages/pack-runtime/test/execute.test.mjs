@@ -17,6 +17,9 @@ import * as contracts from "@ai-game-playbook/contracts";
 import * as core from "@ai-game-playbook/core";
 import * as registry from "@ai-game-playbook/registry";
 import * as packRuntime from "../dist/index.js";
+import * as activeTransactions from "../dist/active-transaction.js";
+import * as recoveryInternals from "../dist/recovery.js";
+import * as transactionInternals from "../dist/transaction-journal.js";
 
 import { createValidRegistryDefinition } from "../../registry/test/fixtures/registry.mjs";
 
@@ -385,6 +388,34 @@ function expectPackError(code) {
   return (error) => error?.name === "PackRuntimeError" && error?.code === code;
 }
 
+async function reopenAsStartedOnly(f, selectedRunId = runId) {
+  const project = {
+    id: "sample.graybox",
+    identityDigest: projectIdentityDigest,
+  };
+  const journal = await packRuntime.loadPackTransactionJournal({
+    root: f.targetRoot,
+    runId: selectedRunId,
+    project,
+    maxDirectoryEntries: 1000,
+  });
+  await rm(
+    join(
+      f.project,
+      ...packRuntime.packTransactionRecordPath(selectedRunId, 1).split("/"),
+    ),
+  );
+  const active = activeTransactions.createActivePackTransactionRecord(
+    journal.started,
+  );
+  await activeTransactions.writeActivePackTransactionRecord({
+    root: f.targetRoot,
+    record: active,
+    maxDirectoryEntries: 1000,
+  });
+  return journal.started;
+}
+
 test("authorized local add commits artifacts, installed state, and an append-only journal", async (t) => {
   const f = await fixture(t);
   const pack = manifest(f.content);
@@ -404,6 +435,10 @@ test("authorized local add commits artifacts, installed state, and an append-onl
     planDigest: plan.planDigest,
   });
   assert.equal(request.scope.paths.includes(packRuntime.PACK_INSTALLED_STATE_PATH), true);
+  assert.equal(
+    request.scope.paths.includes(packRuntime.PACK_ACTIVE_TRANSACTION_PATH),
+    true,
+  );
   assert.deepEqual(request.scope.changeKinds, ["config"]);
 
   const lane = await acquireLane(f.targetRoot);
@@ -897,6 +932,30 @@ test("authorization helper rejects budgets below rollback and journal bounds", a
       }),
     expectPackError("pack-authorization-invalid"),
   );
+  const withoutActiveMarker =
+    Buffer.byteLength(f.content) * 2 +
+    packRuntime.PACK_INSTALLED_STATE_MAX_BYTES +
+    packRuntime.PACK_TRANSACTION_MAX_RECORD_BYTES * 2;
+  assert.throws(
+    () =>
+      packRuntime.createPackOperationAuthorizationRequest({
+        plan,
+        budgets: budgets({ maxChangedBytes: withoutActiveMarker }),
+        deadlineAt: new Date(Date.now() + 30_000).toISOString(),
+      }),
+    expectPackError("pack-authorization-invalid"),
+  );
+  assert.doesNotThrow(() =>
+    packRuntime.createPackOperationAuthorizationRequest({
+      plan,
+      budgets: budgets({
+        maxChangedBytes:
+          withoutActiveMarker +
+          packRuntime.PACK_ACTIVE_TRANSACTION_MAX_BYTES * 2,
+      }),
+      deadlineAt: new Date(Date.now() + 30_000).toISOString(),
+    }),
+  );
 });
 
 test("authorization budgets include a larger replacement rollback preimage", async (t) => {
@@ -1061,4 +1120,340 @@ test("missing transaction storage fails before artifact or installed-state mutat
   );
 
   await lane.release();
+});
+
+test("pack execution attests its expected post-state and clears the active marker", async (t) => {
+  const f = await fixture(t);
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+  const plan = await packRuntime.preparePackOperation(
+    prepareRequest(f, selectedRegistry, pack),
+  );
+  const { decision } = authorize(plan, selectedRegistry);
+  const lane = await acquireLane(f.targetRoot);
+  t.after(() => lane.state === "active" ? lane.release() : undefined);
+
+  const result = await packRuntime.executePreparedPackOperation({
+    plan,
+    authorization: decision,
+    lane,
+  });
+  assert.equal(result.status, "succeeded");
+
+  const journal = await packRuntime.loadPackTransactionJournal({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.deepEqual(journal.started.limits, plan.limits);
+  assert.equal(journal.started.installedStateAfter.revision, 1);
+  assert.equal(
+    journal.started.installedStateAfter.digest,
+    journal.terminal.installedStateAfterDigest,
+  );
+  assert.match(
+    journal.started.installedStateAfter.fileDigest,
+    /^sha256:[0-9a-f]{64}$/,
+  );
+  const terminalSnapshotDigest =
+    recoveryInternals.computePackRecoveryJournalSnapshotDigest(
+      journal,
+      "journal",
+    );
+  const startedSnapshotDigest =
+    recoveryInternals.computePackRecoveryJournalSnapshotDigest(
+      { started: journal.started },
+      "journal",
+    );
+  const markerSnapshotDigest =
+    recoveryInternals.computePackRecoveryJournalSnapshotDigest(
+      { started: journal.started },
+      "marker",
+    );
+  assert.notEqual(terminalSnapshotDigest, startedSnapshotDigest);
+  assert.notEqual(startedSnapshotDigest, markerSnapshotDigest);
+  const overBudgetStarted = structuredClone(journal.started);
+  overBudgetStarted.changes[0].bytes =
+    overBudgetStarted.limits.maxArtifactBytes + 1;
+  overBudgetStarted.recordDigest =
+    transactionInternals.computePackTransactionRecordDigest(
+      overBudgetStarted,
+    );
+  assert.throws(
+    () =>
+      transactionInternals.parsePackTransactionStartedRecord(
+        overBudgetStarted,
+        runId,
+        {
+          id: "sample.graybox",
+          identityDigest: projectIdentityDigest,
+        },
+      ),
+    expectPackError("pack-transaction-corrupt"),
+  );
+  await assert.rejects(
+    readFile(
+      join(
+        f.project,
+        ...packRuntime.PACK_ACTIVE_TRANSACTION_PATH.split("/"),
+      ),
+    ),
+    (error) => error?.code === "ENOENT",
+  );
+
+  const recovery = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(recovery.journal, "terminal");
+  assert.equal(recovery.activeMarker, "absent");
+  assert.equal(recovery.observedState, "postimage");
+  assert.equal(recovery.consistency, "consistent");
+  assert.equal(recovery.recordedOutcome, "committed");
+  assert.equal(recovery.mutationUncertain, false);
+
+  await lane.release();
+});
+
+test("a started-only postimage blocks new plans and can be closed as committed", async (t) => {
+  const f = await fixture(t);
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+  const plan = await packRuntime.preparePackOperation(
+    prepareRequest(f, selectedRegistry, pack),
+  );
+  const { decision } = authorize(plan, selectedRegistry);
+  const lane = await acquireLane(f.targetRoot);
+  t.after(() => lane.state === "active" ? lane.release() : undefined);
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan,
+      authorization: decision,
+      lane,
+    })).status,
+    "succeeded",
+  );
+  await lane.release();
+  await reopenAsStartedOnly(f);
+
+  await assert.rejects(
+    packRuntime.preparePackOperation(
+      prepareRequest(f, selectedRegistry, pack, {
+        selectedRunId: updateRunId,
+      }),
+    ),
+    expectPackError("pack-transaction-conflict"),
+  );
+  const recovery = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(recovery.journal, "started-only");
+  assert.equal(recovery.activeMarker, "matching");
+  assert.equal(recovery.observedState, "postimage");
+  assert.equal(recovery.consistency, "incomplete");
+  assert.equal(recovery.safeTerminalOutcome, "committed");
+  assert.equal(recovery.mutationUncertain, false);
+});
+
+test("recovery distinguishes a restored preimage from a mixed transaction", async (t) => {
+  const preimage = await fixture(t);
+  const preimagePack = manifest(preimage.content);
+  const preimageRegistry = validatedRegistry(preimagePack);
+  const preimagePlan = await packRuntime.preparePackOperation(
+    prepareRequest(preimage, preimageRegistry, preimagePack),
+  );
+  const preimageAuthorization = authorize(preimagePlan, preimageRegistry);
+  const preimageLane = await acquireLane(preimage.targetRoot);
+  t.after(() => preimageLane.state === "active" ? preimageLane.release() : undefined);
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan: preimagePlan,
+      authorization: preimageAuthorization.decision,
+      lane: preimageLane,
+    })).status,
+    "succeeded",
+  );
+  await preimageLane.release();
+  await reopenAsStartedOnly(preimage);
+  await rm(preimage.target);
+  await rm(
+    join(
+      preimage.project,
+      ...packRuntime.PACK_INSTALLED_STATE_PATH.split("/"),
+    ),
+  );
+
+  const restored = await packRuntime.inspectPackTransactionRecovery({
+    root: preimage.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(restored.observedState, "preimage");
+  assert.equal(restored.consistency, "incomplete");
+  assert.equal(restored.safeTerminalOutcome, "failed");
+  assert.equal(restored.mutationUncertain, false);
+
+  await rm(
+    join(
+      preimage.project,
+      ...packRuntime.packTransactionRecordPath(runId, 0).split("/"),
+    ),
+  );
+  const markerOnly = await packRuntime.inspectPackTransactionRecovery({
+    root: preimage.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(markerOnly.journal, "marker-only");
+  assert.equal(markerOnly.observedState, "preimage");
+  assert.equal(markerOnly.consistency, "incomplete");
+  assert.equal(markerOnly.safeTerminalOutcome, "failed");
+  assert.equal(markerOnly.mutationUncertain, false);
+  await writeFile(
+    join(
+      preimage.project,
+      ...packRuntime.packTransactionRecordPath(runId, 1).split("/"),
+    ),
+    "{}\n",
+    "utf8",
+  );
+  await assert.rejects(
+    packRuntime.inspectPackTransactionRecovery({
+      root: preimage.targetRoot,
+      runId,
+      project: {
+        id: "sample.graybox",
+        identityDigest: projectIdentityDigest,
+      },
+      maxDirectoryEntries: 1000,
+    }),
+    expectPackError("pack-transaction-corrupt"),
+  );
+
+  const mixed = await fixture(t);
+  const mixedPack = manifest(mixed.content);
+  const mixedRegistry = validatedRegistry(mixedPack);
+  const mixedPlan = await packRuntime.preparePackOperation(
+    prepareRequest(mixed, mixedRegistry, mixedPack),
+  );
+  const mixedAuthorization = authorize(mixedPlan, mixedRegistry);
+  const mixedLane = await acquireLane(mixed.targetRoot);
+  t.after(() => mixedLane.state === "active" ? mixedLane.release() : undefined);
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan: mixedPlan,
+      authorization: mixedAuthorization.decision,
+      lane: mixedLane,
+    })).status,
+    "succeeded",
+  );
+  await mixedLane.release();
+  await reopenAsStartedOnly(mixed);
+  await rm(mixed.target);
+
+  const unresolved = await packRuntime.inspectPackTransactionRecovery({
+    root: mixed.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(unresolved.observedState, "mixed");
+  assert.equal(unresolved.consistency, "unresolved");
+  assert.equal(unresolved.safeTerminalOutcome, undefined);
+  assert.equal(unresolved.mutationUncertain, true);
+});
+
+test("terminal outcome drift remains contradictory and recovery-required", async (t) => {
+  const f = await fixture(t);
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+  const plan = await packRuntime.preparePackOperation(
+    prepareRequest(f, selectedRegistry, pack),
+  );
+  const { decision } = authorize(plan, selectedRegistry);
+  const lane = await acquireLane(f.targetRoot);
+  t.after(() => lane.state === "active" ? lane.release() : undefined);
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan,
+      authorization: decision,
+      lane,
+    })).status,
+    "succeeded",
+  );
+  await lane.release();
+  await writeFile(f.target, "user drift\n", "utf8");
+
+  const recovery = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(recovery.observedState, "mixed");
+  assert.equal(recovery.consistency, "contradictory");
+  assert.equal(recovery.recordedOutcome, "committed");
+  assert.equal(recovery.mutationUncertain, true);
+
+  await assert.rejects(
+    packRuntime.inspectPackTransactionRecovery({
+      root: f.targetRoot,
+      runId,
+      project: {
+        id: "sample.graybox",
+        identityDigest: projectIdentityDigest,
+      },
+      maxDirectoryEntries: 1000,
+      undeclared: true,
+    }),
+    expectPackError("invalid-pack-recovery-request"),
+  );
+});
+
+test("a malformed active marker blocks planning without being replaced", async (t) => {
+  const f = await fixture(t);
+  const activePath = join(
+    f.project,
+    ...packRuntime.PACK_ACTIVE_TRANSACTION_PATH.split("/"),
+  );
+  await writeFile(activePath, "{}\n", "utf8");
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+
+  await assert.rejects(
+    packRuntime.preparePackOperation(
+      prepareRequest(f, selectedRegistry, pack),
+    ),
+    expectPackError("pack-transaction-corrupt"),
+  );
+  assert.equal(await readFile(activePath, "utf8"), "{}\n");
 });

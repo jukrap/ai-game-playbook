@@ -18,7 +18,12 @@ import {
 } from "@ai-game-playbook/core";
 
 import { PackRuntimeError } from "./errors.js";
-import type { PackChange, PackOperation, PreparedPackOperation } from "./types.js";
+import type {
+  PackChange,
+  PackOperation,
+  PackOperationLimits,
+  PreparedPackOperation,
+} from "./types.js";
 
 export const PACK_TRANSACTION_DIRECTORY: string =
   ".ai-game-playbook/state/packs/transactions";
@@ -29,6 +34,9 @@ const UUID_PATTERN =
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 const ERROR_CODE_PATTERN = /^[a-z][a-z0-9-]{0,127}$/;
 const MAX_TRANSACTION_PATHS = 256;
+const MAX_ARTIFACT_BYTES = 64 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 256 * 1024 * 1024;
+const MAX_DIRECTORY_ENTRIES = 100_000;
 
 type MutableRecord = Record<string, unknown>;
 
@@ -65,6 +73,12 @@ export interface PackTransactionStartedRecord {
     readonly digest: Sha256Digest;
     readonly fileDigest?: Sha256Digest;
   };
+  readonly installedStateAfter: {
+    readonly revision: number;
+    readonly digest: Sha256Digest;
+    readonly fileDigest: Sha256Digest;
+  };
+  readonly limits: PackOperationLimits;
   readonly changes: readonly PackChange[];
   readonly startedAt: string;
   readonly recordDigest: Sha256Digest;
@@ -118,6 +132,11 @@ export interface CreateStartedPackTransactionRequest {
   readonly plan: PreparedPackOperation;
   readonly authorizationId: string;
   readonly requestDigest: Sha256Digest;
+  readonly installedStateAfter: {
+    readonly revision: number;
+    readonly digest: Sha256Digest;
+    readonly fileDigest: Sha256Digest;
+  };
   readonly startedAt: string;
 }
 
@@ -230,6 +249,8 @@ function freezeStarted(
     authorization: Object.freeze({ ...record.authorization }),
     pack: Object.freeze({ ...record.pack }),
     installedState: Object.freeze({ ...record.installedState }),
+    installedStateAfter: Object.freeze({ ...record.installedStateAfter }),
+    limits: Object.freeze({ ...record.limits }),
     changes: Object.freeze(record.changes.map(freezeChange)),
   });
 }
@@ -292,6 +313,11 @@ export function createStartedPackTransaction(
   if (
     !UUID_PATTERN.test(request.authorizationId) ||
     !isSha256Digest(request.requestDigest) ||
+    !Number.isSafeInteger(request.installedStateAfter?.revision) ||
+    request.installedStateAfter.revision !==
+      request.plan.installedState.revision + 1 ||
+    !isSha256Digest(request.installedStateAfter.digest) ||
+    !isSha256Digest(request.installedStateAfter.fileDigest) ||
     !canonicalTimestamp(request.startedAt)
   ) {
     throw new PackRuntimeError(
@@ -315,6 +341,8 @@ export function createStartedPackTransaction(
     operation: request.plan.operation,
     pack: { ...request.plan.pack },
     installedState: { ...request.plan.installedState },
+    installedStateAfter: { ...request.installedStateAfter },
+    limits: { ...request.plan.limits },
     changes: request.plan.changes.map(freezeChange),
     startedAt: request.startedAt,
   };
@@ -362,6 +390,9 @@ export function createTerminalPackTransaction(
     rolledBackPaths.some((path) => !applied.has(path)) ||
     (request.outcome === "committed" &&
       request.installedStateAfterDigest === undefined) ||
+    (request.outcome === "committed" &&
+      request.installedStateAfterDigest !==
+        request.started.installedStateAfter.digest) ||
     ((request.outcome === "failed" || request.outcome === "rolled-back") &&
       request.installedStateAfterDigest !== undefined) ||
     (request.outcome === "failed" && appliedPaths.length > 0) ||
@@ -505,7 +536,7 @@ function parseProject(
   });
 }
 
-function parseStarted(
+export function parsePackTransactionStartedRecord(
   value: unknown,
   expectedRunId: string,
   expectedProject: {
@@ -527,6 +558,8 @@ function parseStarted(
       "operation",
       "pack",
       "installedState",
+      "installedStateAfter",
+      "limits",
       "changes",
       "startedAt",
       "recordDigest",
@@ -558,6 +591,34 @@ function parseStarted(
     !isSha256Digest(value["installedState"]["digest"]) ||
     (value["installedState"]["fileDigest"] !== undefined &&
       !isSha256Digest(value["installedState"]["fileDigest"])) ||
+    !isRecord(value["installedStateAfter"]) ||
+    !exactKeys(value["installedStateAfter"], [
+      "revision",
+      "digest",
+      "fileDigest",
+    ]) ||
+    !Number.isSafeInteger(value["installedStateAfter"]["revision"]) ||
+    value["installedStateAfter"]["revision"] !==
+      (value["installedState"]["revision"] as number) + 1 ||
+    !isSha256Digest(value["installedStateAfter"]["digest"]) ||
+    !isSha256Digest(value["installedStateAfter"]["fileDigest"]) ||
+    !isRecord(value["limits"]) ||
+    !exactKeys(value["limits"], [
+      "maxArtifactBytes",
+      "maxTotalBytes",
+      "maxDirectoryEntries",
+    ]) ||
+    !Number.isSafeInteger(value["limits"]["maxArtifactBytes"]) ||
+    (value["limits"]["maxArtifactBytes"] as number) < 1 ||
+    (value["limits"]["maxArtifactBytes"] as number) > MAX_ARTIFACT_BYTES ||
+    !Number.isSafeInteger(value["limits"]["maxTotalBytes"]) ||
+    (value["limits"]["maxTotalBytes"] as number) <
+      (value["limits"]["maxArtifactBytes"] as number) ||
+    (value["limits"]["maxTotalBytes"] as number) > MAX_TOTAL_BYTES ||
+    !Number.isSafeInteger(value["limits"]["maxDirectoryEntries"]) ||
+    (value["limits"]["maxDirectoryEntries"] as number) < 1 ||
+    (value["limits"]["maxDirectoryEntries"] as number) >
+      MAX_DIRECTORY_ENTRIES ||
     !Array.isArray(value["changes"]) ||
     value["changes"].length > 64 ||
     !canonicalTimestamp(value["startedAt"]) ||
@@ -580,18 +641,35 @@ function parseStarted(
       "transaction pack version is invalid",
     );
   }
+  const maxArtifactBytes = value["limits"]["maxArtifactBytes"] as number;
+  const maxTotalBytes = value["limits"]["maxTotalBytes"] as number;
   const changes = value["changes"].map(parseChange);
   if (
     changes.some(
       (change, index) =>
         index > 0 &&
         compareCanonicalText(changes[index - 1]?.path ?? "", change.path) >= 0,
-    )
+    ) ||
+    changes.some((change) => change.bytes > maxArtifactBytes)
   ) {
     transactionError(
       "pack-transaction-corrupt",
       "$transaction.started.changes",
-      "transaction changes must be sorted and unique",
+      "transaction changes must be sorted, unique, and within artifact limits",
+    );
+  }
+  const totalChangeBytes = changes.reduce(
+    (total, change) => total + change.bytes,
+    0,
+  );
+  if (
+    !Number.isSafeInteger(totalChangeBytes) ||
+    totalChangeBytes > maxTotalBytes
+  ) {
+    transactionError(
+      "pack-transaction-corrupt",
+      "$transaction.started.changes",
+      "transaction change bytes exceed the declared total limit",
     );
   }
   const record = freezeStarted({
@@ -618,6 +696,16 @@ function parseStarted(
       ...(value["installedState"]["fileDigest"] === undefined
         ? {}
         : { fileDigest: value["installedState"]["fileDigest"] as Sha256Digest }),
+    }),
+    installedStateAfter: Object.freeze({
+      revision: value["installedStateAfter"]["revision"] as number,
+      digest: value["installedStateAfter"]["digest"],
+      fileDigest: value["installedStateAfter"]["fileDigest"],
+    }),
+    limits: Object.freeze({
+      maxArtifactBytes: value["limits"]["maxArtifactBytes"] as number,
+      maxTotalBytes: value["limits"]["maxTotalBytes"] as number,
+      maxDirectoryEntries: value["limits"]["maxDirectoryEntries"] as number,
     }),
     changes: Object.freeze(changes),
     startedAt: value["startedAt"],
@@ -793,13 +881,29 @@ export async function loadPackTransactionJournal(
     request.maxDirectoryEntries,
   );
   if (startedValue === undefined) {
+    const orphanedTerminal = await readRecord(
+      root,
+      terminalPath,
+      request.maxDirectoryEntries,
+    );
+    if (orphanedTerminal !== undefined) {
+      transactionError(
+        "pack-transaction-corrupt",
+        terminalPath,
+        "pack transaction has a terminal record without its started record",
+      );
+    }
     transactionError(
       "pack-transaction-not-found",
       startedPath,
       "pack transaction has no started record",
     );
   }
-  const started = parseStarted(startedValue, request.runId, request.project);
+  const started = parsePackTransactionStartedRecord(
+    startedValue,
+    request.runId,
+    request.project,
+  );
   if (started.project.rootIdentityDigest !== root.identityDigest) {
     transactionError(
       "pack-transaction-corrupt",

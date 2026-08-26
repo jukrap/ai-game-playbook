@@ -29,6 +29,7 @@ import {
   type InstalledPackRecord,
   type LoadedInstalledPackState,
 } from "./state.js";
+import { loadActivePackTransactionRecord } from "./active-transaction.js";
 import type {
   PackChange,
   PackConflict,
@@ -747,6 +748,18 @@ export async function preparePackOperation(
   await assertProjectRootIdentity(request.targetRoot);
   if (request.sourceRoot !== undefined) {
     await assertProjectRootIdentity(request.sourceRoot);
+  }
+  const activeTransaction = await loadActivePackTransactionRecord({
+    root: request.targetRoot,
+    project: request.project,
+    maxDirectoryEntries: request.limits.maxDirectoryEntries,
+  });
+  if (activeTransaction !== undefined) {
+    throw new PackRuntimeError(
+      "pack-transaction-conflict",
+      ".ai-game-playbook/state/packs/active.json",
+      "an unresolved pack transaction must be reconciled before planning another operation",
+    );
   }
   const installed = await loadInstalledPackState(
     request.targetRoot,

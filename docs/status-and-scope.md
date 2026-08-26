@@ -1,14 +1,37 @@
 # Current Status and Scope
 
-> Status: Stage 2 control-plane safety boundary in progress, reviewed on 2026-08-26.
+> Status: Stage 2 control-plane implementation in progress, reviewed on 2026-08-26. One read-only source-built command is available; engine support remains planned.
 
 [한국어](status-and-scope.ko.md) · [Documentation](README.md)
 
 ## Current repository state
 
-The repository now contains a private pnpm/TypeScript workspace, versioned contract schemas, semantic validators, typed registry validation and projections, deterministic resolved workflow-plan attestation, a digest-bound foundation plan, tests, Windows/Linux CI configuration, an early private core package, and a private managed-pack runtime. A resolved plan binds the exact registry, workflow descriptor, project stage, input/output schemas, topologically ordered steps, command and handler digests, lanes, permissions, budgets, failure transitions, terminal oracle, and evidence duties. The implemented filesystem boundary binds canonical project roots, creates the six fixed runtime directories through an idempotent identity-attested bootstrap, resolves portable project paths without writable link traversal, bounds directory inspection and file sizes, and stages SHA-256 compare-and-swap writes or exact-digest single-file deletion with precondition, drift, and uncertain-outcome reporting. The process boundary binds a local executable identity and digest, uses direct argument-array spawn, limits environment authority, working directory, time, idle time, and output, and terminates the owned process tree on cancellation or budget exhaustion. Interrupted execution remains mutation-uncertain even when termination is confirmed. The mutating-lane boundary uses a fixed local lock, root/project digests, run and runtime identity, explicit lease renewal, bounded waiting and cancellation, and dead-owner-only stale recovery. The permission boundary validates registered command payloads and project/feature/workflow/session bindings, applies nested execution-budget ceilings, verifies exact Ed25519 approval grants, consumes grants atomically in memory, and compares reported effects with authorized scope before accepting success. The workflow boundary re-resolves the exact plan, records immutable authorization/dispatch/settlement/rollback transitions, and persists canonical append-only checkpoint chains behind a compare-and-swap head. A bounded loader validates every parent transition and current run authority; safe restart hydration requires reauthorization before an undispatched step and marks a dispatched unsettled step `uncertain`. Pack preflight validates offline regular-file content, canonical installed state, dependencies, ownership, downgrade policy, and conflicts, then emits a same-process immutable write-free plan. The pack-specific executor requires that exact plan, broker-issued install authorization, and an attested project-write lane; it persists an exact active marker before the started record, records terminal entries, promotes artifacts and canonical installed state through compare-and-swap, rolls clear partial failures back in reverse, and clears the marker only after a non-uncertain terminal. For explicitly declared direct artifact parents it creates only absent directories with pack-digest-bound ownership markers, keeps existing directories shared, preserves exact identity across updates, and uses reversible same-parent tombstones for removal. Any surviving marker or tombstone uncertainty blocks later plans. A bounded read-only inspector compares two observations against journaled preimages and postimages and attests safe-to-finalize, mixed, unstable, unreadable, or contradictory state without changing it. A separate private finalizer requires a new exact approval and the matching project-write lane, re-inspects before each closure boundary, may clean only exact empty detached tombstones, appends only missing journal closure or reconciliation records, and clears the exact marker only after state and journal verification. It restores the marker if post-clear verification fails and never repairs, retries, or rolls back artifacts. Removal uses installed-state ownership even when the pack is no longer present in the active registry.
+The repository contains a private pnpm/TypeScript workspace, versioned schemas, semantic validators, typed registry validation and generation, deterministic workflow-plan attestation, a runtime registry for implemented commands, a digest-bound public surface, tests, Windows/Linux CI, an early core package, a managed-pack runtime, and an experimental CLI package.
 
-It does not yet contain an installable package, `agpb` executable, MCP server runtime, Codex integration files, integrated command dispatcher, approval UI or durable approval store, executable managed-pack CLI or recovery doctor, CPU or memory sandboxing, engine bridges, engine packs, or a playable golden project. Project-state bootstrap, managed directory lifecycle, pack recovery inspection, and pack recovery finalization are private library functions, not executable commands. The finalizer can close only stable states already classified by the inspector; it cannot repair artifacts, resolve mixed state, or recover a general workflow or engine mutation. The current workflow and pack runtimes are private libraries rather than an executable product. Permission admission is coupled only to the pack executor/finalizer lane and filesystem CAS paths; it is not yet coupled to a general dispatcher, process or engine path, dirty-state preimages, durable receipt bodies or evidence payloads, or a general reconciliation action. It also has no project secret-path classifier or typed editor-object operation scope; editor-object source mutations therefore remain closed. The lane runtime still lacks automatic heartbeat scheduling, parallel-reader coordination, independent operating-system attestation of a foreign live process start, durable recovery receipts, and actual editor control. The command inventory in [planned-surface.json](planned-surface.json) and the generated [foundation plan](../generated/foundation-plan.json) remains design-only; neither raises any command or engine capability above `planned`.
+Implemented core boundaries include:
+
+- canonical project-root binding and portable path resolution without writable link traversal;
+- bounded directory and file inspection;
+- staged SHA-256 compare-and-swap writes, deletion, and reversible empty-directory removal;
+- digest-bound direct process execution with environment, working-directory, time, idle, and output limits;
+- one root/project-bound mutation lease with bounded waiting and dead-owner-only recovery;
+- schema-bound permission admission, exact scoped signed grants, and effect settlement;
+- deterministic workflow-plan resolution and immutable state transitions; and
+- canonical append-only checkpoint chains with restart classification.
+
+The private pack runtime implements write-free preflight, canonical installed state, exact dependencies and ownership, local add/update/remove transactions, active markers, append-only journals, compare-and-swap promotion, clear-failure rollback, marker-bound direct-parent directory ownership, reversible tombstones, bounded recovery inspection, and separately approved stable-state finalization.
+
+The source-built `agpb` executable currently exposes only `doctor`. It checks runtime-registry parity, the supported Node.js range, one canonical project root, the fixed runtime layout, installed-pack-state validity, and active transaction markers. It produces human or canonical JSON output from the registered `DoctorReport` and performs no writes.
+
+## What is not available
+
+There is no installable or published package, MCP server, Codex integration package, general command dispatcher, approval UI, durable approval store, evidence store, mutating pack CLI, recovery-finalization command, CPU or memory sandbox, engine bridge, engine pack, live-engine automation, or playable golden project.
+
+`init`, project inspection, pack and skill commands, engine commands, workflow execution, verification, evidence commands, and documentation command integration remain planned. Private library functions are not public commands. The runtime registry exposes none of them.
+
+Project-state bootstrap, pack mutation, recovery inspection, and recovery finalization remain private APIs. The current doctor can identify unsafe state but cannot initialize, repair, clear, classify recovery, or finalize it. The workflow runtime is not connected to general dispatch, and durable receipts and evidence payloads are not implemented.
+
+All Godot, Unity, and Unreal capabilities remain `planned`. Availability of `doctor` is a control-plane command status, not engine evidence.
 
 ## Intended users and first outcome
 
@@ -24,7 +47,7 @@ The first alpha favors reliable graybox production and verification over broad g
 | Unity | `planned` | Second adapter, official automation paths first | 6.3 LTS |
 | Unreal Engine | `planned` | Third adapter, editor and build paths separated | 5.8.x |
 
-The version families are dated planning targets, not tested compatibility claims. Exact patches and required modules will be detected and pinned before implementation begins.
+These version families are dated planning targets, not tested compatibility claims. Exact patches and required modules will be detected and pinned before each adapter stage.
 
 ## Included in the first alpha
 
@@ -35,6 +58,8 @@ The version families are dated planning targets, not tested compatibility claims
 - Typed placeholders and user-provided or licensed assets with provenance and QA.
 - Local evidence storage and explicit evidence export.
 - Windows x64 as the first build target, with Linux static and headless CI where supported.
+
+These are alpha scope commitments, not current capability claims.
 
 ## Deferred or optional
 
@@ -55,4 +80,4 @@ The version families are dated planning targets, not tested compatibility claims
 
 ## Readiness rule
 
-All seven documentation gates were approved before Stage 1 implementation began. `0.1.0-alpha` still requires the Godot golden loop to pass end to end. A `1.0` release requires all three engines to reach `verified`, along with stable install lifecycle, recovery, and behavior evaluations.
+All seven documentation gates were approved before implementation began. `0.1.0-alpha` still requires the complete Godot golden loop, stable executable lifecycle and recovery behavior, clean external installation, a selected license, and explicit release authority. A `1.0` release requires all three engines to reach the required `verified` capabilities and pass the common packaged scenario.

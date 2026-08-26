@@ -5,12 +5,16 @@
   "description": "Safety-bounded AI game development control plane for Godot, Unity, and Unreal Engine.",
   "license": "UNLICENSED",
   "type": "module",
+  "bin": {
+    "agpb": "./packages/cli/dist/bin.js"
+  },
   "packageManager": "pnpm@11.4.0+sha512.f0febc7e37552ab485494a914241b338e0b3580b93d54ce31f00933015880863129038a1b4ae4e414a0ee63ac35bf21197e990172c4a68256450b5636310968f",
   "engines": {
     "node": ">=22.22.0 <23",
     "pnpm": ">=11.4.0 <12"
   },
   "scripts": {
+    "agpb": "node packages/cli/dist/bin.js",
     "build": "tsc -b --pretty false",
     "ci:check-clean": "node scripts/check-worktree-clean.mjs",
     "docs:check": "node scripts/check-docs.mjs",

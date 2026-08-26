@@ -18,6 +18,10 @@ export {
   FOUNDATION_PLAN_ARTIFACT,
   serializeFoundationPlanArtifact,
 } from "./foundation-plan.js";
+export {
+  BUILTIN_REGISTRY,
+  BUILTIN_REGISTRY_SURFACES,
+} from "./builtin-registry.js";
 export type {
   FoundationPlanArtifact,
   FoundationPlanData,

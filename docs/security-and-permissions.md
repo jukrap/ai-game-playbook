@@ -1,67 +1,90 @@
 # Security and Permissions
 
-> Status: planned permission policy with early private admission, workflow-checkpoint, durable checkpoint-store, and a pack-specific transaction executor. General command dispatch and editor or bridge enforcement do not exist.
+> Status: planned permission policy with implemented private admission, workflow checkpoints, managed-pack transactions, and a read-only CLI diagnostic. General mutation dispatch and engine enforcement do not exist.
 
 [한국어](security-and-permissions.ko.md) · [Documentation](README.md)
 
+## Current enforcement
+
+The current private broker accepts only a registry validated in the same process. It validates command input against the registered schema and binds authorization to project, command and handler, registry, feature, workflow step, optional editor session, normalized scope, budgets, deadline, and run identity. Sensitive authority uses one-permission Ed25519 grants, exact scope, expiration, and single-use reservation.
+
+Authorization is not execution. The broker is not connected to a general mutation dispatcher, MCP server, process workflow, or engine bridge. The narrow pack executor and stable-state recovery finalizer require their own same-process plan, exact `install` decision, and attested project-write lease. Grant reservations and active leases are memory-only and do not survive restart.
+
+The current CLI dispatches only read-only `doctor`. Its descriptor declares `read-project`, no side effect, and a `parallel-read` lane. It cannot request elevated authority or call repair.
+
 ## Default permission model
 
-| Action | Planned default |
+| Action | Default |
 | --- | --- |
-| Read project files and inspect state | Allowed within the selected project |
-| Change source inside an approved feature contract | Allowed within declared path and change budgets |
+| Read selected project files and inspect local state | Allowed within bounded paths |
+| Change source inside an approved feature contract | Allowed only within declared path, change, and budget scope |
 | Control an editor | One approval per project and editor session |
 | Run approved tests and builds | Allowed within configured time, output, and resource budgets |
-| Install or update a pack or skill | Separate approval every time |
+| Install, update, or remove a pack or skill | Separate approval every time |
 | Access the network | Separate approval every time |
 | Transmit project data externally | Separate approval every time |
 | Make a paid provider call | Separate approval every time |
 | Perform a destructive action | Separate approval every time |
 | Publish or release | Separate approval every time |
 
-Permission is evaluated by the control plane, not delegated to MCP annotations, a skill, an engine bridge, or a host UI. Approval is bound to project identity, command, scope, session when relevant, budgets, and expiration.
+MCP annotations, skill text, engine bridges, and host UI labels never grant permission. A blanket `--yes` must not combine installation, network, external transmission, paid calls, destructive work, and publishing.
 
-The current private broker accepts only a registry instance validated in the same process. It validates the actual command payload against the registered input schema, binds its digest to the project, command/handler, registry, feature, workflow step, editor session, normalized targets, budgets, deadline, and run, and verifies domain-separated, one-permission Ed25519 grants against configured public keys. Sensitive grants are single-use; grants are reserved synchronously before an authorization lease is returned. Automatic admission is limited to bounded project reads, approved feature-source paths and change kinds, and registered test/build workflow steps that do not declare an approval checkpoint. Test/build authority does not imply project-file or editor-object mutation. Editor-object source mutations remain rejected until object operation types can be checked against the feature contract.
+## Doctor boundary
 
-Authorization is not execution by itself. The general broker is not yet connected to a command dispatcher, CLI, MCP, process workflow, or engine bridge. Narrow private exceptions are the pack executor and stable-state recovery finalizer. The executor accepts only a same-process prepared plan, a broker-issued `install` decision with exact paths and conservative rollback budgets, and an attested `project-write` lease before invoking filesystem CAS. The finalizer requires a separately issued `install` decision whose input, paths, byte/file ceilings, deadline, registry authority, transaction, project identity, and lane exactly match one same-process recovery plan. Grant use counts and active leases remain memory-only and cannot survive restart; there is no approval UI, durable approval or revocation store, general recovery action, or secret-path classifier yet. The registry derives a domain-separated workflow-plan digest from exact validated authority, rejects ambiguous bindings, and semantically checks the immutable plan. The workflow state machine re-resolves that plan before accepting a broker decision and binds the exact authorization and actual effect to each transition. Its durable checkpoint store preserves the resulting uncertainty barrier across restart, but it deliberately discards stale authorization capability and cannot yet reconcile or clear general workflow uncertainty. Memory, CPU, and GPU request budgets are rejected while runtime enforcement and accounting are unavailable.
+`agpb doctor` performs bounded local reads for the runtime registry, Node.js version, canonical project root, fixed runtime directories, installed-pack state, and active transaction marker. The complete report is validated against the registry-bound output schema before rendering.
+
+Doctor behavior is fail-closed:
+
+- an uninitialized project is reported as attention without creating directories;
+- an unavailable or unsafe root is blocking;
+- incomplete, linked, or conflicting runtime state is blocking;
+- malformed, noncanonical, or wrong-project installed state is blocking;
+- a valid, malformed, or changing active transaction marker is blocking; and
+- unsupported or malformed runtime-version text is blocking.
+
+The command never initializes, repairs, deletes, clears, finalizes, installs, spawns an engine, opens a network connection, or controls an editor. Human and JSON modes use the same report and exit category.
 
 ## Fail-closed stop conditions
 
-A run stops before further mutation when any of the following occurs:
+A mutating run must stop before further mutation when any of the following occurs:
 
 - More than one plausible project or editor instance exists.
-- Project, engine, process, session, scene/world, or feature-contract identity changes.
+- Project, engine, process, session, scene/world, registry, handler, or feature identity changes.
 - A file outside owned or approved paths would be changed.
 - An unexpected dirty file or compare-and-swap mismatch appears.
-- A path traversal, symlink escape, stale PID, invalid token, or schema mismatch is detected.
+- Path traversal, link escape, stale identity, invalid token, or schema mismatch is detected.
 - Time, output, changed-file, changed-byte, repair, resource, or cost budget is exceeded.
 - The operation ends with uncertain mutation state.
-- Required tests are missing, incomplete, skipped entirely, or report zero tests.
+- Required tests are missing, incomplete, all skipped, or report zero tests.
 
-Uncertain mutations are not automatically retried. The workflow first records an `uncertain` receipt and requires state reconciliation or explicit recovery.
+Uncertain mutation is never automatically retried. It requires a new reconciliation or recovery attempt with its own authority and receipt.
 
 ## Process and editor isolation
 
-The current private core digest-binds a local executable and project root, spawns it directly with an argument array, limits environment values and project-scoped working directories, caps time, idle time, and combined output, and terminates only the owned process tree on interruption. Windows retains only a minimal non-secret OS baseline and masks inherited user/path values unless explicitly allowlisted. Interrupted execution remains mutation-uncertain and is not safe to retry without reconciliation. This boundary is not a CPU, memory, filesystem, or network sandbox.
+The current core digest-binds a local executable and project root, spawns it directly with an argument array, limits environment values and project-scoped working directories, caps time, idle time, and combined output, and terminates only the owned process tree. Interrupted execution remains mutation-uncertain even if termination succeeds. This is not a CPU, memory, filesystem, or network sandbox.
 
-The current private core admits `project-write`, `editor-bound`, and `build-bound` work through one fixed local lease per initialized project. The record binds root and project digests, a run UUID, PID, captured runtime-start identity, runtime nonce, lane, and an editor-session digest when applicable. Acquisition has bounded waiting and cancellation; renewal is explicit and compare-and-swap protected. Expiration alone never permits takeover: a live, reused, or unverifiable foreign PID remains blocking, while a dead owner record is atomically quarantined before reacquisition. Foreign live process start time is not yet independently attested by the operating system, automatic heartbeats and parallel-reader coordination do not exist, and no actual editor session is controlled yet.
+Mutating lanes use one fixed project-local lease. The record binds root and project digests, run ID, runtime identity, nonce, lane, and optional editor-session digest. Acquisition has bounded waiting and cancellation; renewal is explicit. Expiration alone does not permit takeover of a live or unverifiable owner. Automatic heartbeats, parallel-reader coordination, independent foreign-process start attestation, and actual editor control remain planned.
 
-Planned local bridges use authenticated, project-scoped sessions, bounded request bodies and queues, timeouts, cancellation, and normalized outer/inner errors. They bind to loopback by default and do not expose an unauthenticated server.
+Planned local bridges use authenticated project-scoped sessions, bounded request bodies and queues, deadlines, cancellation, and separate outer transport and inner operation results. They bind loopback by default and expose no unauthenticated mutation server.
 
 ## Filesystem and pack safety
 
-The current core binds a canonical project root, rejects writable path links and portable path ambiguity, and performs bounded staged SHA-256 compare-and-swap writes and exact-digest single-file deletion. Its fixed-layout bootstrap creates only six runtime directories, one segment at a time, without recursive deletion or caller-selected paths. It verifies parent and target identities, treats concurrent creation as idempotent only after reinspection, reverses only directories created by the failed call, and reports ambiguous cleanup as mutation-uncertain. Private pack preflight accepts only a same-process validated registry and offline, hook-free regular-file artifacts. It verifies local content, canonical installed state, exact dependencies, downgrade policy, owned hashes, non-owned collisions, and resource limits before producing an immutable write-free plan. Control-plane state and lock namespaces are reserved from pack ownership. For an explicitly declared direct artifact parent, the pack executor may create only an absent directory and writes a canonical marker bound to the pack digest; any pre-existing directory remains shared and unclaimed. Updates preserve exact directory identity while rotating the marker. Removal deletes owned files and the marker first, then detaches only the exact empty owned directory into a fixed same-parent tombstone so a clear failure can restore it before file rollback. The caller must still supply the exact approved decision and lane. The executor rechecks lease expiry before transaction start and around every forward staging or commit boundary. Authorization scope and rollback budgets include the fixed active marker, both journal records, installed state, every artifact and marker, created or removed directory paths, tombstones, and captured rollback preimages. The marker embeds the exact expected started record, including pre/post installed-state file digests and observation limits, before that started record is attempted. A non-uncertain terminal clears only the exact marker digest; any remaining or malformed marker blocks preflight and execution. Final artifact digests, including unchanged files in a state-only update, are checked with write-free CAS guards before installed-state commit. The executor writes the immutable started record before final-file effects, stages state and artifacts, commits canonical installed state last, finalizes detached empty tombstones, appends a terminal record, and settles observed paths and bytes. Clear later failures restore detached directories before rolling earlier file commits back in reverse with exact digests; uncertain commits stop without retry.
+The core binds one canonical local project root, rejects path ambiguity and writable links, bounds directory traversal and file size, and stages exact compare-and-swap writes, deletion, and reversible empty-directory removal. The fixed bootstrap creates only six predetermined runtime directories and rolls back only identities created by the failed call.
 
-The recovery inspector performs two bounded, write-free observations and refuses to promote a mixed, unstable, unreadable, terminal-contradictory, or foreign-marker state. It attests the project root, active-marker file digest, started/terminal/reconciliation digests, journal snapshot, observed state, and proposed closure in a same-process report. The report cannot mutate anything. A separate finalizer accepts only an actionable digest-bound plan, a fresh exact approval, and the matching active lane. It re-runs the inspector before writing; may finalize only an exact empty detached directory whose persisted identity and fixed tombstone layout still match; appends only missing sequence-0/1 closure records or a sequence-2 reconciliation behind an immutable `recovery-required` terminal; re-inspects before exact-digest marker deletion; and verifies the closed state afterward. If that last verification fails after deletion, it attempts an expected-absent compare-and-swap restoration of the original marker. Marker clear plus possible restoration are both included in the approval budget. The finalizer never changes installed state or pack artifacts and never performs automatic artifact repair, retry, or rollback. Unexpected content in a detached directory remains preserved and blocks cleanup. Installed-state-owned removal remains available when a pack disappears from the current registry. No CLI, doctor integration, durable recovery receipt, or pack acquisition path exists yet.
+Pack preflight is write-free and accepts only validated offline regular-file artifacts. It verifies content digests, canonical installed state, dependencies, downgrade policy, ownership, non-owned collisions, reserved namespaces, and budgets. Existing directories remain shared. Only explicitly declared missing direct artifact parents may receive pack-digest-bound ownership markers.
 
-Path checks resolve the final target and reject traversal, absolute-path injection, and symlink escape. Engine and system tools are detected but not installed automatically.
+Execution requires an exact plan, approved scope, and project-write lease. It writes an active marker before the started journal record, commits artifacts through compare-and-swap, commits canonical installed state last, records a terminal outcome, and clears only the exact marker after a non-uncertain terminal. Clear later failures restore detached directories before rolling earlier file commits back in reverse. Uncertain commits stop without retry.
+
+Recovery inspection performs two bounded, write-free observations and preserves mixed, unstable, unreadable, contradictory, and foreign-marker states for diagnosis. Finalization requires a new exact approval and lane, re-inspects before each write boundary, may close only a stable attested state, and never repairs pack artifacts. Unexpected tombstone content is preserved and blocks cleanup.
+
+`doctor` can report installed-state corruption or a remaining marker, but it cannot classify recovery, append journal records, clear a marker, or invoke the finalizer. No mutating pack CLI or distributed pack acquisition path exists yet.
 
 ## Network, providers, and telemetry
 
-Telemetry is not planned. Routine evidence remains local. External evidence export, network access, and provider calls are separate actions requiring approval with destination, data categories, retention expectations, model/provider identity, and estimated cost.
+Telemetry is not planned. Routine evidence remains local. External evidence export, network access, and provider calls are separate actions requiring destination, data-category, retention, provider/model, and cost disclosure plus explicit approval.
 
-Hosted providers are disabled by default. The first version may permit at most one optional image provider pack. Installation approval does not authorize a later transmission or paid call.
+Hosted providers are disabled by default. A later version may permit at most one optional image-provider pack. Installation approval never authorizes a later transmission or paid call.
 
 ## Secrets and public artifacts
 
-Secrets and local connection details belong in ignored, machine-local configuration. Receipts store redacted command information and hashes where raw values would expose secrets. Public documentation, exports, and diagnostics must exclude private absolute paths, tokens, internal URLs, and raw local configuration unless the user explicitly selects and approves them.
+Secrets and local connection details belong in ignored machine-local configuration. Receipts and diagnostics must redact values that could expose credentials or private machine details. Public documentation and exports exclude private absolute paths, tokens, internal URLs, and raw local configuration unless the user explicitly selects and approves those exact data.

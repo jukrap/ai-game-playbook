@@ -32,6 +32,10 @@ import {
 } from "./run-engine-contracts.js";
 import { approvalGrantSchema } from "./approval-contracts.js";
 import { taskRoutingSelectionSchema } from "./routing-contracts.js";
+import {
+  doctorReportSchema,
+  doctorRequestSchema,
+} from "./doctor-contracts.js";
 import { resolvedWorkflowPlanSchema } from "./workflow-runtime-contracts.js";
 import { workflowCheckpointSchema } from "./workflow-checkpoint-contracts.js";
 
@@ -60,6 +64,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
   Object.freeze({
     "approval-grant": approvalGrantSchema,
     "build-artifact-evidence": buildArtifactEvidenceSchema,
+    "doctor-report": doctorReportSchema,
+    "doctor-request": doctorRequestSchema,
     "engine-diagnostic": engineDiagnosticSchema,
     "engine-operation-request": engineOperationRequestSchema,
     "engine-operation-result": engineOperationResultSchema,

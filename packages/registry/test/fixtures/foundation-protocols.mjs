@@ -7,6 +7,29 @@ const requestId = "018f6f35-2c9e-7d1a-8a4b-123456789abe";
 const sessionId = "018f6f35-2c9e-7d1a-8a4b-123456789abf";
 
 export const validFoundationProtocolFixtures = {
+  "doctor-request": {
+    schemaVersion: "1.0.0",
+    projectRoot: "D:\\games\\sample",
+  },
+  "doctor-report": {
+    schemaVersion: "1.0.0",
+    commandId: "doctor",
+    status: "attention",
+    controlPlaneVersion: "0.0.0",
+    registryDigest: digest,
+    project: {
+      requestedPath: "D:\\games\\sample",
+      state: "uninitialized",
+    },
+    checks: [
+      {
+        id: "project.state",
+        status: "warning",
+        code: "project-state-not-initialized",
+        message: "Project-local runtime state has not been initialized.",
+      },
+    ],
+  },
   "approval-grant": {
     schemaVersion: "1.0.0",
     grantId: "approval.network-once",

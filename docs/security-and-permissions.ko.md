@@ -1,73 +1,96 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: 036579a1f164a0b2a48b077489e0c0078878e9f7925582cb862559707d2f2fd3
+source_sha256: 23d0f18f602e378124ae258f06c5f478d65a31e22cd8b9b6ded1400ff07f3395
 translated_at: 2026-08-26
 ---
 
 # 보안과 권한
 
-> 상태: 초기 private admission, workflow-checkpoint, durable checkpoint-store, pack 전용 transaction executor가 포함된 계획된 permission 정책입니다. 일반 command dispatch, Editor 또는 bridge enforcement는 아직 없습니다.
+> 상태: private admission, workflow checkpoint, managed-pack transaction, read-only CLI diagnostic가 구현된 계획 permission policy입니다. General mutation dispatch와 engine enforcement는 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
-## 기본 권한 모델
+## 현재 enforcement
 
-| 행동 | 계획된 기본값 |
+현재 private broker는 같은 process에서 validate한 registry만 받습니다. Registered schema로 command input을 검증하고 project, command/handler, registry, feature, workflow step, optional Editor session, normalized scope, budget, deadline, run identity에 authorization을 결합합니다. Sensitive authority는 one-permission Ed25519 grant, exact scope, expiration, single-use reservation을 사용합니다.
+
+Authorization 자체는 execution이 아닙니다. Broker는 general mutation dispatcher, MCP server, process workflow, engine bridge와 연결되지 않았습니다. 좁은 pack executor와 stable-state recovery finalizer는 각각 same-process plan, exact `install` decision, attest된 project-write lease를 요구합니다. Grant reservation과 active lease는 memory-only이며 restart 뒤 유지되지 않습니다.
+
+현재 CLI는 read-only `doctor`만 dispatch합니다. Descriptor는 `read-project`, side effect 없음, `parallel-read` lane을 선언합니다. Elevated authority를 요청하거나 repair를 호출할 수 없습니다.
+
+## 기본 permission 모델
+
+| 동작 | 기본값 |
 | --- | --- |
-| Project file read와 state inspect | 선택한 project 안에서 허용 |
-| 승인된 feature contract 안의 source 변경 | 선언한 path/change budget 안에서 허용 |
-| Editor control | project와 Editor session별 한 번 승인 |
-| 승인된 test와 build 실행 | 설정한 time/output/resource budget 안에서 허용 |
-| Pack 또는 skill install/update | 매번 별도 승인 |
-| Network 접근 | 매번 별도 승인 |
+| 선택한 project file과 local state 읽기 | Bounded path 안에서 허용 |
+| 승인된 feature contract 안의 source 변경 | 선언한 path, change, budget scope 안에서만 허용 |
+| Editor 제어 | Project와 Editor session마다 한 번 승인 |
+| 승인된 test/build 실행 | 설정한 time, output, resource budget 안에서 허용 |
+| Pack/skill install, update, remove | 매번 별도 승인 |
+| Network access | 매번 별도 승인 |
 | Project data 외부 전송 | 매번 별도 승인 |
-| 유료 provider 호출 | 매번 별도 승인 |
-| 파괴 작업 | 매번 별도 승인 |
-| Publish 또는 release | 매번 별도 승인 |
+| Paid provider call | 매번 별도 승인 |
+| Destructive action | 매번 별도 승인 |
+| Publish/release | 매번 별도 승인 |
 
-permission은 control plane이 평가하며 MCP annotation, skill, engine bridge, host UI에 위임하지 않습니다. approval은 project identity, command, scope, 필요한 경우 session, budget, expiration에 결합합니다.
+MCP annotation, skill text, engine bridge, host UI label은 permission을 부여하지 않습니다. Blanket `--yes`로 installation, network, external transmission, paid call, destructive work, publish를 묶어 승인해서는 안 됩니다.
 
-현재 private broker는 같은 process에서 검증한 registry instance만 받습니다. 실제 command payload를 등록 input schema로 검증하고 그 digest를 project, command/handler, registry, feature, workflow step, Editor session, 정규화된 target, budget, deadline, run에 결합하며 설정된 public key로 domain-separated 단일 permission Ed25519 grant를 검증합니다. 민감한 grant는 한 번만 사용할 수 있고 authorization lease를 반환하기 전에 동기적으로 reserve합니다. 자동 admission은 범위가 제한된 project read, 승인된 feature source path와 change kind, approval checkpoint를 선언하지 않은 등록 test/build workflow step으로 제한합니다. test/build 권한은 project file 또는 Editor object mutation 권한을 암묵적으로 포함하지 않습니다. Editor object source mutation은 object operation type을 feature contract와 대조할 수 있을 때까지 거부합니다.
+## Doctor 경계
 
-authorization 자체가 실행은 아닙니다. 일반 broker는 command dispatcher, CLI, MCP, process workflow, engine bridge와 아직 연결되지 않았습니다. 좁은 private 예외로 pack executor와 stable-state recovery finalizer가 있습니다. executor는 같은 process에서 준비한 plan, exact path와 보수적인 rollback budget에 결합된 broker-issued `install` 결정, attest된 `project-write` lease를 모두 받은 뒤에만 filesystem CAS를 호출합니다. finalizer는 input, path, file/byte ceiling, deadline, registry authority, transaction, project identity, lane이 같은 process의 recovery plan 하나와 정확히 일치하는 별도 `install` 결정을 요구합니다. grant use count와 active lease는 memory에만 있어 restart를 넘지 못하며 approval UI, durable approval 또는 revocation store, 일반 recovery action, secret-path classifier도 없습니다. registry는 exact validated authority에서 domain-separated workflow-plan digest를 파생하고 모호한 binding을 거부하며 immutable plan을 의미 검증합니다. workflow state machine은 broker 결정을 받기 전에 이 plan을 다시 해석하고 exact authorization과 실제 effect를 각 transition에 결합합니다. durable checkpoint store는 그 결과인 uncertainty barrier를 restart 뒤에도 보존하지만 stale authorization capability를 의도적으로 버리고 일반 workflow uncertainty를 reconcile하거나 해제하지는 못합니다. runtime enforcement와 accounting이 없는 동안 memory, CPU, GPU request budget은 거부합니다.
+`agpb doctor`는 runtime registry, Node.js version, canonical project root, fixed runtime directory, installed-pack state, active transaction marker를 bounded local read로 검사합니다. 완성된 report는 rendering 전에 registry 결합 output schema로 검증합니다.
+
+Doctor는 fail-closed로 동작합니다.
+
+- 미초기화 project는 directory를 만들지 않고 attention으로 보고합니다.
+- Unavailable 또는 unsafe root는 blocking입니다.
+- Incomplete, linked, conflicting runtime state는 blocking입니다.
+- Malformed, noncanonical, wrong-project installed state는 blocking입니다.
+- Valid, malformed, changing active transaction marker는 blocking입니다.
+- Unsupported 또는 malformed runtime-version text는 blocking입니다.
+
+명령은 초기화, repair, delete, clear, finalize, install, engine spawn, network connection, Editor control을 수행하지 않습니다. Human/JSON mode는 같은 report와 exit category를 사용합니다.
 
 ## Fail-closed 중단 조건
 
-다음 중 하나라도 발생하면 추가 mutation 전에 실행을 중단합니다.
+Mutation run은 다음 중 하나가 발생하면 추가 mutation 전에 중단해야 합니다.
 
-- 가능한 project 또는 Editor instance가 둘 이상입니다.
-- project, engine, process, session, scene/world, feature-contract identity가 바뀝니다.
-- owned 또는 approved path 밖의 file을 변경하려 합니다.
-- 예상하지 않은 dirty file이나 compare-and-swap mismatch가 나타납니다.
-- path traversal, symlink escape, stale PID, invalid token, schema mismatch를 탐지합니다.
-- time, output, changed-file, changed-byte, repair, resource, cost budget을 초과합니다.
-- operation이 불확실한 mutation state로 끝납니다.
-- required test가 없거나 incomplete, all-skipped, zero-test입니다.
+- Plausible project 또는 Editor instance가 둘 이상입니다.
+- Project, engine, process, session, scene/world, registry, handler, feature identity가 바뀝니다.
+- Owned/approved path 밖의 file을 변경하게 됩니다.
+- Unexpected dirty file 또는 compare-and-swap mismatch가 나타납니다.
+- Path traversal, link escape, stale identity, invalid token, schema mismatch를 탐지합니다.
+- Time, output, changed-file, changed-byte, repair, resource, cost budget을 넘습니다.
+- Operation이 uncertain mutation state로 끝납니다.
+- Required test가 없거나 incomplete, all skipped, zero tests입니다.
 
-불확실한 mutation은 자동 재시도하지 않습니다. workflow는 먼저 `uncertain` receipt를 기록하고 state reconciliation 또는 명시적 recovery를 요구합니다.
+Uncertain mutation은 자동 재시도하지 않습니다. 별도 authority와 receipt를 가진 새 reconciliation 또는 recovery attempt가 필요합니다.
 
-## Process와 Editor 격리
+## Process와 Editor isolation
 
-현재 private core는 local executable과 project root를 digest로 결합하고 argument array로 직접 spawn합니다. environment value와 project-scoped working directory를 제한하고 time, idle time, combined output 상한을 적용하며 중단 시 owned process tree만 종료합니다. Windows에서는 최소한의 비민감 OS 기준값만 유지하고 명시적으로 allowlist하지 않은 inherited user/path value를 가립니다. 중단된 실행은 mutation-uncertain으로 유지하며 reconcile 전에는 안전하게 retry할 수 없습니다. 이 경계는 CPU, memory, filesystem 또는 network sandbox가 아닙니다.
+현재 core는 local executable과 project root를 digest-bind하고 argument array로 직접 spawn하며 environment value와 project-scoped working directory를 제한하고 time, idle, combined output을 cap하며 owned process tree만 종료합니다. 종료에 성공해도 interrupted execution은 mutation-uncertain입니다. 이는 CPU, memory, filesystem, network sandbox가 아닙니다.
 
-현재 private core는 초기화된 project마다 고정 local lease 하나를 사용해 `project-write`, `editor-bound`, `build-bound` 작업을 admission합니다. record는 root/project digest, run UUID, PID, 캡처한 runtime-start identity, runtime nonce, lane, 필요한 경우 Editor-session digest를 결합합니다. acquisition은 제한된 대기와 cancellation을 사용하며 갱신은 명시적으로 수행하고 compare-and-swap으로 보호합니다. 만료만으로는 takeover할 수 없습니다. live, reused 또는 확인할 수 없는 foreign PID는 계속 차단하고 dead owner record만 재획득 전에 atomic quarantine합니다. foreign live process start time은 아직 OS에서 독립적으로 attest하지 않으며 automatic heartbeat, parallel-reader coordination, 실제 Editor session 제어도 없습니다.
+Mutation lane은 고정 project-local lease 하나를 사용합니다. Record는 root/project digest, run ID, runtime identity, nonce, lane, optional Editor-session digest를 결합합니다. Acquisition은 bounded waiting/cancellation을 가지며 renew는 explicit합니다. Expiration만으로 live 또는 unverifiable owner를 takeover하지 않습니다. Automatic heartbeat, parallel-reader coordination, independent foreign-process start attestation, actual Editor control은 계획 단계입니다.
 
-계획된 local bridge는 인증된 project-scoped session, 제한된 request body/queue, timeout, cancellation, normalized outer/inner error를 사용합니다. 기본으로 loopback에 bind하고 unauthenticated server를 노출하지 않습니다.
+계획한 local bridge는 authenticated project-scoped session, bounded request body/queue, deadline, cancellation, outer transport와 inner operation result 분리를 사용합니다. 기본 loopback bind이며 unauthenticated mutation server를 노출하지 않습니다.
 
-## Filesystem과 pack 안전
+## Filesystem과 pack safety
 
-현재 core는 canonical project root를 결합하고 writable path link와 portable path ambiguity를 거부하며 제한된 staged SHA-256 compare-and-swap 쓰기와 exact-digest 단일 파일 삭제를 수행합니다. 고정 레이아웃 bootstrap은 caller가 선택한 경로나 recursive 삭제 없이 runtime directory 6개만 한 segment씩 생성합니다. parent와 target identity를 확인하고 동시 생성은 재검사 뒤에만 멱등으로 받아들이며, 실패한 호출이 직접 만든 directory만 역순 정리하고 모호한 정리는 mutation-uncertain으로 보고합니다. private pack preflight는 같은 process에서 검증한 registry와 offline·hook-free regular-file artifact만 받습니다. local content, canonical installed state, exact dependency, downgrade policy, owned hash, 비소유 충돌, resource limit를 확인한 뒤 immutable write-free plan을 만듭니다. control-plane state와 lock namespace는 pack 소유 대상에서 제외합니다. 명시된 artifact 직접 부모에 대해 pack executor는 absent directory만 만들 수 있고 pack digest에 결합된 canonical marker를 씁니다. 기존 directory는 shared·unclaimed로 유지합니다. update는 exact directory identity를 보존하며 marker를 회전합니다. remove는 owned file과 marker를 먼저 지운 뒤 exact empty owned directory만 고정 same-parent tombstone으로 detach하므로, 명확한 실패에는 file rollback 전 directory를 복원할 수 있습니다. caller는 여전히 exact 승인 결정과 lane을 제공해야 합니다. executor는 transaction 시작 전과 각 forward staging·commit 경계 전후에 lease 만료를 다시 검사합니다. 승인 scope와 rollback budget은 고정 active marker, 두 journal record, installed state, 모든 artifact와 marker, 생성·제거 directory path, tombstone, capture한 rollback preimage를 포함합니다. marker는 started record 시도 전에 pre/post installed-state file digest와 observation limit를 포함한 기대 started record 전체를 담습니다. 불확실하지 않은 terminal만 exact marker digest를 지우며, marker가 남았거나 malformed이면 preflight와 execution을 중단합니다. state만 바꾸는 update의 unchanged file을 포함한 최종 artifact digest를 installed-state commit 전에 write-free CAS guard로 확인합니다. final-file effect 전에 immutable started record를 쓰고 state와 artifact를 stage하며 canonical installed state를 마지막에 commit하고 detached empty tombstone을 finalize한 뒤 terminal record와 실제 path/byte settlement를 남깁니다. 뒤 operation의 명확한 실패는 detached directory를 복원한 뒤 앞 file commit을 exact digest로 역순 rollback하고 uncertain commit은 retry 없이 중단합니다.
+Core는 canonical local project root 하나를 bind하고 path ambiguity와 writable link를 거부하며 directory traversal/file size를 제한하고 exact compare-and-swap write, delete, reversible empty-directory removal을 stage합니다. Fixed bootstrap은 predetermined runtime directory 6개만 만들며 실패한 call이 직접 만든 identity만 rollback합니다.
 
-recovery inspector는 write-free 상태로 제한된 관찰을 두 번 수행하며 mixed, unstable, unreadable, terminal contradiction 또는 foreign marker 상태를 승격하지 않습니다. project root, active-marker file digest, started/terminal/reconciliation digest, journal snapshot, observed state, 제안 closure를 같은 process의 report로 attest합니다. report 자체는 아무것도 변경할 수 없습니다. 별도 finalizer는 actionable digest 결합 plan, 새 exact approval, 일치하는 active lane만 받습니다. 쓰기 전 inspector를 다시 실행하고 persisted identity와 고정 tombstone layout이 계속 일치하는 exact empty detached directory만 finalize할 수 있으며, 누락된 sequence-0/1 closure record 또는 immutable `recovery-required` terminal 뒤의 sequence-2 reconciliation만 append합니다. exact-digest marker 삭제 전 다시 검사하고 닫힌 state를 이후 한 번 더 검증합니다. 삭제 뒤 마지막 검증이 실패하면 원래 marker를 expected-absent compare-and-swap으로 복원하려고 시도합니다. marker clear와 가능한 복원은 모두 approval budget에 포함합니다. finalizer는 installed state나 pack artifact를 바꾸지 않으며 자동 artifact repair, retry, rollback을 하지 않습니다. detached directory의 예상하지 못한 content는 보존하고 cleanup을 차단합니다. pack이 현재 registry에서 사라져도 installed-state 소유권을 기준으로 remove할 수 있습니다. CLI, doctor 통합, durable recovery receipt, pack 획득 경로는 아직 없습니다.
+Pack preflight는 write-free이고 validated offline regular-file artifact만 받습니다. Content digest, canonical installed state, dependency, downgrade policy, ownership, non-owned collision, reserved namespace, budget을 검증합니다. Existing directory는 shared입니다. Explicitly declared missing direct artifact parent만 pack-digest-bound ownership marker를 받을 수 있습니다.
 
-path 검사는 최종 target을 resolve하고 traversal, absolute-path injection, symlink escape를 거부합니다. engine과 system tool은 탐지하지만 자동 설치하지 않습니다.
+Execution에는 exact plan, approved scope, project-write lease가 필요합니다. Started journal record 전에 active marker를 쓰고 compare-and-swap으로 artifact를 commit하며 canonical installed state를 마지막에 commit하고 terminal outcome을 기록한 뒤 non-uncertain terminal에서만 exact marker를 지웁니다. 뒤의 명확한 실패는 detached directory를 복원한 다음 앞서 commit한 file을 역순 rollback합니다. Uncertain commit은 재시도하지 않습니다.
+
+Recovery inspection은 bounded write-free observation을 두 번 수행하고 mixed, unstable, unreadable, contradictory, foreign-marker state를 진단용으로 보존합니다. Finalization은 새 exact approval과 lane을 요구하고 각 write boundary 전에 다시 검사하며 stable attest된 state만 닫고 pack artifact를 repair하지 않습니다. Unexpected tombstone content는 보존하며 cleanup을 차단합니다.
+
+`doctor`는 installed-state corruption이나 remaining marker를 보고할 수 있지만 recovery classify, journal append, marker clear, finalizer 호출은 할 수 없습니다. Mutating pack CLI나 distributed pack acquisition path는 아직 없습니다.
 
 ## Network, provider, telemetry
 
-telemetry는 계획하지 않습니다. 일반 evidence는 local에 남습니다. 외부 evidence export, network access, provider call은 destination, data category, retention expectation, model/provider identity, estimated cost를 포함해 따로 승인해야 하는 action입니다.
+Telemetry는 계획하지 않습니다. Routine evidence는 local에 남습니다. External evidence export, network access, provider call은 destination, data category, retention, provider/model, cost disclosure와 explicit approval이 필요한 별도 action입니다.
 
-hosted provider는 기본 disabled입니다. 첫 버전은 optional image provider pack 최대 하나만 허용할 수 있습니다. install approval은 이후 transmission 또는 paid call을 허가하지 않습니다.
+Hosted provider는 기본 비활성입니다. 이후 version에서 optional image-provider pack을 최대 하나 허용할 수 있습니다. Installation approval은 이후 transmission이나 paid call을 승인하지 않습니다.
 
-## Secret과 공개 산출물
+## Secret과 공개 artifact
 
-secret과 local connection detail은 ignore된 machine-local configuration에 둡니다. raw value가 secret을 노출한다면 receipt에는 redacted command 정보와 hash를 저장합니다. 사용자가 명시적으로 선택하고 승인하지 않는 한 public document, export, diagnostic은 private absolute path, token, internal URL, raw local configuration을 제외해야 합니다.
+Secret과 local connection detail은 ignored machine-local configuration에 둡니다. Receipt와 diagnostic은 credential이나 private machine detail을 노출할 수 있는 값을 redact해야 합니다. Public documentation과 export는 사용자가 해당 data를 exact하게 선택하고 승인하지 않는 한 private absolute path, token, internal URL, raw local config를 제외합니다.

@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: 39f759e5fc6df6d4d141c38e036162f8d3e762459e17d57d19b8f4555293cf38
+source_sha256: b380d0ea7c6a457311f6b6f1b6a0f609db6dc77a6241673bf70f392107941b0c
 translated_at: 2026-08-26
 ---
 
 # 목표 아키텍처
 
-> 상태: 목표 아키텍처입니다. `contracts`, `registry` 기반, 초기 `core` 안전 경계와 private managed-pack transaction runtime이 존재하며 나머지 runtime과 bridge 경계는 계획 단계입니다.
+> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, core 안전 primitive, managed-pack transaction과 read-only `agpb doctor`가 존재합니다. General dispatch, evidence store, MCP, host integration, engine, bridge는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -17,59 +17,98 @@ translated_at: 2026-08-26
 ```mermaid
 flowchart TD
     H[Codex 또는 다른 host] --> S[CLI / MCP / host adapter]
-    S --> R[Typed registry]
+    S --> R[Typed runtime registry]
     R --> P[Permission broker]
     P --> W[Bounded workflow runtime]
-    W --> E[Receipt and evidence store]
+    W --> E[Receipt와 evidence store]
     W --> A[Engine adapter]
     A --> B[Thin project bridge]
     B --> G[Godot / Unity / Unreal]
-    W --> F[Safe filesystem and process layer]
+    W --> F[Safe filesystem와 process layer]
 ```
 
-typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 작성 원본입니다. 현재 generator는 CLI, MCP, help, 문서 metadata, host routing용으로 검증된 설계 projection을 생성합니다. 또한 지원되는 workflow stage를 exact registry, workflow, schema, command, handler, lane, permission, budget, failure transition, evidence duty에 결합된 유한하고 domain-separated된 plan으로 해석합니다. private permission과 workflow-state primitive는 검증된 authority를 소비하고 현재 checkpoint store는 제한된 state transition을 영속화합니다. 생성된 CLI/MCP/host 실행 consumer와 durable approval, receipt, evidence store는 아직 계획 단계입니다. 생성 표면은 권한을 부여하거나 capability를 지어낼 수 없습니다.
+Typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 authoring source입니다. Generation은 같은 validated identity에서 CLI, MCP, 문서, skill-routing metadata를 만듭니다. Runtime registry에는 현재 `doctor`만 있으며 CLI help, parsing, input/output validation, dispatch가 그 exact descriptor를 사용합니다. 공개 foundation plan은 runtime-registry digest를 기록하고 미구현 command를 분리합니다.
 
 ## Workspace 경계
 
 | 경계 | 상태 | 책임 |
 | --- | --- | --- |
-| `contracts` | 기반 구현 | engine runtime dependency가 없는 versioned schema와 shared identifier |
-| `registry` | 기반 구현 | descriptor validation, generation, digest, routing, parity check, 결정적 workflow-plan 해석 |
-| `core` | 일부 구현 | canonical project identity, 고정 레이아웃 project-state bootstrap, portable path 해석, staged filesystem compare-and-swap, digest 결합 direct process 실행, root/project 결합 mutating lease, in-memory signed permission admission/settlement, immutable workflow checkpoint transition, append-only checkpoint 영속화, 제한된 chain 검증, restart-safe recovery 분류가 존재하며 dispatcher integration, durable approval/receipt/evidence, uncertainty reconciliation, CPU/memory enforcement, parallel-read coordination은 계획 단계 |
-| `cli` | 계획 | `agpb` argument parsing, local interaction, stable exit behavior, help |
-| `mcp` | 계획 | 동일 permission broker 뒤의 schema-derived tool과 resource |
-| `codex-adapter` | 계획 | skill, host routing metadata, project instruction integration |
-| `pack-runtime` | 일부 구현 | write-free validated-registry preflight, broker/lane 결합 local add, update, installed-state 소유권 기반 remove, 명시했지만 존재하지 않는 artifact parent의 marker 결합 lifecycle, CAS promotion, 명확한 실패의 rollback, effect settlement, active-transaction barrier, append-only journal 검증, 제한된 read-only recovery 분류, 별도 승인된 stable-state finalization이 존재하며 CLI/doctor 통합과 분산 pack 획득은 계획 단계 |
-| `evidence` | 계획 | content-addressed artifact, receipt, export, retention, redaction |
-| `engine-common` | 계약만 구현 | 공통 capability negotiation과 engine operation contract |
-| Engine adapter | 계획 | 넓은 host 권한 없이 Godot, Unity, Unreal orchestration |
-| Project bridge | 계획 | 검증된 engine operation 노출에 필요한 최소 Editor/runtime code |
+| `contracts` | 기반 구현 | Versioned schema, canonical data, identifier, approval, workflow, engine, evidence, doctor protocol |
+| `registry` | 기반 구현 | Descriptor validation, generation, digest, routing, workflow-plan resolution, exact implemented-command inventory |
+| `core` | 일부 구현 | Canonical project identity, safe path, compare-and-swap filesystem operation, bounded process, mutation lease, in-memory permission admission, workflow state, durable checkpoint |
+| `pack-runtime` | 일부 구현 | Write-free preflight, exact ownership, local lifecycle transaction, journal, active barrier, rollback, directory ownership, recovery inspection, approved stable-state finalization |
+| `cli` | 실험적 일부 구현 | Registry-derived help/version, fail-closed parsing, stable exit category, human/JSON output, read-only `doctor` |
+| `evidence` | 계획 | Content-addressed artifact, durable receipt, retention, redaction, explicit export |
+| `mcp` | 계획 | 같은 broker와 result contract 뒤의 registry-derived tool |
+| `codex-adapter` | 계획 | 새 authority를 만들지 않는 project skill, instruction bootstrap, host routing |
+| `engine-common` | Contract만 존재 | 공통 capability negotiation과 engine-operation contract |
+| Engine adapter | 계획 | Broad host authority 없는 Godot, Unity, Unreal orchestration |
+| Project bridge | 계획 | Verified operation 노출에 필요한 최소 Editor/runtime code |
 
-현재 workspace package로 존재하는 경계는 `contracts`, `registry`, 일부 구현된 private `core`, private `pack-runtime`입니다. 표에 있다는 사실만으로 완전한 runtime capability가 존재한다고 주장하지 않습니다.
+Partial package가 존재한다고 전체 product surface가 존재하는 것은 아닙니다. 현재 어떤 package도 Editor를 제어하거나 live engine frame을 검증하지 않습니다.
 
-## 실행 흐름
+## 현재 read-only 실행 흐름
 
-1. project를 탐지하고 exact `GameProjectProfile`을 만듭니다.
-2. `EngineCapabilityReport`를 협상하며 지원하지 않는 operation은 reason과 fallback grade를 유지합니다.
+구현된 CLI 경로는 의도적으로 좁습니다.
+
+1. Global help/version 또는 exact `doctor` command와 선언된 flag만 parse합니다.
+2. Validated runtime registry에서 `doctor` descriptor를 얻습니다.
+3. Descriptor 결합 input schema로 request를 검증합니다.
+4. Registry parity, Node.js version, project identity, fixed state directory, installed-pack state, active transaction marker를 write 없이 검사합니다.
+5. 개별 check outcome에서 `healthy`, `attention`, `blocked`를 계산합니다.
+6. 완성된 report를 descriptor 결합 output schema로 검증합니다.
+7. Human 또는 canonical JSON output을 만들고 stable exit category로 매핑합니다.
+
+Handler digest는 compiled doctor module을 attest합니다. Executable artifact와 registry metadata가 drift하면 cross-package test가 실패합니다.
+
+## 계획된 mutation 실행 흐름
+
+General flow는 아직 executable CLI path가 아닌 목표입니다.
+
+1. Project를 detect하고 exact `GameProjectProfile`을 만듭니다.
+2. `EngineCapabilityReport`를 negotiate하고 unsupported operation의 reason과 evidence gap을 유지합니다.
 3. `FeatureContract`, permission class, budget, owned path, expected dirty state를 검증합니다.
-4. 현재 registry와 project stage에 대해 유한한 workflow plan을 해석하고 attest합니다.
-5. project lane을 획득하고 필요하면 Editor session 하나를 결합합니다.
-6. bounded output, timeout, cancellation, mutation 기본 retry 없음 조건으로 registry command를 실행합니다.
-7. artifact와 state transition을 hash-linked `RunReceipt`에 저장합니다.
-8. reload, restart, failure, rollback 뒤 identity와 dirty state를 reconcile합니다.
+4. Current registry와 project stage에 대해 finite workflow plan을 resolve하고 attest합니다.
+5. Project mutation lane 하나를 얻고 필요하면 exact Editor session 하나를 bind합니다.
+6. Bounded output, timeout, cancellation, mutation 기본 재시도 금지 조건으로 registered command를 실행합니다.
+7. State transition, receipt, evidence를 영속화합니다.
+8. Reload, restart, failure, rollback 뒤 identity와 dirty state를 reconcile합니다.
 
-## 소비자 project 상태
+Unknown mutation state는 `uncertain`으로 가며 곧바로 execution으로 돌아갈 수 없습니다.
 
-게임 project에는 `.ai-game-playbook/`을 둘 계획입니다. project profile, feature contract, policy는 commit 대상입니다. cache, log, screenshot, lock, local detail을 포함한 receipt, local secret, machine-specific configuration은 ignore합니다.
+## 소비자 project state
 
-write는 owned-path rule과 compare-and-swap preimage를 사용합니다. private core는 구현된 primitive가 사용하는 고정 lock, workflow state, pack state, transaction directory만 초기화할 수 있습니다. 초기화는 재실행해도 안전하고 link와 대소문자 alias를 거부하며 parent와 target identity를 확인하고 실패한 호출이 직접 생성한 directory만 rollback합니다. 정리가 모호하면 mutation-uncertain으로 보고합니다. core는 또한 resolved workflow를 pre-dispatch, dispatched, settled, rollback, blocked, terminal, uncertain checkpoint로 진행합니다. 각 transition은 exact plan을 다시 해석하고 같은 process에서 발급된 permission authority만 받으며 domain-separated receipt를 command와 authorization identity에 결합하고 receipt chain, 누적 workflow budget, complete evidence를 보존합니다. canonical checkpoint record는 고정된 project-local directory에 append-only로 저장하고 compare-and-swap head가 현재 chain을 선택합니다. load는 record 수와 byte를 제한하고 모든 parent transition과 현재 registry/project identity를 다시 검사하며 손상된 state를 진단용으로 보존하고 경쟁 head를 거부합니다. restart recovery는 dispatch하지 않은 admission을 재승인 상태로 되돌리고 dispatch했지만 정산하지 못한 step을 `uncertain`으로 바꿉니다. pack preflight는 같은 process에서 검증한 registry, target/source root identity, local artifact byte, installed-state digest, 의도한 file change, conflict, limit를 immutable write-free plan으로 결합합니다. private executor는 exact broker-issued install authorization과 same-process `project-write` lease를 요구합니다. 기대 started record 전체를 담은 canonical active marker를 쓴 뒤 final-file effect 전에 해당 started record를 영속화하고, artifact와 installed-state CAS operation을 stage하며 terminal outcome과 실제 effect settlement를 기록합니다. 불확실하지 않은 terminal에만 marker를 exact digest로 지웁니다. marker가 남아 있거나 malformed이면 이후 모든 pack plan을 중단합니다. read-only inspector는 marker와 journal을 다시 검증하고 선언된 모든 artifact와 installed state를 제한된 snapshot으로 두 번 관찰해 preimage, postimage, mixed, terminal contradiction 또는 unstable state를 보고합니다. 이 report 자체에는 mutation 권한이 없습니다.
+소비자 game project에는 `.ai-game-playbook/`을 둘 계획입니다. Portable profile, feature contract, policy, pack lock은 commit 대상입니다. Cache, log, screenshot, local receipt, lock, secret, machine-specific config는 ignore합니다.
 
-안정적이고 일치하는 report 하나에 대해서만 private recovery finalizer가 exact internal registry descriptor에서 같은 process의 digest 결합 plan을 파생합니다. broker가 별도로 발급한 `install` 승인과 같은 transaction의 attest된 `project-write` lease를 요구합니다. 해당 권한 아래에서 report 전체를 다시 검사하고 필요한 경우 누락된 started/terminal closure 또는 sequence-2 reconciliation record만 append하며 exact marker를 지우기 전에 결과 journal과 preimage/postimage를 확인하고 해제 뒤 다시 검증합니다. 해제 뒤 검증이 실패하면 안전 barrier인 exact marker 복원을 시도합니다. pack artifact를 repair·retry·rollback하지 않으며 stale 또는 ambiguous report는 forward write 없이 정산합니다. 일반 실행 중 뒤 파일의 명확한 실패는 제한된 역순 rollback을 수행하고 uncertain effect는 재시도하지 않습니다. pack이 현재 registry에서 사라져도 canonical installed ownership을 사용해 remove할 수 있습니다. 명시된 artifact 직접 부모에 대해서는 executor가 absent directory만 만들고 pack digest에 결합된 marker를 기록하며 기존 directory는 shared로 둡니다. update는 directory identity를 교체하지 않고 marker를 회전하고, remove는 exact empty owned directory를 고정 same-parent tombstone으로 detach하며 별도 승인 finalizer는 restart 뒤 exact detached tombstone을 정리할 수 있습니다. 어느 pack 경로에도 CLI, doctor command, approval UI, durable approval capability, durable recovery receipt가 없습니다. 일반 workflow state machine은 command dispatch에 아직 연결되지 않았고 전체 receipt와 evidence payload도 영속화하지 않습니다. core는 아직 Editor를 탐지하거나 제어하지 않으며 parallel-read coordination도 계획 단계입니다.
+구현된 bootstrap은 고정 runtime directory 6개만 만들 수 있습니다. Idempotent하고 link와 case alias를 거부하며 parent/target identity를 검증하고 명확히 실패한 call이 만든 directory만 제거합니다. `doctor`는 이 layout을 읽지만 bootstrap을 호출하지 않습니다.
 
-## Host integration
+Pack preflight는 validated registry, source/target root identity, local artifact byte, installed-state digest, intended change, conflict, limit을 same-process immutable plan에 결합합니다. Execution에는 exact `install` authorization과 attest된 project-write lease가 추가로 필요합니다. Canonical installed state는 마지막에 commit합니다. 명확한 실패는 이미 commit한 file을 역순 rollback하며 uncertain effect는 재시도하지 않습니다.
 
-Codex가 첫 지원 host지만 계약은 하나의 chat surface에 의존하지 않습니다. project instruction은 directory scope를 따르고 skill은 점진적으로 load하며 MCP는 필요에 따라 local process 또는 streamable HTTP transport를 사용합니다. host annotation은 advisory이고 control plane permission broker가 권한의 기준입니다.
+Active marker와 append-only journal이 interruption state를 보존합니다. Read-only recovery inspector는 bounded observation을 두 번 수행합니다. 별도 finalizer는 fresh exact approval과 lane을 요구하고 각 closure boundary 전에 다시 검사하며 attest된 stable state만 닫을 수 있고 artifact를 repair하거나 mixed state를 해결하지 않습니다. `doctor`는 malformed installed state나 marker 존재만 보고하며 recovery path를 호출하지 않습니다.
 
-## 실패와 복구
+## Identity와 execution lane
 
-모든 mutation은 precondition, changed path, engine identity, recovery status를 기록하도록 계획합니다. 구현된 lease는 root/project mismatch, lock directory identity 변경, malformed record, live 또는 확인 불가능한 owner에서 중단합니다. 만료된 lease는 owner PID가 더는 실행 중이지 않을 때만 quarantine합니다. pack 전용 finalizer는 위에서 설명한 exact stable preimage 또는 postimage만 닫을 수 있으며 workflow나 engine recovery로 일반화되지 않습니다. workflow 경계는 uncertain mutation이나 누적 budget 위반을 영속적으로 보존하고 선언된 rollback을 별도 command와 receipt로 승인합니다. restart recovery를 분류할 수 있지만 일반 workflow uncertainty를 reconcile하거나 해제하고 project/Editor state를 복원하거나 rollback을 직접 dispatch하지는 못합니다. rollback은 실패한 command가 아무것도 바꾸지 않았음을 뜻하지 않습니다.
+Runtime authority는 project root identity, project profile digest, feature contract digest, process executable/start identity, Editor session nonce, scene/world identity, registry digest, handler digest, 관련 pack digest를 결합할 계획입니다. PID, port, process name, window title 하나만으로는 충분하지 않습니다.
+
+Execution lane은 다음과 같습니다.
+
+- bounded immutable inspection용 `parallel-read`;
+- project source와 managed metadata용 `project-write`;
+- project serialization 안의 exact Editor session용 `editor-bound`;
+- approved test/build work용 `build-bound`.
+
+현재 `doctor` descriptor는 `parallel-read`를 선언하지만 general parallel-reader coordination은 아직 구현하지 않았습니다. Mutation lane은 project마다 lease 하나이며 명시적 renew가 필요합니다.
+
+## Engine adapter 경계
+
+공통 목표 contract는 `detect → negotiate → inspect → mutate → save → compile/import → test → play → deterministic input → logs → capture → profile → build/export → rollback`입니다.
+
+각 adapter는 offline inspection, headless execution, Editor preview, actual play, packaged runtime evidence를 구분해야 합니다. Thin bridge는 typed bounded operation만 받습니다. Exact project/session을 인증하고 request/output size를 제한하며 outer transport와 inner operation outcome을 모두 보고하고 changed object/file, save/import state, log, evidence locator를 반환해야 합니다.
+
+Godot이 첫 계획 adapter이고 Unity, Unreal이 뒤따릅니다. 세 엔진의 현재 support grade는 모두 `planned`입니다.
+
+## Degradation과 support claim
+
+Capability grade는 `planned`, `detected`, `headless`, `editor-preview`, `verified`입니다. Command availability는 engine capability grade를 높이지 않습니다. Missing tool, ambiguous instance, unavailable live Editor, absent test, incomplete capture, unknown performance environment는 explicit degradation 또는 unverified outcome을 만들어야 합니다.
+
+Windows x64가 첫 build target입니다. Linux는 초기 static/headless control-plane CI target입니다. macOS, mobile, console, XR, multiplayer, browser-first game은 첫 alpha 범위 밖입니다.

@@ -33,6 +33,7 @@ const reviewDesignSurface = {
     "agpb evidence export",
     "agpb docs check"
   ],
+  availableCommands: ["agpb doctor"],
   publicTypes: [
     "CommandDescriptor",
     "PackManifest",
@@ -312,11 +313,14 @@ if (plannedSurface) {
   if (plannedSurface.schemaVersion !== "1" || Object.hasOwn(plannedSurface, "$schema")) {
     fail("docs/planned-surface.json: must be schemaVersion 1 design metadata, not a JSON Schema document");
   }
-  if (plannedSurface.implementationStatus !== "design-only") {
-    fail("docs/planned-surface.json: implementationStatus must remain design-only before product implementation");
+  if (plannedSurface.implementationStatus !== "partial") {
+    fail("docs/planned-surface.json: implementationStatus must remain partial while only part of the command surface exists");
   }
-  if (plannedSurface.executableAvailable !== false) {
-    fail("docs/planned-surface.json: executableAvailable must remain false before product implementation");
+  if (plannedSurface.executableAvailable !== true) {
+    fail("docs/planned-surface.json: executableAvailable must remain true after CLI implementation");
+  }
+  if (!/^sha256:[0-9a-f]{64}$/.test(plannedSurface.runtimeRegistryDigest ?? "")) {
+    fail("docs/planned-surface.json: runtimeRegistryDigest must be a canonical SHA-256 digest");
   }
   if (
     plannedSurface.package?.npm !== reviewDesignSurface.package.npm ||
@@ -325,7 +329,7 @@ if (plannedSurface) {
     fail("docs/planned-surface.json: review package or executable name has changed");
   }
 
-  for (const field of ["commands", "publicTypes", "engines", "supportGrades", "evidenceGrades"]) {
+  for (const field of ["commands", "availableCommands", "publicTypes", "engines", "supportGrades", "evidenceGrades"]) {
     const values = plannedSurface[field];
     if (!Array.isArray(values) || values.length === 0) {
       fail(`docs/planned-surface.json: ${field} must be a nonempty array`);
@@ -336,6 +340,19 @@ if (plannedSurface) {
 
   if (Array.isArray(plannedSurface.commands) && !sameArray(plannedSurface.commands, reviewDesignSurface.commands)) {
     fail("docs/planned-surface.json: review command set has changed");
+  }
+  if (
+    Array.isArray(plannedSurface.availableCommands) &&
+    !sameArray(plannedSurface.availableCommands, reviewDesignSurface.availableCommands)
+  ) {
+    fail("docs/planned-surface.json: available command set has drifted");
+  }
+  if (
+    Array.isArray(plannedSurface.availableCommands) &&
+    Array.isArray(plannedSurface.commands) &&
+    plannedSurface.availableCommands.some((command) => !plannedSurface.commands.includes(command))
+  ) {
+    fail("docs/planned-surface.json: available commands must be part of the reviewed command set");
   }
   if (
     Array.isArray(plannedSurface.publicTypes) &&
@@ -385,16 +402,46 @@ if (plannedSurface) {
     }
   }
 
+  try {
+    const generatedPlan = JSON.parse(readText("generated/foundation-plan.json"));
+    const generatedCommands = generatedPlan.data?.commands ?? [];
+    const availableCommands = generatedCommands
+      .filter(({ availability }) => availability === "available")
+      .map(({ syntax }) => syntax);
+    const allCommands = generatedCommands.map(({ syntax }) => syntax);
+    if (generatedPlan.data?.implementationStatus !== plannedSurface.implementationStatus) {
+      fail("generated/foundation-plan.json: implementation status differs from the public surface");
+    }
+    if (generatedPlan.data?.executableAvailable !== plannedSurface.executableAvailable) {
+      fail("generated/foundation-plan.json: executable availability differs from the public surface");
+    }
+    if (generatedPlan.data?.runtimeRegistryDigest !== plannedSurface.runtimeRegistryDigest) {
+      fail("generated/foundation-plan.json: runtime registry digest differs from the public surface");
+    }
+    if (!sameArray(allCommands, plannedSurface.commands)) {
+      fail("generated/foundation-plan.json: command set differs from the public surface");
+    }
+    if (!sameArray(availableCommands, plannedSurface.availableCommands)) {
+      fail("generated/foundation-plan.json: available command set differs from the public surface");
+    }
+  } catch (error) {
+    fail(`generated/foundation-plan.json: invalid JSON (${error.message})`);
+  }
+
 }
 
 const readme = readText("README.md");
 const statusDoc = readText("docs/status-and-scope.md");
-if (!readme.includes("No installable package") || !readme.includes("not commands that can be run today")) {
+if (
+  !readme.includes("No installable package") ||
+  !readme.includes("The only implemented command is read-only `agpb doctor`") ||
+  !readme.includes("keeps every other command and all engine capabilities planned")
+) {
   fail("README.md: executable availability limits must remain explicit");
 }
 if (
-  !statusDoc.includes("does not yet contain an installable package") ||
-  !statusDoc.includes("engine bridges") ||
+  !statusDoc.includes("There is no installable or published package") ||
+  !statusDoc.includes("engine bridge") ||
   !statusDoc.includes("playable golden project")
 ) {
   fail("docs/status-and-scope.md: unavailable runtime and engine capabilities must remain explicit");

@@ -1,10 +1,10 @@
-# Planned Command-Line Interface
+# Command-Line Interface Status
 
-> Status: interface plan only. The `agpb` executable does not exist yet, so none of these commands can currently be run.
+> Status: partial implementation. A source-built `agpb` executable exists, but only read-only `agpb doctor` is currently available. No package is published.
 
 [한국어](planned-cli.ko.md) · [Documentation](README.md)
 
-## Command groups
+## Command inventory
 
 ```text
 agpb init
@@ -29,44 +29,53 @@ agpb evidence export
 agpb docs check
 ```
 
-No slash-command interface is promised. Host integrations may route natural language or UI actions to canonical command IDs, but the public executable remains `agpb`.
+Only `agpb doctor` is marked available in [planned-surface.json](planned-surface.json) and the generated [foundation plan](../generated/foundation-plan.json). Every other entry remains planned. No slash-command interface is promised.
 
-## Workspace and project setup
+## Available now
 
-- `agpb init` is planned to create project-local policy and profile files without installing an engine or modifying unrelated files.
-- `agpb doctor` is planned to inspect the control-plane installation, managed paths, dependencies, and local configuration.
-- `agpb project inspect` is planned to detect engine metadata, project identity, development stage, targets, budgets, and ambiguous state without mutating the project.
+Build the workspace before invoking the repository-local executable:
 
-## Packs and skills
+```shell
+pnpm build
+pnpm run agpb -- doctor --project <project-path>
+pnpm run agpb -- doctor --project <project-path> --json
+```
 
-- `agpb pack list|add|update|remove|doctor` is planned to manage digest-pinned packs through staging, owned-path checks, conflict detection, rollback, and safe uninstall.
-- `agpb skill list|install|check` is planned to expose progressively loaded workflow guidance. Installing a skill does not grant editor, network, or filesystem authority.
+`--project` accepts an absolute path or a path relative to the current working directory. Without it, `doctor` checks the current directory. `--json` emits the registered `DoctorReport` as canonical JSON; the default output is a concise human report with safe next actions.
 
-Pack installation, update, and removal require explicit approval. User-modified or non-owned files must never be overwritten or removed automatically.
+The command performs bounded, read-only checks for:
 
-## Engine connection
+- runtime-registry and generated-surface parity;
+- the supported Node.js range;
+- one canonical local project root;
+- the six fixed runtime directories;
+- canonical installed-pack state; and
+- an active or malformed pack transaction marker.
 
-- `agpb engine status` is planned to show detected projects, processes, sessions, and support grades.
-- `agpb engine capabilities` is planned to negotiate available operations and explicit degradation reasons.
-- `agpb engine connect` is planned to bind one approved project/editor session. Ambiguous instances stop instead of selecting a likely candidate.
+It does not initialize project state, repair files, clear markers, invoke recovery finalization, install software, access the network, or control an editor.
 
-Editor control requires one approval per project/session. Mutating editor commands run through a single project lane.
+## Output and exit contract
 
-## Workflows and verification
+| Exit | Meaning |
+| --- | --- |
+| `0` | Diagnostics completed with `healthy` or `attention`; no blocking finding exists |
+| `1` | The command failed before producing a validated report |
+| `2` | CLI usage is invalid or the command is not implemented |
+| `3` | The validated report contains a blocking finding |
+| `4` | Reserved for a cancelled command |
+| `5` | Reserved for an uncertain command outcome |
 
-- `agpb run <workflow>` is planned to execute a registered, bounded workflow under a feature contract.
-- `agpb verify` is planned to run the required compile/import, tests, gameplay assertions, capture checks, profiling, and build/export evidence for the current contract.
+Human and JSON modes use the same report status and exit mapping. An uninitialized project is an attention-level result and remains write-free. An unsafe root, unsupported runtime, corrupt managed state, or surviving transaction marker is blocking.
 
-Workflow repair is limited to three cycles. Time, output, changed-file, changed-byte, and external-cost budgets are enforced. Unknown completion state produces `uncertain` and disables automatic retry.
+## Remaining planned groups
 
-## Evidence and documentation
-
-- `agpb evidence list|show` is planned to inspect local receipts and artifacts.
-- `agpb evidence export` is the only planned route for sending an evidence package outside the project boundary and always requires explicit approval.
-- `agpb docs check` is planned to validate generated command documentation and translated public docs after the runtime registry exists.
+- `init` will stage only project-local policy and runtime state after conflict checks; it will not install engines or system tools.
+- `project inspect` will report engine markers, project identity, stage, targets, budgets, dirty state, and instance ambiguity.
+- `pack` and `skill` mutations will reuse the approved managed lifecycle and never derive authority from installation alone.
+- `engine` commands will bind exact project/editor sessions and report explicit capability degradation.
+- `run` and `verify` will execute registered bounded workflows and keep process, test, gameplay, capture, performance, and build outcomes separate.
+- `evidence export` will remain the only planned route for external evidence movement and will require explicit destination approval.
 
 ## Common command contract
 
-Every command is planned to declare input and output schemas, capabilities, permissions, side effects, execution lane, timeout, retry mode, budgets, evidence requirements, and handler digest. Outer process success and inner operation success must both pass. Test execution must also prove a complete report and a nonzero test count.
-
-The machine-readable inventory is in [planned-surface.json](planned-surface.json). It describes the intended surface and is not executable configuration.
+Every implemented command must declare input and output schemas, capabilities, permissions, side effects, execution lane, timeout, cancellation, retry mode, budgets, evidence requirements, and a handler digest. The handler metadata for `doctor` attests its compiled module, and CI rejects digest drift. Future CLI, MCP, documentation, and host surfaces must preserve the same command and schema identities.

@@ -21,6 +21,21 @@ export type {
   ApprovalGrantSigningDigestInput,
 } from "./approval-contracts.js";
 export {
+  DOCTOR_CHECK_STATUSES,
+  computeDoctorStatus,
+  doctorReportSchema,
+  doctorRequestSchema,
+} from "./doctor-contracts.js";
+export type {
+  DoctorCheck,
+  DoctorCheckStatus,
+  DoctorProjectState,
+  DoctorProjectSummary,
+  DoctorReport,
+  DoctorRequest,
+  DoctorStatus,
+} from "./doctor-contracts.js";
+export {
   CONTRACT_SCHEMA_DRAFT,
   CONTRACT_SCHEMA_MAX_BYTES,
   defineContractSchema,

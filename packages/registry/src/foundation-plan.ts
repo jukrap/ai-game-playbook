@@ -4,12 +4,14 @@ import {
   type Sha256Digest,
 } from "@ai-game-playbook/contracts";
 
+import { BUILTIN_REGISTRY } from "./builtin-registry.js";
+
 export interface PlannedCommandSurface {
   readonly id: string;
   readonly cliPath: readonly string[];
   readonly syntax: string;
   readonly capability: string;
-  readonly availability: "planned";
+  readonly availability: "available" | "planned";
 }
 
 export interface PlannedSkillSurface {
@@ -21,14 +23,23 @@ export interface PlannedSkillSurface {
 }
 
 export interface FoundationPlanData {
-  readonly implementationStatus: "design-only";
-  readonly executableAvailable: false;
+  readonly implementationStatus: "partial";
+  readonly executableAvailable: true;
+  readonly runtimeRegistryDigest: Sha256Digest;
   readonly package: {
     readonly npm: "ai-game-playbook";
     readonly executable: "agpb";
   };
   readonly commands: readonly PlannedCommandSurface[];
   readonly skills: readonly PlannedSkillSurface[];
+}
+
+const availableCommandIds: ReadonlySet<string> = new Set(
+  BUILTIN_REGISTRY.commands.map(({ id }) => id),
+);
+
+function commandAvailability(id: string): "available" | "planned" {
+  return availableCommandIds.has(id) ? "available" : "planned";
 }
 
 export interface FoundationPlanArtifact {
@@ -54,140 +65,140 @@ const commands: readonly PlannedCommandSurface[] = [
     cliPath: ["init"],
     syntax: "agpb init",
     capability: "workspace.init",
-    availability: "planned",
+    availability: commandAvailability("init"),
   },
   {
     id: "doctor",
     cliPath: ["doctor"],
     syntax: "agpb doctor",
     capability: "workspace.doctor",
-    availability: "planned",
+    availability: commandAvailability("doctor"),
   },
   {
     id: "project.inspect",
     cliPath: ["project", "inspect"],
     syntax: "agpb project inspect",
     capability: "project.inspect",
-    availability: "planned",
+    availability: commandAvailability("project.inspect"),
   },
   {
     id: "pack.list",
     cliPath: ["pack", "list"],
     syntax: "agpb pack list",
     capability: "pack.list",
-    availability: "planned",
+    availability: commandAvailability("pack.list"),
   },
   {
     id: "pack.add",
     cliPath: ["pack", "add"],
     syntax: "agpb pack add",
     capability: "pack.add",
-    availability: "planned",
+    availability: commandAvailability("pack.add"),
   },
   {
     id: "pack.update",
     cliPath: ["pack", "update"],
     syntax: "agpb pack update",
     capability: "pack.update",
-    availability: "planned",
+    availability: commandAvailability("pack.update"),
   },
   {
     id: "pack.remove",
     cliPath: ["pack", "remove"],
     syntax: "agpb pack remove",
     capability: "pack.remove",
-    availability: "planned",
+    availability: commandAvailability("pack.remove"),
   },
   {
     id: "pack.doctor",
     cliPath: ["pack", "doctor"],
     syntax: "agpb pack doctor",
     capability: "pack.doctor",
-    availability: "planned",
+    availability: commandAvailability("pack.doctor"),
   },
   {
     id: "skill.list",
     cliPath: ["skill", "list"],
     syntax: "agpb skill list",
     capability: "skill.list",
-    availability: "planned",
+    availability: commandAvailability("skill.list"),
   },
   {
     id: "skill.install",
     cliPath: ["skill", "install"],
     syntax: "agpb skill install",
     capability: "skill.install",
-    availability: "planned",
+    availability: commandAvailability("skill.install"),
   },
   {
     id: "skill.check",
     cliPath: ["skill", "check"],
     syntax: "agpb skill check",
     capability: "skill.check",
-    availability: "planned",
+    availability: commandAvailability("skill.check"),
   },
   {
     id: "engine.status",
     cliPath: ["engine", "status"],
     syntax: "agpb engine status",
     capability: "engine.status",
-    availability: "planned",
+    availability: commandAvailability("engine.status"),
   },
   {
     id: "engine.capabilities",
     cliPath: ["engine", "capabilities"],
     syntax: "agpb engine capabilities",
     capability: "engine.capabilities",
-    availability: "planned",
+    availability: commandAvailability("engine.capabilities"),
   },
   {
     id: "engine.connect",
     cliPath: ["engine", "connect"],
     syntax: "agpb engine connect",
     capability: "engine.connect",
-    availability: "planned",
+    availability: commandAvailability("engine.connect"),
   },
   {
     id: "run",
     cliPath: ["run"],
     syntax: "agpb run <workflow>",
     capability: "workflow.run",
-    availability: "planned",
+    availability: commandAvailability("run"),
   },
   {
     id: "verify",
     cliPath: ["verify"],
     syntax: "agpb verify",
     capability: "feature.verify",
-    availability: "planned",
+    availability: commandAvailability("verify"),
   },
   {
     id: "evidence.list",
     cliPath: ["evidence", "list"],
     syntax: "agpb evidence list",
     capability: "evidence.list",
-    availability: "planned",
+    availability: commandAvailability("evidence.list"),
   },
   {
     id: "evidence.show",
     cliPath: ["evidence", "show"],
     syntax: "agpb evidence show",
     capability: "evidence.show",
-    availability: "planned",
+    availability: commandAvailability("evidence.show"),
   },
   {
     id: "evidence.export",
     cliPath: ["evidence", "export"],
     syntax: "agpb evidence export",
     capability: "evidence.export",
-    availability: "planned",
+    availability: commandAvailability("evidence.export"),
   },
   {
     id: "docs.check",
     cliPath: ["docs", "check"],
     syntax: "agpb docs check",
     capability: "docs.check",
-    availability: "planned",
+    availability: commandAvailability("docs.check"),
   },
 ];
 
@@ -276,8 +287,9 @@ const skills: readonly PlannedSkillSurface[] = [
 ];
 
 const planData = deepFreeze<FoundationPlanData>({
-  implementationStatus: "design-only",
-  executableAvailable: false,
+  implementationStatus: "partial",
+  executableAvailable: true,
+  runtimeRegistryDigest: BUILTIN_REGISTRY.digest,
   package: { npm: "ai-game-playbook", executable: "agpb" },
   commands,
   skills,

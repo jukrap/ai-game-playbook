@@ -59,6 +59,7 @@ export type {
 export {
   computeInstalledPackStateDigest,
   createEmptyInstalledPackState,
+  loadInstalledPackState,
   PACK_INSTALLED_STATE_MAX_BYTES,
   PACK_INSTALLED_STATE_PATH,
 } from "./state.js";

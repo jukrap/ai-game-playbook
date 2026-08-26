@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture. The `contracts` and `registry` foundations, early `core` safety boundaries, and a private managed-pack transaction runtime exist; the remaining runtime and bridge boundaries are planned.
+> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, managed-pack transactions, and read-only `agpb doctor` exist. General dispatch, evidence storage, MCP, host integration, engines, and bridges remain planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -11,7 +11,7 @@ The repository uses a pnpm workspace for a Node.js/TypeScript control plane. Eng
 ```mermaid
 flowchart TD
     H[Codex or another host] --> S[CLI / MCP / host adapter]
-    S --> R[Typed registry]
+    S --> R[Typed runtime registry]
     R --> P[Permission broker]
     P --> W[Bounded workflow runtime]
     W --> E[Receipt and evidence store]
@@ -21,49 +21,88 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Its current generators produce validated design projections for CLI, MCP, help, documentation metadata, and host routing. It also resolves a supported workflow stage into a finite, domain-separated plan bound to the exact registry, workflow, schemas, commands, handlers, lanes, permissions, budgets, failure transitions, and evidence duties. The private permission and workflow-state primitives consume that validated authority, and the current checkpoint store persists bounded state transitions. Generated CLI/MCP/host execution consumers and durable approval, receipt, and evidence stores remain planned. Generated surfaces cannot grant permissions or invent capabilities.
+The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Generation creates CLI, MCP, documentation, and skill-routing metadata from the same validated identity. The runtime registry currently contains only `doctor`; CLI help, parsing, input/output validation, and dispatch consume that exact descriptor. The public foundation plan records the runtime-registry digest and keeps unimplemented commands separate.
 
 ## Workspace boundaries
 
 | Boundary | Status | Responsibility |
 | --- | --- | --- |
-| `contracts` | Foundation implemented | Versioned schemas and shared identifiers with no engine runtime dependency |
-| `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, parity checks, and deterministic workflow-plan resolution |
-| `core` | Partial | Canonical project identity, fixed-layout project-state bootstrap, portable path resolution, staged filesystem compare-and-swap, digest-bound direct process execution, root/project-bound mutating leases, in-memory signed permission admission/settlement, immutable workflow checkpoint transitions, append-only checkpoint persistence, bounded chain validation, and restart-safe recovery classification exist; dispatcher integration, durable approvals/receipts/evidence, uncertainty reconciliation, CPU/memory enforcement, and parallel-read coordination remain planned |
-| `cli` | Planned | `agpb` argument parsing, local interaction, stable exit behavior, and help |
-| `mcp` | Planned | Schema-derived tools and resources behind the same permission broker |
-| `codex-adapter` | Planned | Skills, host routing metadata, and project instruction integration |
-| `pack-runtime` | Partial | Write-free validated-registry preflight, broker/lane-bound local add, update, installed-state-owned removal, marker-bound lifecycle for explicitly declared missing artifact parents, CAS promotion, clear-failure rollback, effect settlement, an active-transaction barrier, append-only journal verification, bounded read-only recovery classification, and separately approved stable-state finalization exist; CLI/doctor integration and distributed pack acquisition remain planned |
-| `evidence` | Planned | Content-addressed artifacts, receipts, exports, retention, and redaction |
-| `engine-common` | Contract only | Common capability negotiation and engine operation contracts |
+| `contracts` | Foundation implemented | Versioned schemas, canonical data, identifiers, approval, workflow, engine, evidence, and doctor protocols |
+| `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, workflow-plan resolution, and exact implemented-command inventory |
+| `core` | Partial | Canonical project identity, safe paths, compare-and-swap filesystem operations, bounded processes, mutation leases, in-memory permission admission, workflow state, and durable checkpoints |
+| `pack-runtime` | Partial | Write-free preflight, exact ownership, local lifecycle transactions, journals, active barriers, rollback, directory ownership, recovery inspection, and approved stable-state finalization |
+| `cli` | Experimental partial | Registry-derived help/version, fail-closed parsing, stable exit categories, human/JSON output, and read-only `doctor` |
+| `evidence` | Planned | Content-addressed artifacts, durable receipts, retention, redaction, and explicit export |
+| `mcp` | Planned | Registry-derived tools behind the same broker and result contracts |
+| `codex-adapter` | Planned | Project skills, instruction bootstrap, and host routing without new authority |
+| `engine-common` | Contract only | Common capability negotiation and engine-operation contracts |
 | Engine adapters | Planned | Godot, Unity, and Unreal orchestration without broad host authority |
-| Project bridges | Planned | Minimum editor/runtime code needed to expose verified engine operations |
+| Project bridges | Planned | Minimum editor/runtime code needed to expose verified operations |
 
-Only `contracts`, `registry`, the partial private `core`, and the private `pack-runtime` currently exist as workspace packages. A listed boundary is not a claim that its complete runtime capability already exists.
+A partial package is not a claim that its full product surface exists. No current package controls an editor or verifies a live engine frame.
 
-## Execution flow
+## Current read-only execution flow
+
+The implemented CLI path is deliberately narrow:
+
+1. Parse only global help/version or the exact `doctor` command and its declared flags.
+2. Obtain the `doctor` descriptor from the validated runtime registry.
+3. Validate the request against the descriptor-bound input schema.
+4. Inspect registry parity, Node.js version, project identity, fixed state directories, installed-pack state, and active transaction marker without writing.
+5. Derive `healthy`, `attention`, or `blocked` from individual check outcomes.
+6. Validate the complete report against the descriptor-bound output schema.
+7. Render human or canonical JSON output and map it to a stable exit category.
+
+The handler digest attests the compiled doctor module. Cross-package tests fail if the executable artifact and registry metadata drift.
+
+## Planned mutating execution flow
+
+The general flow remains a target rather than an executable CLI path:
 
 1. Detect a project and build an exact `GameProjectProfile`.
-2. Negotiate an `EngineCapabilityReport`; unsupported operations retain a reason and fallback grade.
+2. Negotiate an `EngineCapabilityReport`; unsupported operations retain a reason and evidence gap.
 3. Validate a `FeatureContract`, permission classes, budgets, owned paths, and expected dirty state.
-4. Resolve and attest the finite workflow plan against the current registry and project stage.
-5. Acquire the project lane and, when needed, bind one editor session.
-6. Execute registry commands with bounded output, timeout, cancellation, and no default mutation retry.
-7. Save artifacts and state transitions into a hash-linked `RunReceipt`.
+4. Resolve and attest a finite workflow plan against the current registry and project stage.
+5. Acquire one project mutation lane and, when needed, bind one exact editor session.
+6. Execute registered commands with bounded output, timeout, cancellation, and no default mutation retry.
+7. Persist state transitions, receipts, and evidence.
 8. Reconcile identity and dirty state after reload, restart, failure, or rollback.
+
+Unknown mutation state goes to `uncertain` and cannot return directly to execution.
 
 ## Consumer project state
 
-A consuming game project is planned to contain `.ai-game-playbook/`. Commit-worthy state includes the project profile, feature contracts, and policy. Cache, logs, screenshots, locks, receipts containing local details, local secrets, and machine-specific configuration remain ignored.
+A consuming game project is planned to contain `.ai-game-playbook/`. Portable profiles, feature contracts, policies, and pack locks are commit-worthy. Cache, logs, screenshots, local receipts, locks, secrets, and machine-specific configuration remain ignored.
 
-Writes use owned-path rules and compare-and-swap preimages. The private core can initialize only the fixed lock, workflow-state, pack-state, and transaction directories used by implemented primitives. Initialization is idempotent, rejects links and case aliases, attests parent and target identities, and rolls back only directories created by the failed call; ambiguous cleanup is reported as mutation-uncertain. The core also advances a resolved workflow through pre-dispatch, dispatched, settled, rollback, blocked, terminal, and uncertain checkpoints. Each transition re-resolves the exact plan, accepts only same-process permission authority, binds a domain-separated receipt to command and authorization identity, preserves a receipt chain, and aggregates workflow budgets and complete evidence. Canonical checkpoint records are append-only under a fixed project-local directory, while a compare-and-swap head selects the current chain. Loading bounds record count and bytes, rechecks every parent transition and current registry/project identity, preserves corrupt state for diagnosis, and refuses competing heads. Restart recovery returns an undispatched admission to a reauthorization state and converts a dispatched but unsettled step to `uncertain`. Pack preflight binds a same-process validated registry, target/source root identities, local artifact bytes, installed-state digest, intended file changes, conflicts, and limits into an immutable write-free plan. The private executor then requires an exact broker-issued install authorization and same-process `project-write` lease. It writes a canonical active marker containing the complete expected started record, persists that started record before final-file effects, stages artifact and installed-state CAS operations, records a terminal outcome, settles observed effects, and clears the marker by exact digest only for a non-uncertain terminal. A remaining or malformed marker blocks every later pack plan. A read-only inspector revalidates the marker and journal, takes two bounded snapshots of every declared artifact and installed state, and reports preimage, postimage, mixed, terminal-contradictory, or unstable state. Its report has no mutation authority.
+The implemented bootstrap can create only six fixed runtime directories. It is idempotent, rejects links and case aliases, verifies parent and target identities, and removes only directories created by a clearly failed call. `doctor` reads this layout but never calls the bootstrap.
 
-For one stable matching report, the private recovery finalizer derives a same-process digest-bound plan from an exact internal registry descriptor. A separate broker-issued `install` approval and the same transaction's attested `project-write` lease are required. Under that authority it re-inspects the complete report, appends only the missing started/terminal closure or a sequence-2 reconciliation record when required, verifies the resulting journal and preimage/postimage before clearing the exact marker, and verifies again afterward. If post-clear verification fails, it attempts to restore the exact marker as the safety barrier. It never repairs, retries, or rolls back pack artifacts, and stale or ambiguous reports settle without forward writes. A clear later-file failure in ordinary execution triggers bounded reverse rollback; an uncertain effect is not retried. Removal can use canonical installed ownership even when the pack is no longer in the current registry. For explicitly declared direct artifact parents, the executor creates only absent directories, records pack-digest-bound markers, and leaves pre-existing directories shared. Updates rotate the marker without replacing directory identity; removals detach an exact empty owned directory into a fixed same-parent tombstone, and the separately approved finalizer may clean an exact detached tombstone after restart. Neither pack path has a CLI, doctor command, approval UI, durable approval capability, or durable recovery receipt. The general workflow state machine is not yet wired to command dispatch, and full receipts and evidence payloads are not durable. The core also does not yet discover or control an editor. Parallel-read coordination remains planned.
+Pack preflight binds the validated registry, source and target root identities, local artifact bytes, installed-state digest, intended changes, conflicts, and limits into a same-process immutable plan. Execution additionally requires exact `install` authorization and an attested project-write lease. Canonical installed state is committed last. Clear failures roll back already committed files in reverse; uncertain effects stop without retry.
 
-## Host integration
+An active marker and append-only journal preserve interruption state. The read-only recovery inspector performs two bounded observations. A separate finalizer requires a fresh exact approval and lane, re-inspects before each closure boundary, may close only an attested stable state, and never repairs artifacts or resolves mixed state. `doctor` only reports malformed installed state or marker presence; it does not invoke that recovery path.
 
-Codex is the first supported host, but contracts do not depend on one chat surface. Project instructions follow directory scope, skills load progressively, and MCP uses local process or streamable HTTP transports where appropriate. Host annotations remain advisory; the control plane's permission broker is authoritative.
+## Identity and execution lanes
 
-## Failure and recovery
+Runtime authority is planned to bind project root identity, project profile digest, feature contract digest, process executable and start identity, editor session nonce, scene or world identity, registry digest, handler digest, and pack digest where relevant. PID, port, process name, or window title alone is insufficient.
 
-Every mutation is intended to record preconditions, changed paths, engine identity, and recovery status. The implemented lease stops on root/project mismatch, changed lock-directory identity, malformed records, or a live or unverifiable owner. An expired lease is quarantined only after its owner PID is no longer running. The pack-specific finalizer can close only the exact stable preimage or postimage cases described above; it does not generalize to workflow or engine recovery. The workflow boundary durably preserves an uncertain mutation or aggregate budget violation and authorizes a declared rollback as a separate command and receipt. It can classify restart recovery but cannot yet reconcile or clear general workflow uncertainty, restore project/editor state, or dispatch the rollback itself; rollback never implies that a failed command made no changes.
+Execution lanes are:
+
+- `parallel-read` for bounded immutable inspection;
+- `project-write` for project source and managed metadata;
+- `editor-bound` for one exact editor session inside project serialization; and
+- `build-bound` for approved test and build work.
+
+The current `doctor` descriptor declares `parallel-read`, but general parallel-reader coordination is not yet implemented. Mutating lanes remain one lease per project and require explicit renewal.
+
+## Engine adapter boundary
+
+The common target contract is `detect → negotiate → inspect → mutate → save → compile/import → test → play → deterministic input → logs → capture → profile → build/export → rollback`.
+
+Each adapter must separate offline inspection, headless execution, editor preview, actual play, and packaged runtime evidence. Thin bridges receive only typed bounded operations. They must authenticate the exact project/session, limit request and output sizes, report both outer transport and inner operation outcomes, and return changed objects, files, save/import state, logs, and evidence locators.
+
+Godot is the first planned adapter, followed by Unity and Unreal. The current engine support grade for all three remains `planned`.
+
+## Degradation and support claims
+
+Capability grades are `planned`, `detected`, `headless`, `editor-preview`, and `verified`. A command being available does not raise an engine capability grade. Missing tools, ambiguous instances, unavailable live editors, absent tests, incomplete captures, and unknown performance environments must produce explicit degradation or an unverified outcome.
+
+Windows x64 is the first build target. Linux is initially a static/headless control-plane CI target. macOS, mobile, console, XR, multiplayer, and browser-first games remain outside the first alpha.

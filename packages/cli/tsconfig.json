@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "references": [
+    { "path": "../contracts" },
+    { "path": "../registry" },
+    { "path": "../core" },
+    { "path": "../pack-runtime" }
+  ],
+  "include": ["src/**/*.ts"]
+}

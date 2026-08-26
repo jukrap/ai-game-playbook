@@ -7,7 +7,7 @@ import * as registry from "../packages/registry/dist/index.js";
 
 const rootUrl = new URL("../", import.meta.url);
 
-test("foundation plan declares the complete design-only command and skill surface", () => {
+test("foundation plan separates available and planned command surfaces", () => {
   const artifact = registry.FOUNDATION_PLAN_ARTIFACT;
 
   assert.equal(artifact.schemaVersion, "1.0.0");
@@ -17,8 +17,9 @@ test("foundation plan declares the complete design-only command and skill surfac
   assert.equal(artifact.digest, contracts.digestCanonicalJson(unsignedArtifact));
   assert.equal(Object.isFrozen(artifact), true);
   assert.equal(Object.isFrozen(artifact.data.commands), true);
-  assert.equal(artifact.data.implementationStatus, "design-only");
-  assert.equal(artifact.data.executableAvailable, false);
+  assert.equal(artifact.data.implementationStatus, "partial");
+  assert.equal(artifact.data.executableAvailable, true);
+  assert.equal(artifact.data.runtimeRegistryDigest, registry.BUILTIN_REGISTRY.digest);
   assert.equal(artifact.data.package.npm, "ai-game-playbook");
   assert.equal(artifact.data.package.executable, "agpb");
   assert.equal(artifact.data.commands.length, 20);
@@ -35,10 +36,16 @@ test("foundation plan declares the complete design-only command and skill surfac
   for (const command of artifact.data.commands) {
     assert.equal(contracts.isStableId(command.id), true);
     assert.equal(contracts.isStableId(command.capability), true);
-    assert.equal(command.availability, "planned");
+    assert.equal(["available", "planned"].includes(command.availability), true);
     assert.equal(command.syntax.startsWith("agpb "), true);
     assert.equal(Object.hasOwn(command, "handler"), false);
   }
+  assert.deepEqual(
+    artifact.data.commands
+      .filter(({ availability }) => availability === "available")
+      .map(({ id }) => id),
+    registry.BUILTIN_REGISTRY.commands.map(({ id }) => id),
+  );
   for (const skill of artifact.data.skills) {
     assert.equal(contracts.isStableId(skill.id), true);
     assert.equal(contracts.isStableId(skill.capability), true);
@@ -71,8 +78,18 @@ test("tracked foundation plan is canonical and matches the public planned CLI", 
   const publicPlan = JSON.parse(
     await readFile(new URL("docs/planned-surface.json", rootUrl), "utf8"),
   );
-  assert.equal(publicPlan.implementationStatus, "design-only");
-  assert.equal(publicPlan.executableAvailable, false);
+  assert.equal(publicPlan.implementationStatus, "partial");
+  assert.equal(publicPlan.executableAvailable, true);
+  assert.equal(
+    publicPlan.runtimeRegistryDigest,
+    registry.BUILTIN_REGISTRY.digest,
+  );
+  assert.deepEqual(
+    publicPlan.availableCommands,
+    registry.FOUNDATION_PLAN_ARTIFACT.data.commands
+      .filter(({ availability }) => availability === "available")
+      .map(({ syntax }) => syntax),
+  );
   assert.deepEqual(
     publicPlan.commands,
     registry.FOUNDATION_PLAN_ARTIFACT.data.commands.map(

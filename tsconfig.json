@@ -4,6 +4,7 @@
     { "path": "./packages/contracts" },
     { "path": "./packages/registry" },
     { "path": "./packages/core" },
-    { "path": "./packages/pack-runtime" }
+    { "path": "./packages/pack-runtime" },
+    { "path": "./packages/cli" }
   ]
 }

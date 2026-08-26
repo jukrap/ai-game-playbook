@@ -18,6 +18,9 @@ test("workspace packages stay private and follow the foundation dependency direc
   const packRuntime = await readJson(
     new URL("../packages/pack-runtime/package.json", import.meta.url),
   );
+  const cli = await readJson(
+    new URL("../packages/cli/package.json", import.meta.url),
+  );
 
   assert.equal(root.private, true);
   assert.equal(root.license, "UNLICENSED");
@@ -25,6 +28,7 @@ test("workspace packages stay private and follow the foundation dependency direc
     root.packageManager,
     "pnpm@11.4.0+sha512.f0febc7e37552ab485494a914241b338e0b3580b93d54ce31f00933015880863129038a1b4ae4e414a0ee63ac35bf21197e990172c4a68256450b5636310968f",
   );
+  assert.deepEqual(root.bin, { agpb: "./packages/cli/dist/bin.js" });
 
   assert.equal(contracts.private, true);
   assert.equal(contracts.license, "UNLICENSED");
@@ -48,6 +52,15 @@ test("workspace packages stay private and follow the foundation dependency direc
   assert.deepEqual(packRuntime.dependencies, {
     "@ai-game-playbook/contracts": "workspace:*",
     "@ai-game-playbook/core": "workspace:*",
+    "@ai-game-playbook/registry": "workspace:*",
+  });
+  assert.equal(cli.private, true);
+  assert.equal(cli.license, "UNLICENSED");
+  assert.deepEqual(cli.bin, { agpb: "./dist/bin.js" });
+  assert.deepEqual(cli.dependencies, {
+    "@ai-game-playbook/contracts": "workspace:*",
+    "@ai-game-playbook/core": "workspace:*",
+    "@ai-game-playbook/pack-runtime": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
   });
 });
@@ -81,10 +94,14 @@ test("package-local compiler paths are not inherited from the root config", asyn
   const packRuntime = await readJson(
     new URL("../packages/pack-runtime/tsconfig.json", import.meta.url),
   );
+  const cli = await readJson(
+    new URL("../packages/cli/tsconfig.json", import.meta.url),
+  );
 
   assert.equal(base.compilerOptions.rootDir, undefined);
   assert.equal(contracts.compilerOptions.rootDir, "src");
   assert.equal(registry.compilerOptions.rootDir, "src");
   assert.equal(core.compilerOptions.rootDir, "src");
   assert.equal(packRuntime.compilerOptions.rootDir, "src");
+  assert.equal(cli.compilerOptions.rootDir, "src");
 });

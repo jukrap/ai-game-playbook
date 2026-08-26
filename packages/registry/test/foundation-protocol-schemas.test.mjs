@@ -10,6 +10,8 @@ import { validFoundationProtocolFixtures } from "./fixtures/foundation-protocols
 const expectedIds = [
   "approval-grant",
   "build-artifact-evidence",
+  "doctor-report",
+  "doctor-request",
   "engine-diagnostic",
   "engine-operation-request",
   "engine-operation-result",

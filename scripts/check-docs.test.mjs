@@ -184,13 +184,35 @@ const scenarios = [
       updateFile(root, "docs/concepts.ko.md", (text) => text.replaceAll("`RunReceipt`", "RunReceipt"))
   },
   {
-    name: "executable availability overclaim",
+    name: "executable availability drift",
     shouldPass: false,
-    diagnostic: "executableAvailable must remain false",
+    diagnostic: "executableAvailable must remain true",
     mutate: (root) =>
       updateFile(root, "docs/planned-surface.json", (text) => {
         const surface = JSON.parse(text);
-        surface.executableAvailable = true;
+        surface.executableAvailable = false;
+        return `${JSON.stringify(surface, null, 2)}\n`;
+      })
+  },
+  {
+    name: "available command drift",
+    shouldPass: false,
+    diagnostic: "available command set",
+    mutate: (root) =>
+      updateFile(root, "docs/planned-surface.json", (text) => {
+        const surface = JSON.parse(text);
+        surface.availableCommands = ["agpb init"];
+        return `${JSON.stringify(surface, null, 2)}\n`;
+      })
+  },
+  {
+    name: "runtime registry digest drift",
+    shouldPass: false,
+    diagnostic: "runtime registry digest differs",
+    mutate: (root) =>
+      updateFile(root, "docs/planned-surface.json", (text) => {
+        const surface = JSON.parse(text);
+        surface.runtimeRegistryDigest = `sha256:${"f".repeat(64)}`;
         return `${JSON.stringify(surface, null, 2)}\n`;
       })
   },

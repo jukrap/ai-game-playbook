@@ -2,8 +2,9 @@
   "schemaVersion": "1",
   "artifact": "ai-game-playbook-planned-surface",
   "reviewedAt": "2026-08-26",
-  "implementationStatus": "design-only",
-  "executableAvailable": false,
+  "implementationStatus": "partial",
+  "executableAvailable": true,
+  "runtimeRegistryDigest": "sha256:bf9874275e5ba4df531e7a85b406edc992d4793cea47223e581162bfec8120e2",
   "package": {
     "npm": "ai-game-playbook",
     "executable": "agpb"
@@ -29,6 +30,9 @@
     "agpb evidence show",
     "agpb evidence export",
     "agpb docs check"
+  ],
+  "availableCommands": [
+    "agpb doctor"
   ],
   "publicTypes": [
     "CommandDescriptor",

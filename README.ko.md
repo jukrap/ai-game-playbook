@@ -1,67 +1,83 @@
 ---
 source: README.md
-source_sha256: 67d0bde467bab22516d712ce107df2e3d2658d9ee70dc00b30d74858bca37c59
+source_sha256: 4fb1e0e1b0caaa905f9b5a59682815f1baca667ce9e21f404e1903a2d8a431b3
 translated_at: 2026-08-26
 ---
 
 # AI Game Playbook
 
-> 상태: control plane 계약, registry, 초기 core 안전 경계와 private managed-pack transaction runtime을 구현하는 단계입니다. 설치 가능한 패키지, `agpb` 실행 파일, MCP 서버, 엔진 어댑터는 아직 없습니다.
+> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction과 소스 빌드 방식의 실험적 `agpb doctor` 명령을 구현하고 있습니다. 설치 가능한 패키지, MCP 서버, 엔진 어댑터는 아직 없습니다.
 
 [English](README.md)
 
-AI Game Playbook은 Godot, Unity 또는 Unreal Engine으로 게임을 만드는 소규모 팀을 위한 AI 보조 게임 개발 하네스입니다. 코드 생성만이 아니라 범위가 제한된 워크플로, 명시적 권한, 재현 가능한 증거, 실제 엔진 동작을 중심으로 설계하고 있습니다.
+AI Game Playbook은 Godot, Unity 또는 Unreal Engine을 사용하는 개인과 소규모 팀을 위한 AI 보조 게임 개발 control plane입니다. 코드 생성만이 아니라 범위가 제한된 workflow, 명시적 authority, 재현 가능한 evidence와 실제 엔진 동작을 중시합니다.
 
 ## 현재 존재하는 것
 
-- versioned 공개 schema와 semantic validation을 포함한 pnpm/TypeScript workspace.
-- command, skill, workflow, role lens, schema, pack descriptor를 검증하고 범위가 제한된 설계 projection을 생성하며 exact command authority에 결합된 결정적 workflow plan을 해석하는 typed registry.
-- canonical project root 결합, 고정 레이아웃 project-state bootstrap, portable path 해석, bounded file snapshot, staged SHA-256 compare-and-swap 쓰기와 단일 파일 삭제, digest 결합 direct process 실행, 초기화된 project마다 root/project에 결합된 mutating lease 하나, registry 결합 permission admission과 서명된 scoped grant, resolved-plan state machine, durable append-only checkpoint store를 제공하는 초기 private core package.
-- 검증된 offline·hook-free regular-file pack을 immutable plan으로 준비하고, 명시적으로 승인된 plan만 attest된 project lane, compare-and-swap operation, canonical installed state, append-only transaction record를 통해 적용하며, 명시했지만 존재하지 않는 artifact parent directory만 canonical ownership marker와 함께 관리하는 private `pack-runtime`.
-- 의도한 command 및 skill surface를 담은 digest 결합 추적 계획.
-- 영어 문서와 한국어 미러.
-- contract, 생성 계획 drift, 문서 정합성을 검사하는 cross-platform static check.
+- versioned schema, semantic validation과 결정적 digest를 포함한 private pnpm/TypeScript workspace.
+- command, skill, workflow, role lens, schema, pack descriptor를 검증하고 서로 일치하는 CLI, MCP, 문서, skill routing metadata를 생성하는 typed registry.
+- canonical project identity, link-safe path resolution, bounded file read, staged compare-and-swap write/delete, bounded direct process execution, project mutation lease, scoped signed approval, workflow state와 durable checkpoint 안전 primitive.
+- write-free preflight, exact ownership, add/update/remove transaction, append-only journal, active-transaction barrier, 명확한 실패 뒤 rollback, marker 결합 directory ownership, 별도 승인 recovery finalization을 제공하는 private managed-pack runtime.
+- 실험적 private CLI package와 repository-local `agpb` entry point. 현재 구현된 명령은 read-only `agpb doctor` 하나뿐입니다.
+- `doctor`만 available로 표시하고 나머지 모든 명령과 엔진 capability를 planned로 유지하는 digest 결합 공개 surface.
+- 영어 공개 문서와 한국어 mirror, Windows/Linux conformance check.
 
-이 기반은 개발용 library와 검사이며 사용 가능한 제품이 아닙니다. private state machine은 immutable hash-linked checkpoint를 만들고 authorization과 dispatch를 분리하며 exact run receipt와 보고된 effect를 정산하고 선언된 failure 또는 rollback transition을 진행하며 uncertainty나 누적 budget 초과에서 중단합니다. checkpoint record는 이제 canonical append-only file과 compare-and-swap head로 유지되며, load할 때 제한된 전체 chain과 exact project/workflow authority를 다시 검증합니다. restart recovery는 사용하지 않은 authorization을 버리고 재승인을 요구하며 dispatch 경계를 넘은 step은 `uncertain`으로 전환합니다. 별도의 제한된 bootstrap은 구현된 primitive가 요구하는 lock, workflow state, pack state의 고정 디렉터리 6개만 생성합니다. 재실행해도 안전하며 link와 대소문자 alias를 거부하고, 명확히 실패한 호출이 직접 만든 디렉터리만 제거합니다. pack preflight는 계속 write-free입니다. 별도 private executor는 같은 process의 plan, broker가 발급한 install authorization, attest된 `project-write` lease만 받고 local add, update, installed-state 소유권 기반 remove를 수행합니다. started/terminal transaction을 기록하고 실제 effect를 정산하며 뒤 파일의 명확한 실패가 발생하면 이미 commit한 파일을 rollback합니다. started record 전에는 기대 post-state와 고정 관찰 budget을 담은 canonical active marker 하나를 쓰고, 불확실하지 않게 끝난 terminal 뒤에는 exact digest로 marker를 지웁니다. marker가 남아 있으면 새 pack plan을 중단합니다. 읽기 전용 recovery inspector는 제한된 snapshot을 두 번 취해 일치하는 preimage, postimage, mixed state, terminal drift와 marker-only crash window를 구분합니다. 안정적이고 일치하는 report에 대해서만 별도 private finalizer가 같은 process의 digest 결합 plan, broker가 새로 발급한 install 승인, attest된 `project-write` lease를 요구합니다. 쓰기 전 다시 검사하고 누락된 journal closure 또는 별도 reconciliation record를 append할 수 있으며, marker를 지우기 전에 exact journal과 state를 확인하고 해제 뒤 검증이 실패하면 marker를 복원합니다. pack artifact를 repair·retry·rollback하지 않고 stale, mixed, unstable, unreadable, contradictory 또는 foreign-marker state를 거부합니다. 명시된 artifact 직접 부모에 대해서는 executor가 absent directory만 생성하고 pack digest에 결합된 marker를 쓰며, 기존 directory는 shared로 유지하고 소유한 exact empty directory 제거를 same-parent tombstone으로 stage합니다. 승인된 recovery finalizer는 journal closure 전에 exact detached empty tombstone만 finalize할 수 있으며 pack file이나 mixed state는 여전히 repair하지 않습니다. 어느 경로도 approval이나 lane을 직접 얻거나 CLI를 노출하지 않습니다. approval reservation과 active lease는 여전히 memory에만 있고 이 primitive를 호출하는 dispatcher나 approval UI도 없습니다. lane primitive도 초기화된 local project state와 명시적 갱신이 필요하며 parallel reader를 조정하거나 Editor를 제어하지 않습니다. CPU와 memory sandbox도 아직 없습니다. 현재 저장소는 설치 가능한 npm 패키지나 동작하는 게임 엔진 자동화를 제공하지 않습니다. 문서의 명령은 인터페이스 계획이며 지금 실행할 수 있는 명령이 아닙니다.
+현재 CLI slice는 지원 Node.js 범위, runtime-registry parity, canonical project root 하나, 고정 project-state directory layout, canonical installed-pack state, active pack transaction marker를 검사합니다. 간결한 human output 또는 등록된 canonical JSON report를 출력합니다. 초기화, repair, marker clear, 설치, Editor 제어, network access는 수행하지 않습니다.
+
+대부분의 runtime component는 여전히 private library입니다. Pack mutation에는 exact same-process plan, broker가 발급한 `install` authorization, attest된 project-write lease가 필요합니다. Recovery finalizer는 bounded inspector가 이미 분류한 stable state만 닫을 수 있으며 pack artifact를 repair하거나 mixed state를 해결할 수 없습니다. Approval reservation과 active lease는 memory-only이고 general mutation dispatcher나 approval UI는 없습니다.
+
+## 현재 CLI 실행
+
+배포된 package는 없습니다. pin된 Node.js와 pnpm을 사용하는 source checkout에서 다음을 실행합니다.
+
+```text
+pnpm install --frozen-lockfile
+pnpm build
+pnpm run agpb -- doctor --project <project-path>
+pnpm run agpb -- doctor --project <project-path> --json
+```
+
+`doctor`는 project state 미초기화 같은 attention-level warning을 포함해 blocking finding 없이 진단을 마치면 exit code `0`을 반환합니다. Blocking finding은 `3`, 잘못된 CLI 사용은 `2`, validated report를 만들지 못한 내부 실패는 `1`입니다.
 
 ## 제품 방향
 
-첫 제품 목표는 개인 또는 최대 5인 팀이 만드는 Windows x64용 오프라인 싱글플레이 3D vertical slice입니다. 의도한 흐름은 다음과 같습니다.
+첫 완성 제품 목표는 개인 또는 최대 5인 팀이 만드는 Windows x64용 offline single-player 3D vertical slice입니다. 의도한 흐름은 다음과 같습니다.
 
-1. 프로젝트를 검사하고 사용 가능한 엔진 capability를 협상합니다.
-2. 범위가 제한된 feature contract와 권한 예산을 정의합니다.
-3. 프로젝트 단위 실행 lane 하나에서 소스 또는 Editor 상태를 변경합니다.
-4. compile/import, test, play, 결정적 입력 재생, 실제 runtime 증거 캡처를 수행합니다.
-5. build/export하고 receipt를 기록하며 필요하면 안전하게 rollback합니다.
+1. Project를 inspect하고 사용 가능한 engine capability를 negotiate합니다.
+2. 범위가 제한된 feature contract와 permission budget을 정의합니다.
+3. Project-scoped execution lane 하나를 통해 source 또는 Editor state를 변경합니다.
+4. Compile/import, test, play, deterministic input replay와 실제 runtime evidence capture를 수행합니다.
+5. Build/export하고 receipt를 기록하며 필요할 때 안전하게 rollback합니다.
 
-Godot, Unity, Unreal Engine만 계획된 first-party 엔진입니다. 웹 게임 프레임워크, 멀티플레이어, 모바일, 콘솔, XR, macOS 검증은 첫 alpha 범위 밖입니다.
+Godot, Unity, Unreal Engine만 first-party engine으로 계획합니다. Web game framework, multiplayer, mobile, console, XR, macOS 검증은 첫 alpha 범위 밖입니다.
 
 ## 설계 약속
 
-- 하나의 typed registry가 command 및 skill descriptor를 정의하고 현재 설계 projection을 생성합니다. 향후 CLI, MCP, 도움말, host integration도 동일하게 검증된 authority metadata를 사용해야 합니다.
-- 지원하지 않는 capability는 명시적으로 degrade해야 하며 낮은 등급의 증거를 `verified`로 표시할 수 없습니다.
-- Editor mutation은 프로젝트별로 직렬화하며 identity 또는 dirty file 상태가 모호해지면 중단합니다.
-- 설치, 네트워크, 외부 전송, 유료 호출, 파괴 작업, publish에는 별도 승인이 필요합니다.
-- telemetry는 계획하지 않습니다. 증거는 명시적인 export 작업을 통해서만 로컬 프로젝트 밖으로 나갑니다.
-- 엔진과 콘텐츠 제작 애플리케이션은 탐지하지만 자동 설치하지 않습니다.
+- 하나의 typed registry가 노출된 모든 command를 정의합니다. CLI help와 dispatch는 같은 validated descriptor와 schema identity를 사용합니다.
+- 지원하지 않는 capability는 명시적으로 degrade하며 낮은 evidence를 `verified`로 표시하지 않습니다.
+- Editor mutation은 project별로 직렬화하고 identity 또는 dirty-file state가 모호하면 중단합니다.
+- Installation, network, external transmission, paid call, destructive action, publish는 각각 별도 승인이 필요합니다.
+- Telemetry는 계획하지 않습니다. Evidence는 explicit export action으로만 local project 밖으로 나갑니다.
+- Engine, Editor, Blender와 다른 system tool은 탐지하되 자동 설치하지 않습니다.
+- Uncertain mutation은 자동 재시도하지 않습니다.
 
-## 설계 문서 읽기
+## 설계 문서
 
-- [문서 색인](docs/README.ko.md)
+- [문서 인덱스](docs/README.ko.md)
 - [현재 상태와 범위](docs/status-and-scope.ko.md)
 - [핵심 개념과 공개 타입](docs/concepts.ko.md)
-- [계획된 명령줄 인터페이스](docs/planned-cli.ko.md)
+- [명령줄 인터페이스 상태](docs/planned-cli.ko.md)
 - [목표 아키텍처](docs/architecture.ko.md)
 - [엔진 지원 모델](docs/engine-support.ko.md)
 - [보안과 권한](docs/security-and-permissions.ko.md)
-- [자산과 provenance](docs/assets-and-provenance.ko.md)
+- [자산과 출처](docs/assets-and-provenance.ko.md)
 - [증거와 검증](docs/evidence-and-verification.ko.md)
 - [로드맵](docs/roadmap.ko.md)
 
-## 설치
+## 설치와 릴리스
 
-아직 설치할 수 없습니다. 이 프로젝트로 생각하고 비슷한 이름의 패키지를 설치하지 마세요. 문서 게이트가 승인되고 실제 패키지가 clean install, update, rollback, conflict, uninstall 테스트를 통과한 뒤에만 설치 안내를 추가합니다.
+Repository-local executable은 설치 가능한 product package가 아닙니다. 이 프로젝트라고 기대하며 비슷한 이름의 package를 설치하지 마십시오. Non-owned file을 건드리지 않는 clean install, same-version reinstall, update, conflict, rollback, uninstall 검증을 통과한 뒤 package 설치 문서를 추가합니다.
 
 ## 프로젝트 상태와 라이선스
 
-구현 과정에서 인터페이스가 바뀔 수 있습니다. 프로젝트 라이선스는 아직 선택하지 않았으므로 라이선스 파일이 추가되기 전에는 재배포 권리를 가정하지 마세요. 이 결정 전에는 release나 package publish를 진행하지 않습니다.
+구현 중 interface가 바뀔 수 있습니다. 프로젝트 license를 아직 선택하지 않았으므로 license file이 추가되기 전에는 재배포 권리를 가정하지 마십시오. 해당 결정과 검증 gate를 통과하기 전에는 package publish나 release를 계획하지 않습니다.

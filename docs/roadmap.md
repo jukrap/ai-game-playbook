@@ -1,60 +1,68 @@
 # Roadmap
 
-> Status: common foundation and Stage 2 safety primitives are in progress. Later stages, dates, and availability are not promised.
+> Status: common foundations and Stage 2 safety primitives are in progress. Later stages, dates, and availability are not promises.
 
 [한국어](roadmap.ko.md) · [Documentation](README.md)
 
-## Gate 0: documentation approval — complete
+## Current checkpoint
 
-Maintainers approved seven documentation gates covering repository/install lifecycle, command and memory orchestration, each of the three engines, game production and assets, and the integrated public design before product implementation began.
+Completed foundations include versioned contracts, strict registry validation, generated surfaces, deterministic workflow plans, canonical project/path handling, compare-and-swap filesystem operations, bounded processes, project mutation leases, signed scoped permission admission, workflow checkpoints, and managed-pack transactions with recovery boundaries.
 
-Approval freezes the initial contracts, risks, permission defaults, evidence thresholds, golden tasks, and release scope. Review may send a gate back for revision. Design completion alone does not create a product release.
+The current Stage 2 product slice adds:
 
-## Stage 1: common foundation — in progress
+- an executable repository-local CLI with stable help, version, parsing, output, and exit behavior;
+- an exact runtime registry that exposes only implemented commands;
+- `DoctorRequest` and `DoctorReport` schemas;
+- read-only `agpb doctor` checks for runtime, registry, project-state, installed-pack-state, and active-marker safety;
+- compiled-handler digest attestation; and
+- generated/public availability parity.
 
-- Completed: pnpm workspace, versioned contract schemas, semantic validation, typed registry validation and projections, pack dependency-graph validation, deterministic resolved workflow-plan attestation, a tracked digest-bound foundation plan, a fixed-layout project-state bootstrap, and a private managed-pack preflight and transaction executor with marker-bound artifact-parent lifecycle, an active barrier, read-only recovery classification, and approval/lane-bound recovery closure.
-- Remaining: core runtime, executable CLI, MCP server, Codex adapter, and runtime parity generation.
-- Remaining: executable pack CLI and registry parity, recovery doctor and dispatcher integration, broader lifecycle evaluation, and pack distribution; fixed runtime-directory bootstrap plus local approval/lane-bound add, update, installed-state-owned removal, marker-bound missing-parent creation and reversible removal, active-marker blocking, journaling, read-only recovery inspection, stable-state finalization, clear-failure rollback, and conflict checks exist as private library primitives.
-- Keep the package private and use `ai-game-playbook` and `agpb` as reserved interface names until publication is separately authorized.
+This does not make the package installable and does not raise any engine capability above `planned`.
 
-## Stage 2: execution, evidence, and safety
+## Stage 2 remaining work
 
-- Implemented primitives: compare-and-swap writes and single-file deletion, canonical project-root identity, fixed project-state bootstrap, identity-bound directory creation and reversible removal, bounded direct process execution, serialized root/project-bound mutating leases, in-memory registry-bound permission admission with exact signed grants and effect settlement, immutable resolved-plan checkpoint transitions with receipt-chain, rollback, evidence, and cumulative-budget enforcement, append-only checkpoint persistence with bounded chain validation and restart-safe hydration, plus immutable local pack plans and an authorization/lane-bound transaction executor with marker-bound artifact-parent lifecycle, an active marker, append-only started/terminal/reconciliation records, bounded reverse rollback, two-pass read-only recovery observation, and separately approved stable-state closure.
-- Remaining: durable approval/receipt/evidence storage, general workflow uncertainty reconciliation, general workflow dispatcher integration, full project/editor identity attestation, automatic lease heartbeat integration, and parallel-read coordination.
-- Complete repair/retry and cancellation transitions, dispatcher-owned checkpoint persistence, receipt/evidence storage, and explicit reconciliation around the current bounded state machine.
-- Add content-addressed receipts, evidence storage, redacted diagnostics, retention, and explicit export.
-- Test traversal, symlink escape, invalid tokens, output growth, timeouts, stale processes, ambiguous editors, and install lifecycle conflicts.
+The next control-plane work is:
 
-## Stage 3: Godot adapter and first alpha
+1. Add write-plan-only `init`, then bind its mutation to explicit project metadata authority.
+2. Add read-only `project inspect` with engine markers, project identity, stage, targets, budgets, dirty state, and process ambiguity.
+3. Add pack and skill list/check commands before any mutation command.
+4. Connect approved pack add/update/remove and recovery finalization through a general dispatcher without weakening the existing plan, approval, lane, CAS, journal, or rollback requirements.
+5. Add approval interaction, stable error envelopes, command deadlines, and durable command receipts.
+6. Verify clean install, reinstall, update, conflict, interruption, rollback, recovery, and uninstall behavior from the executable surface.
 
-- Build the common 3D graybox with movement, camera, collision, collectible, HUD, save/load, restart, and win state.
-- Verify detect, inspect, change, save, script validation, test, run, deterministic input, gameplay state, runtime capture, logs, recovery, and Windows export startup.
-- Publish `0.1.0-alpha` only after the complete Godot loop and package lifecycle pass. Unity and Unreal remain `planned` at this point.
+No command may be marked available merely because a private library function exists.
 
-## Stage 4: Unity adapter
+## Stage 3 — evidence, MCP, and Codex integration
 
-- Implement official automation paths first and admit a fallback only after its hard gates pass.
-- Reproduce the graybox with EditMode and PlayMode tests, domain-reload recovery, actual Game View evidence, and Windows x64 Development Build startup.
-- Raise individual Unity capabilities only to the strongest witnessed grade.
+Planned work includes content-addressed artifacts, canonical receipt chains, checkpoint/handoff reconciliation, retention and redaction, explicit evidence export, registry-generated STDIO MCP tools, and project-scoped Codex skills and instructions.
 
-## Stage 5: Unreal adapter
+CLI, MCP, documentation, and skill routing must preserve identical command IDs, schema digests, permissions, and handler identities. MCP annotations remain hints and can never override the permission broker. No background upload or telemetry path is planned.
 
-- Implement official MCP, Editor Python, Automation, UAT, and UBT paths with exact session identity and transactions.
-- Reproduce the graybox in Blueprint and C++ flows.
-- Verify PIE gameplay separately from packaged startup, cook/package, rollback, and asset/actor recovery.
+## Stage 4 — Godot alpha
 
-## Stage 6: optional expansion
+Godot is the first planned engine adapter. The common 3D graybox must prove movement, camera behavior, collision, a collectible, HUD count, save/load across process restart, failure/restart handling, win state, actual runtime frames, Windows export, and exported-player startup.
 
-- Add UI reconstruction, balance simulation, Blender QA, and one optional hosted image-provider pack.
-- Evaluate dashboard and desktop UI needs after the CLI workflows are stable.
-- Treat 3D and audio generation, macOS validation, and additional distribution targets as later work.
+`0.1.0-alpha` is allowed only after the required Godot capabilities reach `verified`, pack lifecycle and recovery are stable, clean external installation passes, and licensing and release authority are resolved. Unity and Unreal remain planned at that point.
 
-## Release thresholds
+## Stage 5 — Unity
 
-`0.1.0-alpha` requires the Godot golden loop, safe installation lifecycle, bounded recovery, and behavior evaluations. Later pre-releases add one verified engine at a time without overstating the others.
+Unity work will prioritize official command-line and automation paths, exact Editor/project identity, EditMode and PlayMode reports, domain-reload reconciliation, actual Game View evidence, Windows x64 Development Build, and packaged startup. Community fallback paths remain optional and must pass the same authentication, schema, identity, timeout, output, recovery, and evidence gates.
 
-`1.0` is allowed only when Godot, Unity, and Unreal all have required capabilities at `verified`; clean install, reinstall, update, user-conflict, rollback, and uninstall are stable; behavior evaluations cover permission and interruption paths; and public documentation matches generated runtime surfaces in both languages.
+## Stage 6 — Unreal
 
-## Persistent non-goals
+Unreal work will use UBT/UAT and commandlets for headless paths and constrained editor operations for editor-bound work. PIE, editor viewport, Automation, cook/package, and packaged execution evidence remain distinct. Global process termination, active worktree switching, broad asset deletion, and unbounded arbitrary Python are outside the accepted boundary.
 
-The roadmap does not authorize automatic engine installation, telemetry, unapproved network access, autonomous publishing, broad process control, or unbounded repair loops. New engines enter through a public adapter contract as community packs, not by expanding first-party scope silently.
+## Stage 7 — stabilization and 1.0
+
+`1.0` requires all three engines to reach the required verified capabilities, a common Windows x64 packaged scenario, stable install/update/recovery/uninstall behavior, schema and pack migration, behavior evaluations, current live-engine evidence, release provenance, and no unresolved critical security or licensing blocker.
+
+## Later extensions
+
+UI reconstruction, deterministic balance simulation, optional Blender QA, and at most one optional hosted image-provider pack follow the core loops. Dashboard/desktop UI, 3D and audio generation, and macOS validation are later work. Additional engines remain community packs behind the public adapter contract.
+
+## Release rules
+
+- The repository remains private-package/`UNLICENSED` during this phase and is not published to npm.
+- A source-built command is not a release.
+- Engine support follows witnessed capability evidence, not roadmap position.
+- English and Korean public docs, generated surfaces, handler digests, tests, and Windows/Linux CI must agree before a status claim changes.

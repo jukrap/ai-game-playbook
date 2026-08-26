@@ -1,12 +1,12 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: e86a884fa55eb48828a1cc87c981e8af5f3d3f34d9547809504cade9bb8cc7bc
+source_sha256: 67e2a8de5f6bf844076b3dd9afbeca883db9a69fa69ccdc6f397c9c391fa1251
 translated_at: 2026-08-27
 ---
 
 # 보안과 권한
 
-> 상태: private admission, workflow checkpoint, durable receipt/artifact record, managed-pack transaction, read-only CLI diagnostic가 구현된 계획 permission policy입니다. General mutation dispatch와 engine enforcement는 아직 없습니다.
+> 상태: private admission, workflow checkpoint, durable receipt/artifact record, bounded private receipt-head query, managed-pack transaction, read-only CLI diagnostic가 구현된 계획 permission policy입니다. General mutation dispatch와 engine enforcement는 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
@@ -21,6 +21,8 @@ Authorization 자체는 execution이 아닙니다. Broker는 general mutation di
 Static project inspection은 local root 하나를 bind하고 directory observation과 file byte를 제한하며 unsafe link와 case ambiguity를 거부하고 read 전후 identity를 다시 확인합니다. `.git` marker는 Git 실행 permission을 부여하지 않으며 Editor lock은 process, session, liveness, connection, mutation authority를 부여하지 않습니다. Report는 mutation, process launch, network access가 없음을 명시합니다. Invalid profile과 ambiguous engine candidate는 그럴듯한 target을 선택하지 않고 이후 authority를 차단합니다.
 
 Private artifact promotion과 receipt store는 current same-process validated registry와 exact project, runtime, command descriptor, handler, workflow plan, 선택적 feature contract에 결합된 receipt만 수용합니다. 미리 존재하는 ignored local directory, stable project-local source snapshot, digest-addressed create-only object, canonical producer manifest, canonical receipt JSON, compare-and-swap head, explicit diagnostic redaction marker, bounded text/artifact를 요구합니다. 검증 중 complete artifact object와 manifest를 두 번 다시 엽니다. Execution authority를 부여하거나 corruption을 repair하거나 mutation을 retry하거나 format QA를 수행하거나 unreachable object를 제거하거나 data를 export하지 않습니다.
+
+Private receipt-head query는 write 또는 execution authority를 추가하지 않습니다. Caller가 선택한 limit 아래에서 fixed store만 scan하고 noncanonical/non-file entry를 거부하며 모든 head를 다시 열고 두 번째 inventory observation을 검사한 뒤 bounded summary를 반환합니다. 복사한 summary는 상세 load를 승인할 수 없습니다. Full-chain verification 전에는 원본 same-process witness, 일치하는 project identity, 일치하는 validated registry, 변경되지 않은 selected head가 필요합니다. Head-only discovery는 malformed 또는 검사하지 않은 record content를 verified evidence로 승격하지 않습니다.
 
 별도 private artifact assessor는 추가 authority를 상속하지 않습니다. I/O 전에 request를 snapshot하고 exact promoted complete artifact 하나를 요구하며 보존 byte를 읽기 전후에 receipt/object/manifest를 검증하고 고정된 byte, JSON tree, PNG dimension, pixel, inflate, chunk limit을 적용합니다. 선택적 provenance validation은 exact current registry와 current-file identity를 요구합니다. Assessor는 raw content 대신 bounded code와 metadata를 반환하며 write, process launch, network access, engine control, export, retry, repair, support-grade promotion을 수행하지 않습니다. 지원하지 않는 interlaced PNG는 `unverified`로 남습니다.
 

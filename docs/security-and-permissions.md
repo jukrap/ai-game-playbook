@@ -1,6 +1,6 @@
 # Security and Permissions
 
-> Status: planned permission policy with implemented private admission, workflow checkpoints, durable receipt and artifact records, managed-pack transactions, and read-only CLI diagnostics. General mutation dispatch and engine enforcement do not exist.
+> Status: planned permission policy with implemented private admission, workflow checkpoints, durable receipt and artifact records, bounded private receipt-head queries, managed-pack transactions, and read-only CLI diagnostics. General mutation dispatch and engine enforcement do not exist.
 
 [한국어](security-and-permissions.ko.md) · [Documentation](README.md)
 
@@ -15,6 +15,8 @@ The current CLI dispatches plan-only `init`, read-only `doctor`, and static read
 Static project inspection binds one local root, limits directory observations and file bytes, rejects unsafe links and case ambiguity, and rechecks identities around reads. A `.git` marker never grants permission to execute Git, and an Editor lock never grants process, session, liveness, connection, or mutation authority. The report explicitly records no mutation, process launch, or network access. Invalid profiles and ambiguous engine candidates block later authority instead of selecting a likely target.
 
 The private artifact promotion and receipt stores accept only the current same-process validated registry and a receipt bound to the exact project, runtime, command descriptor, handler, workflow plan, and optional feature contract. They require pre-existing ignored local directories, stable project-local source snapshots, digest-addressed create-only objects, canonical producer manifests, canonical receipt JSON, compare-and-swap heads, explicit diagnostic redaction markers, and bounded text and artifacts. Complete artifact objects and manifests are reopened twice during verification. These stores do not grant execution authority, repair corruption, retry a mutation, perform format QA, remove unreachable objects, or export data.
+
+The private receipt-head query adds no write or execution authority. It scans only the fixed store under caller-selected limits, rejects noncanonical or non-file entries, reopens every head, and checks a second inventory observation before returning bounded summaries. A copied summary cannot authorize a detailed load; the original same-process witness, matching project identity, matching validated registry, and unchanged selected head are required before full-chain verification begins. Head-only discovery never upgrades malformed or uninspected record content to verified evidence.
 
 A separate private artifact assessor inherits no additional authority. It snapshots the request before I/O, requires one exact promoted complete artifact, verifies the receipt/object/manifest before and after reading retained bytes, and applies fixed byte, JSON-tree, PNG-dimension, pixel, inflate, and chunk limits. Optional provenance validation requires the exact current registry and current-file identity. The assessor returns bounded codes and metadata rather than raw content; it performs no write, process launch, network access, engine control, export, retry, repair, or support-grade promotion. Unsupported interlaced PNG remains `unverified`.
 

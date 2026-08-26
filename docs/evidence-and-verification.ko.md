@@ -1,12 +1,12 @@
 ---
 source: docs/evidence-and-verification.md
-source_sha256: 14aebd1cfcbd7079bbef39ff8923924cc0f165672676f1973ad3de89a3ee4a6e
+source_sha256: bde1d7ce5a4f03289c062e252202cab82e7099bec7a8810037292589b81c7a98
 translated_at: 2026-08-27
 ---
 
 # 증거와 검증
 
-> 상태: receipt/checkpoint 계약, settlement 경계, durable checkpoint chain, private durable receipt record, private content-addressed artifact payload, pure process/test result normalizer, 제한된 private artifact format/provenance assessment를 구현했습니다. Evidence command, engine report parser, export, 영속화된 artifact QA, engine evidence는 아직 없습니다.
+> 상태: receipt/checkpoint 계약, settlement 경계, durable checkpoint chain, private durable receipt record, bounded private receipt-head query, private content-addressed artifact payload, pure process/test result normalizer, 제한된 private artifact format/provenance assessment를 구현했습니다. Evidence command, engine report parser, export, 영속화된 artifact QA, engine evidence는 아직 없습니다.
 
 [English](evidence-and-verification.md) · [문서](README.ko.md)
 
@@ -39,7 +39,11 @@ Private promotion API는 complete artifact source를 stable project-local regula
 
 Private receipt store는 promoted `RunReceipt` body를 run별 compare-and-swap head 뒤의 canonical immutable record로 영속화합니다. Persistence는 같은 canonical project root, runtime, registry, command, workflow plan, 선택적 feature contract를 결합합니다. Diagnostic에는 explicit redaction marker가 필요하고 명백한 credential-shaped text와 absolute private-machine path pattern을 거부하며 record, chain, artifact count, artifact byte에 고정 budget을 적용합니다. 모든 complete artifact는 exact CAS object path와 일치하는 manifest를 사용해야 하며 load는 둘을 두 번 다시 엽니다. Promotion 뒤 source file은 evidence authority가 아닙니다. Missing, malformed, noncanonical, tampered, relocated, rebound, stale, competing state는 repair하거나 조용히 교체하지 않고 그대로 보존한 채 거부합니다.
 
-현재 receipt/object slice는 검증하는 receipt chain 하나에서 complete artifact 최대 256개, 총 64 MiB, manifest 128 KiB로 제한됩니다. 별도 private assessment는 최대 16 MiB의 promoted complete artifact 하나를 받아 보존 byte를 읽기 전후에 receipt, object, manifest를 다시 검증하고 raw content 없는 bounded metadata를 반환합니다. BOM 없는 UTF-8 decode, depth/node limit을 적용한 exact canonical JSON parse, PNG chunk·CRC·dimension·bounded inflate output·non-interlaced scanline 검증을 수행할 수 있습니다. Interlaced PNG는 구조를 검사하지만 `unverified`로 남습니다. 선택적 `AssetProvenance` validation은 exact current registry를 사용하며 선언된 current-file path, digest, byte count가 평가한 artifact와 일치해야 합니다. Assessment는 영속화하지 않으며 runtime-frame origin, engine import state, 더 넓은 image semantics, production readiness를 증명하지 않습니다. 다른 format, engine report parsing, retention cleanup/reachable-head GC, list/show/export command, record encryption, 다른 registry authority 아래의 과거 chain load는 제공하지 않습니다. Approval reservation과 uncertainty를 해제하는 action도 아직 durable하지 않습니다.
+Bounded private head query는 caller가 선택하되 entry 16,384개, head 1,024개, aggregate head data 16 MiB를 넘을 수 없는 limit 아래에서 fixed receipt directory 전체를 검사합니다. Canonical regular-file name만 허용하고 모든 head를 bounded canonical JSON으로 parse하며 filename identity와 latest record 존재를 맞춘 다음, head를 다시 열고 inventory를 다시 관찰한 뒤 run ID 순서의 frozen summary를 반환합니다. Summary validation level은 명시적으로 `head-and-latest-record-presence`입니다. 이 단계에서는 record body, predecessor reachability, artifact, engine evidence를 검증하지 않습니다. Current head가 없는 canonical record file은 reachable 또는 orphan이라고 표시하지 않고 수량만 셉니다.
+
+상세 load는 원본 same-process query witness만 받습니다. Foreign-project 또는 registry가 일치하지 않는 head를 거부하고 query 뒤 선택한 head가 전진하면 거부한 다음 기존 bounded full-chain/artifact verification에 위임합니다. Summary를 복사해도 load authority가 생기지 않습니다. 이는 private discovery 경계이며 `agpb evidence` command, MCP tool, export path, persistent index, cursor, historical-registry archive, retention mechanism이 아닙니다.
+
+현재 receipt/object slice는 검증하는 receipt chain 하나에서 complete artifact 최대 256개, 총 64 MiB, manifest 128 KiB로 제한됩니다. 별도 private assessment는 최대 16 MiB의 promoted complete artifact 하나를 받아 보존 byte를 읽기 전후에 receipt, object, manifest를 다시 검증하고 raw content 없는 bounded metadata를 반환합니다. BOM 없는 UTF-8 decode, depth/node limit을 적용한 exact canonical JSON parse, PNG chunk·CRC·dimension·bounded inflate output·non-interlaced scanline 검증을 수행할 수 있습니다. Interlaced PNG는 구조를 검사하지만 `unverified`로 남습니다. 선택적 `AssetProvenance` validation은 exact current registry를 사용하며 선언된 current-file path, digest, byte count가 평가한 artifact와 일치해야 합니다. Assessment는 영속화하지 않으며 runtime-frame origin, engine import state, 더 넓은 image semantics, production readiness를 증명하지 않습니다. 다른 format, engine report parsing, retention cleanup/reachable-head GC, CLI/MCP list/show/export operation, record encryption, 다른 registry authority 아래의 과거 chain load는 제공하지 않습니다. Approval reservation과 uncertainty를 해제하는 action도 아직 durable하지 않습니다.
 
 ## Test 판정 기준
 

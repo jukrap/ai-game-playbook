@@ -5,6 +5,7 @@
     { "path": "./packages/registry" },
     { "path": "./packages/core" },
     { "path": "./packages/project-runtime" },
+    { "path": "./packages/godot-adapter" },
     { "path": "./packages/skill-runtime" },
     { "path": "./packages/evidence" },
     { "path": "./packages/pack-runtime" },

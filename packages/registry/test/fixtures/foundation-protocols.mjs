@@ -34,7 +34,6 @@ export const validFoundationProtocolFixtures = {
     schemaVersion: "1.0.0",
     projectRoot: "D:\\games\\sample",
     engine: "godot",
-    executablePath: "D:\\tools\\Godot.exe",
   },
   "engine-status-report": {
     schemaVersion: "1.0.0",

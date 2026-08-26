@@ -11,7 +11,14 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.match(registry.BUILTIN_REGISTRY.digest, digestPattern);
   assert.deepEqual(
     registry.BUILTIN_REGISTRY.commands.map(({ id }) => id),
-    ["doctor", "init", "project.inspect", "skill.check", "skill.list"],
+    [
+      "doctor",
+      "engine.status",
+      "init",
+      "project.inspect",
+      "skill.check",
+      "skill.list",
+    ],
   );
 
   const doctor = registry.BUILTIN_REGISTRY.commands[0];
@@ -27,6 +34,33 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.equal(doctor.handler.package, "@ai-game-playbook/cli");
   assert.equal(doctor.handler.export, "runDoctor");
   assert.match(doctor.handler.digest, digestPattern);
+
+  const engineStatus = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "engine.status",
+  );
+  assert.notEqual(engineStatus, undefined);
+  assert.deepEqual(engineStatus.cli, { path: ["engine", "status"], aliases: [] });
+  assert.deepEqual(engineStatus.capabilities, ["engine.status"]);
+  assert.deepEqual(engineStatus.permissions, ["read-project"]);
+  assert.deepEqual(engineStatus.sideEffects, [
+    { kind: "none", scope: "godot-static-status", boundary: "local" },
+  ]);
+  assert.equal(engineStatus.lane, "parallel-read");
+  assert.equal(engineStatus.timeoutMs, 10_000);
+  assert.deepEqual(engineStatus.retry, { mode: "never", maxAttempts: 1 });
+  assert.equal(engineStatus.budgets.maxChangedFiles, 0);
+  assert.equal(engineStatus.budgets.maxChangedBytes, 0);
+  assert.equal(
+    engineStatus.input.schemaId,
+    contracts.engineStatusRequestSchema.schemaId,
+  );
+  assert.equal(
+    engineStatus.output.schemaId,
+    contracts.engineStatusReportSchema.schemaId,
+  );
+  assert.equal(engineStatus.handler.package, "@ai-game-playbook/godot-adapter");
+  assert.equal(engineStatus.handler.export, "runGodotEngineStatus");
+  assert.match(engineStatus.handler.digest, digestPattern);
 
   const init = registry.BUILTIN_REGISTRY.commands.find(({ id }) => id === "init");
   assert.notEqual(init, undefined);
@@ -114,6 +148,7 @@ test("builtin generated surfaces preserve implemented schema and command identit
   assert.equal(surfaces.registryDigest, registry.BUILTIN_REGISTRY.digest);
   assert.deepEqual(surfaces.cli.data.commands.map(({ id }) => id), [
     "doctor",
+    "engine.status",
     "init",
     "project.inspect",
     "skill.check",
@@ -121,6 +156,7 @@ test("builtin generated surfaces preserve implemented schema and command identit
   ]);
   assert.deepEqual(surfaces.docs.data.commands.map(({ id }) => id), [
     "doctor",
+    "engine.status",
     "init",
     "project.inspect",
     "skill.check",
@@ -128,6 +164,7 @@ test("builtin generated surfaces preserve implemented schema and command identit
   ]);
   assert.deepEqual(surfaces.mcp.data.tools.map(({ commandId }) => commandId), [
     "doctor",
+    "engine.status",
     "init",
     "project.inspect",
     "skill.check",
@@ -138,6 +175,7 @@ test("builtin generated surfaces preserve implemented schema and command identit
   assert.equal(surfaces.mcp.data.tools[2].enabledByDefault, false);
   assert.equal(surfaces.mcp.data.tools[3].enabledByDefault, false);
   assert.equal(surfaces.mcp.data.tools[4].enabledByDefault, false);
+  assert.equal(surfaces.mcp.data.tools[5].enabledByDefault, false);
   assert.equal(
     surfaces.mcp.data.tools[0].outputSchemaId,
     contracts.doctorReportSchema.schemaId,

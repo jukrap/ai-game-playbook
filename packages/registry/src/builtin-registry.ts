@@ -2,6 +2,8 @@ import {
   assetProvenanceSchema,
   doctorReportSchema,
   doctorRequestSchema,
+  engineStatusReportSchema,
+  engineStatusRequestSchema,
   gameProjectProfileSchema,
   initReportSchema,
   initRequestSchema,
@@ -133,6 +135,55 @@ const doctorCommand: CommandDescriptor = Object.freeze({
     export: "runDoctor",
     digest: parseSha256Digest(
       "sha256:d8996ca370062478f2ad393cdccb622ad36b094a6add613bc7674724bcba87a9",
+    ),
+  }),
+});
+
+const engineStatusCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("engine.status"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "experimental",
+  summary: "Inspect static Godot project compatibility without engine execution.",
+  cli: Object.freeze({
+    path: Object.freeze(["engine", "status"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: engineStatusRequestSchema.schemaId,
+    digest: engineStatusRequestSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: engineStatusReportSchema.schemaId,
+    digest: engineStatusReportSchema.digest,
+  }),
+  capabilities: Object.freeze([parseStableId("engine.status")]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "none",
+      scope: "godot-static-status",
+      boundary: "local",
+    }),
+  ]),
+  lane: "parallel-read",
+  timeoutMs: 10_000,
+  cancellation: Object.freeze({ mode: "not-applicable", graceMs: 0 }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: 10_000,
+    maxOutputBytes: 1_048_576,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([parseStableId("engine-status-report")]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/godot-adapter",
+    export: "runGodotEngineStatus",
+    digest: parseSha256Digest(
+      "sha256:196803e948c170e1e86a8b50642e22277755118dcdc860894ea661273fa11500",
     ),
   }),
 });
@@ -327,6 +378,8 @@ const definition: RegistryDefinition = Object.freeze({
     assetProvenanceSchema,
     doctorRequestSchema,
     doctorReportSchema,
+    engineStatusRequestSchema,
+    engineStatusReportSchema,
     gameProjectProfileSchema,
     initRequestSchema,
     initReportSchema,
@@ -340,6 +393,7 @@ const definition: RegistryDefinition = Object.freeze({
   ]),
   commands: Object.freeze([
     doctorCommand,
+    engineStatusCommand,
     initCommand,
     projectInspectCommand,
     skillCheckCommand,

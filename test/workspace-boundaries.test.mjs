@@ -27,8 +27,14 @@ test("workspace packages stay private and follow the foundation dependency direc
   const projectRuntime = await readJson(
     new URL("../packages/project-runtime/package.json", import.meta.url),
   );
+  const godotAdapter = await readJson(
+    new URL("../packages/godot-adapter/package.json", import.meta.url),
+  );
   const cli = await readJson(
     new URL("../packages/cli/package.json", import.meta.url),
+  );
+  const mcp = await readJson(
+    new URL("../packages/mcp/package.json", import.meta.url),
   );
 
   assert.equal(root.private, true);
@@ -84,16 +90,37 @@ test("workspace packages stay private and follow the foundation dependency direc
     "@ai-game-playbook/core": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
   });
+  assert.equal(godotAdapter.private, true);
+  assert.equal(godotAdapter.license, "UNLICENSED");
+  assert.deepEqual(godotAdapter.dependencies, {
+    "@ai-game-playbook/contracts": "workspace:*",
+    "@ai-game-playbook/core": "workspace:*",
+    "@ai-game-playbook/project-runtime": "workspace:*",
+    "@ai-game-playbook/registry": "workspace:*",
+  });
   assert.equal(cli.private, true);
   assert.equal(cli.license, "UNLICENSED");
   assert.deepEqual(cli.bin, { agpb: "./dist/bin.js" });
   assert.deepEqual(cli.dependencies, {
     "@ai-game-playbook/contracts": "workspace:*",
     "@ai-game-playbook/core": "workspace:*",
+    "@ai-game-playbook/godot-adapter": "workspace:*",
     "@ai-game-playbook/pack-runtime": "workspace:*",
     "@ai-game-playbook/project-runtime": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
     "@ai-game-playbook/skill-runtime": "workspace:*",
+  });
+  assert.equal(mcp.private, true);
+  assert.equal(mcp.license, "UNLICENSED");
+  assert.deepEqual(mcp.bin, { "agpb-mcp": "./dist/bin.js" });
+  assert.deepEqual(mcp.dependencies, {
+    "@ai-game-playbook/cli": "workspace:*",
+    "@ai-game-playbook/contracts": "workspace:*",
+    "@ai-game-playbook/core": "workspace:*",
+    "@ai-game-playbook/godot-adapter": "workspace:*",
+    "@ai-game-playbook/project-runtime": "workspace:*",
+    "@ai-game-playbook/registry": "workspace:*",
+    "@modelcontextprotocol/server": "2.0.0",
   });
 });
 
@@ -135,6 +162,9 @@ test("package-local compiler paths are not inherited from the root config", asyn
   const projectRuntime = await readJson(
     new URL("../packages/project-runtime/tsconfig.json", import.meta.url),
   );
+  const godotAdapter = await readJson(
+    new URL("../packages/godot-adapter/tsconfig.json", import.meta.url),
+  );
   const cli = await readJson(
     new URL("../packages/cli/tsconfig.json", import.meta.url),
   );
@@ -147,5 +177,6 @@ test("package-local compiler paths are not inherited from the root config", asyn
   assert.equal(packRuntime.compilerOptions.rootDir, "src");
   assert.equal(skillRuntime.compilerOptions.rootDir, "src");
   assert.equal(projectRuntime.compilerOptions.rootDir, "src");
+  assert.equal(godotAdapter.compilerOptions.rootDir, "src");
   assert.equal(cli.compilerOptions.rootDir, "src");
 });

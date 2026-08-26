@@ -152,6 +152,20 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       })(),
     ],
     [
+      "engine-status-request",
+      {
+        ...fixtures["engine-status-request"],
+        engine: "unity",
+      },
+    ],
+    [
+      "engine-status-request",
+      {
+        ...fixtures["engine-status-request"],
+        executablePath: "D:\\tools\\Godot.exe",
+      },
+    ],
+    [
       "engine-status-report",
       {
         ...fixtures["engine-status-report"],

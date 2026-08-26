@@ -20,6 +20,7 @@ test("CLI help and version are derived from the implemented runtime surface", as
   assert.match(help.stdout, /^AI Game Playbook 0\.0\.0/m);
   assert.match(help.stdout, /init\s+Plan/);
   assert.match(help.stdout, /doctor\s+Inspect/);
+  assert.match(help.stdout, /engine status\s+Inspect/);
   assert.match(help.stdout, /project inspect\s+Inspect/);
   assert.match(help.stdout, /skill check\s+Inspect/);
   assert.match(help.stdout, /skill list\s+List/);
@@ -83,6 +84,50 @@ test("project inspect maps engine ambiguity to the blocked exit category", async
   assert.equal(JSON.parse(output.stdout).engine.status, "ambiguous");
 });
 
+test("engine status exposes bounded Godot project compatibility without host tool reads", async (t) => {
+  const { project } = await fixture(t);
+  await writeFile(
+    join(project, "project.godot"),
+    'config_version=5\nconfig/features=PackedStringArray("4.7")\n',
+    "utf8",
+  );
+
+  const json = await cli.runCli([
+    "engine",
+    "status",
+    "--engine",
+    "godot",
+    "--project",
+    project,
+    "--json",
+  ]);
+  assert.equal(json.exitCode, cli.CLI_EXIT_CODES.success);
+  assert.equal(json.stderr, "");
+  const report = JSON.parse(json.stdout);
+  assert.equal(report.commandId, "engine.status");
+  assert.equal(report.status, "attention");
+  assert.equal(report.engine, "godot");
+  assert.equal(report.project.status, "detected");
+  assert.equal(report.executable.status, "not-provided");
+  assert.equal(report.compatibility.targetVersion, "4.7.2");
+  assert.equal(report.support.grade, "planned");
+  assert.equal(report.externalProcessStarted, false);
+
+  const human = await cli.runCli([
+    "engine",
+    "status",
+    "--engine",
+    "godot",
+    "--project",
+    project,
+  ]);
+  assert.equal(human.exitCode, cli.CLI_EXIT_CODES.success);
+  assert.match(human.stdout, /AI Game Playbook engine status/);
+  assert.match(human.stdout, /Support: planned/);
+  assert.match(human.stdout, /Executable: not-provided/);
+  assert.match(human.stdout, /Files changed: 0/);
+});
+
 test("doctor JSON and human output agree with stable exit categories", async (t) => {
   const { project } = await fixture(t);
 
@@ -116,6 +161,11 @@ test("CLI fails closed on unknown commands, flags, and missing option values", a
     ["project", "inspect", "--connect"],
     ["project", "inspect", "--project"],
     ["project", "inspect", "--project", "one", "--project", "two"],
+    ["engine"],
+    ["engine", "connect"],
+    ["engine", "status"],
+    ["engine", "status", "--engine", "unity"],
+    ["engine", "status", "--engine", "godot", "--executable", process.execPath],
   ]) {
     const result = await cli.runCli(args);
     assert.equal(result.exitCode, cli.CLI_EXIT_CODES.usage);

@@ -32,6 +32,9 @@ importers:
       '@ai-game-playbook/core':
         specifier: workspace:*
         version: link:../core
+      '@ai-game-playbook/godot-adapter':
+        specifier: workspace:*
+        version: link:../godot-adapter
       '@ai-game-playbook/pack-runtime':
         specifier: workspace:*
         version: link:../pack-runtime
@@ -86,6 +89,21 @@ importers:
         specifier: workspace:*
         version: link:../registry
 
+  packages/godot-adapter:
+    dependencies:
+      '@ai-game-playbook/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@ai-game-playbook/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ai-game-playbook/project-runtime':
+        specifier: workspace:*
+        version: link:../project-runtime
+      '@ai-game-playbook/registry':
+        specifier: workspace:*
+        version: link:../registry
+
   packages/mcp:
     dependencies:
       '@ai-game-playbook/cli':
@@ -97,6 +115,9 @@ importers:
       '@ai-game-playbook/core':
         specifier: workspace:*
         version: link:../core
+      '@ai-game-playbook/godot-adapter':
+        specifier: workspace:*
+        version: link:../godot-adapter
       '@ai-game-playbook/project-runtime':
         specifier: workspace:*
         version: link:../project-runtime

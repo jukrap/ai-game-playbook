@@ -4,6 +4,7 @@ import {
   BUILTIN_REGISTRY_SURFACES,
   validateRegisteredContractValue,
 } from "@ai-game-playbook/registry";
+import { runGodotEngineStatus } from "@ai-game-playbook/godot-adapter";
 import { isAbsolute, resolve } from "node:path";
 
 import { runDoctor } from "./doctor.js";
@@ -137,6 +138,23 @@ function projectInspectHelpText(): string {
   ].join("\n");
 }
 
+function engineStatusHelpText(): string {
+  return [
+    "Usage: agpb engine status --engine godot [--project <path>] [--json]",
+    "",
+    "Inspect static Godot project compatibility without running or locating an engine.",
+    "",
+    "Options:",
+    "  --engine godot   Select the implemented static Godot adapter",
+    "  --project <path> Select a project root; defaults to the current directory",
+    "  --json           Emit the registered engine status report as canonical JSON",
+    "  -h, --help       Show command help",
+    "",
+    "Host executable discovery and explicit executable paths are unavailable on this surface.",
+    "",
+  ].join("\n");
+}
+
 function skillListHelpText(): string {
   return [
     "Usage: agpb skill list [--project <path>] [--json]",
@@ -172,6 +190,13 @@ function skillCheckHelpText(): string {
 interface ParsedDoctorArguments {
   readonly json: boolean;
   readonly projectRoot: string;
+  readonly help: boolean;
+}
+
+interface ParsedEngineStatusArguments {
+  readonly json: boolean;
+  readonly projectRoot: string;
+  readonly engine: "godot";
   readonly help: boolean;
 }
 
@@ -343,6 +368,87 @@ function parseProjectInspectArguments(
   return Object.freeze({ json, projectRoot, help });
 }
 
+function parseEngineStatusArguments(
+  args: readonly string[],
+  cwd: string,
+): ParsedEngineStatusArguments | CliRunResult {
+  let json = false;
+  let help = false;
+  let projectValue: string | undefined;
+  let engineValue: string | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (value === "--json") {
+      if (json) {
+        return result(CLI_EXIT_CODES.usage, "", "Option --json was repeated.\n");
+      }
+      json = true;
+      continue;
+    }
+    if (value === "-h" || value === "--help") {
+      help = true;
+      continue;
+    }
+    if (value === "--project" || value === "--engine") {
+      const next = args[index + 1];
+      if (next === undefined || next.startsWith("-")) {
+        return result(
+          CLI_EXIT_CODES.usage,
+          "",
+          `Option ${value} requires one value.\n`,
+        );
+      }
+      if (value === "--project") {
+        if (projectValue !== undefined) {
+          return result(
+            CLI_EXIT_CODES.usage,
+            "",
+            "Option --project was repeated.\n",
+          );
+        }
+        projectValue = next;
+      } else {
+        if (engineValue !== undefined) {
+          return result(
+            CLI_EXIT_CODES.usage,
+            "",
+            "Option --engine was repeated.\n",
+          );
+        }
+        engineValue = next;
+      }
+      index += 1;
+      continue;
+    }
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Unknown engine status option.\n${engineStatusHelpText()}`,
+    );
+  }
+  if (!help && engineValue === undefined) {
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Option --engine godot is required.\n${engineStatusHelpText()}`,
+    );
+  }
+  if (engineValue !== undefined && engineValue !== "godot") {
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Only --engine godot is implemented.\n${engineStatusHelpText()}`,
+    );
+  }
+  const projectRoot =
+    projectValue === undefined
+      ? cwd
+      : isAbsolute(projectValue)
+        ? projectValue
+        : resolve(cwd, projectValue);
+  return Object.freeze({ json, projectRoot, engine: "godot", help });
+}
+
 function parseSkillArguments(
   args: readonly string[],
   cwd: string,
@@ -471,6 +577,36 @@ function humanProjectInspectReport(
   }
   lines.push(
     "Static inspection only: no Git status, process inventory, Editor connection, or support-grade promotion.",
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+function humanEngineStatusReport(
+  report: Awaited<ReturnType<typeof runGodotEngineStatus>>,
+): string {
+  const lines = [
+    "AI Game Playbook engine status",
+    `Status: ${report.status}`,
+    "Files changed: 0",
+    `Engine: ${report.engine}`,
+    `Project: ${report.project.canonicalPath ?? report.project.requestedPath}`,
+    `Project state: ${report.project.status}`,
+    `Target version: ${report.compatibility.targetVersion}`,
+    `Compatibility: ${report.compatibility.status}`,
+    `Executable: ${report.executable.status}`,
+    `Support: ${report.support.grade} (${report.support.evidenceGrade})`,
+  ];
+  for (const issue of report.issues) {
+    lines.push(
+      "",
+      `${issue.severity.toUpperCase().padEnd(9)} ${issue.code}  ${issue.message}`,
+      `          Next: ${issue.nextAction}`,
+    );
+  }
+  lines.push(
+    "",
+    `Status digest: ${report.statusDigest}`,
+    "Static project inspection only: no host executable read, process launch, Editor control, or support-grade promotion.",
   );
   return `${lines.join("\n")}\n`;
 }
@@ -725,6 +861,69 @@ async function dispatchProjectInspect(
   }
 }
 
+async function dispatchEngineStatus(
+  args: readonly string[],
+  options: CliRuntimeOptions,
+): Promise<CliRunResult> {
+  const parsed = parseEngineStatusArguments(
+    args,
+    options.cwd ?? process.cwd(),
+  );
+  if ("exitCode" in parsed) return parsed;
+  if (parsed.help) return result(CLI_EXIT_CODES.success, engineStatusHelpText());
+
+  const descriptor = BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "engine.status",
+  );
+  if (descriptor === undefined) {
+    return result(
+      CLI_EXIT_CODES.failure,
+      "",
+      "The engine status command is unavailable in the runtime registry.\n",
+    );
+  }
+  let input: ReturnType<typeof validateRegisteredContractValue>;
+  try {
+    input = validateRegisteredContractValue(
+      BUILTIN_REGISTRY,
+      descriptor.input,
+      {
+        schemaVersion: "1.0.0",
+        projectRoot: parsed.projectRoot,
+        engine: parsed.engine,
+      },
+    );
+  } catch {
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      "Engine status input is outside the registered argument contract.\n",
+    );
+  }
+  try {
+    const report = await runWithDeadline(
+      () => runGodotEngineStatus(input),
+      descriptor.timeoutMs,
+    );
+    return result(
+      report.status === "blocked"
+        ? CLI_EXIT_CODES.blocked
+        : CLI_EXIT_CODES.success,
+      parsed.json
+        ? `${canonicalizeJson(report)}\n`
+        : humanEngineStatusReport(report),
+    );
+  } catch (error) {
+    return result(
+      CLI_EXIT_CODES.failure,
+      "",
+      error instanceof CliDeadlineError
+        ? "Engine status exceeded its registered deadline without producing a report.\n"
+        : "Engine status failed before it could produce a validated report.\n",
+    );
+  }
+}
+
 async function dispatchSkillList(
   args: readonly string[],
   options: CliRuntimeOptions,
@@ -853,6 +1052,16 @@ export async function runCli(
   }
   if (args[0] === "init") {
     return dispatchInit(args.slice(1), options);
+  }
+  if (args[0] === "engine") {
+    if (args[1] === "status") {
+      return dispatchEngineStatus(args.slice(2), options);
+    }
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Unknown engine command.\n${engineStatusHelpText()}`,
+    );
   }
   if (args[0] === "project") {
     if (args[1] === "inspect") {

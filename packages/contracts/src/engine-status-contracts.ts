@@ -52,8 +52,7 @@ export type EngineStatusVersionPrecision = "exact" | "major-minor" | "unknown";
 export interface EngineStatusRequest {
   readonly schemaVersion: SemanticVersion;
   readonly projectRoot: string;
-  readonly engine: EngineId;
-  readonly executablePath?: string;
+  readonly engine: "godot";
 }
 
 export interface EngineStatusVersionObservation {
@@ -634,13 +633,12 @@ export const engineStatusRequestSchema: VersionedContractSchema =
     version: "1.0.0",
     title: "Engine Status Request",
     description:
-      "Selects one project, engine, and optional explicit executable candidate for bounded status inspection.",
+      "Selects one project and the static Godot adapter for bounded status inspection without host-tool input.",
     schema: contractRoot(
       {
         schemaVersion: reference("semanticVersion"),
         projectRoot: localPath,
-        engine: reference("engineId"),
-        executablePath: localPath,
+        engine: { const: "godot" },
       },
       ["schemaVersion", "projectRoot", "engine"],
     ),

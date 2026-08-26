@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -208,6 +208,48 @@ test("skill tools bind the generated registry handlers and remain write-free", a
     assert.equal(checked.structuredContent?.status, "attention");
     assert.equal(checked.structuredContent?.mutationPerformed, false);
     assert.deepEqual(await readdir(root), before);
+  });
+});
+
+test("engine status MCP tool is project-bound and cannot read a host executable", async () => {
+  await withProject(async (root) => {
+    await writeFile(
+      join(root, "project.godot"),
+      'config_version=5\nconfig/features=PackedStringArray("4.7")\n',
+      "utf8",
+    );
+    const before = await readdir(root);
+    const plan = await createMcpRuntimePlan({
+      projectRoot: root,
+      enabledTools: ["agpb_engine__status"],
+      allowHostDisclosure: true,
+    });
+
+    const status = await invokeMcpTool(plan, {
+      name: "agpb_engine__status",
+      arguments: {
+        schemaVersion: "1.0.0",
+        projectRoot: root,
+        engine: "godot",
+      },
+    });
+    assert.equal(status.isError, undefined);
+    assert.equal(status.structuredContent?.commandId, "engine.status");
+    assert.equal(status.structuredContent?.support.grade, "planned");
+    assert.equal(status.structuredContent?.externalProcessStarted, false);
+    assert.deepEqual(await readdir(root), before);
+
+    const denied = await invokeMcpTool(plan, {
+      name: "agpb_engine__status",
+      arguments: {
+        schemaVersion: "1.0.0",
+        projectRoot: root,
+        engine: "godot",
+        executablePath: process.execPath,
+      },
+    });
+    assert.equal(denied.isError, true);
+    assert.match(denied.content[0]?.text ?? "", /mcp-command-input-invalid/u);
   });
 });
 

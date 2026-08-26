@@ -451,7 +451,7 @@ function validateProfileAssessment(value: ProjectProfileAssessment): void {
       throw new TypeError("profile candidate digest is invalid");
     }
     if (
-      value.status === "valid" &&
+      ["valid", "mismatch"].includes(value.status) &&
       value.candidate.engine.projectIdentityDigest !==
         computeGameProjectIdentityDigest({
           projectId: value.candidate.projectId,

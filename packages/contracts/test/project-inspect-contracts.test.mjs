@@ -454,6 +454,33 @@ test("bounded inspection can report an unreadable profile without inventing a di
   );
 });
 
+test("mismatch assessments still require an internally valid profile identity", () => {
+  const base = reportFields();
+  const candidate = {
+    ...profile(),
+    engine: {
+      ...profile().engine,
+      projectIdentityDigest: `sha256:${"0".repeat(64)}`,
+    },
+  };
+
+  assert.throws(
+    () =>
+      contracts.summarizeProjectInspection({
+        ...base,
+        profile: {
+          status: "mismatch",
+          path: ".ai-game-playbook/profile.json",
+          fileDigest: profileFileDigest,
+          candidateDigest: contracts.digestCanonicalJson(candidate),
+          candidate,
+          reason: "The profile contradicts the observed marker.",
+        },
+      }),
+    TypeError,
+  );
+});
+
 test("unbound inspection reports cannot carry observations or an attested digest", () => {
   const fields = {
     project: { requestedPath: "D:\\games\\missing" },

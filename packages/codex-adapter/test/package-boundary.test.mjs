@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+
+import { BUILTIN_REGISTRY_SURFACES } from "../../registry/dist/index.js";
 
 const readJson = async (url) => JSON.parse(await readFile(url, "utf8"));
 
@@ -26,6 +29,7 @@ test("the Codex adapter is private and keeps a one-way workspace boundary", asyn
       import: "./dist/index.js",
     },
   });
+  assert.deepEqual(packageJson.files, ["dist", "skills"]);
   assert.deepEqual(tsconfig.references, [
     { path: "../contracts" },
     { path: "../registry" },
@@ -36,4 +40,26 @@ test("the Codex adapter is private and keeps a one-way workspace boundary", asyn
     root.references.some(({ path }) => path === "./packages/codex-adapter"),
     true,
   );
+});
+
+test("the packaged Codex skill bytes match the generated registry route", async () => {
+  const routes = BUILTIN_REGISTRY_SURFACES.skills.data.routes;
+  assert.equal(routes.length, 1);
+
+  const [route] = routes;
+  assert.equal(route.id, "project.inspection");
+  assert.equal(route.body.path, "skills/project-inspection/SKILL.md");
+
+  const content = await readFile(
+    new URL("../skills/project-inspection/SKILL.md", import.meta.url),
+    "utf8",
+  );
+  const digest = `sha256:${createHash("sha256").update(content).digest("hex")}`;
+  assert.equal(digest, route.body.digest);
+  assert.match(
+    content,
+    /^---\nname: project-inspection\ndescription: Use when [^\n]+\n---\n/u,
+  );
+  assert.equal(content.includes("\r"), false);
+  assert.equal(content.endsWith("\n"), true);
 });

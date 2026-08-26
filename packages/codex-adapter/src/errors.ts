@@ -7,6 +7,7 @@ export type CodexSetupBoundaryErrorCode =
   | "codex-setup-registry-drift"
   | "codex-setup-runtime-drift"
   | "codex-setup-runtime-invalid"
+  | "codex-setup-skill-artifact-invalid"
   | "codex-setup-target-unsafe";
 
 export class CodexSetupBoundaryError extends Error {

@@ -10,8 +10,11 @@ export {
 export type {
   CodexProjectSetupInspection,
   CodexProjectSetupPlan,
+  CodexSetupFileTargetInspection,
   CodexSetupTargetCode,
   CodexSkillTarget,
+  CodexSkillTargetInspection,
   CreateCodexProjectSetupPlanOptions,
 } from "./setup.js";
 export { CODEX_MCP_ENTRY_MAX_BYTES } from "./runtime-entry.js";
+export { CODEX_SKILL_MAX_BYTES } from "./skill-artifact.js";

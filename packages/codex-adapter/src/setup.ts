@@ -37,10 +37,15 @@ import {
   snapshotRuntimeEntry,
   type RuntimeEntrySnapshot,
 } from "./runtime-entry.js";
+import {
+  CODEX_SKILL_MAX_BYTES,
+  skillArtifactMatches,
+  snapshotSkillArtifact,
+  type SkillArtifactSnapshot,
+} from "./skill-artifact.js";
 
 export const CODEX_CONFIG_PATH = ".codex/config.toml" as const;
 export const CODEX_CONFIG_MAX_BYTES: number = 256 * 1024;
-const CODEX_CONFIG_PARENT = ".codex" as const;
 const SERVER_NAME = "ai_game_playbook" as const;
 const STARTUP_TIMEOUT_SECONDS = 10;
 const MINIMUM_NODE_VERSION = parseSemanticVersion("22.22.0").value;
@@ -57,10 +62,13 @@ export interface CreateCodexProjectSetupPlanOptions {
 
 export interface CodexSkillTarget {
   readonly id: string;
+  readonly name: string;
   readonly path: string;
   readonly sourcePath: string;
   readonly sourceDigest: Sha256Digest;
-  readonly materialization: "not-implemented";
+  readonly maxBytes: number;
+  readonly content: string;
+  readonly materialization: "plan-only";
 }
 
 export interface CodexProjectSetupPlan {
@@ -108,19 +116,27 @@ export type CodexSetupTargetCode =
   | "target-current"
   | "target-missing";
 
+export interface CodexSetupFileTargetInspection<Path extends string = string> {
+  readonly path: Path;
+  readonly action: "create" | "retain" | "conflict";
+  readonly code: CodexSetupTargetCode;
+  readonly expectedDigest: Sha256Digest;
+  readonly actualDigest?: Sha256Digest;
+  readonly bytes?: number;
+}
+
+export interface CodexSkillTargetInspection
+  extends CodexSetupFileTargetInspection<string> {
+  readonly id: string;
+  readonly name: string;
+}
+
 export interface CodexProjectSetupInspection {
   readonly schemaVersion: "1.0.0";
   readonly planDigest: Sha256Digest;
   readonly projectIdentityDigest: Sha256Digest;
-  readonly target: {
-    readonly path: typeof CODEX_CONFIG_PATH;
-    readonly action: "create" | "retain" | "conflict";
-    readonly code: CodexSetupTargetCode;
-    readonly expectedDigest: Sha256Digest;
-    readonly actualDigest?: Sha256Digest;
-    readonly bytes?: number;
-  };
-  readonly skillTargets: readonly CodexSkillTarget[];
+  readonly target: CodexSetupFileTargetInspection<typeof CODEX_CONFIG_PATH>;
+  readonly skillTargets: readonly CodexSkillTargetInspection[];
   readonly mutationPerformed: false;
 }
 
@@ -129,6 +145,7 @@ interface SetupPlanState {
   readonly node: BoundProcessExecutable;
   readonly entry: RuntimeEntrySnapshot;
   readonly mcp: McpRuntimePlan;
+  readonly skills: readonly SkillArtifactSnapshot[];
 }
 
 const setupPlanStates = new WeakMap<object, SetupPlanState>();
@@ -250,18 +267,52 @@ function renderConfig(
   ].join("\n");
 }
 
-function skillTargets(): readonly CodexSkillTarget[] {
-  return Object.freeze(
-    BUILTIN_REGISTRY_SURFACES.skills.data.routes.map((route) =>
+async function createSkillTargets(): Promise<{
+  readonly targets: readonly CodexSkillTarget[];
+  readonly snapshots: readonly SkillArtifactSnapshot[];
+}> {
+  const targets: CodexSkillTarget[] = [];
+  const snapshots: SkillArtifactSnapshot[] = [];
+  const names = new Set<string>();
+  for (const route of BUILTIN_REGISTRY_SURFACES.skills.data.routes) {
+    const match = /^skills\/([a-z0-9]+(?:-[a-z0-9]+)*)\/SKILL\.md$/u.exec(
+      route.body.path,
+    );
+    const name = match?.[1];
+    if (name === undefined || names.has(name)) {
+      throw new CodexSetupBoundaryError(
+        "codex-setup-registry-drift",
+        "Codex skill routing contains an invalid or colliding target.",
+      );
+    }
+    names.add(name);
+    const source = fileURLToPath(
+      new URL(`../${route.body.path}`, import.meta.url),
+    );
+    const snapshot = await snapshotSkillArtifact({
+      path: source,
+      expectedName: name,
+      expectedDigest: route.body.digest,
+      maxBytes: CODEX_SKILL_MAX_BYTES,
+    });
+    snapshots.push(snapshot);
+    targets.push(
       Object.freeze({
         id: route.id,
-        path: `.agents/skills/${route.id}/SKILL.md`,
+        name,
+        path: `.agents/skills/${name}/SKILL.md`,
         sourcePath: route.body.path,
-        sourceDigest: route.body.digest,
-        materialization: "not-implemented" as const,
+        sourceDigest: snapshot.digest,
+        maxBytes: CODEX_SKILL_MAX_BYTES,
+        content: snapshot.content,
+        materialization: "plan-only" as const,
       }),
-    ),
-  );
+    );
+  }
+  return Object.freeze({
+    targets: Object.freeze(targets),
+    snapshots: Object.freeze(snapshots),
+  });
 }
 
 function currentNodeVersion(): SemanticVersion {
@@ -349,6 +400,7 @@ export async function createCodexProjectSetupPlan(
       "Codex setup registry and MCP surface are not exact.",
     );
   }
+  const skills = await createSkillTargets();
 
   const content = renderConfig(root, node, entry, mcp);
   const target = {
@@ -408,14 +460,17 @@ export async function createCodexProjectSetupPlan(
       enabledTools: Object.freeze(mcp.enabledTools.map(({ name }) => name)),
     },
     target,
-    skillTargets: skillTargets(),
+    skillTargets: skills.targets,
     mutationPerformed: false as const,
   });
   const plan: CodexProjectSetupPlan = deepFreeze({
     ...fields,
     planDigest: digestCanonicalJson(fields),
   });
-  setupPlanStates.set(plan, Object.freeze({ root, node, entry, mcp }));
+  setupPlanStates.set(
+    plan,
+    Object.freeze({ root, node, entry, mcp, skills: skills.snapshots }),
+  );
   return plan;
 }
 
@@ -452,6 +507,17 @@ async function assertRuntimeState(state: SetupPlanState): Promise<void> {
     if (!runtimeEntryMatches(state.entry, currentEntry)) {
       throw new Error("entrypoint drift");
     }
+    for (const skill of state.skills) {
+      const currentSkill = await snapshotSkillArtifact({
+        path: skill.canonicalPath,
+        expectedName: skill.name,
+        expectedDigest: skill.digest,
+        maxBytes: CODEX_SKILL_MAX_BYTES,
+      });
+      if (!skillArtifactMatches(skill, currentSkill)) {
+        throw new Error("skill artifact drift");
+      }
+    }
   } catch {
     throw new CodexSetupBoundaryError(
       "codex-setup-runtime-drift",
@@ -463,13 +529,14 @@ async function assertRuntimeState(state: SetupPlanState): Promise<void> {
 function targetResult(
   plan: CodexProjectSetupPlan,
   target: CodexProjectSetupInspection["target"],
+  skillTargets: readonly CodexSkillTargetInspection[],
 ): CodexProjectSetupInspection {
   return deepFreeze({
     schemaVersion: "1.0.0" as const,
     planDigest: plan.planDigest,
     projectIdentityDigest: plan.project.identityDigest,
     target,
-    skillTargets: plan.skillTargets,
+    skillTargets,
     mutationPerformed: false as const,
   });
 }
@@ -478,15 +545,16 @@ async function finishInspection(
   plan: CodexProjectSetupPlan,
   state: SetupPlanState,
   target: CodexProjectSetupInspection["target"],
+  skillTargets: readonly CodexSkillTargetInspection[],
 ): Promise<CodexProjectSetupInspection> {
   await assertRuntimeState(state);
-  return targetResult(plan, target);
+  return targetResult(plan, target, skillTargets);
 }
 
 function targetUnsafe(): never {
   throw new CodexSetupBoundaryError(
     "codex-setup-target-unsafe",
-    "Codex project configuration target is linked, aliased, or type-conflicted.",
+    "Codex project setup target is linked, aliased, or type-conflicted.",
   );
 }
 
@@ -499,33 +567,48 @@ function isBudgetError(error: unknown): boolean {
   );
 }
 
-export async function inspectCodexProjectSetup(
-  plan: CodexProjectSetupPlan,
-): Promise<CodexProjectSetupInspection> {
-  const state = stateFor(plan);
-  await assertRuntimeState(state);
+interface ProjectFileExpectation<Path extends string> {
+  readonly path: Path;
+  readonly maxBytes: number;
+  readonly expectedDigest: Sha256Digest;
+}
 
-  let parent;
-  try {
-    parent = await resolveProjectPath(state.root, CODEX_CONFIG_PARENT, {
-      expectedType: "directory",
-      existence: "optional",
-    });
-  } catch {
-    targetUnsafe();
-  }
-  if (parent.kind === "absent") {
-    return finishInspection(plan, state, {
-      path: CODEX_CONFIG_PATH,
-      action: "create",
-      code: "target-missing",
-      expectedDigest: plan.target.contentDigest,
-    });
+function parentPaths(path: string): readonly string[] {
+  const segments = path.split("/");
+  return Object.freeze(
+    segments
+      .slice(0, -1)
+      .map((_, index) => segments.slice(0, index + 1).join("/")),
+  );
+}
+
+async function inspectProjectFileTarget<Path extends string>(
+  root: CanonicalProjectRoot,
+  expectation: ProjectFileExpectation<Path>,
+): Promise<CodexSetupFileTargetInspection<Path>> {
+  for (const parentPath of parentPaths(expectation.path)) {
+    let parent;
+    try {
+      parent = await resolveProjectPath(root, parentPath, {
+        expectedType: "directory",
+        existence: "optional",
+      });
+    } catch {
+      targetUnsafe();
+    }
+    if (parent.kind === "absent") {
+      return Object.freeze({
+        path: expectation.path,
+        action: "create" as const,
+        code: "target-missing" as const,
+        expectedDigest: expectation.expectedDigest,
+      });
+    }
   }
 
   let target;
   try {
-    target = await resolveProjectPath(state.root, CODEX_CONFIG_PATH, {
+    target = await resolveProjectPath(root, expectation.path, {
       expectedType: "file",
       existence: "optional",
     });
@@ -533,39 +616,70 @@ export async function inspectCodexProjectSetup(
     targetUnsafe();
   }
   if (target.kind === "absent") {
-    return finishInspection(plan, state, {
-      path: CODEX_CONFIG_PATH,
-      action: "create",
-      code: "target-missing",
-      expectedDigest: plan.target.contentDigest,
+    return Object.freeze({
+      path: expectation.path,
+      action: "create" as const,
+      code: "target-missing" as const,
+      expectedDigest: expectation.expectedDigest,
     });
   }
 
   let snapshot;
   try {
     snapshot = await readProjectFileSnapshot({
-      root: state.root,
-      path: CODEX_CONFIG_PATH,
-      maxBytes: plan.target.maxBytes,
+      root,
+      path: expectation.path,
+      maxBytes: expectation.maxBytes,
     });
   } catch (error) {
     if (isBudgetError(error)) {
-      return finishInspection(plan, state, {
-        path: CODEX_CONFIG_PATH,
-        action: "conflict",
-        code: "target-byte-budget-exceeded",
-        expectedDigest: plan.target.contentDigest,
+      return Object.freeze({
+        path: expectation.path,
+        action: "conflict" as const,
+        code: "target-byte-budget-exceeded" as const,
+        expectedDigest: expectation.expectedDigest,
       });
     }
     targetUnsafe();
   }
-  const current = snapshot.digest === plan.target.contentDigest;
-  return finishInspection(plan, state, {
-    path: CODEX_CONFIG_PATH,
-    action: current ? "retain" : "conflict",
-    code: current ? "target-current" : "target-content-conflict",
-    expectedDigest: plan.target.contentDigest,
+  const current = snapshot.digest === expectation.expectedDigest;
+  return Object.freeze({
+    path: expectation.path,
+    action: current ? ("retain" as const) : ("conflict" as const),
+    code: current
+      ? ("target-current" as const)
+      : ("target-content-conflict" as const),
+    expectedDigest: expectation.expectedDigest,
     actualDigest: snapshot.digest,
     bytes: snapshot.bytes,
   });
+}
+
+export async function inspectCodexProjectSetup(
+  plan: CodexProjectSetupPlan,
+): Promise<CodexProjectSetupInspection> {
+  const state = stateFor(plan);
+  await assertRuntimeState(state);
+  const target = await inspectProjectFileTarget(state.root, {
+    path: CODEX_CONFIG_PATH,
+    maxBytes: plan.target.maxBytes,
+    expectedDigest: plan.target.contentDigest,
+  });
+  const skillTargets: CodexSkillTargetInspection[] = [];
+  for (const skill of plan.skillTargets) {
+    const inspected = await inspectProjectFileTarget(state.root, {
+      path: skill.path,
+      maxBytes: skill.maxBytes,
+      expectedDigest: skill.sourceDigest,
+    });
+    skillTargets.push(
+      Object.freeze({ id: skill.id, name: skill.name, ...inspected }),
+    );
+  }
+  return finishInspection(
+    plan,
+    state,
+    target,
+    Object.freeze(skillTargets),
+  );
 }

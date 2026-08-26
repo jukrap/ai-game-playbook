@@ -107,6 +107,36 @@ test("builtin generated surfaces preserve implemented schema and command identit
   );
 });
 
+test("the builtin registry routes one bounded project inspection skill", () => {
+  assert.deepEqual(
+    registry.BUILTIN_REGISTRY.skills.map(({ id }) => id),
+    ["project.inspection"],
+  );
+
+  const skill = registry.BUILTIN_REGISTRY.skills[0];
+  assert.equal(skill.lifecycle, "stable");
+  assert.equal(skill.invocation, "model");
+  assert.deepEqual(skill.capabilities, ["project.inspect"]);
+  assert.deepEqual(skill.requiredPermissions, ["read-project"]);
+  assert.equal(skill.body.path, "skills/project-inspection/SKILL.md");
+  assert.match(skill.body.digest, digestPattern);
+  assert.equal(skill.body.maxTokens, 800);
+  assert.deepEqual(skill.references, []);
+  assert.equal(skill.triggers.every((trigger) => trigger.startsWith("Use when")), true);
+  assert.equal(skill.exclusions.length > 0, true);
+  assert.equal(skill.completionCriteria.length > 0, true);
+  assert.equal(skill.evidenceDuties.length > 0, true);
+
+  assert.deepEqual(
+    registry.BUILTIN_REGISTRY_SURFACES.skills.data.routes.map(({ id }) => id),
+    ["project.inspection"],
+  );
+  assert.equal(
+    registry.BUILTIN_REGISTRY_SURFACES.skills.data.routes[0].body.digest,
+    skill.body.digest,
+  );
+});
+
 test("builtin registry validates implemented input and output values", () => {
   const doctor = registry.BUILTIN_REGISTRY.commands[0];
   const request = registry.validateRegisteredContractValue(

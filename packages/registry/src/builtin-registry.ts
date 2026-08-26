@@ -14,6 +14,7 @@ import {
   type CommandDescriptor,
   type PermissionClass,
   type ProjectStage,
+  type SkillDescriptor,
 } from "@ai-game-playbook/contracts";
 
 import { generateRegistrySurfaces } from "./generation.js";
@@ -181,6 +182,42 @@ const projectInspectCommand: CommandDescriptor = Object.freeze({
   }),
 });
 
+const projectInspectionSkill: SkillDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("project.inspection"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "stable",
+  invocation: "model",
+  summary:
+    "Inspect one local game project's static identity before choosing later work.",
+  triggers: Object.freeze([
+    "Use when a local Godot, Unity, or Unreal project must be identified before planning changes.",
+    "Use when engine, project profile, or static Editor marker evidence is missing or ambiguous.",
+  ]),
+  exclusions: Object.freeze([
+    "Do not use for live Editor control, process discovery, builds, playtests, mutation, or support verification.",
+  ]),
+  capabilities: Object.freeze([parseStableId("project.inspect")]),
+  supportedStages: supportedStages(),
+  requiredPermissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  body: Object.freeze({
+    path: "skills/project-inspection/SKILL.md",
+    digest: parseSha256Digest(
+      "sha256:690277cd4d7862e3057f93d58f01a8415e84b5c63c853df68c06ac47605f954b",
+    ),
+    maxTokens: 800,
+  }),
+  references: Object.freeze([]),
+  completionCriteria: Object.freeze([
+    "Report the bound project and observed engine candidate state without mutation.",
+    "Preserve every unknown, attention, blocked, and unverified result.",
+  ]),
+  evidenceDuties: Object.freeze([
+    "Use the registered project inspection report as the complete evidence boundary for this step.",
+    "State that no live Editor, runtime frame, build, or engine support grade was verified.",
+  ]),
+});
+
 const definition: RegistryDefinition = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   controlPlaneVersion: parseSemanticVersion("0.0.0").value,
@@ -196,7 +233,7 @@ const definition: RegistryDefinition = Object.freeze({
     runReceiptSchema,
   ]),
   commands: Object.freeze([doctorCommand, initCommand, projectInspectCommand]),
-  skills: Object.freeze([]),
+  skills: Object.freeze([projectInspectionSkill]),
   roleLenses: Object.freeze([]),
   workflows: Object.freeze([]),
   packs: Object.freeze([]),

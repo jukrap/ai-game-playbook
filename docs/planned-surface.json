@@ -1,10 +1,10 @@
 {
   "schemaVersion": "1",
   "artifact": "ai-game-playbook-planned-surface",
-  "reviewedAt": "2026-08-26",
+  "reviewedAt": "2026-08-27",
   "implementationStatus": "partial",
   "executableAvailable": true,
-  "runtimeRegistryDigest": "sha256:bec20aa9a410f001106c291febeaf2e252d115e52610a0d4ad8e1d789e8fc317",
+  "runtimeRegistryDigest": "sha256:372417bc8dd01a1603cabeeb075c01fe78fa37f2b9054f9288adc1ea4d49380a",
   "package": {
     "npm": "ai-game-playbook",
     "executable": "agpb"

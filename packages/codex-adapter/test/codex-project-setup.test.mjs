@@ -88,7 +88,21 @@ test("setup planning emits one deterministic local-only config without writing",
   assert.match(plan.target.content, /default_tools_approval_mode = "prompt"/u);
   assert.match(plan.target.content, /--allow-host-disclosure/u);
   assert.match(plan.target.content, /enabled_tools = \["agpb_doctor", "agpb_project__inspect"\]/u);
-  assert.deepEqual(plan.skillTargets, []);
+  assert.equal(plan.skillTargets.length, 1);
+  const skillTarget = plan.skillTargets[0];
+  assert.equal(skillTarget.id, "project.inspection");
+  assert.equal(skillTarget.name, "project-inspection");
+  assert.equal(
+    skillTarget.path,
+    ".agents/skills/project-inspection/SKILL.md",
+  );
+  assert.equal(skillTarget.sourcePath, "skills/project-inspection/SKILL.md");
+  assert.match(skillTarget.sourceDigest, /^sha256:[0-9a-f]{64}$/u);
+  assert.equal(skillTarget.maxBytes, 65_536);
+  assert.equal(skillTarget.materialization, "plan-only");
+  assert.equal(skillTarget.content.startsWith("---\nname: project-inspection\n"), true);
+  assert.equal(skillTarget.content.includes("\r"), false);
+  assert.equal(skillTarget.content.endsWith("\n"), true);
   assert.deepEqual(
     plan.skillTargets.map(({ id }) => id),
     BUILTIN_REGISTRY_SURFACES.skills.data.routes.map(({ id }) => id),
@@ -180,6 +194,53 @@ test("inspection distinguishes create, retain, and conflict without mutation", a
   assert.equal(oversized.target.actualDigest, undefined);
 });
 
+test("skill targets are planned and inspected without mutation", async (t) => {
+  const { project } = await fixture(t);
+  const plan = await createPlan(project);
+  const [skillPlan] = plan.skillTargets;
+
+  const missing = await inspectCodexProjectSetup(plan);
+  assert.equal(missing.skillTargets.length, 1);
+  assert.equal(missing.skillTargets[0].id, "project.inspection");
+  assert.equal(missing.skillTargets[0].action, "create");
+  assert.equal(missing.skillTargets[0].code, "target-missing");
+  assert.deepEqual(await readdir(project), []);
+
+  const skillDirectory = join(
+    project,
+    ".agents",
+    "skills",
+    "project-inspection",
+  );
+  await mkdir(skillDirectory, { recursive: true });
+  const skillPath = join(skillDirectory, "SKILL.md");
+  await writeFile(skillPath, skillPlan.content);
+
+  const current = await inspectCodexProjectSetup(plan);
+  assert.equal(current.skillTargets[0].action, "retain");
+  assert.equal(current.skillTargets[0].code, "target-current");
+  assert.equal(
+    current.skillTargets[0].actualDigest,
+    skillPlan.sourceDigest,
+  );
+
+  await appendFile(skillPath, "\nUser change.\n");
+  const conflict = await inspectCodexProjectSetup(plan);
+  assert.equal(conflict.skillTargets[0].action, "conflict");
+  assert.equal(conflict.skillTargets[0].code, "target-content-conflict");
+  assert.notEqual(
+    conflict.skillTargets[0].actualDigest,
+    skillPlan.sourceDigest,
+  );
+  assert.equal(conflict.mutationPerformed, false);
+
+  await writeFile(skillPath, Buffer.alloc(skillPlan.maxBytes + 1));
+  const oversized = await inspectCodexProjectSetup(plan);
+  assert.equal(oversized.skillTargets[0].action, "conflict");
+  assert.equal(oversized.skillTargets[0].code, "target-byte-budget-exceeded");
+  assert.equal(oversized.skillTargets[0].actualDigest, undefined);
+});
+
 test("unsafe config parents and case aliases fail closed", async (t) => {
   const linked = await fixture(t);
   const linkedPlan = await createPlan(linked.project);
@@ -207,6 +268,23 @@ test("unsafe config parents and case aliases fail closed", async (t) => {
       error instanceof CodexSetupBoundaryError &&
       error.code === "codex-setup-target-unsafe",
   );
+
+  const skillLinked = await fixture(t);
+  const skillLinkedPlan = await createPlan(skillLinked.project);
+  const skillOutside = join(skillLinked.sandbox, "skill-outside");
+  await mkdir(skillOutside);
+  await symlink(
+    skillOutside,
+    join(skillLinked.project, ".agents"),
+    process.platform === "win32" ? "junction" : "dir",
+  );
+  await assert.rejects(
+    () => inspectCodexProjectSetup(skillLinkedPlan),
+    (error) =>
+      error instanceof CodexSetupBoundaryError &&
+      error.code === "codex-setup-target-unsafe",
+  );
+  assert.deepEqual(await readdir(skillOutside), []);
 });
 
 test("runtime entrypoint snapshots detect drift and reject unsafe sizes", async (t) => {

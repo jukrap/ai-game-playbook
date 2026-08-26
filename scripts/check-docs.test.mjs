@@ -11,6 +11,9 @@ const workflowText = readFileSync(join(sourceRoot, ".github", "workflows", "docs
 if (!workflowText.includes('- "scripts/check-docs.test.mjs"')) {
   throw new Error("documentation CI must watch the regression suite path");
 }
+if (!workflowText.includes('- "generated/foundation-plan.json"')) {
+  throw new Error("documentation CI must watch the generated foundation plan");
+}
 
 const plannedSurfaceArtifact = JSON.parse(readFileSync(join(sourceRoot, "docs", "planned-surface.json"), "utf8"));
 if (plannedSurfaceArtifact.schemaVersion !== "1" || Object.hasOwn(plannedSurfaceArtifact, "$schema")) {

@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const workflowPath = new URL(
+const controlPlaneWorkflowPath = new URL(
   "../.github/workflows/control-plane.yml",
   import.meta.url,
 );
+const docsWorkflowPath = new URL("../.github/workflows/docs.yml", import.meta.url);
 
 test("control-plane CI runs the same locked verification on Windows and Linux", () => {
-  const workflow = readFileSync(workflowPath, "utf8");
+  const workflow = readFileSync(controlPlaneWorkflowPath, "utf8");
 
   assert.match(workflow, /permissions:\n  contents: read\n/);
   assert.match(workflow, /ubuntu-latest/);
@@ -22,8 +23,11 @@ test("control-plane CI runs the same locked verification on Windows and Linux", 
     /run: pnpm install --frozen-lockfile --ignore-scripts/,
   );
   assert.match(workflow, /run: pnpm verify/);
-  assert.match(workflow, /run: pnpm audit --prod/);
-  assert.match(workflow, /run: git diff --exit-code -- \./);
+  assert.match(workflow, /run: pnpm audit\n/);
+  assert.doesNotMatch(workflow, /pnpm audit --prod/);
+  assert.match(workflow, /run: pnpm run ci:check-clean/);
+  assert.match(workflow, /- "generated\/\*\*"/);
+  assert.match(workflow, /- "docs\/planned-surface\.json"/);
 
   const actionReferences = [...workflow.matchAll(/^\s*- uses: ([^\s]+)$/gm)].map(
     ([, value]) => value,
@@ -33,4 +37,17 @@ test("control-plane CI runs the same locked verification on Windows and Linux", 
     assert.match(actionReference, /^[^@\s]+@[0-9a-f]{40}$/);
   }
   assert.doesNotMatch(workflow, /pull_request_target/);
+});
+
+test("repository workflows do not persist checkout credentials", () => {
+  for (const candidateWorkflowPath of [controlPlaneWorkflowPath, docsWorkflowPath]) {
+    const workflow = readFileSync(candidateWorkflowPath, "utf8");
+    assert.match(
+      workflow,
+      /uses: actions\/checkout@[0-9a-f]{40}[^\r\n]*\r?\n\s+with:\r?\n\s+persist-credentials: false/,
+    );
+    assert.doesNotMatch(workflow, /persist-credentials: true/);
+    assert.doesNotMatch(workflow, /pull_request_target/);
+    assert.match(workflow, /node-version: 22\.23\.2/);
+  }
 });

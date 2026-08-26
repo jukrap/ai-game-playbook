@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "tsc -b --pretty false",
+    "ci:check-clean": "node scripts/check-worktree-clean.mjs",
     "docs:check": "node scripts/check-docs.mjs",
     "docs:test": "node scripts/check-docs.test.mjs",
     "plan:check": "node scripts/generate-foundation-plan.mjs --check",

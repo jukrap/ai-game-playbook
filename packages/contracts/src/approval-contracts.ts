@@ -21,6 +21,14 @@ export interface ApprovalGrantScope {
   readonly objectIds: readonly string[];
   readonly destinations: readonly string[];
   readonly dataClasses: readonly StableId[];
+  readonly changeKinds: readonly (
+    | "metadata"
+    | "source"
+    | "config"
+    | "scene"
+    | "asset"
+    | "test"
+  )[];
   readonly provider?: string;
   readonly model?: string;
   readonly publishTargets: readonly string[];
@@ -38,6 +46,7 @@ export interface ApprovalGrant {
   };
   readonly workflow?: {
     readonly id: StableId;
+    readonly stepId: StableId;
     readonly resolvedPlanDigest: Sha256Digest;
   };
   readonly command: {
@@ -70,7 +79,11 @@ export function computeApprovalGrantSigningDigest(
   grant: ApprovalGrantSigningDigestInput,
 ): Sha256Digest {
   const { signature: _signature, ...subject } = grant;
-  return digestCanonicalJson(subject);
+  return digestCanonicalJson({
+    domain: "ai-game-playbook.approval-grant",
+    version: "1",
+    subject,
+  });
 }
 
 export function isCanonicalApprovalDestination(value: string): boolean {
@@ -97,6 +110,7 @@ export function isCanonicalApprovalScope(scope: ApprovalGrantScope): boolean {
     scope.objectIds,
     scope.destinations,
     scope.dataClasses,
+    scope.changeKinds,
     scope.publishTargets,
   ];
   return arrays.every((values) =>
@@ -119,9 +133,10 @@ const featureBinding = closedObject(
 const workflowBinding = closedObject(
   {
     id: reference("stableId"),
+    stepId: reference("stableId"),
     resolvedPlanDigest: reference("sha256Digest"),
   },
-  ["id", "resolvedPlanDigest"],
+  ["id", "stepId", "resolvedPlanDigest"],
 );
 
 const commandBinding = closedObject(
@@ -160,11 +175,22 @@ const grantScope = closedObject(
       maximum: 64,
       unique: true,
     }),
+    changeKinds: boundedArray(
+      enumSchema(["metadata", "source", "config", "scene", "asset", "test"]),
+      { maximum: 6, unique: true },
+    ),
     provider: textSchema(200),
     model: textSchema(200),
     publishTargets: exactTextArray,
   },
-  ["paths", "objectIds", "destinations", "dataClasses", "publishTargets"],
+  [
+    "paths",
+    "objectIds",
+    "destinations",
+    "dataClasses",
+    "changeKinds",
+    "publishTargets",
+  ],
 );
 
 const grantBudgets = closedObject(
@@ -260,8 +286,11 @@ export const approvalGrantSchema: VersionedContractSchema =
               feature: featureBinding,
               scope: {
                 type: "object",
-                properties: { paths: { type: "array", minItems: 1 } },
-                required: ["paths"],
+                properties: {
+                  paths: { type: "array", minItems: 1 },
+                  changeKinds: { type: "array", minItems: 1 },
+                },
+                required: ["paths", "changeKinds"],
               },
             },
             required: ["feature"],

@@ -1,6 +1,6 @@
 # Security and Permissions
 
-> Status: planned permission policy. Early filesystem, process, and mutating-lane enforcement exists; the permission broker and editor or bridge enforcement do not.
+> Status: planned permission policy with an early private admission primitive. Filesystem, process, mutating-lane, and in-memory grant enforcement exist, but command dispatch and editor or bridge enforcement do not.
 
 [한국어](security-and-permissions.ko.md) · [Documentation](README.md)
 
@@ -20,6 +20,10 @@
 | Publish or release | Separate approval every time |
 
 Permission is evaluated by the control plane, not delegated to MCP annotations, a skill, an engine bridge, or a host UI. Approval is bound to project identity, command, scope, session when relevant, budgets, and expiration.
+
+The current private broker accepts only a registry instance validated in the same process. It validates the actual command payload against the registered input schema, binds its digest to the project, command/handler, registry, feature, workflow step, editor session, normalized targets, budgets, deadline, and run, and verifies domain-separated, one-permission Ed25519 grants against configured public keys. Sensitive grants are single-use; grants are reserved synchronously before an authorization lease is returned. Automatic admission is limited to bounded project reads, approved feature-source paths and change kinds, and registered test/build workflow steps that do not declare an approval checkpoint. Test/build authority does not imply project-file or editor-object mutation. Editor-object source mutations remain rejected until object operation types can be checked against the feature contract.
+
+Authorization is not execution. The primitive is not yet connected to the process runner, filesystem CAS, project lane, CLI, MCP, or an engine bridge. Grant use counts, active leases, and uncertainty barriers are memory-only and cannot survive restart; there is no approval UI, durable revocation/checkpoint store, recovery action, or secret-path classifier yet. A workflow plan digest is bound as supplied by the caller but is not independently attested until the workflow runtime exists. Memory, CPU, and GPU request budgets are rejected while runtime enforcement and accounting are unavailable. Reported effects are checked at settlement, and undeclared or malformed side-effect completion blocks later side effects in that broker instance, but a durable workflow must eventually preserve and reconcile the same state.
 
 ## Fail-closed stop conditions
 

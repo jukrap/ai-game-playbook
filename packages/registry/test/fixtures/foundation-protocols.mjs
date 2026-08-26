@@ -24,6 +24,7 @@ export const validFoundationProtocolFixtures = {
       objectIds: [],
       destinations: ["https://api.example.com"],
       dataClasses: [],
+      changeKinds: [],
       publishTargets: [],
     },
     budgets: {

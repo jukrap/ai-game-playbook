@@ -17,6 +17,7 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
-    "@ai-game-playbook/contracts": "workspace:*"
+    "@ai-game-playbook/contracts": "workspace:*",
+    "@ai-game-playbook/registry": "workspace:*"
   }
 }

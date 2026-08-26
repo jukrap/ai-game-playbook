@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: 6f1c3e2d44326aa4c97978d62fed337d3aa4d427f7317842e673cb97ed8041bf
+source_sha256: f3b3faf0492c3522812175dbcff713d469cd2f71d01d93b2159e4771d7361a4a
 translated_at: 2026-08-26
 ---
 
 # 목표 아키텍처
 
-> 상태: 목표 아키텍처입니다. `contracts`, `registry` 기반과 초기 `core` filesystem/process/mutating-lane 경계가 존재하며 나머지 runtime과 bridge 경계는 계획 단계입니다.
+> 상태: 목표 아키텍처입니다. `contracts`, `registry` 기반과 초기 `core` filesystem/process/mutating-lane/permission-admission 경계가 존재하며 나머지 runtime과 bridge 경계는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -27,7 +27,7 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 작성 원본입니다. 현재 generator는 CLI, MCP, help, 문서 metadata, host routing용으로 검증된 설계 projection을 생성합니다. runtime consumer는 아직 계획 단계입니다. 생성 표면은 권한을 부여하거나 capability를 지어낼 수 없습니다.
+typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 작성 원본입니다. 현재 generator는 CLI, MCP, help, 문서 metadata, host routing용으로 검증된 설계 projection을 생성합니다. private permission primitive는 검증된 command와 schema authority를 소비하지만 생성된 CLI/MCP/host 실행 consumer는 아직 계획 단계입니다. 생성 표면은 권한을 부여하거나 capability를 지어낼 수 없습니다.
 
 ## Workspace 경계
 
@@ -35,7 +35,7 @@ typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 | --- | --- | --- |
 | `contracts` | 기반 구현 | engine runtime dependency가 없는 versioned schema와 shared identifier |
 | `registry` | 기반 구현 | descriptor validation, generation, digest, routing, parity check |
-| `core` | 일부 구현 | canonical project identity, portable path 해석, staged filesystem compare-and-swap, digest 결합 direct process 실행, root/project 결합 mutating lease가 존재하며 permission, CPU/memory budget, parallel-read coordination, checkpoint, workflow state는 계획 단계 |
+| `core` | 일부 구현 | canonical project identity, portable path 해석, staged filesystem compare-and-swap, digest 결합 direct process 실행, root/project 결합 mutating lease, in-memory signed permission admission/settlement가 존재하며 dispatcher integration, durable approval, CPU/memory enforcement, parallel-read coordination, checkpoint, workflow state는 계획 단계 |
 | `cli` | 계획 | `agpb` argument parsing, local interaction, stable exit behavior, help |
 | `mcp` | 계획 | 동일 permission broker 뒤의 schema-derived tool과 resource |
 | `codex-adapter` | 계획 | skill, host routing metadata, project instruction integration |
@@ -61,7 +61,7 @@ typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 
 게임 project에는 `.ai-game-playbook/`을 둘 계획입니다. project profile, feature contract, policy는 commit 대상입니다. cache, log, screenshot, lock, local detail을 포함한 receipt, local secret, machine-specific configuration은 ignore합니다.
 
-write는 owned-path rule과 compare-and-swap preimage를 사용합니다. 현재 private core는 고정된 project-local lease 하나로 `project-write`, `editor-bound`, `build-bound` admission을 직렬화하지만 아직 Editor를 탐지하거나 제어하지는 않습니다. pack lifecycle operation은 계획 단계이며 promote 전에 change를 stage하고 non-owned file을 삭제하지 않도록 구현할 예정입니다. parallel read coordination도 아직 계획 단계입니다.
+write는 owned-path rule과 compare-and-swap preimage를 사용합니다. 현재 private core는 고정된 project-local lease 하나로 `project-write`, `editor-bound`, `build-bound` admission을 직렬화하지만 아직 Editor를 탐지하거나 제어하지는 않습니다. permission primitive는 검증된 registry에서 command를 resolve하고 실제 input schema를 검증하며 feature/workflow/session scope와 budget을 좁히고 exact signed grant를 memory에서 소비하며 보고된 undeclared effect를 거부합니다. 아직 lane 획득이나 command dispatch와 연결되지 않았고 approval consumption과 uncertainty barrier는 process restart를 넘어 보존되지 않습니다. pack lifecycle operation과 parallel read coordination도 계획 단계입니다.
 
 ## Host integration
 

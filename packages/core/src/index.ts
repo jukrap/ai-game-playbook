@@ -32,6 +32,28 @@ export {
   PROCESS_MAX_TERMINATION_GRACE_MS,
   runBoundedProcess,
 } from "./process-runner.js";
+export {
+  createApprovalGrantSubject,
+  createPermissionBroker,
+} from "./permission-broker.js";
+export type {
+  CreateApprovalGrantSubjectOptions,
+  PermissionActualEffects,
+  PermissionAuthorizationChallenge,
+  PermissionAuthorizationDecision,
+  PermissionAuthorizationLease,
+  PermissionAuthorizationRequest,
+  PermissionBroker,
+  PermissionBrokerOptions,
+  PermissionBrokerProject,
+  PermissionChallengeEntry,
+  PermissionSettlement,
+  PermissionSettlementInput,
+  PermissionSettlementOutcome,
+  PermissionWorkflowBinding,
+  TrustedApprovalKey,
+  UnsignedApprovalGrant,
+} from "./permission-broker.js";
 export type {
   BoundedProcessLimits,
   BoundedProcessOutcome,

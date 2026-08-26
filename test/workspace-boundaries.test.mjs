@@ -38,6 +38,7 @@ test("workspace packages stay private and follow the foundation dependency direc
   assert.equal(core.license, "UNLICENSED");
   assert.deepEqual(core.dependencies, {
     "@ai-game-playbook/contracts": "workspace:*",
+    "@ai-game-playbook/registry": "workspace:*",
   });
 });
 

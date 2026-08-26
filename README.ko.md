@@ -1,12 +1,12 @@
 ---
 source: README.md
-source_sha256: eaf045dfcc0e880be591ed6cedc838111deb4df8b2d749151657babcfb9b0474
+source_sha256: e406e07d16e4c399e011ac65d6139a2e3721a508f768ca40710ecc63c7bb8738
 translated_at: 2026-08-26
 ---
 
 # AI Game Playbook
 
-> 상태: control plane 계약, registry, 초기 core filesystem/process/project-lane 경계를 구현하는 단계입니다. 설치 가능한 패키지, `agpb` 실행 파일, MCP 서버, 엔진 어댑터는 아직 없습니다.
+> 상태: control plane 계약, registry, 초기 core filesystem/process/project-lane/permission-admission 경계를 구현하는 단계입니다. 설치 가능한 패키지, `agpb` 실행 파일, MCP 서버, 엔진 어댑터는 아직 없습니다.
 
 [English](README.md)
 
@@ -16,12 +16,12 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine으로 게임을 만드는 
 
 - versioned 공개 schema와 semantic validation을 포함한 pnpm/TypeScript workspace.
 - command, skill, workflow, role lens, schema, pack descriptor를 검증하고 범위가 제한된 설계 projection을 생성하는 typed registry.
-- canonical project root 결합, portable path 해석, staged SHA-256 compare-and-swap 쓰기, digest 결합 direct process 실행, 초기화된 project마다 root/project에 결합된 mutating lease 하나를 제공하는 초기 private core package.
+- canonical project root 결합, portable path 해석, staged SHA-256 compare-and-swap 쓰기, digest 결합 direct process 실행, 초기화된 project마다 root/project에 결합된 mutating lease 하나, registry 결합 permission admission과 서명된 scoped grant를 제공하는 초기 private core package.
 - 의도한 command 및 skill surface를 담은 digest 결합 추적 계획.
 - 영어 문서와 한국어 미러.
 - contract, 생성 계획 drift, 문서 정합성을 검사하는 cross-platform static check.
 
-이 기반은 개발용 library와 검사이며 사용 가능한 제품이 아닙니다. lane primitive는 미리 생성된 local project state와 명시적 갱신이 필요하고 아직 parallel reader를 조정하거나 Editor를 제어하지 않습니다. core 경계에는 아직 permission broker, CPU 또는 memory sandbox, workflow recovery가 없습니다. 현재 저장소는 설치 가능한 npm 패키지나 동작하는 게임 엔진 자동화를 제공하지 않습니다. 문서의 명령은 인터페이스 계획이며 지금 실행할 수 있는 명령이 아닙니다.
+이 기반은 개발용 library와 검사이며 사용 가능한 제품이 아닙니다. lane primitive는 미리 생성된 local project state와 명시적 갱신이 필요하고 아직 parallel reader를 조정하거나 Editor를 제어하지 않습니다. permission primitive는 실제 등록 command input, project/feature/workflow/session scope, 실행 budget, Ed25519 grant, use count, 보고된 effect를 검증하지만 in-memory이고 dispatcher, approval UI, durable checkpoint, recovery flow에 연결되지 않았습니다. CPU와 memory sandbox도 아직 없습니다. 현재 저장소는 설치 가능한 npm 패키지나 동작하는 게임 엔진 자동화를 제공하지 않습니다. 문서의 명령은 인터페이스 계획이며 지금 실행할 수 있는 명령이 아닙니다.
 
 ## 제품 방향
 

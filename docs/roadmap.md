@@ -19,8 +19,8 @@ Approval freezes the initial contracts, risks, permission defaults, evidence thr
 
 ## Stage 2: execution, evidence, and safety
 
-- Implemented primitives: compare-and-swap writes, canonical project-root identity, bounded direct process execution, and serialized root/project-bound mutating leases.
-- Remaining: permission broker, full project/editor identity attestation, automatic lease heartbeat integration, and parallel-read coordination.
+- Implemented primitives: compare-and-swap writes, canonical project-root identity, bounded direct process execution, serialized root/project-bound mutating leases, and in-memory registry-bound permission admission with exact signed grants and effect settlement.
+- Remaining: dispatcher/lane integration, durable approval consumption and uncertainty reconciliation, full project/editor identity attestation, automatic lease heartbeat integration, and parallel-read coordination.
 - Add bounded workflows, checkpoints, resume validation, repair limits, cancellation, and uncertainty handling.
 - Add content-addressed receipts, evidence storage, redacted diagnostics, retention, and explicit export.
 - Test traversal, symlink escape, invalid tokens, output growth, timeouts, stale processes, ambiguous editors, and install lifecycle conflicts.

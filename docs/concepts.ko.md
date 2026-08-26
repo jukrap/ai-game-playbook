@@ -1,12 +1,12 @@
 ---
 source: docs/concepts.md
-source_sha256: b77955803997122ea093c969b04e0d8ea30043a7d26c10c416e63ca6e710172f
+source_sha256: b7ff1c8648f3ea0f373cb34bbb3e62aea20f54e0fa4f8c5b46eb56526eda7a74
 translated_at: 2026-08-26
 ---
 
 # 핵심 개념과 공개 타입
 
-> 상태: versioned schema와 semantic validator를 구현했습니다. runtime consumer와 engine capability는 아직 계획 단계입니다.
+> 상태: versioned schema와 semantic validator를 구현했고 초기 private permission consumer가 존재합니다. 실행 가능한 runtime surface와 engine capability는 아직 계획 단계입니다.
 
 [English](concepts.md) · [문서](README.ko.md)
 
@@ -31,6 +31,7 @@ adapter는 지원하지 않는 단계를 보고할 수 있습니다. 필수 단�
 | `GameProjectProfile` | engine, version, project identity, development stage, target platform, 선언한 quality/change budget |
 | `EngineCapabilityReport` | 현재 환경에서 탐지한 operation, limitation, identity, support grade |
 | `FeatureContract` | 플레이어가 볼 결과, 허용 변경 범위, 완료 조건, 위험, budget, rollback plan |
+| `ApprovalGrant` | exact project, command, request, scope, budget, expiration, 필요한 경우 feature/workflow/Editor session identity에 결합된 단일 signed permission |
 | `RunReceipt` | run identity, tool/command, 시간, exit/inner result, log, test, capture, artifact hash, changed file, recovery result |
 | `AssetProvenance` | asset source와 lineage, 권리, transform, 필요 시 provider/model/checkpoint/seed, cost/approval, file hash, QA state |
 

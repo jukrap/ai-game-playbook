@@ -1,6 +1,6 @@
 # Core Concepts and Public Types
 
-> Status: versioned schemas and semantic validators are implemented. Runtime consumers and engine capability remain planned.
+> Status: versioned schemas and semantic validators are implemented, and an early private permission consumer exists. Executable runtime surfaces and engine capability remain planned.
 
 [한국어](concepts.ko.md) · [Documentation](README.md)
 
@@ -25,6 +25,7 @@ The current foundation implements these contracts as versioned JSON schemas and 
 | `GameProjectProfile` | Engine, version, project identity, development stage, target platform, and declared quality/change budgets |
 | `EngineCapabilityReport` | Detected operations, limitations, identity, and support grade for the current environment |
 | `FeatureContract` | Player-visible outcome, allowed change scope, completion conditions, risks, budgets, and rollback plan |
+| `ApprovalGrant` | One signed permission bound to exact project, command, request, scope, budget, expiration, and optional feature, workflow, or editor session identity |
 | `RunReceipt` | Run identity, tools and commands, timing, exit and inner results, logs, tests, captures, artifact hashes, changed files, and recovery result |
 | `AssetProvenance` | Asset source and lineage, rights, transformations, provider/model/checkpoint/seed when applicable, cost and approvals, file hashes, and QA state |
 

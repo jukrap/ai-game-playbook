@@ -1,12 +1,12 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: bf54b11c04d1b89cae2af1e85a907d742bdba0b39ae425058147a7ca0dc83286
+source_sha256: 13651c4177325d50d8a94e4240358683dc90cdc5db06da50020b99cf7e1275a1
 translated_at: 2026-08-26
 ---
 
 # 보안과 권한
 
-> 상태: 계획된 permission 정책입니다. 초기 filesystem/process/mutating-lane enforcement는 존재하지만 permission broker, Editor 또는 bridge enforcement는 아직 없습니다.
+> 상태: 초기 private admission primitive가 포함된 계획된 permission 정책입니다. filesystem/process/mutating-lane/in-memory grant enforcement는 존재하지만 command dispatch, Editor 또는 bridge enforcement는 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
@@ -26,6 +26,10 @@ translated_at: 2026-08-26
 | Publish 또는 release | 매번 별도 승인 |
 
 permission은 control plane이 평가하며 MCP annotation, skill, engine bridge, host UI에 위임하지 않습니다. approval은 project identity, command, scope, 필요한 경우 session, budget, expiration에 결합합니다.
+
+현재 private broker는 같은 process에서 검증한 registry instance만 받습니다. 실제 command payload를 등록 input schema로 검증하고 그 digest를 project, command/handler, registry, feature, workflow step, Editor session, 정규화된 target, budget, deadline, run에 결합하며 설정된 public key로 domain-separated 단일 permission Ed25519 grant를 검증합니다. 민감한 grant는 한 번만 사용할 수 있고 authorization lease를 반환하기 전에 동기적으로 reserve합니다. 자동 admission은 범위가 제한된 project read, 승인된 feature source path와 change kind, approval checkpoint를 선언하지 않은 등록 test/build workflow step으로 제한합니다. test/build 권한은 project file 또는 Editor object mutation 권한을 암묵적으로 포함하지 않습니다. Editor object source mutation은 object operation type을 feature contract와 대조할 수 있을 때까지 거부합니다.
+
+authorization은 실행이 아닙니다. 이 primitive는 아직 process runner, filesystem CAS, project lane, CLI, MCP, engine bridge와 연결되지 않았습니다. grant use count, active lease, uncertainty barrier는 memory에만 있어 restart를 넘지 못하며 approval UI, durable revocation/checkpoint store, recovery action, secret-path classifier도 없습니다. workflow plan digest는 caller가 제공한 값으로 결합하지만 workflow runtime이 생기기 전까지 독립적으로 attest하지 않습니다. runtime enforcement와 accounting이 없는 동안 memory, CPU, GPU request budget은 거부합니다. settlement에서 보고된 effect를 검사하고 undeclared 또는 malformed side-effect completion은 해당 broker instance의 후속 side effect를 차단하지만, 최종적으로 durable workflow가 같은 상태를 보존하고 reconcile해야 합니다.
 
 ## Fail-closed 중단 조건
 

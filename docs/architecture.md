@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture. The `contracts` and `registry` foundations and early `core` filesystem, process, and mutating-lane boundaries exist; the remaining runtime and bridge boundaries are planned.
+> Status: target architecture. The `contracts` and `registry` foundations and early `core` filesystem, process, mutating-lane, and permission-admission boundaries exist; the remaining runtime and bridge boundaries are planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -21,7 +21,7 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Its current generators produce validated design projections for CLI, MCP, help, documentation metadata, and host routing. Runtime consumers remain planned. Generated surfaces cannot grant permissions or invent capabilities.
+The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Its current generators produce validated design projections for CLI, MCP, help, documentation metadata, and host routing. The private permission primitive consumes validated command and schema authority, while generated CLI/MCP/host execution consumers remain planned. Generated surfaces cannot grant permissions or invent capabilities.
 
 ## Workspace boundaries
 
@@ -29,7 +29,7 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 | --- | --- | --- |
 | `contracts` | Foundation implemented | Versioned schemas and shared identifiers with no engine runtime dependency |
 | `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, and parity checks |
-| `core` | Partial | Canonical project identity, portable path resolution, staged filesystem compare-and-swap, digest-bound direct process execution, and root/project-bound mutating leases exist; permissions, CPU/memory budgets, parallel-read coordination, checkpoints, and workflow state remain planned |
+| `core` | Partial | Canonical project identity, portable path resolution, staged filesystem compare-and-swap, digest-bound direct process execution, root/project-bound mutating leases, and in-memory signed permission admission/settlement exist; dispatcher integration, durable approvals, CPU/memory enforcement, parallel-read coordination, checkpoints, and workflow state remain planned |
 | `cli` | Planned | `agpb` argument parsing, local interaction, stable exit behavior, and help |
 | `mcp` | Planned | Schema-derived tools and resources behind the same permission broker |
 | `codex-adapter` | Planned | Skills, host routing metadata, and project instruction integration |
@@ -55,7 +55,7 @@ Only `contracts`, `registry`, and the partial private `core` currently exist as 
 
 A consuming game project is planned to contain `.ai-game-playbook/`. Commit-worthy state includes the project profile, feature contracts, and policy. Cache, logs, screenshots, locks, receipts containing local details, local secrets, and machine-specific configuration remain ignored.
 
-Writes use owned-path rules and compare-and-swap preimages. The current private core serializes `project-write`, `editor-bound`, and `build-bound` admission through one fixed project-local lease, but it does not yet discover or control an editor. Pack lifecycle operations remain planned and will stage changes before promotion without deleting non-owned files. Parallel read coordination also remains planned.
+Writes use owned-path rules and compare-and-swap preimages. The current private core serializes `project-write`, `editor-bound`, and `build-bound` admission through one fixed project-local lease, but it does not yet discover or control an editor. Its permission primitive resolves a command from a validated registry, validates the actual input schema, narrows feature/workflow/session scope and budgets, consumes exact signed grants in memory, and rejects reported undeclared effects. It is not yet wired to lane acquisition or command dispatch, and its approval consumption and uncertainty barrier are not durable across process restart. Pack lifecycle operations and parallel-read coordination remain planned.
 
 ## Host integration
 

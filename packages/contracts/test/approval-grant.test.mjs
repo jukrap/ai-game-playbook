@@ -24,6 +24,7 @@ function grant(overrides = {}) {
       objectIds: [],
       destinations: ["https://api.example.com"],
       dataClasses: [],
+      changeKinds: [],
       publishTargets: [],
     },
     budgets: {
@@ -52,6 +53,8 @@ test("approval grant signing digest covers authority and excludes only signature
   const base = grant();
   const digest = contracts.computeApprovalGrantSigningDigest(base);
   assert.match(digest, /^sha256:[0-9a-f]{64}$/);
+  const { signature: _signature, ...unsigned } = base;
+  assert.notEqual(digest, contracts.digestCanonicalJson(unsigned));
   assert.equal(
     contracts.computeApprovalGrantSigningDigest({
       ...base,

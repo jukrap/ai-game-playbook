@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import {
   chmod,
   copyFile,
-  link,
   mkdir,
   mkdtemp,
   readFile,
   readdir,
   rm,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -47,11 +47,7 @@ function pathExecutableName() {
 }
 
 async function makeExecutable(path) {
-  try {
-    await link(process.execPath, path);
-  } catch {
-    await copyFile(process.execPath, path);
-  }
+  await copyFile(process.execPath, path);
   await chmod(path, 0o700);
 }
 
@@ -81,6 +77,21 @@ async function discover(projectRoot, configuredPaths = [], pathDirectories = [])
   });
   return { authorization, plan, report };
 }
+
+test("executable fixtures never alias the active Node runtime", async (t) => {
+  const { tools } = await fixture(t);
+  const candidatePath = join(tools, pathExecutableName());
+  await makeExecutable(candidatePath);
+
+  const [runtimeIdentity, candidateIdentity] = await Promise.all([
+    stat(process.execPath, { bigint: true }),
+    stat(candidatePath, { bigint: true }),
+  ]);
+  assert.notDeepEqual(
+    [candidateIdentity.dev, candidateIdentity.ino],
+    [runtimeIdentity.dev, runtimeIdentity.ino],
+  );
+});
 
 test("discovery requires explicit host-tool approval and omits source paths", async (t) => {
   const { project, tools } = await fixture(t);

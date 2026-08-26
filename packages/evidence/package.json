@@ -1,0 +1,23 @@
+{
+  "name": "@ai-game-playbook/evidence",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Deterministic evidence normalization for AI Game Playbook.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -b --pretty false",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@ai-game-playbook/contracts": "workspace:*",
+    "@ai-game-playbook/core": "workspace:*"
+  }
+}

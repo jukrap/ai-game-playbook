@@ -1,0 +1,36 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const readJson = async (url) => JSON.parse(await readFile(url, "utf8"));
+
+test("the evidence package is private and follows the workspace dependency boundary", async () => {
+  const root = await readJson(new URL("../../../tsconfig.json", import.meta.url));
+  const packageJson = await readJson(
+    new URL("../package.json", import.meta.url),
+  );
+  const tsconfig = await readJson(new URL("../tsconfig.json", import.meta.url));
+
+  assert.equal(packageJson.name, "@ai-game-playbook/evidence");
+  assert.equal(packageJson.private, true);
+  assert.equal(packageJson.license, "UNLICENSED");
+  assert.deepEqual(packageJson.dependencies, {
+    "@ai-game-playbook/contracts": "workspace:*",
+    "@ai-game-playbook/core": "workspace:*",
+  });
+  assert.deepEqual(packageJson.exports, {
+    ".": {
+      types: "./dist/index.d.ts",
+      import: "./dist/index.js",
+    },
+  });
+  assert.equal(tsconfig.compilerOptions.rootDir, "src");
+  assert.deepEqual(tsconfig.references, [
+    { path: "../contracts" },
+    { path: "../core" },
+  ]);
+  assert.equal(
+    root.references.some(({ path }) => path === "./packages/evidence"),
+    true,
+  );
+});

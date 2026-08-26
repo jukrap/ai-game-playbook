@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  chmod,
   mkdir,
   mkdtemp,
   readFile,
@@ -225,6 +226,7 @@ test("executable drift fails before process dispatch and settles authority", asy
   const { project } = await fixture(t);
   const executable = join(project, "candidate.exe");
   await writeFile(executable, "first executable identity");
+  await chmod(executable, 0o700);
   const plan = await godot.prepareGodotVersionProbe({
     runId: crypto.randomUUID(),
     projectId: "sample.graybox",

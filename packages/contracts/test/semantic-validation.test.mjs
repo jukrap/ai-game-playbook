@@ -32,6 +32,7 @@ const capabilityReport = {
       permissions: ["read-project"],
       requiredEvidence: ["engine-identity"],
       evidenceGrade: "locally-executed",
+      latestReceiptDigest: secondDigest,
       checkedAt: startedAt,
     },
   ],
@@ -164,5 +165,30 @@ test("capability semantic checks reject duplicate and future observations", () =
       "engine-capability-duplicate-operation",
       "engine-capability-future-observation",
     ],
+  );
+});
+
+test("capability semantic checks bind observed support to witnessed evidence", () => {
+  const detected = structuredClone(capabilityReport);
+  detected.capabilities[0].evidenceGrade = "implemented";
+  delete detected.capabilities[0].latestReceiptDigest;
+
+  assert.deepEqual(
+    contracts
+      .checkEngineCapabilityReportSemantics(detected)
+      .map(({ code }) => code),
+    [
+      "engine-capability-observed-without-execution-evidence",
+      "engine-capability-observed-without-receipt",
+    ],
+  );
+
+  const editorPreview = structuredClone(capabilityReport);
+  editorPreview.capabilities[0].support = "editor-preview";
+  assert.deepEqual(
+    contracts
+      .checkEngineCapabilityReportSemantics(editorPreview)
+      .map(({ code }) => code),
+    ["engine-capability-editor-without-engine-evidence"],
   );
 });

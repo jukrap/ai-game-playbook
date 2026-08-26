@@ -204,6 +204,7 @@ export interface EngineSessionIdentity {
     readonly executableDigest: Sha256Digest;
   };
   readonly editorInstanceId?: StableId;
+  readonly runtimeInstanceId?: StableId;
   readonly nonceDigest?: Sha256Digest;
   readonly boundAt: string;
 }
@@ -239,6 +240,7 @@ export const engineSessionIdentitySchema: VersionedContractSchema =
           ]),
           process: engineProcessIdentity,
           editorInstanceId: reference("stableId"),
+          runtimeInstanceId: reference("stableId"),
           nonceDigest: reference("sha256Digest"),
           boundAt: reference("timestamp"),
         },
@@ -256,7 +258,7 @@ export const engineSessionIdentitySchema: VersionedContractSchema =
           if: {
             type: "object",
             properties: {
-              executionKind: { enum: ["editor", "runtime"] },
+              executionKind: { const: "editor" },
             },
             required: ["executionKind"],
           },
@@ -272,13 +274,18 @@ export const engineSessionIdentitySchema: VersionedContractSchema =
         {
           if: {
             type: "object",
-            properties: { executionKind: { const: "packaged" } },
+            properties: {
+              executionKind: { enum: ["runtime", "packaged"] },
+            },
             required: ["executionKind"],
           },
           then: {
             type: "object",
-            properties: { nonceDigest: reference("sha256Digest") },
-            required: ["nonceDigest"],
+            properties: {
+              runtimeInstanceId: reference("stableId"),
+              nonceDigest: reference("sha256Digest"),
+            },
+            required: ["runtimeInstanceId", "nonceDigest"],
           },
         },
       ],
@@ -644,7 +651,45 @@ export const engineOperationResultSchema: VersionedContractSchema =
         {
           if: {
             type: "object",
-            properties: { support: { const: "verified" } },
+            properties: { status: { const: "passed" } },
+            required: ["status"],
+          },
+          then: {
+            type: "object",
+            properties: {
+              support: enumSchema([
+                "detected",
+                "headless",
+                "editor-preview",
+                "verified",
+              ]),
+            },
+            required: ["support"],
+          },
+        },
+        {
+          if: {
+            type: "object",
+            properties: { support: { enum: ["detected", "headless"] } },
+            required: ["support"],
+          },
+          then: {
+            type: "object",
+            properties: {
+              evidenceGrade: enumSchema([
+                "locally-executed",
+                "engine-verified",
+              ]),
+            },
+            required: ["evidenceGrade"],
+          },
+        },
+        {
+          if: {
+            type: "object",
+            properties: {
+              support: { enum: ["editor-preview", "verified"] },
+            },
             required: ["support"],
           },
           then: {

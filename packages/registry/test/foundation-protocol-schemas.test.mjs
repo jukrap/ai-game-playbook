@@ -151,6 +151,27 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       "engine-operation-result",
       {
         ...fixtures["engine-operation-result"],
+        support: "planned",
+      },
+    ],
+    [
+      "engine-operation-result",
+      {
+        ...fixtures["engine-operation-result"],
+        evidenceGrade: "implemented",
+      },
+    ],
+    [
+      "engine-operation-result",
+      {
+        ...fixtures["engine-operation-result"],
+        support: "editor-preview",
+      },
+    ],
+    [
+      "engine-operation-result",
+      {
+        ...fixtures["engine-operation-result"],
         mutation: "committed",
       },
     ],
@@ -214,6 +235,36 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
     );
     assert.equal(validate(fixture), false, `${id} accepted unsafe evidence`);
   }
+});
+
+test("engine sessions distinguish editor and standalone runtime instances", () => {
+  const validate = validator().compile(
+    contracts.FOUNDATION_PROTOCOL_SCHEMAS["engine-session-identity"].schema,
+  );
+  const fixture = validFoundationProtocolFixtures["engine-session-identity"];
+  const { editorInstanceId: _, ...withoutEditorInstance } = fixture;
+  const runtime = {
+    ...withoutEditorInstance,
+    executionKind: "runtime",
+    runtimeInstanceId: "runtime.graybox-primary",
+  };
+
+  assert.equal(
+    validate(runtime),
+    true,
+    JSON.stringify(validate.errors),
+  );
+
+  const { runtimeInstanceId: __, ...runtimeWithoutInstance } = runtime;
+  assert.equal(validate(runtimeWithoutInstance), false);
+
+  assert.equal(
+    validate({
+      ...withoutEditorInstance,
+      executionKind: "packaged",
+    }),
+    false,
+  );
 });
 
 test("every foundation protocol rejects a mismatched schema version", () => {

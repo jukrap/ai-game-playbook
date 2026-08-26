@@ -156,6 +156,46 @@ test("contract schemas reject unsafe identity, scope, support, and cost shapes",
           {
             ...validPublicContractFixtures["engine-capability-report"]
               .capabilities[0],
+            evidenceGrade: "implemented",
+          },
+        ],
+      },
+    ],
+    [
+      "engine-capability-report",
+      {
+        ...validPublicContractFixtures["engine-capability-report"],
+        capabilities: [
+          (() => {
+            const { latestReceiptDigest: _, ...withoutReceipt } =
+              validPublicContractFixtures["engine-capability-report"]
+                .capabilities[0];
+            return withoutReceipt;
+          })(),
+        ],
+      },
+    ],
+    [
+      "engine-capability-report",
+      {
+        ...validPublicContractFixtures["engine-capability-report"],
+        capabilities: [
+          {
+            ...validPublicContractFixtures["engine-capability-report"]
+              .capabilities[0],
+            support: "editor-preview",
+          },
+        ],
+      },
+    ],
+    [
+      "engine-capability-report",
+      {
+        ...validPublicContractFixtures["engine-capability-report"],
+        capabilities: [
+          {
+            ...validPublicContractFixtures["engine-capability-report"]
+              .capabilities[0],
             support: "verified",
             latestReceiptDigest:
               validPublicContractFixtures["engine-capability-report"]

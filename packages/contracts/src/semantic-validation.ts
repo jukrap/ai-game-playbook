@@ -8,6 +8,9 @@ export type ContractSemanticIssueCode =
   | "engine-capability-duplicate-id"
   | "engine-capability-duplicate-operation"
   | "engine-capability-future-observation"
+  | "engine-capability-editor-without-engine-evidence"
+  | "engine-capability-observed-without-execution-evidence"
+  | "engine-capability-observed-without-receipt"
   | "engine-capability-planned-without-reason"
   | "engine-capability-verified-without-receipt"
   | "engine-capability-verified-without-runtime-evidence"
@@ -218,6 +221,44 @@ export function checkEngineCapabilityReportSemantics(
           "engine-capability-planned-without-reason",
           `${path}/degradeReason`,
           "Planned support must state why the operation is not available.",
+        ),
+      );
+    }
+    if (
+      (capability.support === "detected" || capability.support === "headless") &&
+      capability.evidenceGrade !== "locally-executed" &&
+      capability.evidenceGrade !== "engine-verified"
+    ) {
+      issues.push(
+        issue(
+          "engine-capability-observed-without-execution-evidence",
+          `${path}/evidenceGrade`,
+          "Detected and headless support require locally executed or engine-verified evidence.",
+        ),
+      );
+    }
+    if (
+      capability.support === "editor-preview" &&
+      capability.evidenceGrade !== "engine-verified"
+    ) {
+      issues.push(
+        issue(
+          "engine-capability-editor-without-engine-evidence",
+          `${path}/evidenceGrade`,
+          "Editor-preview support requires engine-verified evidence.",
+        ),
+      );
+    }
+    if (
+      capability.support !== "planned" &&
+      capability.support !== "verified" &&
+      capability.latestReceiptDigest === undefined
+    ) {
+      issues.push(
+        issue(
+          "engine-capability-observed-without-receipt",
+          `${path}/latestReceiptDigest`,
+          "Observed support requires a receipt digest.",
         ),
       );
     }

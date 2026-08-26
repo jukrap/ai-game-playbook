@@ -275,7 +275,24 @@ const engineCapability = {
     {
       if: {
         type: "object",
-        properties: { support: { const: "verified" } },
+        properties: { support: { enum: ["detected", "headless"] } },
+        required: ["support"],
+      },
+      then: {
+        type: "object",
+        properties: {
+          evidenceGrade: enumSchema(["locally-executed", "engine-verified"]),
+          latestReceiptDigest: reference("sha256Digest"),
+        },
+        required: ["evidenceGrade", "latestReceiptDigest"],
+      },
+    },
+    {
+      if: {
+        type: "object",
+        properties: {
+          support: { enum: ["editor-preview", "verified"] },
+        },
         required: ["support"],
       },
       then: {

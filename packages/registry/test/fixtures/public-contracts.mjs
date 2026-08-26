@@ -161,6 +161,7 @@ export const validPublicContractFixtures = {
         permissions: ["read-project"],
         requiredEvidence: ["engine-identity"],
         evidenceGrade: "locally-executed",
+        latestReceiptDigest: secondDigest,
         checkedAt: startedAt,
       },
     ],

@@ -88,6 +88,14 @@ export type {
   ResolveProjectPathOptions,
 } from "./project-path.js";
 export {
+  initializeProjectState,
+  PROJECT_STATE_DIRECTORIES,
+} from "./project-state.js";
+export type {
+  InitializeProjectStateRequest,
+  ProjectStateInitializationResult,
+} from "./project-state.js";
+export {
   acquireProjectLane,
   assertProjectLaneLease,
   inspectProjectLane,

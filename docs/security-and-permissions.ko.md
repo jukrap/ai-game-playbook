@@ -1,6 +1,6 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: ddc427a5a5bf84cc4aa83255bd2c0192794f6bd3b13aea7476a18dc9169cfb1c
+source_sha256: dc81551343ea3095a84b8ac821d65b32604690dd2dbf4fb6aa614e98dd6ef7c6
 translated_at: 2026-08-26
 ---
 
@@ -56,7 +56,7 @@ authorization 자체가 실행은 아닙니다. 일반 broker는 command dispatc
 
 ## Filesystem과 pack 안전
 
-현재 core는 canonical project root를 결합하고 writable path link와 portable path ambiguity를 거부하며 제한된 staged SHA-256 compare-and-swap 쓰기와 exact-digest 단일 파일 삭제를 수행합니다. private pack preflight는 같은 process에서 검증한 registry와 offline·hook-free regular-file artifact만 받습니다. local content, canonical installed state, exact dependency, downgrade policy, owned hash, 비소유 충돌, resource limit를 확인한 뒤 immutable write-free plan을 만듭니다. control-plane state와 lock namespace는 pack 소유 대상에서 제외합니다. pack executor는 directory를 만들거나 authority를 직접 얻지 않습니다. 필요한 state, transaction, lock, artifact parent directory가 미리 존재해야 하고 caller가 exact 승인 결정과 lane을 제공해야 합니다. transaction 시작 전과 각 forward staging·commit 경계 전후에 lease 만료를 다시 검사합니다. 승인 budget은 capture한 rollback preimage 크기를 사용하며, 단일 pack update가 설치된 dependent를 무효화하면 중단합니다. state만 바꾸는 update의 unchanged file을 포함한 최종 artifact digest를 installed-state commit 전에 write-free CAS guard로 확인합니다. final-file effect 전에 immutable started record를 쓰고 state와 artifact를 stage하며 canonical installed state를 마지막에 commit한 뒤 terminal record와 실제 path/byte settlement를 남깁니다. 뒤 operation의 명확한 실패는 앞 file commit을 exact digest로 역순 rollback하고 uncertain commit은 retry 없이 중단해 후속 reconciliation을 요구합니다. pack이 현재 registry에서 사라져도 installed-state 소유권을 기준으로 remove할 수 있습니다. CLI, 자동 directory bootstrap, transaction reconciler, pack 획득 경로는 아직 없습니다.
+현재 core는 canonical project root를 결합하고 writable path link와 portable path ambiguity를 거부하며 제한된 staged SHA-256 compare-and-swap 쓰기와 exact-digest 단일 파일 삭제를 수행합니다. 고정 레이아웃 bootstrap은 caller가 선택한 경로나 recursive 삭제 없이 runtime directory 6개만 한 segment씩 생성합니다. parent와 target identity를 확인하고 동시 생성은 재검사 뒤에만 멱등으로 받아들이며, 실패한 호출이 직접 만든 directory만 역순 정리하고 모호한 정리는 mutation-uncertain으로 보고합니다. private pack preflight는 같은 process에서 검증한 registry와 offline·hook-free regular-file artifact만 받습니다. local content, canonical installed state, exact dependency, downgrade policy, owned hash, 비소유 충돌, resource limit를 확인한 뒤 immutable write-free plan을 만듭니다. control-plane state와 lock namespace는 pack 소유 대상에서 제외합니다. pack executor는 pack artifact parent directory를 만들거나 authority를 직접 얻지 않습니다. 해당 artifact parent는 미리 존재해야 하고 caller가 exact 승인 결정과 lane을 제공해야 합니다. transaction 시작 전과 각 forward staging·commit 경계 전후에 lease 만료를 다시 검사합니다. 승인 budget은 capture한 rollback preimage 크기를 사용하며, 단일 pack update가 설치된 dependent를 무효화하면 중단합니다. state만 바꾸는 update의 unchanged file을 포함한 최종 artifact digest를 installed-state commit 전에 write-free CAS guard로 확인합니다. final-file effect 전에 immutable started record를 쓰고 state와 artifact를 stage하며 canonical installed state를 마지막에 commit한 뒤 terminal record와 실제 path/byte settlement를 남깁니다. 뒤 operation의 명확한 실패는 앞 file commit을 exact digest로 역순 rollback하고 uncertain commit은 retry 없이 중단해 후속 reconciliation을 요구합니다. pack이 현재 registry에서 사라져도 installed-state 소유권을 기준으로 remove할 수 있습니다. CLI, transaction reconciler, pack 소유 directory lifecycle, pack 획득 경로는 아직 없습니다.
 
 path 검사는 최종 target을 resolve하고 traversal, absolute-path injection, symlink escape를 거부합니다. engine과 system tool은 탐지하지만 자동 설치하지 않습니다.
 

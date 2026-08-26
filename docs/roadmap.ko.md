@@ -1,6 +1,6 @@
 ---
 source: docs/roadmap.md
-source_sha256: 164eeb622e5dfccbdf5abe854ed2ca42db3d116c2d1dd691d5804c539b00cccc
+source_sha256: d49530a226cef33d5a74bfa028841af465b4049f90718efa019c82c4aee14991
 translated_at: 2026-08-26
 ---
 
@@ -18,9 +18,9 @@ translated_at: 2026-08-26
 
 ## Stage 1: 공통 기반 — 진행 중
 
-- 완료: pnpm workspace, versioned contract schema, semantic validation, typed registry 검증 및 projection, pack dependency graph 검증, 결정적 resolved workflow-plan attestation, 추적 가능한 digest 결합 foundation plan, private managed-pack preflight와 transaction executor.
+- 완료: pnpm workspace, versioned contract schema, semantic validation, typed registry 검증 및 projection, pack dependency graph 검증, 결정적 resolved workflow-plan attestation, 추적 가능한 digest 결합 foundation plan, 고정 레이아웃 project-state bootstrap, private managed-pack preflight와 transaction executor.
 - 남음: core runtime, 실행 가능한 CLI, MCP server, Codex adapter, runtime parity generation.
-- 남음: project-state bootstrap, 실행 가능한 pack CLI와 registry parity, 중단 transaction reconciliation과 doctor flow, 더 넓은 lifecycle evaluation, pack distribution. local approval/lane 결합 add, update, installed-state 소유권 기반 remove, journal, 명확한 실패의 rollback, conflict 검사는 private library primitive로 구현했습니다.
+- 남음: 실행 가능한 pack CLI와 registry parity, pack 소유 artifact directory lifecycle, 중단 transaction reconciliation과 doctor flow, 더 넓은 lifecycle evaluation, pack distribution. 고정 runtime directory bootstrap과 local approval/lane 결합 add, update, installed-state 소유권 기반 remove, journal, 명확한 실패의 rollback, conflict 검사는 private library primitive로 구현했습니다.
 - package는 private으로 유지하고 publish를 별도로 승인하기 전까지 `ai-game-playbook`과 `agpb`를 예약된 interface 이름으로만 사용합니다.
 
 ## Stage 2: 실행, 증거, 안전

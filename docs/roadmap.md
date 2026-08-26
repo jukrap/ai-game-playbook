@@ -12,9 +12,9 @@ Approval freezes the initial contracts, risks, permission defaults, evidence thr
 
 ## Stage 1: common foundation — in progress
 
-- Completed: pnpm workspace, versioned contract schemas, semantic validation, typed registry validation and projections, pack dependency-graph validation, deterministic resolved workflow-plan attestation, a tracked digest-bound foundation plan, and a private managed-pack preflight and transaction executor.
+- Completed: pnpm workspace, versioned contract schemas, semantic validation, typed registry validation and projections, pack dependency-graph validation, deterministic resolved workflow-plan attestation, a tracked digest-bound foundation plan, a fixed-layout project-state bootstrap, and a private managed-pack preflight and transaction executor.
 - Remaining: core runtime, executable CLI, MCP server, Codex adapter, and runtime parity generation.
-- Remaining: project-state bootstrap, executable pack CLI and registry parity, interrupted-transaction reconciliation and doctor flow, broader lifecycle evaluation, and pack distribution; local approval/lane-bound add, update, installed-state-owned removal, journaling, clear-failure rollback, and conflict checks exist as private library primitives.
+- Remaining: executable pack CLI and registry parity, pack-owned artifact-directory lifecycle, interrupted-transaction reconciliation and doctor flow, broader lifecycle evaluation, and pack distribution; fixed runtime-directory bootstrap plus local approval/lane-bound add, update, installed-state-owned removal, journaling, clear-failure rollback, and conflict checks exist as private library primitives.
 - Keep the package private and use `ai-game-playbook` and `agpb` as reserved interface names until publication is separately authorized.
 
 ## Stage 2: execution, evidence, and safety

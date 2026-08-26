@@ -1,6 +1,6 @@
 ---
 source: README.md
-source_sha256: 5c50d9768303e966a7ff972d18b756a17895c7cb94d4d110e196f1d76df0e3cb
+source_sha256: 5c426b5a4da689558820cb302858be995fa3bdbc797cd8eb945368091b8aa39d
 translated_at: 2026-08-26
 ---
 
@@ -16,13 +16,13 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine으로 게임을 만드는 
 
 - versioned 공개 schema와 semantic validation을 포함한 pnpm/TypeScript workspace.
 - command, skill, workflow, role lens, schema, pack descriptor를 검증하고 범위가 제한된 설계 projection을 생성하며 exact command authority에 결합된 결정적 workflow plan을 해석하는 typed registry.
-- canonical project root 결합, portable path 해석, bounded file snapshot, staged SHA-256 compare-and-swap 쓰기와 단일 파일 삭제, digest 결합 direct process 실행, 초기화된 project마다 root/project에 결합된 mutating lease 하나, registry 결합 permission admission과 서명된 scoped grant, resolved-plan state machine, durable append-only checkpoint store를 제공하는 초기 private core package.
+- canonical project root 결합, 고정 레이아웃 project-state bootstrap, portable path 해석, bounded file snapshot, staged SHA-256 compare-and-swap 쓰기와 단일 파일 삭제, digest 결합 direct process 실행, 초기화된 project마다 root/project에 결합된 mutating lease 하나, registry 결합 permission admission과 서명된 scoped grant, resolved-plan state machine, durable append-only checkpoint store를 제공하는 초기 private core package.
 - 검증된 offline·hook-free regular-file pack을 immutable plan으로 준비하고, 명시적으로 승인된 plan만 attest된 project lane, compare-and-swap file operation, canonical installed state, append-only transaction record를 통해 적용하는 private `pack-runtime`.
 - 의도한 command 및 skill surface를 담은 digest 결합 추적 계획.
 - 영어 문서와 한국어 미러.
 - contract, 생성 계획 drift, 문서 정합성을 검사하는 cross-platform static check.
 
-이 기반은 개발용 library와 검사이며 사용 가능한 제품이 아닙니다. private state machine은 immutable hash-linked checkpoint를 만들고 authorization과 dispatch를 분리하며 exact run receipt와 보고된 effect를 정산하고 선언된 failure 또는 rollback transition을 진행하며 uncertainty나 누적 budget 초과에서 중단합니다. checkpoint record는 이제 canonical append-only file과 compare-and-swap head로 유지되며, load할 때 제한된 전체 chain과 exact project/workflow authority를 다시 검증합니다. restart recovery는 사용하지 않은 authorization을 버리고 재승인을 요구하며 dispatch 경계를 넘은 step은 `uncertain`으로 전환합니다. pack preflight는 계속 write-free입니다. 별도 private executor는 같은 process의 plan, broker가 발급한 install authorization, attest된 `project-write` lease만 받고 local add, update, installed-state 소유권 기반 remove를 수행합니다. started/terminal transaction을 기록하고 실제 effect를 정산하며 뒤 파일의 명확한 실패가 발생하면 이미 commit한 파일을 rollback합니다. project directory를 만들거나 approval·lane을 직접 얻지 않으며 CLI를 노출하거나 중단된 transaction을 reconcile하지도 않습니다. approval reservation과 active lease는 여전히 memory에만 있고 이 primitive를 호출하는 dispatcher나 approval UI도 없습니다. lane primitive도 미리 생성된 local project state와 명시적 갱신이 필요하며 parallel reader를 조정하거나 Editor를 제어하지 않습니다. CPU와 memory sandbox도 아직 없습니다. 현재 저장소는 설치 가능한 npm 패키지나 동작하는 게임 엔진 자동화를 제공하지 않습니다. 문서의 명령은 인터페이스 계획이며 지금 실행할 수 있는 명령이 아닙니다.
+이 기반은 개발용 library와 검사이며 사용 가능한 제품이 아닙니다. private state machine은 immutable hash-linked checkpoint를 만들고 authorization과 dispatch를 분리하며 exact run receipt와 보고된 effect를 정산하고 선언된 failure 또는 rollback transition을 진행하며 uncertainty나 누적 budget 초과에서 중단합니다. checkpoint record는 이제 canonical append-only file과 compare-and-swap head로 유지되며, load할 때 제한된 전체 chain과 exact project/workflow authority를 다시 검증합니다. restart recovery는 사용하지 않은 authorization을 버리고 재승인을 요구하며 dispatch 경계를 넘은 step은 `uncertain`으로 전환합니다. 별도의 제한된 bootstrap은 구현된 primitive가 요구하는 lock, workflow state, pack state의 고정 디렉터리 6개만 생성합니다. 재실행해도 안전하며 link와 대소문자 alias를 거부하고, 명확히 실패한 호출이 직접 만든 디렉터리만 제거합니다. pack preflight는 계속 write-free입니다. 별도 private executor는 같은 process의 plan, broker가 발급한 install authorization, attest된 `project-write` lease만 받고 local add, update, installed-state 소유권 기반 remove를 수행합니다. started/terminal transaction을 기록하고 실제 effect를 정산하며 뒤 파일의 명확한 실패가 발생하면 이미 commit한 파일을 rollback합니다. executor는 pack artifact parent directory를 만들거나 approval·lane을 직접 얻지 않으며 CLI를 노출하거나 중단된 transaction을 reconcile하지도 않습니다. approval reservation과 active lease는 여전히 memory에만 있고 이 primitive를 호출하는 dispatcher나 approval UI도 없습니다. lane primitive도 초기화된 local project state와 명시적 갱신이 필요하며 parallel reader를 조정하거나 Editor를 제어하지 않습니다. CPU와 memory sandbox도 아직 없습니다. 현재 저장소는 설치 가능한 npm 패키지나 동작하는 게임 엔진 자동화를 제공하지 않습니다. 문서의 명령은 인터페이스 계획이며 지금 실행할 수 있는 명령이 아닙니다.
 
 ## 제품 방향
 

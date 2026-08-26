@@ -1,6 +1,6 @@
 ---
 source: docs/engine-support.md
-source_sha256: 85f8e4b1ad6fe990015a742a08692bd2a7f2dbf654ed0e19a08142e5ba772f06
+source_sha256: 1a5e90bb92a599784aeef27e7caa3c8ed5b10575e534bf94f19319f3c29f8739
 translated_at: 2026-08-27
 ---
 
@@ -33,11 +33,11 @@ translated_at: 2026-08-27
 
 Source-built `agpb engine status --engine godot` command는 support grade가 아니라 control-plane observation입니다. Static Godot project candidate 하나를 검증하고 major/minor hint를 pin된 `4.7.2` target과 비교합니다. Executable path를 받지 않고 host-tool discovery/version probe나 process start를 수행하지 않으며 matrix의 모든 cell을 `planned`로 유지합니다.
 
-Internal-only 후속 흐름은 discovery와 execution을 분리합니다. Project-only 준비는 host candidate를 읽지 않고 bounded explicit source count와 source digest를 bind합니다. Discovery가 exact configured file 또는 선택한 PATH directory의 고정 direct name을 읽기 전에 signed single-use `host-tool-inspection` grant가 필요합니다. Discovery는 nonrecursive이고 process를 시작하지 않으며 source path나 execution authority를 반환하지 않고 원본 same-process report 뒤에만 candidate를 보존합니다. Version 준비는 선택한 retained candidate 하나만 받고 bounded runner가 `--version`만 호출하기 전에 content/filesystem-identity digest에 결합된 두 번째 signed grant를 요구합니다. Probe는 dispatch 전 drift를 거부하고 실행 뒤 identity를 다시 확인하며 authorization을 정산하고 raw path/output 없이 normalized process와 output digest를 출력합니다. Filesystem/network isolation은 명시적으로 `not-enforced`로 유지합니다. 이 component들에는 automated local witness가 있지만 실제 Godot binary의 retained execution이 없고 CLI/MCP에 노출되지 않으므로 matrix를 변경하지 않습니다.
+Internal-only 후속 흐름은 discovery와 execution을 분리합니다. Project-only 준비는 host candidate를 읽지 않고 bounded explicit source count와 source digest를 bind합니다. Discovery가 exact configured file 또는 선택한 PATH directory의 고정 direct name을 읽기 전에 signed single-use `host-tool-inspection` grant가 필요합니다. Discovery는 nonrecursive이고 process를 시작하지 않으며 source path나 execution authority를 반환하지 않고 원본 same-process report 뒤에만 candidate를 보존합니다. Version 준비는 선택한 retained candidate 하나만 받고 bounded runner가 `--version`만 호출하기 전에 content/filesystem-identity digest에 결합된 두 번째 signed grant를 요구합니다. Probe는 dispatch 전 drift를 거부하고 실행 뒤 identity를 다시 확인하며 authorization을 정산하고 raw path/output 없이 normalized process와 output digest를 출력합니다. 세 번째 workflow-bound admission은 그 원본 completed report만 받고 고정 headless startup argument를 bind합니다. 현재 process layer는 project write, network access, child process를 deny할 수 없으므로 project process를 시작하지 않고 canonical blocked receipt만 보존합니다. 이 component들에는 automated local witness가 있지만 실제 Godot binary의 retained execution이 없고 CLI/MCP에 노출되지 않으므로 matrix를 변경하지 않습니다.
 
 ## Godot 방향
 
-Godot에는 첫 static adapter 경계가 생겼고 첫 live adapter 계획 대상인 점은 그대로입니다. static scene inspect는 engine-backed preflight 및 runtime play와 분리합니다. 첫 alpha에는 script/batch validation, exact project/Editor identity, 실제 input mapping을 통한 결정적 input, gameplay state assertion, 실제 runtime frame, log, Windows export startup이 필요합니다.
+Godot에는 첫 static adapter 경계와 fail-closed preflight admission이 생겼고 첫 live adapter 계획 대상인 점은 그대로입니다. Static scene inspect와 blocked admission은 contained engine-backed preflight 및 runtime play와 분리합니다. 첫 alpha에는 script/batch validation, exact project/Editor identity, 실제 input mapping을 통한 결정적 input, gameplay state assertion, 실제 runtime frame, log, Windows export startup이 필요합니다.
 
 project bridge는 인증하고 fail closed해야 하며 Windows를 지원하고 schema parity를 보존해야 합니다. 또한 Editor mutation 직렬화, request/output 제한, lock 복구, 실제 runtime frame/input 동작을 증명해야 합니다. 모든 hard gate를 만족하는 후보가 없으면 최소 GDScript bridge를 만듭니다.
 

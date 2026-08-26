@@ -17,6 +17,8 @@ const expectedIds = [
   "engine-operation-result",
   "engine-project-identity",
   "engine-session-identity",
+  "engine-status-report",
+  "engine-status-request",
   "init-report",
   "init-request",
   "input-replay-trace",
@@ -148,6 +150,24 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
           fixtures["engine-session-identity"];
         return withoutNonce;
       })(),
+    ],
+    [
+      "engine-status-report",
+      {
+        ...fixtures["engine-status-report"],
+        support: {
+          grade: "detected",
+          evidenceGrade: "locally-executed",
+          reason: "Static evidence was observed.",
+        },
+      },
+    ],
+    [
+      "engine-status-report",
+      {
+        ...fixtures["engine-status-report"],
+        externalProcessStarted: true,
+      },
     ],
     [
       "engine-session-identity",

@@ -49,6 +49,10 @@ import {
   skillListReportSchema,
   skillListRequestSchema,
 } from "./skill-catalog-contracts.js";
+import {
+  engineStatusReportSchema,
+  engineStatusRequestSchema,
+} from "./engine-status-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -77,6 +81,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "build-artifact-evidence": buildArtifactEvidenceSchema,
     "doctor-report": doctorReportSchema,
     "doctor-request": doctorRequestSchema,
+    "engine-status-report": engineStatusReportSchema,
+    "engine-status-request": engineStatusRequestSchema,
     "init-report": initReportSchema,
     "init-request": initRequestSchema,
     "project-inspect-report": projectInspectReportSchema,

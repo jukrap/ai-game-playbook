@@ -62,6 +62,34 @@ export {
   summarizeSkillCatalogEntries,
   summarizeSkillChecks,
 } from "./skill-catalog-contracts.js";
+export {
+  ENGINE_STATUS_MAX_EXECUTABLE_BYTES,
+  ENGINE_STATUS_MAX_ISSUES,
+  assertEngineStatusReportSemantics,
+  computeEngineStatusDigest,
+  computeEngineStatusStatus,
+  engineStatusReportSchema,
+  engineStatusRequestSchema,
+} from "./engine-status-contracts.js";
+export type {
+  EngineStatus,
+  EngineStatusCompatibility,
+  EngineStatusCompatibilityState,
+  EngineStatusDigestInput,
+  EngineStatusExecutableCandidate,
+  EngineStatusExecutableObservation,
+  EngineStatusExecutableState,
+  EngineStatusIssue,
+  EngineStatusIssueSeverity,
+  EngineStatusProjectCandidate,
+  EngineStatusProjectObservation,
+  EngineStatusProjectState,
+  EngineStatusReport,
+  EngineStatusRequest,
+  EngineStatusSupport,
+  EngineStatusVersionObservation,
+  EngineStatusVersionPrecision,
+} from "./engine-status-contracts.js";
 export type {
   SkillCatalogDigestInput,
   SkillCatalogEntry,

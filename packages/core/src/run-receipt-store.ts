@@ -22,6 +22,7 @@ import {
   readProjectFileSnapshot,
   writeProjectFileCas,
 } from "./cas-write.js";
+import { verifyRunReceiptArtifacts } from "./evidence-artifact-store.js";
 import { CoreBoundaryError, type CoreBoundaryErrorCode } from "./errors.js";
 import {
   assertProjectRootIdentity,
@@ -366,14 +367,12 @@ function assertReceiptStorageSafety(
     );
   }
   const artifactIds = new Set<string>();
-  const artifactPaths = new Set<string>();
   const startedAt = Date.parse(receipt.timing.startedAt);
   const endedAt = Date.parse(receipt.timing.endedAt);
   for (const artifact of receipt.artifacts) {
     const createdAt = Date.parse(artifact.createdAt);
     if (
       artifactIds.has(artifact.artifactId) ||
-      artifactPaths.has(artifact.path) ||
       artifact.commandId !== receipt.authority.command.id ||
       createdAt < startedAt ||
       createdAt > endedAt ||
@@ -386,7 +385,6 @@ function assertReceiptStorageSafety(
       );
     }
     artifactIds.add(artifact.artifactId);
-    artifactPaths.add(artifact.path);
   }
 
   if (receipt.diagnostics.some((diagnostic) => !diagnostic.redacted)) {
@@ -1051,67 +1049,35 @@ function normalizePersistRequest(
   });
 }
 
-function assertArtifactBudget(
-  receipts: readonly RunReceipt[],
-  maxArtifactBytes: number,
-): void {
-  let totalBytes = 0;
-  let completeArtifacts = 0;
-  for (const receipt of receipts) {
-    for (const artifact of receipt.artifacts) {
-      if (!artifact.complete) continue;
-      completeArtifacts += 1;
-      totalBytes += artifact.bytes;
-      if (
-        completeArtifacts > RUN_RECEIPT_MAX_ARTIFACTS ||
-        !Number.isSafeInteger(totalBytes) ||
-        artifact.bytes > RUN_RECEIPT_MAX_ARTIFACT_BYTES ||
-        totalBytes > maxArtifactBytes
-      ) {
-        throw storeError(
-          "run-receipt-store-budget-exceeded",
-          "$request.maxArtifactBytes",
-          "complete artifact locators exceed the verification budget",
-        );
-      }
-    }
-  }
-}
-
 async function verifyArtifacts(
   root: CanonicalProjectRoot,
+  registry: ValidatedRegistry,
   receipts: readonly RunReceipt[],
   maxArtifactBytes: number,
 ): Promise<void> {
-  assertArtifactBudget(receipts, maxArtifactBytes);
-  for (const receipt of receipts) {
-    for (const artifact of receipt.artifacts) {
-      if (!artifact.complete) continue;
-      let snapshot;
-      try {
-        snapshot = await readProjectFileSnapshot({
-          root,
-          path: artifact.path,
-          maxBytes: Math.max(1, artifact.bytes),
-        });
-      } catch {
-        throw storeError(
-          "run-receipt-store-artifact-invalid",
-          artifact.path,
-          "complete artifact could not be reopened as a stable project file",
-        );
-      }
-      if (
-        snapshot.digest !== artifact.digest ||
-        snapshot.bytes !== artifact.bytes
-      ) {
-        throw storeError(
-          "run-receipt-store-artifact-invalid",
-          artifact.path,
-          "complete artifact bytes differ from the receipt locator",
-        );
-      }
+  try {
+    await verifyRunReceiptArtifacts({
+      root,
+      registry,
+      receipts,
+      maxArtifactBytes,
+    });
+  } catch (error) {
+    if (
+      error instanceof CoreBoundaryError &&
+      error.code === "evidence-artifact-budget-exceeded"
+    ) {
+      throw storeError(
+        "run-receipt-store-budget-exceeded",
+        "$request.maxArtifactBytes",
+        "complete artifacts exceed the verification budget",
+      );
     }
+    throw storeError(
+      "run-receipt-store-artifact-invalid",
+      error instanceof CoreBoundaryError ? error.path : "$receipt.artifacts",
+      "complete artifact bytes or manifest are not valid durable evidence",
+    );
   }
 }
 
@@ -1278,7 +1244,12 @@ async function loadRunReceiptChainInternal(
     );
   }
   const receipts = Object.freeze(newestFirst.reverse());
-  await verifyArtifacts(request.root, receipts, request.maxArtifactBytes);
+  await verifyArtifacts(
+    request.root,
+    request.registry,
+    receipts,
+    request.maxArtifactBytes,
+  );
 
   for (const recordFile of recordFiles) {
     const current = await readTextFile(
@@ -1550,7 +1521,12 @@ export async function persistRunReceipt(
       "receipt chain exceeds the fixed total byte limit",
     );
   }
-  await verifyArtifacts(request.root, receipts, request.maxArtifactBytes);
+  await verifyArtifacts(
+    request.root,
+    request.registry,
+    receipts,
+    request.maxArtifactBytes,
+  );
 
   const receiptPath = recordPath(
     request.receipt.identity.runId,
@@ -1561,7 +1537,12 @@ export async function persistRunReceipt(
     receiptPath,
     receiptText,
   );
-  await verifyArtifacts(request.root, receipts, request.maxArtifactBytes);
+  await verifyArtifacts(
+    request.root,
+    request.registry,
+    receipts,
+    request.maxArtifactBytes,
+  );
   const head = makeHead(request.receipt, sequence, recordFile.digest);
   const headText = serializePersisted(head);
   const writtenHead = await writeHead(

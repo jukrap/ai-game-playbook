@@ -521,7 +521,7 @@ test("receipt calls snapshot input and reject duplicate run attempts", async (t)
   );
 });
 
-test("complete artifact locators are bounded, reopenable, and drift-sensitive", async (t) => {
+test("promoted artifact locators are bounded, reopenable, and drift-sensitive", async (t) => {
   const { project, root } = await fixture(t);
   await mkdir(join(project, "artifacts"));
   const content = "verified artifact\n";
@@ -537,10 +537,17 @@ test("complete artifact locators are bounded, reopenable, and drift-sensitive", 
     createdAt: new Date(Date.UTC(2026, 7, 26, 12, 0, 0, 10)).toISOString(),
     commandId: "doctor",
   };
-  const value = receipt({
+  const draft = receipt({
     projectIdentityDigest: root.identityDigest,
     artifacts: [artifact],
   });
+  const promoted = await core.promoteRunReceiptArtifacts({
+    root,
+    registry: registry.BUILTIN_REGISTRY,
+    receipt: draft,
+    maxArtifactBytes: artifact.bytes,
+  });
+  const value = promoted.receipt;
 
   await assert.rejects(
     core.persistRunReceipt({
@@ -561,7 +568,7 @@ test("complete artifact locators are bounded, reopenable, and drift-sensitive", 
   await core.loadRunReceiptChain(loadRequest(root, artifact.bytes));
 
   await writeFile(
-    join(project, "artifacts", "verified.txt"),
+    join(project, ...value.artifacts[0].path.split("/")),
     "changed artifact\n",
     "utf8",
   );
@@ -594,12 +601,20 @@ test("idempotent append retries revalidate the durable head and artifacts", asyn
     createdAt: new Date(Date.UTC(2026, 7, 26, 12, 0, 1, 10)).toISOString(),
     commandId: "doctor",
   };
-  const secondReceipt = receipt({
+  const secondDraft = receipt({
     ordinal: 1,
     projectIdentityDigest: root.identityDigest,
     previousReceiptDigest: firstReceipt.receiptDigest,
     artifacts: [artifact],
   });
+  const secondReceipt = (
+    await core.promoteRunReceiptArtifacts({
+      root,
+      registry: registry.BUILTIN_REGISTRY,
+      receipt: secondDraft,
+      maxArtifactBytes: artifact.bytes,
+    })
+  ).receipt;
   await core.persistRunReceipt({
     root,
     registry: registry.BUILTIN_REGISTRY,
@@ -608,7 +623,11 @@ test("idempotent append retries revalidate the durable head and artifacts", asyn
     maxArtifactBytes: artifact.bytes,
   });
 
-  await writeFile(join(project, "artifacts", "append.txt"), "drifted\n", "utf8");
+  await writeFile(
+    join(project, ...secondReceipt.artifacts[0].path.split("/")),
+    "drifted\n",
+    "utf8",
+  );
   await assert.rejects(
     core.persistRunReceipt({
       root,

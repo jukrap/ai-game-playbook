@@ -1,6 +1,25 @@
 export { CoreBoundaryError } from "./errors.js";
 export type { CoreBoundaryErrorCode } from "./errors.js";
 export {
+  computeEvidenceArtifactManifestDigest,
+  EVIDENCE_ARTIFACT_MANIFESTS_PATH,
+  EVIDENCE_ARTIFACT_MAX_ARTIFACTS,
+  EVIDENCE_ARTIFACT_MAX_MANIFEST_BYTES,
+  EVIDENCE_ARTIFACT_MAX_TOTAL_BYTES,
+  EVIDENCE_ARTIFACT_OBJECTS_PATH,
+  EVIDENCE_ARTIFACT_STORE_PATH,
+  promoteRunReceiptArtifacts,
+  verifyRunReceiptArtifacts,
+} from "./evidence-artifact-store.js";
+export type {
+  EvidenceArtifactManifest,
+  EvidenceArtifactManifestDigestInput,
+  PromotedRunReceiptArtifacts,
+  PromoteRunReceiptArtifactsRequest,
+  StoredEvidenceArtifact,
+  VerifyRunReceiptArtifactsRequest,
+} from "./evidence-artifact-store.js";
+export {
   CAS_MAX_WRITE_BYTES,
   deleteProjectFileCas,
   readProjectFileSnapshot,

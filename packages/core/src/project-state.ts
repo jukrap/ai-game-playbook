@@ -17,6 +17,9 @@ import {
 export const PROJECT_STATE_DIRECTORIES: readonly string[] = Object.freeze([
   ".ai-game-playbook",
   ".ai-game-playbook/evidence",
+  ".ai-game-playbook/evidence/artifacts",
+  ".ai-game-playbook/evidence/artifacts/manifests",
+  ".ai-game-playbook/evidence/artifacts/objects",
   ".ai-game-playbook/evidence/receipts",
   ".ai-game-playbook/locks",
   ".ai-game-playbook/state",

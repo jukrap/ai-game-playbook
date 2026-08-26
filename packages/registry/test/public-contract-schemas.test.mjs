@@ -474,6 +474,31 @@ test("contract schemas reject unsafe identity, scope, support, and cost shapes",
       },
     ],
     [
+      "run-receipt",
+      {
+        ...validPublicContractFixtures["run-receipt"],
+        artifacts: [
+          {
+            ...validPublicContractFixtures["run-receipt"].artifacts[0],
+            sourcePath: "captures/test-report.xml",
+          },
+        ],
+      },
+    ],
+    [
+      "run-receipt",
+      {
+        ...validPublicContractFixtures["run-receipt"],
+        artifacts: [
+          {
+            ...validPublicContractFixtures["run-receipt"].artifacts[0],
+            manifestDigest:
+              validPublicContractFixtures["run-receipt"].receiptDigest,
+          },
+        ],
+      },
+    ],
+    [
       "asset-provenance",
       {
         ...validPublicContractFixtures["asset-provenance"],

@@ -96,12 +96,12 @@ test("registry and generated surface digests match the cross-platform golden vec
     },
     {
       registry:
-        "sha256:c11e736e66924f8d066244453c4b504fc8faef8b219b5a69bd7a2db3920ddeef",
-      cli: "sha256:5d0c52e51f9d217bdd1e8d6e0a7050f755f26e900f962f13ad324e8cd722434d",
-      docs: "sha256:55e7bd1f6e65c2632d122c82a176c14278b9d6dbb09ae165f5e9a4d7b71465be",
-      mcp: "sha256:af03b36f0ff0974ca305f16754fb6a79ee69d9663588d094879341b27b00bdef",
+        "sha256:f5e119339e59484f9636a73a991e80f1b5d7b9af733efca7b6ebaa68ab94250a",
+      cli: "sha256:ab191b723d24bfb82e4b30aa4d6c14224a972d42dc57f3cee7cfb10f39658382",
+      docs: "sha256:90af96e3180e5e08e18e0ed63114176956408a8653e52cc187813c63ff36e4e9",
+      mcp: "sha256:f247cf79ff137511fd583f7b8b12934a96d869cf6d41f28b61edd651108c2305",
       skills:
-        "sha256:c5894172bfe8f5f80be80c952765e7c70700c5c4fa002736550c3dbbc1c21ffc",
+        "sha256:32a6e09203800e92312206a451b0acdc36f1763bdfa824611edd90d10e05b8e4",
     },
   );
 });

@@ -56,6 +56,7 @@ export type ContractSemanticIssueCode =
   | "engine-capability-verified-without-receipt"
   | "engine-capability-verified-without-runtime-evidence"
   | "run-receipt-authority-canonical-invalid"
+  | "run-receipt-artifact-attestation-invalid"
   | "run-receipt-digest-mismatch"
   | "run-receipt-duration-mismatch"
   | "run-receipt-effect-canonical-invalid"
@@ -955,6 +956,21 @@ export function checkRunReceiptSemantics(
         "Actual effect arrays must be strictly canonical.",
       ),
     );
+  }
+  for (const [index, artifact] of receipt.artifacts.entries()) {
+    if (
+      (artifact.sourcePath === undefined) !==
+        (artifact.manifestDigest === undefined) ||
+      (!artifact.complete && artifact.sourcePath !== undefined)
+    ) {
+      issues.push(
+        issue(
+          "run-receipt-artifact-attestation-invalid",
+          `/artifacts/${index}`,
+          "Artifact source and manifest attestation must be retained together only for complete artifacts.",
+        ),
+      );
+    }
   }
   if (receipt.effects.durationMs !== receipt.timing.durationMs) {
     issues.push(

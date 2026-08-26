@@ -444,6 +444,8 @@ export interface RunReceipt {
     readonly artifactId: StableId;
     readonly kind: StableId;
     readonly path: string;
+    readonly sourcePath?: string;
+    readonly manifestDigest?: Sha256Digest;
     readonly digest: Sha256Digest;
     readonly bytes: number;
     readonly complete: boolean;
@@ -693,11 +695,13 @@ const mutation = closedObject(
   ["status", "changedFiles", "unexpectedDirtyFiles"],
 );
 
-const receiptArtifact = closedObject(
+const receiptArtifactBase = closedObject(
   {
     artifactId: reference("stableId"),
     kind: reference("stableId"),
     path: reference("portablePath"),
+    sourcePath: reference("portablePath"),
+    manifestDigest: reference("sha256Digest"),
     digest: reference("sha256Digest"),
     bytes: { type: "integer", minimum: 0, maximum: 1099511627776 },
     complete: { type: "boolean" },
@@ -715,6 +719,14 @@ const receiptArtifact = closedObject(
     "commandId",
   ],
 );
+
+const receiptArtifact = {
+  ...receiptArtifactBase,
+  dependentRequired: {
+    sourcePath: ["manifestDigest"],
+    manifestDigest: ["sourcePath"],
+  },
+};
 
 const diagnostic = closedObject(
   {

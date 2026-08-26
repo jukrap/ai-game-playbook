@@ -418,6 +418,66 @@ test("run receipt digests attest the canonical body and cannot self-parent", () 
   );
 });
 
+test("run receipt artifact attestations are paired, complete, and digest-bound", () => {
+  const receiptArtifact = {
+    artifactId: "artifact.test-report",
+    kind: "test-report",
+    path: ".ai-game-playbook/evidence/test-report.xml",
+    digest,
+    bytes: 512,
+    complete: true,
+    createdAt: endedAt,
+    commandId: "verify",
+  };
+  const sourceOnly = structuredClone(runReceipt);
+  sourceOnly.artifacts = [structuredClone(receiptArtifact)];
+  sourceOnly.artifacts[0].sourcePath = "captures/test-report.xml";
+  sourceOnly.receiptDigest = contracts.computeRunReceiptDigest(sourceOnly);
+  assert.equal(
+    contracts
+      .checkRunReceiptSemantics(sourceOnly)
+      .some(
+        ({ code }) => code === "run-receipt-artifact-attestation-invalid",
+      ),
+    true,
+  );
+
+  const incomplete = structuredClone(runReceipt);
+  incomplete.artifacts = [structuredClone(receiptArtifact)];
+  incomplete.artifacts[0].complete = false;
+  incomplete.artifacts[0].sourcePath = "captures/test-report.xml";
+  incomplete.artifacts[0].manifestDigest = contracts.sha256Digest(
+    "artifact manifest",
+  );
+  incomplete.receiptDigest = contracts.computeRunReceiptDigest(incomplete);
+  assert.equal(
+    contracts
+      .checkRunReceiptSemantics(incomplete)
+      .some(
+        ({ code }) => code === "run-receipt-artifact-attestation-invalid",
+      ),
+    true,
+  );
+
+  const attested = structuredClone(runReceipt);
+  attested.artifacts = [structuredClone(receiptArtifact)];
+  attested.artifacts[0].sourcePath = "captures/test-report.xml";
+  attested.artifacts[0].manifestDigest = contracts.sha256Digest(
+    "artifact manifest",
+  );
+  attested.receiptDigest = contracts.computeRunReceiptDigest(attested);
+  assert.deepEqual(contracts.checkRunReceiptSemantics(attested), []);
+
+  const changedManifest = structuredClone(attested);
+  changedManifest.artifacts[0].manifestDigest = contracts.sha256Digest(
+    "different artifact manifest",
+  );
+  assert.notEqual(
+    contracts.computeRunReceiptDigest(changedManifest),
+    attested.receiptDigest,
+  );
+});
+
 test("run receipt identity retains feature contract and resolved execution authority", () => {
   const missingFeatureDigest = structuredClone(runReceipt);
   delete missingFeatureDigest.identity.featureContractDigest;

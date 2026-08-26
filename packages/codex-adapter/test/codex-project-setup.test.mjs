@@ -35,7 +35,8 @@ const mcpEntryPoint = fileURLToPath(
 );
 
 async function fixture(t) {
-  const sandbox = await mkdtemp(join(tmpdir(), "agpb-codex-setup-"));
+  const createdSandbox = await mkdtemp(join(tmpdir(), "agpb-codex-setup-"));
+  const sandbox = await realpath(createdSandbox);
   const project = join(sandbox, "project");
   await mkdir(project);
   t.after(() => rm(sandbox, { recursive: true, force: true }));

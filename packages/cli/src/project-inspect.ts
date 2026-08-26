@@ -11,8 +11,6 @@ import {
   isPortableProjectPath,
   parseSemanticVersion,
   parseStableId,
-  projectInspectReportSchema,
-  projectInspectRequestSchema,
   summarizeProjectInspection,
   type EngineId,
   type GameProjectProfile,
@@ -46,7 +44,6 @@ import {
 import {
   BUILTIN_REGISTRY,
   validateRegisteredContractValue,
-  validateRegistry,
 } from "@ai-game-playbook/registry";
 
 const ROOT_ENTRY_LIMIT = 10_000;
@@ -58,21 +55,6 @@ const UNREAL_PROJECT_MAX_BYTES = 1_048_576;
 const INSTANCE_SIGNAL_MAX_BYTES = 16_384;
 const MAX_ENGINE_CANDIDATES = 16;
 const MAX_ISSUES = 64;
-
-const inspectionSchemaRegistry = validateRegistry({
-  schemaVersion: parseSemanticVersion("1.0.0").value,
-  controlPlaneVersion: BUILTIN_REGISTRY.controlPlaneVersion,
-  schemas: Object.freeze([
-    gameProjectProfileSchema,
-    projectInspectRequestSchema,
-    projectInspectReportSchema,
-  ]),
-  commands: Object.freeze([]),
-  skills: Object.freeze([]),
-  roleLenses: Object.freeze([]),
-  workflows: Object.freeze([]),
-  packs: Object.freeze([]),
-});
 
 interface MarkerFileObservation {
   readonly marker: ProjectEngineMarkerObservation;
@@ -789,7 +771,7 @@ async function inspectProfile(
   let value: GameProjectProfile;
   try {
     value = validateRegisteredContractValue(
-      inspectionSchemaRegistry,
+      BUILTIN_REGISTRY,
       Object.freeze({
         schemaId: gameProjectProfileSchema.schemaId,
         digest: gameProjectProfileSchema.digest,
@@ -1008,16 +990,24 @@ async function inspectInstances(
 }
 
 function validateReport(report: ProjectInspectReport): ProjectInspectReport {
+  const descriptor = projectInspectDescriptor();
   const validated = validateRegisteredContractValue(
-    inspectionSchemaRegistry,
-    Object.freeze({
-      schemaId: projectInspectReportSchema.schemaId,
-      digest: projectInspectReportSchema.digest,
-    }),
+    BUILTIN_REGISTRY,
+    descriptor.output,
     report,
   ) as unknown as ProjectInspectReport;
   assertProjectInspectReportSemantics(validated);
   return validated;
+}
+
+function projectInspectDescriptor() {
+  const command = BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "project.inspect",
+  );
+  if (command === undefined) {
+    throw new TypeError("builtin registry does not contain project.inspect");
+  }
+  return command;
 }
 
 function unavailableReport(
@@ -1073,12 +1063,10 @@ function unavailableReport(
 export async function runProjectInspect(
   input: unknown,
 ): Promise<ProjectInspectReport> {
+  const descriptor = projectInspectDescriptor();
   const request = validateRegisteredContractValue(
-    inspectionSchemaRegistry,
-    Object.freeze({
-      schemaId: projectInspectRequestSchema.schemaId,
-      digest: projectInspectRequestSchema.digest,
-    }),
+    BUILTIN_REGISTRY,
+    descriptor.input,
     input,
   ) as unknown as ProjectInspectRequest;
 

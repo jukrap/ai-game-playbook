@@ -1,11 +1,14 @@
 import {
   doctorReportSchema,
   doctorRequestSchema,
+  gameProjectProfileSchema,
   initReportSchema,
   initRequestSchema,
   parseSemanticVersion,
   parseSha256Digest,
   parseStableId,
+  projectInspectReportSchema,
+  projectInspectRequestSchema,
   type CommandDescriptor,
   type PermissionClass,
   type ProjectStage,
@@ -127,16 +130,68 @@ const doctorCommand: CommandDescriptor = Object.freeze({
   }),
 });
 
+const projectInspectCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("project.inspect"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "experimental",
+  summary: "Inspect static game project identity without mutation.",
+  cli: Object.freeze({
+    path: Object.freeze(["project", "inspect"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: projectInspectRequestSchema.schemaId,
+    digest: projectInspectRequestSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: projectInspectReportSchema.schemaId,
+    digest: projectInspectReportSchema.digest,
+  }),
+  capabilities: Object.freeze([parseStableId("project.inspect")]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "none",
+      scope: "project-static-inspection",
+      boundary: "local",
+    }),
+  ]),
+  lane: "parallel-read",
+  timeoutMs: 10_000,
+  cancellation: Object.freeze({ mode: "not-applicable", graceMs: 0 }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: 10_000,
+    maxOutputBytes: 1_048_576,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([parseStableId("project-inspection")]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/cli",
+    export: "runProjectInspect",
+    digest: parseSha256Digest(
+      "sha256:53fb471f5f4da4bcd79b8cba4420e66568aee517998f2384227cac78ea239b38",
+    ),
+  }),
+});
+
 const definition: RegistryDefinition = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   controlPlaneVersion: parseSemanticVersion("0.0.0").value,
   schemas: Object.freeze([
     doctorRequestSchema,
     doctorReportSchema,
+    gameProjectProfileSchema,
     initRequestSchema,
     initReportSchema,
+    projectInspectRequestSchema,
+    projectInspectReportSchema,
   ]),
-  commands: Object.freeze([doctorCommand, initCommand]),
+  commands: Object.freeze([doctorCommand, initCommand, projectInspectCommand]),
   skills: Object.freeze([]),
   roleLenses: Object.freeze([]),
   workflows: Object.freeze([]),

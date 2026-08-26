@@ -8,6 +8,7 @@ import { isAbsolute, resolve } from "node:path";
 
 import { runDoctor } from "./doctor.js";
 import { runInit } from "./init.js";
+import { runProjectInspect } from "./project-inspect.js";
 import { CliDeadlineError, runWithDeadline } from "./deadline.js";
 
 export interface CliExitCodes {
@@ -114,6 +115,22 @@ function initHelpText(): string {
     "  -h, --help        Show command help",
     "",
     "Apply is unavailable. This command never initializes, installs, or repairs.",
+    "",
+  ].join("\n");
+}
+
+function projectInspectHelpText(): string {
+  return [
+    "Usage: agpb project inspect [--project <path>] [--json]",
+    "",
+    "Inspect static Godot, Unity, or Unreal project identity without mutation.",
+    "",
+    "Options:",
+    "  --project <path>  Select a project root; defaults to the current directory",
+    "  --json            Emit the registered inspection report as canonical JSON",
+    "  -h, --help        Show command help",
+    "",
+    "This command does not run Git, enumerate processes, connect to an Editor, or change files.",
     "",
   ].join("\n");
 }
@@ -236,6 +253,62 @@ function parseInitArguments(
   return Object.freeze({ json, projectRoot, help });
 }
 
+function parseProjectInspectArguments(
+  args: readonly string[],
+  cwd: string,
+): ParsedDoctorArguments | CliRunResult {
+  let json = false;
+  let help = false;
+  let projectValue: string | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (value === "--json") {
+      if (json) {
+        return result(CLI_EXIT_CODES.usage, "", "Option --json was repeated.\n");
+      }
+      json = true;
+      continue;
+    }
+    if (value === "-h" || value === "--help") {
+      help = true;
+      continue;
+    }
+    if (value === "--project") {
+      const next = args[index + 1];
+      if (next === undefined || next.startsWith("-")) {
+        return result(
+          CLI_EXIT_CODES.usage,
+          "",
+          "Option --project requires one path.\n",
+        );
+      }
+      if (projectValue !== undefined) {
+        return result(
+          CLI_EXIT_CODES.usage,
+          "",
+          "Option --project was repeated.\n",
+        );
+      }
+      projectValue = next;
+      index += 1;
+      continue;
+    }
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Unknown project inspect option.\n${projectInspectHelpText()}`,
+    );
+  }
+
+  const projectRoot =
+    projectValue === undefined
+      ? cwd
+      : isAbsolute(projectValue)
+        ? projectValue
+        : resolve(cwd, projectValue);
+  return Object.freeze({ json, projectRoot, help });
+}
+
 function humanDoctorReport(report: Awaited<ReturnType<typeof runDoctor>>): string {
   const lines = [
     "AI Game Playbook doctor",
@@ -275,6 +348,40 @@ function humanInitReport(report: Awaited<ReturnType<typeof runInit>>): string {
     lines.push("", `Plan digest: ${report.planDigest}`);
   }
   lines.push("Apply support: unavailable; no project state was changed.");
+  return `${lines.join("\n")}\n`;
+}
+
+function humanProjectInspectReport(
+  report: Awaited<ReturnType<typeof runProjectInspect>>,
+): string {
+  const lines = [
+    "AI Game Playbook project inspect",
+    `Status: ${report.status}`,
+    "Files changed: 0",
+    `Project: ${report.project.canonicalPath ?? report.project.requestedPath}`,
+    `Engine: ${report.engine.status}`,
+    `Profile: ${report.profile.status}`,
+    `Dirty state: ${report.dirtyState.status}`,
+    `Instances: ${report.instances.status} (selection disabled)`,
+  ];
+  for (const candidate of report.engine.candidates) {
+    lines.push(
+      `  ${candidate.engine} ${candidate.completeness} ${candidate.version.raw ?? "version unknown"}`,
+    );
+  }
+  for (const issue of report.issues) {
+    lines.push(
+      "",
+      `${issue.severity.toUpperCase().padEnd(9)} ${issue.path ?? issue.code}  ${issue.message}`,
+      `          Next: ${issue.nextAction}`,
+    );
+  }
+  if (report.inspectionDigest !== undefined) {
+    lines.push("", `Inspection digest: ${report.inspectionDigest}`);
+  }
+  lines.push(
+    "Static inspection only: no Git status, process inventory, Editor connection, or support-grade promotion.",
+  );
   return `${lines.join("\n")}\n`;
 }
 
@@ -404,6 +511,72 @@ async function dispatchDoctor(
   }
 }
 
+async function dispatchProjectInspect(
+  args: readonly string[],
+  options: CliRuntimeOptions,
+): Promise<CliRunResult> {
+  const cwd = options.cwd ?? process.cwd();
+  const parsed = parseProjectInspectArguments(args, cwd);
+  if ("exitCode" in parsed) {
+    return parsed;
+  }
+  if (parsed.help) {
+    return result(CLI_EXIT_CODES.success, projectInspectHelpText());
+  }
+
+  const descriptor = BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "project.inspect",
+  );
+  if (descriptor === undefined) {
+    return result(
+      CLI_EXIT_CODES.failure,
+      "",
+      "The project inspect command is unavailable in the runtime registry.\n",
+    );
+  }
+  let input: ReturnType<typeof validateRegisteredContractValue>;
+  try {
+    input = validateRegisteredContractValue(
+      BUILTIN_REGISTRY,
+      descriptor.input,
+      { schemaVersion: "1.0.0", projectRoot: parsed.projectRoot },
+    );
+  } catch {
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      "Project inspect input is outside the registered argument contract.\n",
+    );
+  }
+  try {
+    const report = await runWithDeadline(
+      () => runProjectInspect(input),
+      descriptor.timeoutMs,
+    );
+    return result(
+      report.status === "blocked"
+        ? CLI_EXIT_CODES.blocked
+        : CLI_EXIT_CODES.success,
+      parsed.json
+        ? `${canonicalizeJson(report)}\n`
+        : humanProjectInspectReport(report),
+    );
+  } catch (error) {
+    if (error instanceof CliDeadlineError) {
+      return result(
+        CLI_EXIT_CODES.failure,
+        "",
+        "Project inspection exceeded its registered deadline without producing a report.\n",
+      );
+    }
+    return result(
+      CLI_EXIT_CODES.failure,
+      "",
+      "Project inspection failed before it could produce a validated report.\n",
+    );
+  }
+}
+
 export async function runCli(
   args: readonly string[],
   options: CliRuntimeOptions = {},
@@ -436,6 +609,16 @@ export async function runCli(
   }
   if (args[0] === "init") {
     return dispatchInit(args.slice(1), options);
+  }
+  if (args[0] === "project") {
+    if (args[1] === "inspect") {
+      return dispatchProjectInspect(args.slice(2), options);
+    }
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Unknown project command.\n${projectInspectHelpText()}`,
+    );
   }
   return result(
     CLI_EXIT_CODES.usage,

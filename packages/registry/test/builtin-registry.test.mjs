@@ -11,7 +11,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.match(registry.BUILTIN_REGISTRY.digest, digestPattern);
   assert.deepEqual(
     registry.BUILTIN_REGISTRY.commands.map(({ id }) => id),
-    ["doctor", "init"],
+    ["doctor", "init", "project.inspect"],
   );
 
   const doctor = registry.BUILTIN_REGISTRY.commands[0];
@@ -45,6 +45,39 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.equal(init.handler.package, "@ai-game-playbook/cli");
   assert.equal(init.handler.export, "runInit");
   assert.match(init.handler.digest, digestPattern);
+
+  const inspect = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "project.inspect",
+  );
+  assert.notEqual(inspect, undefined);
+  assert.deepEqual(inspect.cli, { path: ["project", "inspect"], aliases: [] });
+  assert.deepEqual(inspect.capabilities, ["project.inspect"]);
+  assert.deepEqual(inspect.permissions, ["read-project"]);
+  assert.deepEqual(inspect.sideEffects, [
+    { kind: "none", scope: "project-static-inspection", boundary: "local" },
+  ]);
+  assert.equal(inspect.lane, "parallel-read");
+  assert.equal(inspect.timeoutMs, 10_000);
+  assert.deepEqual(inspect.retry, { mode: "never", maxAttempts: 1 });
+  assert.equal(inspect.budgets.maxChangedFiles, 0);
+  assert.equal(inspect.budgets.maxChangedBytes, 0);
+  assert.equal(
+    inspect.input.schemaId,
+    contracts.projectInspectRequestSchema.schemaId,
+  );
+  assert.equal(
+    inspect.output.schemaId,
+    contracts.projectInspectReportSchema.schemaId,
+  );
+  assert.equal(inspect.handler.package, "@ai-game-playbook/cli");
+  assert.equal(inspect.handler.export, "runProjectInspect");
+  assert.match(inspect.handler.digest, digestPattern);
+  assert.equal(
+    registry.BUILTIN_REGISTRY.schemas.some(
+      ({ schemaId }) => schemaId === contracts.gameProjectProfileSchema.schemaId,
+    ),
+    true,
+  );
 });
 
 test("builtin generated surfaces preserve implemented schema and command identity", () => {
@@ -53,17 +86,21 @@ test("builtin generated surfaces preserve implemented schema and command identit
   assert.deepEqual(surfaces.cli.data.commands.map(({ id }) => id), [
     "doctor",
     "init",
+    "project.inspect",
   ]);
   assert.deepEqual(surfaces.docs.data.commands.map(({ id }) => id), [
     "doctor",
     "init",
+    "project.inspect",
   ]);
   assert.deepEqual(surfaces.mcp.data.tools.map(({ commandId }) => commandId), [
     "doctor",
     "init",
+    "project.inspect",
   ]);
   assert.equal(surfaces.mcp.data.tools[0].enabledByDefault, false);
   assert.equal(surfaces.mcp.data.tools[1].enabledByDefault, false);
+  assert.equal(surfaces.mcp.data.tools[2].enabledByDefault, false);
   assert.equal(
     surfaces.mcp.data.tools[0].outputSchemaId,
     contracts.doctorReportSchema.schemaId,
@@ -158,4 +195,14 @@ test("builtin registry validates implemented input and output values", () => {
     },
   );
   assert.equal(initOutput.mode, "plan-only");
+
+  const inspect = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "project.inspect",
+  );
+  const inspectInput = registry.validateRegisteredContractValue(
+    registry.BUILTIN_REGISTRY,
+    inspect.input,
+    { schemaVersion: "1.0.0", projectRoot: "D:\\games\\sample" },
+  );
+  assert.equal(inspectInput.projectRoot, "D:\\games\\sample");
 });

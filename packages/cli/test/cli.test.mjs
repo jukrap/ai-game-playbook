@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -20,12 +20,65 @@ test("CLI help and version are derived from the implemented runtime surface", as
   assert.match(help.stdout, /^AI Game Playbook 0\.0\.0/m);
   assert.match(help.stdout, /init\s+Plan/);
   assert.match(help.stdout, /doctor\s+Inspect/);
+  assert.match(help.stdout, /project inspect\s+Inspect/);
   assert.doesNotMatch(help.stdout, /pack add/);
   assert.equal(help.stderr, "");
 
   const version = await cli.runCli(["--version"]);
   assert.equal(version.exitCode, cli.CLI_EXIT_CODES.success);
   assert.equal(version.stdout, "0.0.0\n");
+});
+
+test("project inspect JSON and human modes preserve static attention", async (t) => {
+  const { project } = await fixture(t);
+
+  const json = await cli.runCli([
+    "project",
+    "inspect",
+    "--project",
+    project,
+    "--json",
+  ]);
+  assert.equal(json.exitCode, cli.CLI_EXIT_CODES.success);
+  assert.equal(json.stderr, "");
+  const report = JSON.parse(json.stdout);
+  assert.equal(report.commandId, "project.inspect");
+  assert.equal(report.status, "attention");
+  assert.equal(report.engine.status, "none");
+  assert.equal(report.mutationPerformed, false);
+
+  const human = await cli.runCli([
+    "project",
+    "inspect",
+    "--project",
+    project,
+  ]);
+  assert.equal(human.exitCode, cli.CLI_EXIT_CODES.success);
+  assert.match(human.stdout, /AI Game Playbook project inspect/);
+  assert.match(human.stdout, /Status: attention/);
+  assert.match(human.stdout, /Engine: none/);
+  assert.match(human.stdout, /Files changed: 0/);
+});
+
+test("project inspect maps engine ambiguity to the blocked exit category", async (t) => {
+  const { project } = await fixture(t);
+  await writeFile(join(project, "project.godot"), "config_version=5\n", "utf8");
+  await writeFile(
+    join(project, "Sample.uproject"),
+    '{"EngineAssociation":"5.8"}\n',
+    "utf8",
+  );
+
+  const output = await cli.runCli([
+    "project",
+    "inspect",
+    "--project",
+    project,
+    "--json",
+  ]);
+
+  assert.equal(output.exitCode, cli.CLI_EXIT_CODES.blocked);
+  assert.equal(JSON.parse(output.stdout).engine.status, "ambiguous");
 });
 
 test("doctor JSON and human output agree with stable exit categories", async (t) => {
@@ -55,11 +108,16 @@ test("CLI fails closed on unknown commands, flags, and missing option values", a
     ["doctor", "--repair"],
     ["init", "--apply"],
     ["doctor", "--project"],
+    ["project"],
+    ["project", "status"],
+    ["project", "inspect", "--connect"],
+    ["project", "inspect", "--project"],
+    ["project", "inspect", "--project", "one", "--project", "two"],
   ]) {
     const result = await cli.runCli(args);
     assert.equal(result.exitCode, cli.CLI_EXIT_CODES.usage);
     assert.equal(result.stdout, "");
-    assert.match(result.stderr, /Usage|Unknown|requires/);
+    assert.match(result.stderr, /Usage|Unknown|requires|repeated/);
   }
 });
 

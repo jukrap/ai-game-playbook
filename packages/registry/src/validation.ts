@@ -1621,7 +1621,11 @@ function validatePackArtifactOwnership(
   const artifactTargets = new Map<string, number>();
   const ownedPaths = new Map<
     string,
-    { readonly index: number; readonly digest?: string }
+    {
+      readonly index: number;
+      readonly kind: PackManifest["ownedPaths"][number]["kind"];
+      readonly digest?: string;
+    }
   >();
 
   for (let index = 0; index < pack.ownedPaths.length; index += 1) {
@@ -1642,6 +1646,7 @@ function validatePackArtifactOwnership(
     } else {
       ownedPaths.set(ownedPath.path, {
         index,
+        kind: ownedPath.kind,
         ...(ownedPath.digest === undefined ? {} : { digest: ownedPath.digest }),
       });
     }
@@ -1676,19 +1681,33 @@ function validatePackArtifactOwnership(
           "artifact target is not declared as an owned path",
         ),
       );
-    } else if (
-      artifact.mode !== "directory" &&
-      ownership.digest !== undefined &&
-      ownership.digest !== artifact.digest
-    ) {
-      appendDiagnostic(
-        diagnostics,
-        diagnostic(
-          "pack-owned-path-invalid",
-          `${path}.ownedPaths[${ownership.index}].digest`,
-          "owned path digest conflicts with its artifact digest",
-        ),
-      );
+    } else {
+      const expectedKind =
+        artifact.mode === "directory" ? "directory" : "file";
+      if (ownership.kind !== expectedKind) {
+        appendDiagnostic(
+          diagnostics,
+          diagnostic(
+            "pack-owned-path-invalid",
+            `${path}.ownedPaths[${ownership.index}].kind`,
+            `artifact mode ${artifact.mode} requires ${expectedKind} ownership`,
+          ),
+        );
+      }
+      if (
+        artifact.mode !== "directory" &&
+        ownership.digest !== undefined &&
+        ownership.digest !== artifact.digest
+      ) {
+        appendDiagnostic(
+          diagnostics,
+          diagnostic(
+            "pack-owned-path-invalid",
+            `${path}.ownedPaths[${ownership.index}].digest`,
+            "owned path digest conflicts with its artifact digest",
+          ),
+        );
+      }
     }
   }
 }
@@ -1696,12 +1715,14 @@ function validatePackArtifactOwnership(
 interface OwnedPathClaim {
   readonly packIndex: number;
   readonly pathIndex: number;
+  readonly kind: PackManifest["ownedPaths"][number]["kind"];
 }
 
 interface OwnedPathTrieNode {
   readonly children: Map<string, OwnedPathTrieNode>;
   claim?: OwnedPathClaim;
   firstClaim?: OwnedPathClaim;
+  firstOtherPackClaim?: OwnedPathClaim;
 }
 
 function createOwnedPathTrieNode(): OwnedPathTrieNode {
@@ -1710,6 +1731,28 @@ function createOwnedPathTrieNode(): OwnedPathTrieNode {
 
 function ownedPathClaimLocator(claim: OwnedPathClaim): string {
   return `$.packs[${claim.packIndex}].ownedPaths[${claim.pathIndex}].path`;
+}
+
+function firstForeignDescendantClaim(
+  node: OwnedPathTrieNode,
+  packIndex: number,
+): OwnedPathClaim | undefined {
+  if (node.firstClaim === undefined) {
+    return undefined;
+  }
+  return node.firstClaim.packIndex === packIndex
+    ? node.firstOtherPackClaim
+    : node.firstClaim;
+}
+
+function isAllowedSamePackAncestor(
+  ancestor: OwnedPathClaim,
+  descendant: OwnedPathClaim,
+): boolean {
+  return (
+    ancestor.packIndex === descendant.packIndex &&
+    ancestor.kind === "directory"
+  );
 }
 
 function validatePackOwnershipCollisions(
@@ -1732,7 +1775,7 @@ function validatePackOwnershipCollisions(
       if (ownedPath === undefined) {
         continue;
       }
-      const claim = { packIndex, pathIndex };
+      const claim = { packIndex, pathIndex, kind: ownedPath.kind };
       const visited = [root];
       let node = root;
       let conflict: OwnedPathClaim | undefined;
@@ -1741,7 +1784,10 @@ function validatePackOwnershipCollisions(
         .map((segment) => segment.toLowerCase());
 
       for (const segment of segments) {
-        if (node.claim !== undefined) {
+        if (
+          node.claim !== undefined &&
+          !isAllowedSamePackAncestor(node.claim, claim)
+        ) {
           conflict = node.claim;
           break;
         }
@@ -1755,7 +1801,13 @@ function validatePackOwnershipCollisions(
       }
 
       if (conflict === undefined) {
-        conflict = node.claim ?? node.firstClaim;
+        conflict = node.claim;
+      }
+      if (conflict === undefined) {
+        conflict =
+          claim.kind === "directory"
+            ? firstForeignDescendantClaim(node, claim.packIndex)
+            : node.firstClaim;
       }
       if (conflict !== undefined) {
         appendDiagnostic(
@@ -1771,7 +1823,14 @@ function validatePackOwnershipCollisions(
 
       node.claim = claim;
       for (const visitedNode of visited) {
-        visitedNode.firstClaim ??= claim;
+        if (visitedNode.firstClaim === undefined) {
+          visitedNode.firstClaim = claim;
+        } else if (
+          visitedNode.firstClaim.packIndex !== claim.packIndex &&
+          visitedNode.firstOtherPackClaim === undefined
+        ) {
+          visitedNode.firstOtherPackClaim = claim;
+        }
       }
     }
   }

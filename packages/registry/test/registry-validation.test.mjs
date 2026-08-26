@@ -447,6 +447,34 @@ test("pack validation requires explicit bounded network authority", () => {
 });
 
 test("pack validation binds artifacts to unique owned paths", () => {
+  const nestedOwnership = createValidRegistryDefinition();
+  const nestedOwnershipPack = createPack("pack.nested-owner", "1.0.0");
+  nestedOwnershipPack.artifacts[0].target =
+    "GameContent/agpb-nested-owner/index.js";
+  nestedOwnershipPack.ownedPaths = [
+    {
+      path: "GameContent/agpb-nested-owner",
+      kind: "directory",
+    },
+    {
+      path: nestedOwnershipPack.artifacts[0].target,
+      kind: "file",
+      digest: nestedOwnershipPack.artifacts[0].digest,
+    },
+  ];
+  nestedOwnershipPack.digest =
+    contracts.computePackManifestDigest(nestedOwnershipPack);
+  nestedOwnership.packs.push(nestedOwnershipPack);
+  assert.equal(registry.validateRegistry(nestedOwnership).packs.length, 1);
+
+  const reverseNestedOwnership = createValidRegistryDefinition();
+  const reverseNestedPack = structuredClone(nestedOwnershipPack);
+  reverseNestedPack.id = "pack.reverse-nested-owner";
+  reverseNestedPack.ownedPaths.reverse();
+  reverseNestedPack.digest = contracts.computePackManifestDigest(reverseNestedPack);
+  reverseNestedOwnership.packs.push(reverseNestedPack);
+  assert.equal(registry.validateRegistry(reverseNestedOwnership).packs.length, 1);
+
   const duplicateTarget = createValidRegistryDefinition();
   const duplicateTargetPack = createPack("pack.duplicate-target", "1.0.0");
   duplicateTargetPack.artifacts.push(
@@ -486,6 +514,34 @@ test("pack validation binds artifacts to unique owned paths", () => {
     contracts.computePackManifestDigest(conflictingDigestPack);
   conflictingDigest.packs.push(conflictingDigestPack);
   expectDiagnostic(conflictingDigest, "pack-owned-path-invalid");
+
+  const wrongOwnershipKind = createValidRegistryDefinition();
+  const wrongOwnershipKindPack = createPack("pack.wrong-kind", "1.0.0");
+  wrongOwnershipKindPack.ownedPaths[0].kind = "directory";
+  wrongOwnershipKindPack.digest =
+    contracts.computePackManifestDigest(wrongOwnershipKindPack);
+  wrongOwnershipKind.packs.push(wrongOwnershipKindPack);
+  expectDiagnostic(wrongOwnershipKind, "pack-owned-path-invalid");
+
+  const samePackFileAncestor = createValidRegistryDefinition();
+  const samePackFileAncestorPack = createPack("pack.file-ancestor", "1.0.0");
+  samePackFileAncestorPack.artifacts[0].target =
+    "GameContent/agpb-file-ancestor/index.js";
+  samePackFileAncestorPack.ownedPaths = [
+    {
+      path: "GameContent/agpb-file-ancestor",
+      kind: "file",
+    },
+    {
+      path: samePackFileAncestorPack.artifacts[0].target,
+      kind: "file",
+      digest: samePackFileAncestorPack.artifacts[0].digest,
+    },
+  ];
+  samePackFileAncestorPack.digest =
+    contracts.computePackManifestDigest(samePackFileAncestorPack);
+  samePackFileAncestor.packs.push(samePackFileAncestorPack);
+  expectDiagnostic(samePackFileAncestor, "pack-owned-path-invalid");
 
   const crossPackCaseCollision = createValidRegistryDefinition();
   const firstCasePack = createPack("pack.case-owner-a", "1.0.0");

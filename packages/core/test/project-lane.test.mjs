@@ -56,6 +56,7 @@ function request(root, overrides = {}) {
 
 test("project mutation leases bind identity and release their fixed lock", async (t) => {
   assert.equal(typeof core.acquireProjectLane, "function");
+  assert.equal(typeof core.assertProjectLaneLease, "function");
   assert.equal(typeof core.inspectProjectLane, "function");
   assert.equal(
     core.PROJECT_LANE_LOCK_PATH,
@@ -64,6 +65,11 @@ test("project mutation leases bind identity and release their fixed lock", async
 
   const { project, root } = await fixture(t);
   const lease = await core.acquireProjectLane(request(root));
+  assert.doesNotThrow(() => core.assertProjectLaneLease(lease));
+  assert.throws(
+    () => core.assertProjectLaneLease({ ...lease }),
+    expectCoreError("project-lane-state-invalid"),
+  );
 
   assert.equal(Object.isFrozen(lease), true);
   assert.equal(lease.state, "active");

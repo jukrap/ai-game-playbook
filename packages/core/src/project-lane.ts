@@ -47,6 +47,7 @@ const CURRENT_PROCESS_STARTED_AT: string = new Date(
   Date.now() - Math.max(0, Math.round(process.uptime() * 1_000)),
 ).toISOString();
 const CURRENT_PROCESS_INSTANCE_NONCE: string = randomUUID();
+const projectLaneLeaseInstances = new WeakSet<object>();
 
 export type ProjectMutationLane =
   | "build-bound"
@@ -131,6 +132,22 @@ export interface ProjectLaneLease {
   assertOwned(): Promise<ProjectLaneLeaseRecord>;
   renew(): Promise<ProjectLaneLeaseRecord>;
   release(): Promise<void>;
+}
+
+export function assertProjectLaneLease(
+  value: unknown,
+): asserts value is ProjectLaneLease {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    !projectLaneLeaseInstances.has(value)
+  ) {
+    throw new CoreBoundaryError(
+      "project-lane-state-invalid",
+      "$projectLane",
+      "project lane lease must be produced by this core runtime process",
+    );
+  }
 }
 
 interface ValidatedAcquireProjectLaneRequest {
@@ -801,11 +818,22 @@ async function atomicCreateLock(
   record: ProjectLaneLeaseRecord,
 ): Promise<LaneFileSnapshot | undefined> {
   await assertLaneDirectory(request.root, directory);
-  const target = await resolveProjectPath(
-    request.root,
-    PROJECT_LANE_LOCK_PATH,
-    { expectedType: "file", existence: "optional" },
-  );
+  let target: ResolvedProjectPath;
+  try {
+    target = await resolveProjectPath(request.root, PROJECT_LANE_LOCK_PATH, {
+      expectedType: "file",
+      existence: "optional",
+    });
+  } catch (error) {
+    if (
+      error instanceof CoreBoundaryError &&
+      error.code === "project-path-not-found"
+    ) {
+      await assertLaneDirectory(request.root, directory);
+      return undefined;
+    }
+    throw error;
+  }
   if (!sameIdentity(target.parentIdentity, directory)) {
     throw new CoreBoundaryError(
       "project-lane-ownership-lost",
@@ -1256,7 +1284,7 @@ function createLease(
     }
   };
 
-  return Object.freeze({
+  const lease: ProjectLaneLease = Object.freeze({
     get state(): ProjectLaneLeaseState {
       return state;
     },
@@ -1290,6 +1318,8 @@ function createLease(
     renew,
     release,
   });
+  projectLaneLeaseInstances.add(lease);
+  return lease;
 }
 
 async function acquireValidatedProjectLane(

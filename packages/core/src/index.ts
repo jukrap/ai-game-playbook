@@ -89,6 +89,7 @@ export type {
 } from "./project-path.js";
 export {
   acquireProjectLane,
+  assertProjectLaneLease,
   inspectProjectLane,
   PROJECT_LANE_LOCK_PATH,
   PROJECT_LANE_MAX_LEASE_MS,

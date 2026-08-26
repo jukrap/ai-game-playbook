@@ -87,6 +87,16 @@ function isMissing(error: unknown): boolean {
   );
 }
 
+function isWindowsRealpathRace(error: unknown): boolean {
+  return (
+    process.platform === "win32" &&
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "EBADF"
+  );
+}
+
 function projectRootError(error: unknown): never {
   if (isMissing(error)) {
     throw new CoreBoundaryError(
@@ -357,6 +367,13 @@ async function checkedRealPath(
   try {
     resolved = await realpath(candidate);
   } catch (error) {
+    if (isWindowsRealpathRace(error)) {
+      throw new CoreBoundaryError(
+        "project-path-not-found",
+        path,
+        "project path changed during resolution",
+      );
+    }
     pathError(error, path);
   }
   if (!isContained(root.canonicalPath, resolved)) {

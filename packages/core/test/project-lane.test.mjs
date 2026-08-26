@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import {
   chmod,
   mkdir,
@@ -199,6 +200,35 @@ test("one project lane serializes mutations while different projects remain inde
   assert.equal(waiterLease.state, "active");
   await waiterLease.release();
   await secondProjectLease.release();
+});
+
+test("contended project lane handoffs preserve each exact successor", async (t) => {
+  const { root } = await fixture(t);
+  const owner = await core.acquireProjectLane(
+    request(root, { runId: randomUUID() }),
+  );
+  const contenders = Array.from({ length: 16 }, async () => {
+    const lease = await core.acquireProjectLane(
+      request(root, {
+        runId: randomUUID(),
+        waitTimeoutMs: 10_000,
+        pollIntervalMs: 10,
+      }),
+    );
+    assert.equal(lease.state, "active");
+    await lease.release();
+  });
+
+  const outcomes = await Promise.allSettled([owner.release(), ...contenders]);
+  assert.deepEqual(
+    outcomes.map((outcome) =>
+      outcome.status === "fulfilled"
+        ? "fulfilled"
+        : `${outcome.reason?.code}: ${outcome.reason?.message}\n${outcome.reason?.stack}`,
+    ),
+    Array.from({ length: outcomes.length }, () => "fulfilled"),
+  );
+  assert.deepEqual(await core.inspectProjectLane({ root }), { status: "free" });
 });
 
 test("a queued lane request can be cancelled without disturbing the owner", async (t) => {

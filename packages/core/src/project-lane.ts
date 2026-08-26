@@ -49,6 +49,16 @@ const CURRENT_PROCESS_STARTED_AT: string = new Date(
 const CURRENT_PROCESS_INSTANCE_NONCE: string = randomUUID();
 const projectLaneLeaseInstances = new WeakSet<object>();
 
+class LaneSnapshotChangedError extends CoreBoundaryError {
+  constructor() {
+    super(
+      "project-lane-lock-invalid",
+      "$projectLane.lock",
+      "project lane lock changed while it was read",
+    );
+  }
+}
+
 export type ProjectMutationLane =
   | "build-bound"
   | "editor-bound"
@@ -610,11 +620,7 @@ async function readLockSnapshot(
       before.mtimeNs !== after.mtimeNs ||
       before.ctimeNs !== after.ctimeNs
     ) {
-      throw new CoreBoundaryError(
-        "project-lane-lock-invalid",
-        "$projectLane.lock",
-        "project lane lock changed while it was read",
-      );
+      throw new LaneSnapshotChangedError();
     }
     stats = after;
   } catch (error) {
@@ -1022,14 +1028,17 @@ async function moveLockToTombstone(
     if (!moved.isFile() || !identityMatches(current, moved)) {
       throw new Error("moved lane lock identity mismatch");
     }
-    const lockAfter = await resolveProjectPath(root, PROJECT_LANE_LOCK_PATH, {
-      expectedType: "file",
-      existence: "optional",
-    });
-    if (lockAfter.kind !== "absent") {
-      throw new Error("lane lock still exists after rename");
-    }
+    await assertReleasedIdentityIsNotCurrent(root, directory, current);
     await unlink(tombstonePath);
+    try {
+      await lstat(tombstonePath, { bigint: true });
+      throw new Error("released lane tombstone still exists after cleanup");
+    } catch (error) {
+      if (!isMissing(error)) {
+        throw error;
+      }
+    }
+    await assertReleasedIdentityIsNotCurrent(root, directory, current);
     await syncDirectory(directory.absolutePath);
   } catch {
     throw new CoreBoundaryError(
@@ -1038,6 +1047,40 @@ async function moveLockToTombstone(
       "project lane lock moved but cleanup could not be proven",
       true,
     );
+  }
+}
+
+async function assertReleasedIdentityIsNotCurrent(
+  root: CanonicalProjectRoot,
+  directory: BoundLaneDirectory,
+  released: LaneFileSnapshot,
+): Promise<void> {
+  await assertLaneDirectory(root, directory);
+  let target: ResolvedProjectPath;
+  try {
+    target = await resolveProjectPath(root, PROJECT_LANE_LOCK_PATH, {
+      expectedType: "file",
+      existence: "optional",
+    });
+  } catch (error) {
+    if (
+      error instanceof CoreBoundaryError &&
+      error.code === "project-path-not-found"
+    ) {
+      await assertLaneDirectory(root, directory);
+      return;
+    }
+    throw error;
+  }
+  if (!sameIdentity(target.parentIdentity, directory)) {
+    throw new Error("project lane lock parent changed during release cleanup");
+  }
+  if (
+    target.kind !== "absent" &&
+    target.targetIdentity !== undefined &&
+    sameIdentity(target.targetIdentity, released)
+  ) {
+    throw new Error("released project lane identity returned to the lock path");
   }
 }
 
@@ -1365,7 +1408,28 @@ async function acquireValidatedProjectLane(
       );
     }
 
-    const existing = await readLockSnapshot(request.root, directory);
+    let existing: LaneFileSnapshot | undefined;
+    try {
+      existing = await readLockSnapshot(request.root, directory);
+    } catch (error) {
+      if (!(error instanceof LaneSnapshotChangedError)) {
+        throw error;
+      }
+      await assertLaneDirectory(request.root, directory);
+      const remainingMs = deadline - performance.now();
+      if (remainingMs <= 0) {
+        throw new CoreBoundaryError(
+          "project-lane-busy",
+          "$projectLane.lock",
+          "project lane lock did not stabilize before the wait deadline",
+        );
+      }
+      await waitForRetry(
+        Math.max(1, Math.min(request.pollIntervalMs, Math.ceil(remainingMs))),
+        request.signal,
+      );
+      continue;
+    }
     if (existing === undefined) {
       continue;
     }

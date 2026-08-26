@@ -1,18 +1,18 @@
 ---
 source: docs/architecture.md
-source_sha256: 0974bec87a1e6da69af297c6b46e4421e879f99311e5f48923bfcf21aea9c685
+source_sha256: bca4e845dd9b8bc1283b4429406877522cad7515cebe69c9feb1cf3a0fc307f8
 translated_at: 2026-08-26
 ---
 
 # 목표 아키텍처
 
-> 상태: 계획된 아키텍처입니다. 검토 중 package와 bridge 경계가 바뀔 수 있습니다.
+> 상태: 목표 아키텍처입니다. `contracts`와 `registry` 기반은 존재하며 runtime과 bridge 경계는 아직 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
 ## 개요
 
-계획된 시스템은 pnpm workspace와 Node.js/TypeScript control plane을 사용합니다. 엔진별 bridge는 Unity의 C#, Unreal의 Python/C++, Godot의 GDScript로 얇게 유지합니다. 그 외 Python은 격리된 Blender 또는 ML workload에만 도입합니다.
+저장소는 Node.js/TypeScript control plane용 pnpm workspace를 사용합니다. 엔진별 bridge는 Unity의 C#, Unreal의 Python/C++, Godot의 GDScript로 얇게 유지할 계획입니다. 그 외 Python은 격리된 Blender 또는 ML workload에만 도입합니다.
 
 ```mermaid
 flowchart TD
@@ -27,25 +27,25 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-typed registry는 command, skill, role-lens, workflow descriptor를 작성하는 유일한 계획 원본입니다. CLI parsing, MCP schema, help, public command metadata, Codex routing은 생성 projection입니다. 생성 표면은 권한을 부여하거나 capability를 지어낼 수 없습니다.
+typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 작성 원본입니다. 현재 generator는 CLI, MCP, help, 문서 metadata, host routing용으로 검증된 설계 projection을 생성합니다. runtime consumer는 아직 계획 단계입니다. 생성 표면은 권한을 부여하거나 capability를 지어낼 수 없습니다.
 
-## 계획된 workspace 경계
+## Workspace 경계
 
-| 경계 | 책임 |
-| --- | --- |
-| `contracts` | engine runtime dependency가 없는 versioned schema와 shared identifier |
-| `registry` | descriptor validation, generation, digest, parity check |
-| `core` | project identity, permission, budget, lane, checkpoint, workflow state |
-| `cli` | `agpb` argument parsing, local interaction, stable exit behavior, help |
-| `mcp` | 동일 permission broker 뒤의 schema-derived tool과 resource |
-| `codex-adapter` | skill, host routing metadata, project instruction integration |
-| `pack-runtime` | staged install, owned path, dependency check, update, rollback, uninstall |
-| `evidence` | content-addressed artifact, receipt, export, retention, redaction |
-| `engine-common` | 공통 capability negotiation과 engine operation contract |
-| Engine adapter | 넓은 host 권한 없이 Godot, Unity, Unreal orchestration |
-| Project bridge | 검증된 engine operation 노출에 필요한 최소 Editor/runtime code |
+| 경계 | 상태 | 책임 |
+| --- | --- | --- |
+| `contracts` | 기반 구현 | engine runtime dependency가 없는 versioned schema와 shared identifier |
+| `registry` | 기반 구현 | descriptor validation, generation, digest, routing, parity check |
+| `core` | 계획 | project identity, permission, budget, lane, checkpoint, workflow state |
+| `cli` | 계획 | `agpb` argument parsing, local interaction, stable exit behavior, help |
+| `mcp` | 계획 | 동일 permission broker 뒤의 schema-derived tool과 resource |
+| `codex-adapter` | 계획 | skill, host routing metadata, project instruction integration |
+| `pack-runtime` | 계획 | staged install, owned path, dependency check, update, rollback, uninstall |
+| `evidence` | 계획 | content-addressed artifact, receipt, export, retention, redaction |
+| `engine-common` | 계약만 구현 | 공통 capability negotiation과 engine operation contract |
+| Engine adapter | 계획 | 넓은 host 권한 없이 Godot, Unity, Unreal orchestration |
+| Project bridge | 계획 | 검증된 engine operation 노출에 필요한 최소 Editor/runtime code |
 
-이는 논리적 경계 계획이며 정확히 이 package 이름이 이미 존재한다는 뜻이 아닙니다.
+현재 workspace package로 존재하는 경계는 `contracts`와 `registry`뿐입니다. 표에 있다는 사실만으로 runtime package나 capability가 존재한다고 주장하지 않습니다.
 
 ## 실행 흐름
 

@@ -1,6 +1,6 @@
 # AI Game Playbook
 
-> Status: documentation and contract design only. No installable package, `agpb` executable, MCP server, or engine adapter exists yet.
+> Status: control-plane contract and registry foundation in progress. No installable package, `agpb` executable, MCP server, or engine adapter exists yet.
 
 [한국어](README.ko.md)
 
@@ -8,12 +8,13 @@ AI Game Playbook is a planned AI-assisted game-development harness for small tea
 
 ## What exists today
 
-- A reviewable product and architecture baseline.
-- Planned command, pack, adapter, permission, evidence, asset, and verification contracts.
+- A pnpm/TypeScript workspace with versioned public schemas and semantic validation.
+- A typed registry that validates command, skill, workflow, role-lens, schema, and pack descriptors and generates bounded design projections.
+- A tracked, digest-bound plan for the intended command and skill surface.
 - English documentation with a Korean mirror.
-- A machine-readable description of the planned public surface.
+- Cross-platform static checks for contracts, generated-plan drift, and documentation parity.
 
-The repository does not currently provide an npm package or working game-engine automation. Commands shown in the documentation are interface plans, not commands that can be run today.
+These foundations are development-time libraries and checks, not a usable product. The repository does not currently provide an installable npm package or working game-engine automation. Commands shown in the documentation are interface plans, not commands that can be run today.
 
 ## Product direction
 
@@ -29,7 +30,7 @@ Godot, Unity, and Unreal Engine are the only planned first-party engines. Web-ga
 
 ## Design promises
 
-- One typed registry is planned to generate the CLI, MCP schemas, help, documentation metadata, and host skill routing.
+- One typed registry defines command and skill descriptors and generates their current design projections. Future CLI, MCP, help, and host integrations must consume the same validated authority metadata.
 - Unsupported capabilities must degrade explicitly; lower-grade evidence cannot be labeled `verified`.
 - Editor mutations are serialized per project and stop when identity or dirty-file state becomes ambiguous.
 - Installation, networking, external transmission, paid calls, destructive actions, and publishing require separate approval.
@@ -55,4 +56,4 @@ Installation is not available. Do not install similarly named packages expecting
 
 ## Project status and licensing
 
-The design may change during review. The project license has not been selected, so do not assume redistribution rights until a license file is added. No release or package publication is planned before that decision.
+The interfaces may change during implementation. The project license has not been selected, so do not assume redistribution rights until a license file is added. No release or package publication is planned before that decision.

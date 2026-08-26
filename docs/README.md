@@ -1,12 +1,12 @@
 # Documentation
 
-> Status: public design package, reviewed on 2026-08-26. Product implementation has not started.
+> Status: public design and implementation-status package, reviewed on 2026-08-26. The control-plane foundation is in progress.
 
 [한국어](README.ko.md) · [Project overview](../README.md)
 
 ## Audience and purpose
 
-This package is for prospective users, contributors, and maintainers who need to understand the intended product boundary before implementation. It describes planned contracts and current limitations without presenting planned behavior as shipped functionality.
+This package is for prospective users, contributors, and maintainers who need to understand the product boundary and current capability. It distinguishes implemented foundations from planned runtime behavior and shipped functionality.
 
 ## Document set
 
@@ -22,12 +22,13 @@ This package is for prospective users, contributors, and maintainers who need to
 | [Evidence and verification](evidence-and-verification.md) | Receipts, evidence grades, deterministic playtests, and golden tasks |
 | [Roadmap](roadmap.md) | Documentation approval, implementation order, and release criteria |
 
-The file [planned-surface.json](planned-surface.json) is a machine-readable design artifact. It is not a runtime registry and cannot be used to invoke commands.
+The file [planned-surface.json](planned-surface.json) is manually maintained public design data. The generated [foundation plan](../generated/foundation-plan.json) is a digest-bound projection of the typed registry. Both remain design-only artifacts: neither is a runtime registry nor can invoke commands.
 
 ## Status language
 
 - **Current** means the artifact is present and can be inspected in this repository.
-- **Planned** means the contract is designed but has no product implementation.
+- **Implemented foundation** means code and tests exist, but no user-facing runtime capability is implied.
+- **Planned** means no usable runtime capability has been established.
 - **Detected**, **headless**, **editor-preview**, and **verified** are engine support grades that require progressively stronger runtime evidence.
 - A roadmap milestone does not imply availability.
 
@@ -44,6 +45,6 @@ Project maintainers own this package. Review it whenever implementation status, 
 ## Caveats
 
 - No live engine loop has been verified for this product.
-- Exact engine patch versions will be pinned again at implementation start.
-- Package naming and public interfaces remain provisional until documentation approval.
+- Exact engine patch versions will be pinned before each adapter implementation begins.
+- Package naming and public interfaces remain provisional until the first release.
 - A project license must be selected before external code adoption or package publication.

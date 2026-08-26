@@ -1,12 +1,12 @@
 # Target Architecture
 
-> Status: planned architecture. Package and bridge boundaries may change during review.
+> Status: target architecture. The `contracts` and `registry` foundations exist; runtime and bridge boundaries remain planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
 ## Overview
 
-The planned system uses a pnpm workspace and a Node.js/TypeScript control plane. Engine-specific bridges remain thin: C# for Unity, Python/C++ for Unreal, and GDScript for Godot. Python is otherwise introduced only for isolated Blender or ML workloads.
+The repository uses a pnpm workspace for a Node.js/TypeScript control plane. Engine-specific bridges are planned to remain thin: C# for Unity, Python/C++ for Unreal, and GDScript for Godot. Python is otherwise introduced only for isolated Blender or ML workloads.
 
 ```mermaid
 flowchart TD
@@ -21,25 +21,25 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-The typed registry is the only planned authoring source for command, skill, role-lens, and workflow descriptors. CLI parsing, MCP schemas, help, public command metadata, and Codex routing are generated projections. Generated surfaces cannot grant permissions or invent capabilities.
+The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Its current generators produce validated design projections for CLI, MCP, help, documentation metadata, and host routing. Runtime consumers remain planned. Generated surfaces cannot grant permissions or invent capabilities.
 
-## Planned workspace boundaries
+## Workspace boundaries
 
-| Boundary | Responsibility |
-| --- | --- |
-| `contracts` | Versioned schemas and shared identifiers with no engine runtime dependency |
-| `registry` | Descriptor validation, generation, digesting, and parity checks |
-| `core` | Project identity, permissions, budgets, lanes, checkpoints, and workflow state |
-| `cli` | `agpb` argument parsing, local interaction, stable exit behavior, and help |
-| `mcp` | Schema-derived tools and resources behind the same permission broker |
-| `codex-adapter` | Skills, host routing metadata, and project instruction integration |
-| `pack-runtime` | Staged install, owned paths, dependency checks, update, rollback, and uninstall |
-| `evidence` | Content-addressed artifacts, receipts, exports, retention, and redaction |
-| `engine-common` | Common capability negotiation and engine operation contracts |
-| Engine adapters | Godot, Unity, and Unreal orchestration without broad host authority |
-| Project bridges | Minimum editor/runtime code needed to expose verified engine operations |
+| Boundary | Status | Responsibility |
+| --- | --- | --- |
+| `contracts` | Foundation implemented | Versioned schemas and shared identifiers with no engine runtime dependency |
+| `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, and parity checks |
+| `core` | Planned | Project identity, permissions, budgets, lanes, checkpoints, and workflow state |
+| `cli` | Planned | `agpb` argument parsing, local interaction, stable exit behavior, and help |
+| `mcp` | Planned | Schema-derived tools and resources behind the same permission broker |
+| `codex-adapter` | Planned | Skills, host routing metadata, and project instruction integration |
+| `pack-runtime` | Planned | Staged install, owned paths, dependency checks, update, rollback, and uninstall |
+| `evidence` | Planned | Content-addressed artifacts, receipts, exports, retention, and redaction |
+| `engine-common` | Contract only | Common capability negotiation and engine operation contracts |
+| Engine adapters | Planned | Godot, Unity, and Unreal orchestration without broad host authority |
+| Project bridges | Planned | Minimum editor/runtime code needed to expose verified engine operations |
 
-This is a logical boundary plan, not a promise that these exact package names already exist.
+Only `contracts` and `registry` currently exist as workspace packages. A listed boundary is not a claim that its runtime package or capability already exists.
 
 ## Execution flow
 

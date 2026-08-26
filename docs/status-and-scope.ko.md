@@ -1,20 +1,20 @@
 ---
 source: docs/status-and-scope.md
-source_sha256: fdfb808f26701dc1281cb2e4ef09678fb3ad9695d753970a60d73be9c9246ac1
+source_sha256: fd235e52ad01452bf3aed7ad65046ad614488f034d48803923e2f4a4d4376ed6
 translated_at: 2026-08-26
 ---
 
 # 현재 상태와 범위
 
-> 상태: 2026-08-26에 검토한 설계 기준선입니다.
+> 상태: 2026-08-26에 검토한 Stage 1 control plane 기반 구현 단계입니다.
 
 [English](status-and-scope.md) · [문서](README.ko.md)
 
 ## 현재 저장소 상태
 
-현재 저장소에는 작업 규칙과 공개 문서 기준선만 있습니다. 제품 소스 코드, package manifest, `agpb` 실행 파일, MCP 서버, Codex integration 파일, engine bridge, engine pack, 실행 가능한 golden project는 없습니다.
+현재 저장소에는 private pnpm/TypeScript workspace, versioned contract schema, semantic validator, typed registry 검증 및 projection, digest 결합 foundation plan, test, Windows/Linux CI 설정이 있습니다.
 
-[planned-surface.json](planned-surface.json)의 명령과 타입 목록은 설명용 설계 데이터입니다. 이 파일이 존재해도 capability 등급은 `planned`보다 높아지지 않습니다.
+설치 가능한 package, `agpb` 실행 파일, MCP server runtime, Codex integration 파일, permission 또는 workflow runtime, engine bridge, engine pack, 실행 가능한 golden project는 아직 없습니다. [planned-surface.json](planned-surface.json)의 명령 목록과 생성된 [foundation plan](../generated/foundation-plan.json)은 설계 전용이며 어느 command 또는 engine capability도 `planned`보다 높이지 않습니다.
 
 ## 대상 사용자와 첫 결과물
 
@@ -61,4 +61,4 @@ translated_at: 2026-08-26
 
 ## 준비 조건
 
-7개 문서 게이트를 모두 검토하고 승인한 뒤에만 첫 제품 구현을 시작합니다. `0.1.0-alpha`는 Godot golden loop 전체가 end-to-end로 통과해야 합니다. `1.0`은 세 엔진이 모두 `verified`에 도달하고 설치 생명주기, 복구, behavior evaluation이 안정화되어야 합니다.
+7개 문서 gate를 모두 승인한 뒤 Stage 1 구현을 시작했습니다. `0.1.0-alpha`는 여전히 Godot golden loop 전체가 end-to-end로 통과해야 합니다. `1.0`은 세 엔진이 모두 `verified`에 도달하고 설치 생명주기, 복구, behavior evaluation이 안정화되어야 합니다.

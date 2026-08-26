@@ -1,18 +1,18 @@
 ---
 source: docs/README.md
-source_sha256: b0f6b2ace989b0240bb1b1e6d9210fb92a2ca47ce4a06919bfcb06e7dce9fcb6
+source_sha256: f2f0031fda0de3be7d7e000d22186f1461edd87e1f52d99c6f8fb11a65a03625
 translated_at: 2026-08-26
 ---
 
 # 문서
 
-> 상태: 2026-08-26에 검토한 공개 설계 문서 묶음입니다. 제품 구현은 시작하지 않았습니다.
+> 상태: 2026-08-26에 검토한 공개 설계 및 구현 상태 문서 묶음입니다. control plane 기반 구현을 진행하고 있습니다.
 
 [English](README.md) · [프로젝트 소개](../README.ko.md)
 
 ## 독자와 목적
 
-이 문서 묶음은 구현 전에 제품 경계를 이해해야 하는 잠재 사용자, 기여자, 유지관리자를 위한 것입니다. 계획된 동작을 출시된 기능처럼 표현하지 않으면서 계획된 계약과 현재 한계를 설명합니다.
+이 문서 묶음은 제품 경계와 현재 capability를 이해해야 하는 잠재 사용자, 기여자, 유지관리자를 위한 것입니다. 구현된 기반, 계획된 runtime 동작, 출시된 기능을 구분합니다.
 
 ## 문서 구성
 
@@ -28,12 +28,13 @@ translated_at: 2026-08-26
 | [증거와 검증](evidence-and-verification.ko.md) | receipt, 증거 등급, 결정적 playtest, golden task |
 | [로드맵](roadmap.ko.md) | 문서 승인, 구현 순서, release 기준 |
 
-[planned-surface.json](planned-surface.json)은 기계 판독 가능한 설계 산출물입니다. runtime registry가 아니며 명령 호출에 사용할 수 없습니다.
+[planned-surface.json](planned-surface.json)은 수동으로 관리하는 공개 설계 데이터입니다. 생성된 [foundation plan](../generated/foundation-plan.json)은 typed registry의 digest 결합 projection입니다. 둘 다 설계 전용 산출물이며 runtime registry가 아니고 명령 호출에 사용할 수 없습니다.
 
 ## 상태 표현
 
 - **Current**는 해당 산출물이 현재 저장소에 존재하고 검사할 수 있음을 뜻합니다.
-- **Planned**는 계약을 설계했지만 제품 구현이 없음을 뜻합니다.
+- **Implemented foundation**은 코드와 테스트가 존재하지만 사용자용 runtime capability를 의미하지 않음을 뜻합니다.
+- **Planned**는 사용 가능한 runtime capability가 확립되지 않았음을 뜻합니다.
 - **Detected**, **headless**, **editor-preview**, **verified**는 점차 강한 runtime 증거를 요구하는 엔진 지원 등급입니다.
 - 로드맵 milestone은 기능 제공을 의미하지 않습니다.
 
@@ -50,6 +51,6 @@ translated_at: 2026-08-26
 ## 주의 사항
 
 - 이 제품으로 검증한 live engine loop는 아직 없습니다.
-- 정확한 엔진 patch 버전은 구현 시작 시 다시 pin합니다.
-- 문서 승인 전에는 package 이름과 공개 인터페이스가 바뀔 수 있습니다.
+- 정확한 엔진 patch 버전은 각 adapter 구현을 시작하기 전에 pin합니다.
+- package 이름과 공개 인터페이스는 첫 release 전까지 바뀔 수 있습니다.
 - 외부 코드 채택이나 package publish 전에 프로젝트 라이선스를 선택해야 합니다.

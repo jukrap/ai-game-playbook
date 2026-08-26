@@ -1,27 +1,27 @@
 ---
 source: docs/roadmap.md
-source_sha256: 9f058ac517a2e2e6978de794a489c2f1dfce45dc5b8ac395facf61bc98b77425
+source_sha256: 230cd1226839b414c29d601f4ad73e61499d39cd33ae54a4ebed79fc40355c15
 translated_at: 2026-08-26
 ---
 
 # 로드맵
 
-> 상태: 계획된 순서입니다. 일정과 제공 시점을 약속하지 않습니다.
+> 상태: Stage 1을 진행하고 있습니다. 후속 단계, 일정, 제공 시점은 약속하지 않습니다.
 
 [English](roadmap.md) · [문서](README.ko.md)
 
-## Gate 0: 문서 승인
+## Gate 0: 문서 승인 — 완료
 
-제품을 구현하기 전에 저장소/설치 생명주기, 명령 및 메모리 orchestration, 세 엔진 각각, 게임 제작과 asset, 통합 공개 설계를 다루는 7개 문서 gate를 검토하고 승인합니다.
+제품 구현을 시작하기 전에 저장소/설치 생명주기, 명령 및 메모리 orchestration, 세 엔진 각각, 게임 제작과 asset, 통합 공개 설계를 다루는 7개 문서 gate를 검토하고 승인했습니다.
 
 승인은 초기 contract, risk, permission default, evidence threshold, golden task, release scope를 동결합니다. 검토 결과 gate를 수정 단계로 되돌릴 수 있습니다. 설계 완료만으로 제품 release가 생기지 않습니다.
 
-## Stage 1: 공통 기반
+## Stage 1: 공통 기반 — 진행 중
 
-- pnpm workspace와 versioned contract package를 만듭니다.
-- typed registry, generator, core runtime, CLI, MCP surface, Codex adapter를 구현합니다.
-- digest-owned pack staging, install, update, conflict handling, rollback, uninstall을 구현합니다.
-- publish가 승인된 뒤에만 npm package 이름 `ai-game-playbook`과 executable 이름 `agpb`를 사용합니다.
+- 완료: pnpm workspace, versioned contract schema, semantic validation, typed registry 검증 및 projection, pack dependency graph 검증, 추적 가능한 digest 결합 foundation plan.
+- 남음: core runtime, 실행 가능한 CLI, MCP server, Codex adapter, runtime parity generation.
+- 남음: digest-owned pack staging, install, update, conflict handling, rollback, uninstall.
+- package는 private으로 유지하고 publish를 별도로 승인하기 전까지 `ai-game-playbook`과 `agpb`를 예약된 interface 이름으로만 사용합니다.
 
 ## Stage 2: 실행, 증거, 안전
 

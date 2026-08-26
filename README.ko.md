@@ -1,12 +1,12 @@
 ---
 source: README.md
-source_sha256: cbf0fd5b2231c5514307528884749915344f02e742b53bff9f8ab7962af1da4e
+source_sha256: 7729c57c32db5e9a2bce0904902af84cbc140247001c625fa3e74512d094d4a2
 translated_at: 2026-08-26
 ---
 
 # AI Game Playbook
 
-> 상태: 문서 및 계약 설계 단계입니다. 설치 가능한 패키지, `agpb` 실행 파일, MCP 서버, 엔진 어댑터는 아직 없습니다.
+> 상태: control plane 계약과 registry 기반을 구현하는 단계입니다. 설치 가능한 패키지, `agpb` 실행 파일, MCP 서버, 엔진 어댑터는 아직 없습니다.
 
 [English](README.md)
 
@@ -14,12 +14,13 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine으로 게임을 만드는 
 
 ## 현재 존재하는 것
 
-- 검토 가능한 제품 및 아키텍처 기준선.
-- 계획된 명령, 팩, 어댑터, 권한, 증거, 자산, 검증 계약.
+- versioned 공개 schema와 semantic validation을 포함한 pnpm/TypeScript workspace.
+- command, skill, workflow, role lens, schema, pack descriptor를 검증하고 범위가 제한된 설계 projection을 생성하는 typed registry.
+- 의도한 command 및 skill surface를 담은 digest 결합 추적 계획.
 - 영어 문서와 한국어 미러.
-- 계획된 공개 표면을 설명하는 기계 판독 가능 파일.
+- contract, 생성 계획 drift, 문서 정합성을 검사하는 cross-platform static check.
 
-현재 저장소는 npm 패키지나 동작하는 게임 엔진 자동화를 제공하지 않습니다. 문서의 명령은 인터페이스 계획이며 지금 실행할 수 있는 명령이 아닙니다.
+이 기반은 개발용 library와 검사이며 사용 가능한 제품이 아닙니다. 현재 저장소는 설치 가능한 npm 패키지나 동작하는 게임 엔진 자동화를 제공하지 않습니다. 문서의 명령은 인터페이스 계획이며 지금 실행할 수 있는 명령이 아닙니다.
 
 ## 제품 방향
 
@@ -35,7 +36,7 @@ Godot, Unity, Unreal Engine만 계획된 first-party 엔진입니다. 웹 게임
 
 ## 설계 약속
 
-- 하나의 typed registry에서 CLI, MCP schema, 도움말, 문서 metadata, host skill routing을 생성할 계획입니다.
+- 하나의 typed registry가 command 및 skill descriptor를 정의하고 현재 설계 projection을 생성합니다. 향후 CLI, MCP, 도움말, host integration도 동일하게 검증된 authority metadata를 사용해야 합니다.
 - 지원하지 않는 capability는 명시적으로 degrade해야 하며 낮은 등급의 증거를 `verified`로 표시할 수 없습니다.
 - Editor mutation은 프로젝트별로 직렬화하며 identity 또는 dirty file 상태가 모호해지면 중단합니다.
 - 설치, 네트워크, 외부 전송, 유료 호출, 파괴 작업, publish에는 별도 승인이 필요합니다.
@@ -61,4 +62,4 @@ Godot, Unity, Unreal Engine만 계획된 first-party 엔진입니다. 웹 게임
 
 ## 프로젝트 상태와 라이선스
 
-검토 과정에서 설계가 바뀔 수 있습니다. 프로젝트 라이선스는 아직 선택하지 않았으므로 라이선스 파일이 추가되기 전에는 재배포 권리를 가정하지 마세요. 이 결정 전에는 release나 package publish를 진행하지 않습니다.
+구현 과정에서 인터페이스가 바뀔 수 있습니다. 프로젝트 라이선스는 아직 선택하지 않았으므로 라이선스 파일이 추가되기 전에는 재배포 권리를 가정하지 마세요. 이 결정 전에는 release나 package publish를 진행하지 않습니다.

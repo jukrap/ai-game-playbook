@@ -1,14 +1,14 @@
 # Current Status and Scope
 
-> Status: design baseline only, reviewed on 2026-08-26.
+> Status: Stage 1 control-plane foundation in progress, reviewed on 2026-08-26.
 
 [한국어](status-and-scope.ko.md) · [Documentation](README.md)
 
 ## Current repository state
 
-The repository currently contains working rules and a public documentation baseline. It does not contain product source code, a package manifest, an `agpb` executable, an MCP server, Codex integration files, engine bridges, engine packs, or a playable golden project.
+The repository now contains a private pnpm/TypeScript workspace, versioned contract schemas, semantic validators, typed registry validation and projections, a digest-bound foundation plan, tests, and Windows/Linux CI configuration.
 
-The command and type inventory in [planned-surface.json](planned-surface.json) is descriptive design data. Its presence does not raise any capability above `planned`.
+It does not yet contain an installable package, `agpb` executable, MCP server runtime, Codex integration files, permission or workflow runtime, engine bridges, engine packs, or a playable golden project. The command inventory in [planned-surface.json](planned-surface.json) and the generated [foundation plan](../generated/foundation-plan.json) remains design-only; neither raises any command or engine capability above `planned`.
 
 ## Intended users and first outcome
 
@@ -55,4 +55,4 @@ The version families are dated planning targets, not tested compatibility claims
 
 ## Readiness rule
 
-The first product implementation starts only after all seven documentation gates are reviewed and approved. `0.1.0-alpha` requires the Godot golden loop to pass end to end. A `1.0` release requires all three engines to reach `verified`, along with stable install lifecycle, recovery, and behavior evaluations.
+All seven documentation gates were approved before Stage 1 implementation began. `0.1.0-alpha` still requires the Godot golden loop to pass end to end. A `1.0` release requires all three engines to reach `verified`, along with stable install lifecycle, recovery, and behavior evaluations.

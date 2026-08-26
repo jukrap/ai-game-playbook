@@ -1,6 +1,6 @@
 # Core Concepts and Public Types
 
-> Status: planned contracts. None of these types is implemented yet.
+> Status: versioned schemas and semantic validators are implemented. Runtime consumers and engine capability remain planned.
 
 [한국어](concepts.ko.md) · [Documentation](README.md)
 
@@ -14,7 +14,9 @@ The common lifecycle is:
 
 An adapter may report a step as unsupported. It must not silently skip a required step or substitute weaker evidence.
 
-## Planned public types
+## Public contract types
+
+The current foundation implements these contracts as versioned JSON schemas and TypeScript definitions with fail-closed semantic checks. This does not make any CLI command, workflow, or engine operation executable.
 
 | Type | Responsibility |
 | --- | --- |

@@ -389,14 +389,23 @@ if (plannedSurface) {
 
 const readme = readText("README.md");
 const statusDoc = readText("docs/status-and-scope.md");
-if (!readme.includes("No installable package") || !readme.includes("does not currently provide an npm package")) {
-  fail("README.md: current non-implementation status is not explicit enough");
+if (!readme.includes("No installable package") || !readme.includes("not commands that can be run today")) {
+  fail("README.md: executable availability limits must remain explicit");
 }
-if (!statusDoc.includes("does not contain product source code")) {
-  fail("docs/status-and-scope.md: product source absence must remain explicit before implementation");
+if (
+  !statusDoc.includes("does not yet contain an installable package") ||
+  !statusDoc.includes("engine bridges") ||
+  !statusDoc.includes("playable golden project")
+) {
+  fail("docs/status-and-scope.md: unavailable runtime and engine capabilities must remain explicit");
 }
 
-for (const requiredPath of ["README.md", "README.ko.md", "docs/planned-surface.json"]) {
+for (const requiredPath of [
+  "README.md",
+  "README.ko.md",
+  "docs/planned-surface.json",
+  "generated/foundation-plan.json"
+]) {
   if (!existsSync(rootPath(requiredPath)) || !statSync(rootPath(requiredPath)).isFile()) {
     fail(`${requiredPath}: required public artifact is missing`);
   }

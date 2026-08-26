@@ -1,21 +1,21 @@
 # Roadmap
 
-> Status: planned sequence. Dates and availability are not promised.
+> Status: Stage 1 in progress. Later stages, dates, and availability are not promised.
 
 [한국어](roadmap.ko.md) · [Documentation](README.md)
 
-## Gate 0: documentation approval
+## Gate 0: documentation approval — complete
 
-Before product implementation, maintainers review and approve seven documentation gates covering repository/install lifecycle, command and memory orchestration, each of the three engines, game production and assets, and the integrated public design.
+Maintainers approved seven documentation gates covering repository/install lifecycle, command and memory orchestration, each of the three engines, game production and assets, and the integrated public design before product implementation began.
 
 Approval freezes the initial contracts, risks, permission defaults, evidence thresholds, golden tasks, and release scope. Review may send a gate back for revision. Design completion alone does not create a product release.
 
-## Stage 1: common foundation
+## Stage 1: common foundation — in progress
 
-- Create the pnpm workspace and versioned contract packages.
-- Implement the typed registry, generators, core runtime, CLI, MCP surface, and Codex adapter.
-- Implement digest-owned pack staging, install, update, conflict handling, rollback, and uninstall.
-- Reserve the npm package name `ai-game-playbook` and executable name `agpb` only when publication is authorized.
+- Completed: pnpm workspace, versioned contract schemas, semantic validation, typed registry validation and projections, pack dependency-graph validation, and a tracked digest-bound foundation plan.
+- Remaining: core runtime, executable CLI, MCP server, Codex adapter, and runtime parity generation.
+- Remaining: digest-owned pack staging, install, update, conflict handling, rollback, and uninstall.
+- Keep the package private and use `ai-game-playbook` and `agpb` as reserved interface names until publication is separately authorized.
 
 ## Stage 2: execution, evidence, and safety
 

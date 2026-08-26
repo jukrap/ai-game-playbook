@@ -1,12 +1,12 @@
 ---
 source: docs/concepts.md
-source_sha256: 4aeb3cee047a56bc199d14a19af27fbaab77e2eaf59e50a01d9bbfbd82e1acce
+source_sha256: b77955803997122ea093c969b04e0d8ea30043a7d26c10c416e63ca6e710172f
 translated_at: 2026-08-26
 ---
 
 # 핵심 개념과 공개 타입
 
-> 상태: 계획된 계약입니다. 아직 구현된 타입은 없습니다.
+> 상태: versioned schema와 semantic validator를 구현했습니다. runtime consumer와 engine capability는 아직 계획 단계입니다.
 
 [English](concepts.md) · [문서](README.ko.md)
 
@@ -20,7 +20,9 @@ AI Game Playbook은 계약 중심 control plane으로 계획하고 있습니다.
 
 adapter는 지원하지 않는 단계를 보고할 수 있습니다. 필수 단계를 조용히 건너뛰거나 더 약한 증거로 대체할 수 없습니다.
 
-## 계획된 공개 타입
+## 공개 계약 타입
+
+현재 기반은 이 계약을 versioned JSON schema와 TypeScript 정의 및 fail-closed semantic check로 구현합니다. 이것만으로 CLI command, workflow, engine operation을 실행할 수 있는 것은 아닙니다.
 
 | 타입 | 책임 |
 | --- | --- |

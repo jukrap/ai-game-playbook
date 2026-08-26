@@ -23,6 +23,7 @@ function createFixture() {
   cpSync(join(sourceRoot, "README.md"), join(fixtureRoot, "README.md"));
   cpSync(join(sourceRoot, "README.ko.md"), join(fixtureRoot, "README.ko.md"));
   cpSync(join(sourceRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+  cpSync(join(sourceRoot, "generated"), join(fixtureRoot, "generated"), { recursive: true });
   cpSync(join(sourceRoot, "scripts", "check-docs.mjs"), join(fixtureRoot, "scripts", "check-docs.mjs"));
   return fixtureRoot;
 }

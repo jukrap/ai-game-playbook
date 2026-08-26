@@ -24,6 +24,7 @@ export type {
 export {
   createProjectDirectoryCas,
   deleteProjectDirectoryCas,
+  readProjectDirectoryIdentity,
   stageProjectDirectoryCasCreate,
   stageProjectDirectoryCasDelete,
   stageProjectDirectoryCasRemoval,
@@ -38,6 +39,7 @@ export type {
   ProjectDirectoryCasRemovalRequest,
   ProjectDirectoryCasRestoreResult,
   ProjectDirectoryIdentity,
+  ProjectDirectoryReadRequest,
   StagedProjectDirectoryCasRemoval,
   StagedProjectDirectoryCasCreate,
   StagedProjectDirectoryCasDelete,

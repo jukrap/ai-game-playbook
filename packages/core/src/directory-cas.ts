@@ -39,6 +39,8 @@ export interface ProjectDirectoryCasCreateRequest {
   readonly maxDirectoryEntries?: number;
 }
 
+export type ProjectDirectoryReadRequest = ProjectDirectoryCasCreateRequest;
+
 export interface ProjectDirectoryCasCreateResult {
   readonly status: "created";
   readonly path: PortableProjectPath;
@@ -652,6 +654,25 @@ export async function stageProjectDirectoryCasCreate(
     parentPath: dirname(target.absolutePath),
     parentIdentity: target.parentIdentity,
   });
+}
+
+export async function readProjectDirectoryIdentity(
+  value: ProjectDirectoryReadRequest,
+): Promise<ProjectDirectoryIdentity> {
+  const request = validateCreateRequest(value);
+  await assertProjectRootIdentity(request.root);
+  const first = await resolveDirectory(request, "required");
+  const firstIdentity = createDirectoryIdentity(request.root, first);
+  await assertProjectRootIdentity(request.root);
+  const second = await resolveDirectory(request, "required");
+  const secondIdentity = createDirectoryIdentity(request.root, second);
+  if (!identitiesMatch(firstIdentity, secondIdentity)) {
+    preconditionFailure(
+      first.relativePath,
+      "directory identity changed while its witness was read",
+    );
+  }
+  return secondIdentity;
 }
 
 export async function createProjectDirectoryCas(

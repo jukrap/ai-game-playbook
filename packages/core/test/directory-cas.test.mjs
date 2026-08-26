@@ -38,6 +38,7 @@ async function fixture(t) {
 test("staged directory CAS creates one absent directory only at commit", async (t) => {
   assert.equal(typeof core.stageProjectDirectoryCasCreate, "function");
   assert.equal(typeof core.createProjectDirectoryCas, "function");
+  assert.equal(typeof core.readProjectDirectoryIdentity, "function");
 
   const { project, root } = await fixture(t);
   const target = join(project, "Packs", "managed");
@@ -60,6 +61,13 @@ test("staged directory CAS creates one absent directory only at commit", async (
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.identity), true);
   assert.equal((await lstat(target)).isDirectory(), true);
+  assert.deepEqual(
+    await core.readProjectDirectoryIdentity({
+      root,
+      path: "Packs/managed",
+    }),
+    result.identity,
+  );
   assert.equal(staged.state, "committed");
   await assert.rejects(staged.commit(), expectCoreError("cas-state-invalid"));
 });

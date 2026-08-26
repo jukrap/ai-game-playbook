@@ -123,6 +123,23 @@ export type {
   ProjectRootEntryKindHint,
 } from "./project-root-listing.js";
 export {
+  loadRunReceiptChain,
+  persistRunReceipt,
+  RUN_RECEIPT_MAX_ARTIFACT_BYTES,
+  RUN_RECEIPT_MAX_ARTIFACTS,
+  RUN_RECEIPT_MAX_CHAIN_BYTES,
+  RUN_RECEIPT_MAX_CHAIN_LENGTH,
+  RUN_RECEIPT_MAX_HEAD_BYTES,
+  RUN_RECEIPT_MAX_RECORD_BYTES,
+  RUN_RECEIPT_STORE_PATH,
+} from "./run-receipt-store.js";
+export type {
+  LoadRunReceiptChainRequest,
+  LoadedRunReceiptChain,
+  PersistRunReceiptRequest,
+  StoredRunReceipt,
+} from "./run-receipt-store.js";
+export {
   planProjectInitialization,
   PROJECT_INITIALIZATION_TARGETS,
 } from "./project-initialization-plan.js";

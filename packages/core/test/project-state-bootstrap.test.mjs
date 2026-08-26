@@ -39,6 +39,8 @@ test("project state bootstrap creates only the fixed runtime layout and is idemp
   assert.equal(typeof core.initializeProjectState, "function");
   assert.deepEqual(core.PROJECT_STATE_DIRECTORIES, [
     ".ai-game-playbook",
+    ".ai-game-playbook/evidence",
+    ".ai-game-playbook/evidence/receipts",
     ".ai-game-playbook/locks",
     ".ai-game-playbook/state",
     ".ai-game-playbook/state/packs",
@@ -71,7 +73,7 @@ test("project state bootstrap creates only the fixed runtime layout and is idemp
   }
   assert.deepEqual(
     (await readdir(join(project, ".ai-game-playbook"))).sort(),
-    ["locks", "state"],
+    ["evidence", "locks", "state"],
   );
 
   const repeated = await core.initializeProjectState({ root });

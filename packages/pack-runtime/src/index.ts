@@ -22,9 +22,14 @@ export {
 } from "./authorization.js";
 export { executePreparedPackOperation } from "./execute.js";
 export { preparePackOperation } from "./prepare.js";
-export { inspectPackTransactionRecovery } from "./recovery.js";
+export {
+  computePackTransactionRecoveryReportDigest,
+  inspectPackTransactionRecovery,
+} from "./recovery.js";
 export type {
   InspectPackTransactionRecoveryRequest,
+  PackRecoveryFinalizationAction,
+  PackRecoveryFinalizationOutcome,
   PackRecoveryActualFile,
   PackRecoveryExpectedFile,
   PackRecoveryObservation,
@@ -32,12 +37,30 @@ export type {
   PackTransactionRecoveryReport,
 } from "./recovery.js";
 export {
+  computePackRecoveryFinalizationPlanDigest,
+  createPackRecoveryCommandInput,
+  preparePackTransactionRecoveryFinalization,
+} from "./recovery-plan.js";
+export type {
+  ActionablePackRecoveryFinalization,
+  PreparedPackRecoveryFinalization,
+  PreparePackRecoveryFinalizationRequest,
+} from "./recovery-plan.js";
+export { createPackRecoveryAuthorizationRequest } from "./recovery-authorization.js";
+export type { CreatePackRecoveryAuthorizationRequest } from "./recovery-authorization.js";
+export { finalizePackTransactionRecovery } from "./finalize-recovery.js";
+export type {
+  FinalizePackTransactionRecoveryRequest,
+  PackRecoveryFinalizationResult,
+} from "./finalize-recovery.js";
+export {
   computeInstalledPackStateDigest,
   createEmptyInstalledPackState,
   PACK_INSTALLED_STATE_MAX_BYTES,
   PACK_INSTALLED_STATE_PATH,
 } from "./state.js";
 export {
+  createPackTransactionReconciliation,
   computePackTransactionRecordDigest,
   loadPackTransactionJournal,
   PACK_TRANSACTION_DIRECTORY,
@@ -54,9 +77,12 @@ export type {
   LoadedInstalledPackState,
 } from "./state.js";
 export type {
+  CreatePackTransactionReconciliationRequest,
   LoadPackTransactionJournalRequest,
   LoadedPackTransactionJournal,
   PackTransactionOutcome,
+  PackTransactionReconciliationOutcome,
+  PackTransactionReconciliationRecord,
   PackTransactionRecord,
   PackTransactionStartedRecord,
   PackTransactionTerminalRecord,

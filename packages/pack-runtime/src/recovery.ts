@@ -48,6 +48,19 @@ export type PackRecoveryObservationMatch =
   | "both"
   | "neither";
 
+export type PackRecoveryFinalizationAction =
+  | "append-reconciliation"
+  | "append-started-and-terminal"
+  | "append-terminal"
+  | "blocked"
+  | "clear-marker"
+  | "none";
+
+export type PackRecoveryFinalizationOutcome =
+  | "committed"
+  | "failed"
+  | "rolled-back";
+
 export interface PackRecoveryObservation {
   readonly path: string;
   readonly role: "artifact" | "installed-state";
@@ -73,9 +86,19 @@ export interface PackTransactionRecoveryReport {
   readonly project: {
     readonly id: StableId;
     readonly identityDigest: Sha256Digest;
+    readonly rootIdentityDigest: Sha256Digest;
   };
-  readonly journal: "marker-only" | "started-only" | "terminal";
+  readonly journal:
+    | "marker-only"
+    | "reconciled"
+    | "started-only"
+    | "terminal";
+  readonly journalSnapshotDigest: Sha256Digest;
+  readonly startedRecordDigest: Sha256Digest;
+  readonly terminalRecordDigest?: Sha256Digest;
+  readonly reconciliationRecordDigest?: Sha256Digest;
   readonly activeMarker: "absent" | "matching" | "other";
+  readonly activeMarkerFileDigest?: Sha256Digest;
   readonly observedState: "mixed" | "postimage" | "preimage";
   readonly consistency:
     | "consistent"
@@ -86,7 +109,10 @@ export interface PackTransactionRecoveryReport {
   readonly mutationUncertain: boolean;
   readonly recordedOutcome?: PackTransactionOutcome;
   readonly safeTerminalOutcome?: "committed" | "failed";
+  readonly finalizationAction: PackRecoveryFinalizationAction;
+  readonly finalizationOutcome?: PackRecoveryFinalizationOutcome;
   readonly observations: readonly PackRecoveryObservation[];
+  readonly reportDigest: Sha256Digest;
 }
 
 interface ObservationBudget {
@@ -99,6 +125,18 @@ interface PackRecoveryJournalSnapshot {
   readonly journal: LoadedPackTransactionJournal;
   readonly source: PackRecoveryJournalSource;
 }
+
+interface PackRecoveryReportInternals {
+  readonly root: CanonicalProjectRoot;
+  readonly active: LoadedActivePackTransaction | undefined;
+  readonly journal: LoadedPackTransactionJournal;
+  readonly source: PackRecoveryJournalSource;
+}
+
+const recoveryReportInternals = new WeakMap<
+  PackTransactionRecoveryReport,
+  PackRecoveryReportInternals
+>();
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -341,6 +379,35 @@ function freezeReport(
   });
 }
 
+export function computePackTransactionRecoveryReportDigest(
+  report: Omit<PackTransactionRecoveryReport, "reportDigest"> &
+    Partial<Pick<PackTransactionRecoveryReport, "reportDigest">>,
+): Sha256Digest {
+  const { reportDigest: _reportDigest, ...body } = report;
+  return digestCanonicalJson({
+    domain: "ai-game-playbook.pack-transaction-recovery-report",
+    version: "1",
+    report: body,
+  });
+}
+
+export function internalsForPackTransactionRecoveryReport(
+  report: PackTransactionRecoveryReport,
+): PackRecoveryReportInternals {
+  const internals = recoveryReportInternals.get(report);
+  if (
+    internals === undefined ||
+    computePackTransactionRecoveryReportDigest(report) !== report.reportDigest
+  ) {
+    throw new PackRuntimeError(
+      "pack-recovery-report-untrusted",
+      "$request.report",
+      "pack recovery requires a same-process attested inspection report",
+    );
+  }
+  return internals;
+}
+
 export function computePackRecoveryJournalSnapshotDigest(
   journal: LoadedPackTransactionJournal,
   source: PackRecoveryJournalSource,
@@ -351,6 +418,7 @@ export function computePackRecoveryJournalSnapshotDigest(
     source,
     startedRecordDigest: journal.started.recordDigest,
     terminalRecordDigest: journal.terminal?.recordDigest ?? null,
+    reconciliationRecordDigest: journal.reconciliation?.recordDigest ?? null,
   });
 }
 
@@ -440,6 +508,8 @@ export async function inspectPackTransactionRecovery(
   let consistency: PackTransactionRecoveryReport["consistency"];
   let mutationUncertain: boolean;
   let safeTerminalOutcome: "committed" | "failed" | undefined;
+  let finalizationAction: PackRecoveryFinalizationAction = "blocked";
+  let finalizationOutcome: PackRecoveryFinalizationOutcome | undefined;
   if (!stable || marker === "other") {
     consistency = "unresolved";
     mutationUncertain = true;
@@ -448,53 +518,130 @@ export async function inspectPackTransactionRecovery(
       consistency = "incomplete";
       mutationUncertain = false;
       safeTerminalOutcome = "failed";
+      finalizationAction = "append-started-and-terminal";
+      finalizationOutcome = "failed";
     } else {
       consistency = "unresolved";
       mutationUncertain = true;
     }
   } else if (journal.terminal === undefined) {
-    if (observed === "preimage" || observed === "postimage") {
+    if (
+      marker === "matching" &&
+      (observed === "preimage" || observed === "postimage")
+    ) {
       consistency = "incomplete";
       mutationUncertain = false;
       safeTerminalOutcome = observed === "postimage" ? "committed" : "failed";
+      finalizationAction = "append-terminal";
+      finalizationOutcome = safeTerminalOutcome;
     } else {
       consistency = "unresolved";
       mutationUncertain = true;
     }
-  } else if (journal.terminal.outcome === "recovery-required") {
-    consistency = "unresolved";
-    mutationUncertain = true;
-  } else {
+  } else if (journal.reconciliation !== undefined) {
     const expected =
-      journal.terminal.outcome === "committed" ? "postimage" : "preimage";
+      journal.reconciliation.outcome === "committed"
+        ? "postimage"
+        : "preimage";
+    finalizationOutcome = journal.reconciliation.outcome;
     if (observed === expected && marker === "absent") {
       consistency = "consistent";
       mutationUncertain = false;
-    } else if (observed === expected) {
-      consistency = "unresolved";
+      finalizationAction = "none";
+    } else if (observed === expected && marker === "matching") {
+      consistency = "incomplete";
       mutationUncertain = true;
+      finalizationAction = "clear-marker";
     } else {
       consistency = "contradictory";
       mutationUncertain = true;
+      finalizationAction = "blocked";
+    }
+  } else if (journal.terminal.outcome === "recovery-required") {
+    if (
+      marker === "matching" &&
+      (observed === "preimage" || observed === "postimage")
+    ) {
+      consistency = "incomplete";
+      mutationUncertain = true;
+      safeTerminalOutcome = observed === "postimage" ? "committed" : "failed";
+      finalizationAction = "append-reconciliation";
+      finalizationOutcome = safeTerminalOutcome;
+    } else {
+      consistency = "unresolved";
+      mutationUncertain = true;
+    }
+  } else {
+    const expected =
+      journal.terminal.outcome === "committed" ? "postimage" : "preimage";
+    finalizationOutcome = journal.terminal.outcome;
+    if (observed === expected && marker === "absent") {
+      consistency = "consistent";
+      mutationUncertain = false;
+      finalizationAction = "none";
+    } else if (observed === expected && marker === "matching") {
+      consistency = "incomplete";
+      mutationUncertain = true;
+      finalizationAction = "clear-marker";
+    } else {
+      consistency = "contradictory";
+      mutationUncertain = true;
+      finalizationAction = "blocked";
     }
   }
 
-  return freezeReport({
+  const journalSnapshotDigest = computePackRecoveryJournalSnapshotDigest(
+    journal,
+    journalAfter.source,
+  );
+  const body = {
     schemaVersion: "1.0.0",
     runId: request.runId,
-    project: request.project,
+    project: Object.freeze({
+      ...request.project,
+      rootIdentityDigest: root.identityDigest,
+    }),
     journal: markerOnly
       ? "marker-only"
       : journal.terminal === undefined
         ? "started-only"
-        : "terminal",
+        : journal.reconciliation === undefined
+          ? "terminal"
+          : "reconciled",
+    journalSnapshotDigest,
+    startedRecordDigest: journal.started.recordDigest,
+    ...(journal.terminal === undefined
+      ? {}
+      : { terminalRecordDigest: journal.terminal.recordDigest }),
+    ...(journal.reconciliation === undefined
+      ? {}
+      : { reconciliationRecordDigest: journal.reconciliation.recordDigest }),
     activeMarker: marker,
+    ...(activeAfter === undefined
+      ? {}
+      : { activeMarkerFileDigest: activeAfter.fileDigest }),
     observedState: observed,
     consistency,
     stable,
     mutationUncertain,
     ...(recordedOutcome === undefined ? {} : { recordedOutcome }),
     ...(safeTerminalOutcome === undefined ? {} : { safeTerminalOutcome }),
+    finalizationAction,
+    ...(finalizationOutcome === undefined ? {} : { finalizationOutcome }),
     observations,
+  } satisfies Omit<PackTransactionRecoveryReport, "reportDigest">;
+  const report = freezeReport({
+    ...body,
+    reportDigest: computePackTransactionRecoveryReportDigest(body),
   });
+  recoveryReportInternals.set(
+    report,
+    Object.freeze({
+      root,
+      active: activeAfter,
+      journal,
+      source: journalAfter.source,
+    }),
+  );
+  return report;
 }

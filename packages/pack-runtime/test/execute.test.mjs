@@ -79,6 +79,85 @@ const packOperationOutputSchema = contracts.defineContractSchema({
   },
 });
 
+const packRecoveryInputSchema = contracts.defineContractSchema({
+  id: "pack-recovery-input",
+  version: "1.0.0",
+  title: "Pack Recovery Input",
+  description: "Digest-bound input for one approved pack recovery closure.",
+  schema: {
+    type: "object",
+    properties: {
+      schemaVersion: { type: "string" },
+      transactionRunId: {
+        type: "string",
+        pattern:
+          "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      },
+      reportDigest: {
+        type: "string",
+        pattern: "^sha256:[0-9a-f]{64}$",
+      },
+      journalSnapshotDigest: {
+        type: "string",
+        pattern: "^sha256:[0-9a-f]{64}$",
+      },
+      action: {
+        enum: [
+          "append-reconciliation",
+          "append-started-and-terminal",
+          "append-terminal",
+          "clear-marker",
+        ],
+      },
+      finalOutcome: { enum: ["committed", "failed", "rolled-back"] },
+    },
+    required: [
+      "schemaVersion",
+      "transactionRunId",
+      "reportDigest",
+      "journalSnapshotDigest",
+      "action",
+      "finalOutcome",
+    ],
+    additionalProperties: false,
+  },
+});
+
+const packRecoveryOutputSchema = contracts.defineContractSchema({
+  id: "pack-recovery-output",
+  version: "1.0.0",
+  title: "Pack Recovery Output",
+  description: "Bounded outcome for one approved pack recovery closure.",
+  schema: {
+    type: "object",
+    properties: {
+      schemaVersion: { type: "string" },
+      status: { enum: ["failed", "finalized", "recovery-required", "stale"] },
+      action: {
+        enum: [
+          "append-reconciliation",
+          "append-started-and-terminal",
+          "append-terminal",
+          "clear-marker",
+        ],
+      },
+      reportDigest: {
+        type: "string",
+        pattern: "^sha256:[0-9a-f]{64}$",
+      },
+      mutationUncertain: { type: "boolean" },
+    },
+    required: [
+      "schemaVersion",
+      "status",
+      "action",
+      "reportDigest",
+      "mutationUncertain",
+    ],
+    additionalProperties: false,
+  },
+});
+
 function currentOperatingSystem() {
   if (process.platform === "win32") return "windows";
   if (process.platform === "darwin") return "macos";
@@ -213,14 +292,56 @@ function commandFor(operation) {
   return { command, definition };
 }
 
+function recoveryCommand(definition) {
+  const command = structuredClone(
+    definition.commands.find(({ id }) => id === "project.inspect"),
+  );
+  command.id = "pack.recover";
+  command.version = "1.0.0";
+  command.lifecycle = "internal";
+  command.summary = "Finalize one separately approved pack recovery closure.";
+  command.cli = { path: ["internal", "pack-recover"], aliases: [] };
+  command.input = {
+    schemaId: packRecoveryInputSchema.schemaId,
+    digest: packRecoveryInputSchema.digest,
+  };
+  command.output = {
+    schemaId: packRecoveryOutputSchema.schemaId,
+    digest: packRecoveryOutputSchema.digest,
+  };
+  command.capabilities = ["pack.recover"];
+  command.permissions = ["install"];
+  command.sideEffects = [
+    { kind: "filesystem", scope: "approved-paths", boundary: "local" },
+  ];
+  command.lane = "project-write";
+  command.retry = { mode: "never", maxAttempts: 1 };
+  command.budgets = {
+    maxChangedFiles: 4,
+    maxChangedBytes: 4_194_304,
+    maxDurationMs: 30_000,
+    maxOutputBytes: 65_536,
+    maxRepairCycles: 0,
+  };
+  command.requiredEvidence = ["evidence.pack-recovery"];
+  command.handler = {
+    package: "@ai-game-playbook/pack-runtime",
+    export: "finalizePackTransactionRecovery",
+    digest: `sha256:${"9".repeat(64)}`,
+  };
+  return command;
+}
+
 function validatedRegistry(pack, operation = "add") {
   const { command, definition } = commandFor(operation);
   definition.schemas.push(
     contracts.approvalGrantSchema,
     packOperationInputSchema,
     packOperationOutputSchema,
+    packRecoveryInputSchema,
+    packRecoveryOutputSchema,
   );
-  definition.commands.push(command);
+  definition.commands.push(command, recoveryCommand(definition));
   definition.packs.push(pack);
   return registry.validateRegistry(definition);
 }
@@ -231,8 +352,10 @@ function validatedRegistryWithoutPack(operation) {
     contracts.approvalGrantSchema,
     packOperationInputSchema,
     packOperationOutputSchema,
+    packRecoveryInputSchema,
+    packRecoveryOutputSchema,
   );
-  definition.commands.push(command);
+  definition.commands.push(command, recoveryCommand(definition));
   return registry.validateRegistry(definition);
 }
 
@@ -371,6 +494,44 @@ function authorize(plan, selectedRegistry, options = {}) {
   return { broker, decision, request };
 }
 
+function authorizeRecovery(plan, selectedRegistry, options = {}) {
+  const brokerNow = options.brokerNow ?? Date.now();
+  const deadlineAt =
+    options.deadlineAt ?? new Date(brokerNow + 30_000).toISOString();
+  const broker = core.createPermissionBroker({
+    registry: selectedRegistry,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+      stage: "vertical-slice",
+      budgets: budgets({
+        maxChangedFiles: 128,
+        maxChangedBytes: 16_777_216,
+        maxDurationMs: 900_000,
+      }),
+    },
+    trustedApprovalKeys: [
+      { keyId: "approval.local-key", publicKeyPem },
+    ],
+    now: () => brokerNow,
+  });
+  const request = packRuntime.createPackRecoveryAuthorizationRequest({
+    plan,
+    budgets: budgets({ maxChangedFiles: 4 }),
+    deadlineAt,
+  });
+  const pending = broker.authorize(request, []);
+  assert.equal(pending.status, "approval-required");
+  const decision = broker.authorize(request, [
+    signedGrant(pending.challenge, {
+      approvedAt: new Date(brokerNow - 60_000).toISOString(),
+      expiresAt: new Date(brokerNow + 600_000).toISOString(),
+    }),
+  ]);
+  assert.equal(decision.status, "authorized");
+  return { broker, decision, request };
+}
+
 async function acquireLane(root, selectedRunId = runId) {
   return core.acquireProjectLane({
     root,
@@ -405,15 +566,19 @@ async function reopenAsStartedOnly(f, selectedRunId = runId) {
       ...packRuntime.packTransactionRecordPath(selectedRunId, 1).split("/"),
     ),
   );
+  await writeActiveForStarted(f, journal.started);
+  return journal.started;
+}
+
+async function writeActiveForStarted(f, started) {
   const active = activeTransactions.createActivePackTransactionRecord(
-    journal.started,
+    started,
   );
   await activeTransactions.writeActivePackTransactionRecord({
     root: f.targetRoot,
     record: active,
     maxDirectoryEntries: 1000,
   });
-  return journal.started;
 }
 
 test("authorized local add commits artifacts, installed state, and an append-only journal", async (t) => {
@@ -425,7 +590,16 @@ test("authorized local add commits artifacts, installed state, and an append-onl
   );
 
   assert.equal(typeof packRuntime.createPackOperationAuthorizationRequest, "function");
+  assert.equal(
+    typeof packRuntime.createPackRecoveryAuthorizationRequest,
+    "function",
+  );
+  assert.equal(
+    typeof packRuntime.preparePackTransactionRecoveryFinalization,
+    "function",
+  );
   assert.equal(typeof packRuntime.executePreparedPackOperation, "function");
+  assert.equal(typeof packRuntime.finalizePackTransactionRecovery, "function");
   assert.equal(typeof packRuntime.loadPackTransactionJournal, "function");
   const { decision, request } = authorize(plan, selectedRegistry);
   assert.deepEqual(request.input, {
@@ -1270,6 +1444,696 @@ test("a started-only postimage blocks new plans and can be closed as committed",
   assert.equal(recovery.mutationUncertain, false);
 });
 
+test("separately approved recovery closes a stable started-only postimage", async (t) => {
+  const f = await fixture(t);
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+  const plan = await packRuntime.preparePackOperation(
+    prepareRequest(f, selectedRegistry, pack),
+  );
+  const { decision } = authorize(plan, selectedRegistry);
+  const executionLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    executionLane.state === "active" ? executionLane.release() : undefined,
+  );
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan,
+      authorization: decision,
+      lane: executionLane,
+    })).status,
+    "succeeded",
+  );
+  await executionLane.release();
+  await reopenAsStartedOnly(f);
+
+  const report = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(report.finalizationAction, "append-terminal");
+  assert.equal(report.finalizationOutcome, "committed");
+  const recoveryPlan =
+    packRuntime.preparePackTransactionRecoveryFinalization({
+      report,
+      registry: selectedRegistry,
+    });
+  const recoveryByteFloor =
+    packRuntime.PACK_ACTIVE_TRANSACTION_MAX_BYTES * 2 +
+    packRuntime.PACK_TRANSACTION_MAX_RECORD_BYTES;
+  assert.throws(
+    () =>
+      packRuntime.createPackRecoveryAuthorizationRequest({
+        plan: recoveryPlan,
+        budgets: budgets({
+          maxChangedFiles: 4,
+          maxChangedBytes: recoveryByteFloor - 1,
+        }),
+        deadlineAt: new Date(Date.now() + 30_000).toISOString(),
+      }),
+    expectPackError("pack-authorization-invalid"),
+  );
+  const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
+  assert.deepEqual(recoveryAuthority.request.scope.paths, [
+    packRuntime.PACK_ACTIVE_TRANSACTION_PATH,
+    packRuntime.packTransactionRecordPath(runId, 1),
+  ].sort());
+  const recoveryLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    recoveryLane.state === "active" ? recoveryLane.release() : undefined,
+  );
+
+  const result = await packRuntime.finalizePackTransactionRecovery({
+    plan: recoveryPlan,
+    authorization: recoveryAuthority.decision,
+    lane: recoveryLane,
+  });
+  assert.equal(result.status, "finalized");
+  assert.equal(result.action, "append-terminal");
+  assert.equal(result.finalOutcome, "committed");
+  assert.equal(result.mutationUncertain, false);
+  assert.equal(result.settlement.status, "succeeded");
+  assert.deepEqual(result.effects.changedPaths, [
+    packRuntime.PACK_ACTIVE_TRANSACTION_PATH,
+    packRuntime.packTransactionRecordPath(runId, 1),
+  ].sort());
+
+  const journal = await packRuntime.loadPackTransactionJournal({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(journal.terminal.outcome, "committed");
+  assert.equal(journal.reconciliation, undefined);
+  const closed = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(closed.consistency, "consistent");
+  assert.equal(closed.finalizationAction, "none");
+  assert.throws(
+    () =>
+      packRuntime.preparePackTransactionRecoveryFinalization({
+        report: closed,
+        registry: selectedRegistry,
+      }),
+    expectPackError("pack-recovery-not-actionable"),
+  );
+
+  await recoveryLane.release();
+});
+
+test("recovery can close a marker-only preimage without touching game artifacts", async (t) => {
+  const f = await fixture(t);
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+  const plan = await packRuntime.preparePackOperation(
+    prepareRequest(f, selectedRegistry, pack),
+  );
+  const executionAuthority = authorize(plan, selectedRegistry);
+  const executionLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    executionLane.state === "active" ? executionLane.release() : undefined,
+  );
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan,
+      authorization: executionAuthority.decision,
+      lane: executionLane,
+    })).status,
+    "succeeded",
+  );
+  await executionLane.release();
+  await reopenAsStartedOnly(f);
+  await rm(f.target);
+  await rm(
+    join(
+      f.project,
+      ...packRuntime.PACK_INSTALLED_STATE_PATH.split("/"),
+    ),
+  );
+  await rm(
+    join(
+      f.project,
+      ...packRuntime.packTransactionRecordPath(runId, 0).split("/"),
+    ),
+  );
+
+  const report = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(report.finalizationAction, "append-started-and-terminal");
+  assert.equal(report.finalizationOutcome, "failed");
+  const recoveryPlan =
+    packRuntime.preparePackTransactionRecoveryFinalization({
+      report,
+      registry: selectedRegistry,
+    });
+  const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
+  const recoveryLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    recoveryLane.state === "active" ? recoveryLane.release() : undefined,
+  );
+  const result = await packRuntime.finalizePackTransactionRecovery({
+    plan: recoveryPlan,
+    authorization: recoveryAuthority.decision,
+    lane: recoveryLane,
+  });
+
+  assert.equal(result.status, "finalized");
+  assert.equal(result.finalOutcome, "failed");
+  assert.equal(result.mutationUncertain, false);
+  await assert.rejects(readFile(f.target), (error) => error?.code === "ENOENT");
+  const journal = await packRuntime.loadPackTransactionJournal({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(journal.terminal.outcome, "failed");
+  assert.equal(journal.reconciliation, undefined);
+  await recoveryLane.release();
+});
+
+test("recovery clears a stranded marker only after an existing terminal still matches", async (t) => {
+  const f = await fixture(t);
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+  const plan = await packRuntime.preparePackOperation(
+    prepareRequest(f, selectedRegistry, pack),
+  );
+  const executionAuthority = authorize(plan, selectedRegistry);
+  const executionLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    executionLane.state === "active" ? executionLane.release() : undefined,
+  );
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan,
+      authorization: executionAuthority.decision,
+      lane: executionLane,
+    })).status,
+    "succeeded",
+  );
+  await executionLane.release();
+  const journalBefore = await packRuntime.loadPackTransactionJournal({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  await writeActiveForStarted(f, journalBefore.started);
+
+  const report = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(report.finalizationAction, "clear-marker");
+  assert.equal(report.finalizationOutcome, "committed");
+  const recoveryPlan =
+    packRuntime.preparePackTransactionRecoveryFinalization({
+      report,
+      registry: selectedRegistry,
+    });
+  assert.deepEqual(recoveryPlan.paths, [
+    packRuntime.PACK_ACTIVE_TRANSACTION_PATH,
+  ]);
+  const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
+  const recoveryLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    recoveryLane.state === "active" ? recoveryLane.release() : undefined,
+  );
+  const result = await packRuntime.finalizePackTransactionRecovery({
+    plan: recoveryPlan,
+    authorization: recoveryAuthority.decision,
+    lane: recoveryLane,
+  });
+
+  assert.equal(result.status, "finalized");
+  assert.deepEqual(result.effects.changedPaths, [
+    packRuntime.PACK_ACTIVE_TRANSACTION_PATH,
+  ]);
+  const journalAfter = await packRuntime.loadPackTransactionJournal({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(
+    journalAfter.terminal.recordDigest,
+    journalBefore.terminal.recordDigest,
+  );
+  await recoveryLane.release();
+});
+
+test("recovery-required terminal is resolved by a separate reconciliation record", async (t) => {
+  const f = await fixture(t);
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+  const plan = await packRuntime.preparePackOperation(
+    prepareRequest(f, selectedRegistry, pack),
+  );
+  const executionAuthority = authorize(plan, selectedRegistry);
+  const executionLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    executionLane.state === "active" ? executionLane.release() : undefined,
+  );
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan,
+      authorization: executionAuthority.decision,
+      lane: executionLane,
+    })).status,
+    "succeeded",
+  );
+  await executionLane.release();
+  const started = await reopenAsStartedOnly(f);
+  const terminal = transactionInternals.createTerminalPackTransaction({
+    started,
+    outcome: "recovery-required",
+    mutationUncertain: true,
+    touchedPaths: [
+      packRuntime.PACK_ACTIVE_TRANSACTION_PATH,
+      packRuntime.PACK_INSTALLED_STATE_PATH,
+      f.target
+        .slice(f.project.length + 1)
+        .replaceAll("\\", "/"),
+      packRuntime.packTransactionRecordPath(runId, 0),
+      packRuntime.packTransactionRecordPath(runId, 1),
+    ].sort(),
+    appliedPaths: [
+      f.target
+        .slice(f.project.length + 1)
+        .replaceAll("\\", "/"),
+    ],
+    rolledBackPaths: [],
+    installedStateAfterDigest: started.installedStateAfter.digest,
+    error: { code: "pack-execution-uncertain", path: f.target
+      .slice(f.project.length + 1)
+      .replaceAll("\\", "/") },
+    endedAt: new Date(Date.parse(started.startedAt) + 1).toISOString(),
+  });
+  await transactionInternals.writePackTransactionRecord(
+    f.targetRoot,
+    terminal,
+    1000,
+  );
+
+  const report = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(report.finalizationAction, "append-reconciliation");
+  assert.equal(report.finalizationOutcome, "committed");
+  const recoveryPlan =
+    packRuntime.preparePackTransactionRecoveryFinalization({
+      report,
+      registry: selectedRegistry,
+    });
+  const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
+  const recoveryLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    recoveryLane.state === "active" ? recoveryLane.release() : undefined,
+  );
+  const result = await packRuntime.finalizePackTransactionRecovery({
+    plan: recoveryPlan,
+    authorization: recoveryAuthority.decision,
+    lane: recoveryLane,
+  });
+
+  assert.equal(result.status, "finalized");
+  const journal = await packRuntime.loadPackTransactionJournal({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(journal.terminal.outcome, "recovery-required");
+  assert.equal(journal.reconciliation.outcome, "committed");
+  assert.equal(
+    journal.reconciliation.parentRecordDigest,
+    journal.terminal.recordDigest,
+  );
+  assert.equal(
+    journal.reconciliation.recoveryReportDigest,
+    report.reportDigest,
+  );
+  const reconciliationPath = join(
+    f.project,
+    ...packRuntime.packTransactionRecordPath(runId, 2).split("/"),
+  );
+  const tamperedReconciliation = JSON.parse(
+    await readFile(reconciliationPath, "utf8"),
+  );
+  tamperedReconciliation.recoveryReportDigest = `sha256:${"0".repeat(64)}`;
+  await writeFile(
+    reconciliationPath,
+    `${contracts.canonicalizeJson(tamperedReconciliation)}\n`,
+    "utf8",
+  );
+  await assert.rejects(
+    packRuntime.loadPackTransactionJournal({
+      root: f.targetRoot,
+      runId,
+      project: {
+        id: "sample.graybox",
+        identityDigest: projectIdentityDigest,
+      },
+      maxDirectoryEntries: 1000,
+    }),
+    (error) =>
+      error instanceof packRuntime.PackRuntimeError &&
+      error.code === "pack-transaction-corrupt" &&
+      error.path === "$transaction.reconciliation.recordDigest",
+  );
+  await recoveryLane.release();
+});
+
+test("recovery rejects copied authority and settles a drifted report without writes", async (t) => {
+  const f = await fixture(t);
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+  const plan = await packRuntime.preparePackOperation(
+    prepareRequest(f, selectedRegistry, pack),
+  );
+  const executionAuthority = authorize(plan, selectedRegistry);
+  const executionLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    executionLane.state === "active" ? executionLane.release() : undefined,
+  );
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan,
+      authorization: executionAuthority.decision,
+      lane: executionLane,
+    })).status,
+    "succeeded",
+  );
+  await executionLane.release();
+  await reopenAsStartedOnly(f);
+  const report = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.throws(
+    () =>
+      packRuntime.preparePackTransactionRecoveryFinalization({
+        report: structuredClone(report),
+        registry: selectedRegistry,
+      }),
+    expectPackError("pack-recovery-report-untrusted"),
+  );
+  const recoveryPlan =
+    packRuntime.preparePackTransactionRecoveryFinalization({
+      report,
+      registry: selectedRegistry,
+    });
+  assert.throws(
+    () =>
+      packRuntime.createPackRecoveryAuthorizationRequest({
+        plan: structuredClone(recoveryPlan),
+        budgets: budgets({ maxChangedFiles: 4 }),
+        deadlineAt: new Date(Date.now() + 30_000).toISOString(),
+      }),
+    expectPackError("pack-recovery-plan-untrusted"),
+  );
+  const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
+  const recoveryLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    recoveryLane.state === "active" ? recoveryLane.release() : undefined,
+  );
+  await assert.rejects(
+    packRuntime.finalizePackTransactionRecovery({
+      plan: recoveryPlan,
+      authorization: {
+        ...recoveryAuthority.decision,
+        lease: { ...recoveryAuthority.decision.lease },
+      },
+      lane: recoveryLane,
+    }),
+    expectPackError("pack-authorization-invalid"),
+  );
+  await assert.rejects(
+    packRuntime.finalizePackTransactionRecovery({
+      plan: recoveryPlan,
+      authorization: recoveryAuthority.decision,
+      lane: { ...recoveryLane },
+    }),
+    expectPackError("pack-lane-invalid"),
+  );
+  await writeFile(f.target, "drift after recovery approval\n", "utf8");
+  const result = await packRuntime.finalizePackTransactionRecovery({
+    plan: recoveryPlan,
+    authorization: recoveryAuthority.decision,
+    lane: recoveryLane,
+  });
+
+  assert.equal(result.status, "stale");
+  assert.equal(result.mutationUncertain, false);
+  assert.equal(result.settlement.status, "failed");
+  assert.deepEqual(result.effects.changedPaths, []);
+  assert.equal(result.error.code, "pack-recovery-stale");
+  assert.equal(
+    await readFile(
+      join(
+        f.project,
+        ...packRuntime.PACK_ACTIVE_TRANSACTION_PATH.split("/"),
+      ),
+      "utf8",
+    ).then((text) => text.length > 0),
+    true,
+  );
+  await recoveryLane.release();
+});
+
+test("recovery keeps the active barrier when state drifts after journal closure", async (t) => {
+  const f = await fixture(t);
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+  const plan = await packRuntime.preparePackOperation(
+    prepareRequest(f, selectedRegistry, pack),
+  );
+  const executionAuthority = authorize(plan, selectedRegistry);
+  const executionLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    executionLane.state === "active" ? executionLane.release() : undefined,
+  );
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan,
+      authorization: executionAuthority.decision,
+      lane: executionLane,
+    })).status,
+    "succeeded",
+  );
+  await executionLane.release();
+  await reopenAsStartedOnly(f);
+  const report = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  const recoveryPlan =
+    packRuntime.preparePackTransactionRecoveryFinalization({
+      report,
+      registry: selectedRegistry,
+    });
+  const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
+  const recoveryLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    recoveryLane.state === "active" ? recoveryLane.release() : undefined,
+  );
+  const transactionDirectory = join(
+    f.project,
+    ".ai-game-playbook",
+    "state",
+    "packs",
+    "transactions",
+  );
+  const watcher = watch(transactionDirectory);
+  const injectDrift = (async () => {
+    for await (const event of watcher) {
+      if (event.filename?.toString() === `${runId}-0001.json`) {
+        await writeFile(f.target, "drift during recovery closure\n", "utf8");
+        return;
+      }
+    }
+  })();
+
+  const result = await packRuntime.finalizePackTransactionRecovery({
+    plan: recoveryPlan,
+    authorization: recoveryAuthority.decision,
+    lane: recoveryLane,
+  });
+  await Promise.race([
+    injectDrift,
+    delay(5_000, undefined, { ref: false }).then(() => {
+      throw new Error("recovery journal observer did not inject drift");
+    }),
+  ]);
+
+  assert.equal(result.status, "recovery-required");
+  assert.equal(result.mutationUncertain, true);
+  assert.equal(result.settlement.status, "uncertain");
+  assert.equal(result.error.path, "$recovery.beforeClear");
+  assert.equal(
+    await readFile(
+      join(
+        f.project,
+        ...packRuntime.PACK_ACTIVE_TRANSACTION_PATH.split("/"),
+      ),
+      "utf8",
+    ).then((text) => text.length > 0),
+    true,
+  );
+  await recoveryLane.release();
+});
+
+test("recovery restores the barrier when post-clear verification detects drift", async (t) => {
+  const f = await fixture(t);
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+  const plan = await packRuntime.preparePackOperation(
+    prepareRequest(f, selectedRegistry, pack),
+  );
+  const executionAuthority = authorize(plan, selectedRegistry);
+  const executionLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    executionLane.state === "active" ? executionLane.release() : undefined,
+  );
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan,
+      authorization: executionAuthority.decision,
+      lane: executionLane,
+    })).status,
+    "succeeded",
+  );
+  await executionLane.release();
+  const journal = await packRuntime.loadPackTransactionJournal({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  await writeActiveForStarted(f, journal.started);
+  const report = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  const recoveryPlan =
+    packRuntime.preparePackTransactionRecoveryFinalization({
+      report,
+      registry: selectedRegistry,
+    });
+  const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
+  const recoveryLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    recoveryLane.state === "active" ? recoveryLane.release() : undefined,
+  );
+  const packStateDirectory = join(
+    f.project,
+    ".ai-game-playbook",
+    "state",
+    "packs",
+  );
+  const watcher = watch(packStateDirectory);
+  const injectDrift = (async () => {
+    for await (const event of watcher) {
+      if (event.filename?.toString() === "active.json") {
+        await writeFile(f.target, "drift after marker clear\n", "utf8");
+        return;
+      }
+    }
+  })();
+
+  const result = await packRuntime.finalizePackTransactionRecovery({
+    plan: recoveryPlan,
+    authorization: recoveryAuthority.decision,
+    lane: recoveryLane,
+  });
+  await Promise.race([
+    injectDrift,
+    delay(5_000, undefined, { ref: false }).then(() => {
+      throw new Error("active marker observer did not inject drift");
+    }),
+  ]);
+
+  assert.equal(result.status, "recovery-required");
+  assert.equal(result.mutationUncertain, true);
+  assert.equal(result.settlement.status, "uncertain");
+  assert.equal(
+    await readFile(
+      join(
+        f.project,
+        ...packRuntime.PACK_ACTIVE_TRANSACTION_PATH.split("/"),
+      ),
+      "utf8",
+    ).then((text) => text.length > 0),
+    true,
+  );
+  await recoveryLane.release();
+});
+
 test("recovery distinguishes a restored preimage from a mixed transaction", async (t) => {
   const preimage = await fixture(t);
   const preimagePack = manifest(preimage.content);
@@ -1336,6 +2200,32 @@ test("recovery distinguishes a restored preimage from a mixed transaction", asyn
     join(
       preimage.project,
       ...packRuntime.packTransactionRecordPath(runId, 1).split("/"),
+    ),
+    "{}\n",
+    "utf8",
+  );
+  await assert.rejects(
+    packRuntime.inspectPackTransactionRecovery({
+      root: preimage.targetRoot,
+      runId,
+      project: {
+        id: "sample.graybox",
+        identityDigest: projectIdentityDigest,
+      },
+      maxDirectoryEntries: 1000,
+    }),
+    expectPackError("pack-transaction-corrupt"),
+  );
+  await rm(
+    join(
+      preimage.project,
+      ...packRuntime.packTransactionRecordPath(runId, 1).split("/"),
+    ),
+  );
+  await writeFile(
+    join(
+      preimage.project,
+      ...packRuntime.packTransactionRecordPath(runId, 2).split("/"),
     ),
     "{}\n",
     "utf8",

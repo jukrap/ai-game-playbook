@@ -46,6 +46,8 @@ export type PackTransactionOutcome =
   | "recovery-required"
   | "rolled-back";
 
+export type PackTransactionReconciliationOutcome = "committed" | "failed";
+
 export interface PackTransactionStartedRecord {
   readonly schemaVersion: "1.0.0";
   readonly kind: "started";
@@ -109,13 +111,38 @@ export interface PackTransactionTerminalRecord {
   readonly recordDigest: Sha256Digest;
 }
 
+export interface PackTransactionReconciliationRecord {
+  readonly schemaVersion: "1.0.0";
+  readonly kind: "reconciliation";
+  readonly sequence: 2;
+  readonly runId: string;
+  readonly project: {
+    readonly id: StableId;
+    readonly identityDigest: Sha256Digest;
+    readonly rootIdentityDigest: Sha256Digest;
+  };
+  readonly parentRecordDigest: Sha256Digest;
+  readonly outcome: PackTransactionReconciliationOutcome;
+  readonly observedState: "postimage" | "preimage";
+  readonly authorization: {
+    readonly authorizationId: string;
+    readonly requestDigest: Sha256Digest;
+  };
+  readonly recoveryReportDigest: Sha256Digest;
+  readonly touchedPaths: readonly string[];
+  readonly reconciledAt: string;
+  readonly recordDigest: Sha256Digest;
+}
+
 export type PackTransactionRecord =
   | PackTransactionStartedRecord
-  | PackTransactionTerminalRecord;
+  | PackTransactionTerminalRecord
+  | PackTransactionReconciliationRecord;
 
 export interface LoadedPackTransactionJournal {
   readonly started: PackTransactionStartedRecord;
   readonly terminal?: PackTransactionTerminalRecord;
+  readonly reconciliation?: PackTransactionReconciliationRecord;
 }
 
 export interface LoadPackTransactionJournalRequest {
@@ -153,6 +180,18 @@ export interface CreateTerminalPackTransactionRequest {
     readonly path: string;
   };
   readonly endedAt: string;
+}
+
+export interface CreatePackTransactionReconciliationRequest {
+  readonly started: PackTransactionStartedRecord;
+  readonly terminal: PackTransactionTerminalRecord;
+  readonly outcome: PackTransactionReconciliationOutcome;
+  readonly observedState: "postimage" | "preimage";
+  readonly authorizationId: string;
+  readonly requestDigest: Sha256Digest;
+  readonly recoveryReportDigest: Sha256Digest;
+  readonly touchedPaths: readonly string[];
+  readonly reconciledAt: string;
 }
 
 function isRecord(value: unknown): value is MutableRecord {
@@ -218,7 +257,7 @@ function validateRunId(value: unknown, path: string): asserts value is string {
 
 export function packTransactionRecordPath(
   runId: string,
-  sequence: 0 | 1,
+  sequence: 0 | 1 | 2,
 ): string {
   validateRunId(runId, "$runId");
   return `${PACK_TRANSACTION_DIRECTORY}/${runId}-${sequence.toString().padStart(4, "0")}.json`;
@@ -304,6 +343,17 @@ function freezeTerminal(
     ...(record.error === undefined
       ? {}
       : { error: Object.freeze({ ...record.error }) }),
+  });
+}
+
+function freezeReconciliation(
+  record: PackTransactionReconciliationRecord,
+): PackTransactionReconciliationRecord {
+  return Object.freeze({
+    ...record,
+    project: Object.freeze({ ...record.project }),
+    authorization: Object.freeze({ ...record.authorization }),
+    touchedPaths: Object.freeze([...record.touchedPaths]),
   });
 }
 
@@ -433,6 +483,61 @@ export function createTerminalPackTransaction(
     endedAt: request.endedAt,
   };
   return freezeTerminal({
+    ...body,
+    recordDigest: computePackTransactionRecordDigest(body),
+  });
+}
+
+export function createPackTransactionReconciliation(
+  request: CreatePackTransactionReconciliationRequest,
+): PackTransactionReconciliationRecord {
+  const touchedPaths = sortedUniquePaths(
+    request.touchedPaths,
+    "$transaction.reconciliation.touchedPaths",
+  );
+  const reconciliationPath = packTransactionRecordPath(
+    request.started.runId,
+    2,
+  );
+  if (
+    request.terminal.runId !== request.started.runId ||
+    request.terminal.parentRecordDigest !== request.started.recordDigest ||
+    request.terminal.outcome !== "recovery-required" ||
+    request.terminal.mutationUncertain !== true ||
+    !["committed", "failed"].includes(request.outcome) ||
+    request.observedState !==
+      (request.outcome === "committed" ? "postimage" : "preimage") ||
+    !UUID_PATTERN.test(request.authorizationId) ||
+    !isSha256Digest(request.requestDigest) ||
+    !isSha256Digest(request.recoveryReportDigest) ||
+    !touchedPaths.includes(reconciliationPath) ||
+    !canonicalTimestamp(request.reconciledAt) ||
+    Date.parse(request.reconciledAt) < Date.parse(request.terminal.endedAt)
+  ) {
+    throw new PackRuntimeError(
+      "invalid-pack-recovery-request",
+      "$transaction.reconciliation",
+      "reconciliation record is internally inconsistent",
+    );
+  }
+  const body = {
+    schemaVersion: "1.0.0" as const,
+    kind: "reconciliation" as const,
+    sequence: 2 as const,
+    runId: request.started.runId,
+    project: { ...request.started.project },
+    parentRecordDigest: request.terminal.recordDigest,
+    outcome: request.outcome,
+    observedState: request.observedState,
+    authorization: {
+      authorizationId: request.authorizationId,
+      requestDigest: request.requestDigest,
+    },
+    recoveryReportDigest: request.recoveryReportDigest,
+    touchedPaths,
+    reconciledAt: request.reconciledAt,
+  };
+  return freezeReconciliation({
     ...body,
     recordDigest: computePackTransactionRecordDigest(body),
   });
@@ -813,6 +918,84 @@ function parseTerminal(
   return candidate;
 }
 
+function parseReconciliation(
+  value: unknown,
+  started: PackTransactionStartedRecord,
+  terminal: PackTransactionTerminalRecord,
+): PackTransactionReconciliationRecord {
+  if (
+    !isRecord(value) ||
+    !exactKeys(value, [
+      "schemaVersion",
+      "kind",
+      "sequence",
+      "runId",
+      "project",
+      "parentRecordDigest",
+      "outcome",
+      "observedState",
+      "authorization",
+      "recoveryReportDigest",
+      "touchedPaths",
+      "reconciledAt",
+      "recordDigest",
+    ]) ||
+    value["schemaVersion"] !== "1.0.0" ||
+    value["kind"] !== "reconciliation" ||
+    value["sequence"] !== 2 ||
+    value["runId"] !== started.runId ||
+    value["parentRecordDigest"] !== terminal.recordDigest ||
+    !isRecord(value["authorization"]) ||
+    !exactKeys(value["authorization"], [
+      "authorizationId",
+      "requestDigest",
+    ]) ||
+    typeof value["authorization"]["authorizationId"] !== "string" ||
+    !UUID_PATTERN.test(value["authorization"]["authorizationId"]) ||
+    !isSha256Digest(value["authorization"]["requestDigest"]) ||
+    !isSha256Digest(value["recoveryReportDigest"]) ||
+    !canonicalTimestamp(value["reconciledAt"]) ||
+    !isSha256Digest(value["recordDigest"])
+  ) {
+    transactionError(
+      "pack-transaction-corrupt",
+      "$transaction.reconciliation",
+      "reconciliation transaction record is malformed",
+    );
+  }
+  let candidate: PackTransactionReconciliationRecord;
+  try {
+    candidate = createPackTransactionReconciliation({
+      started,
+      terminal,
+      outcome: value["outcome"] as PackTransactionReconciliationOutcome,
+      observedState: value["observedState"] as "postimage" | "preimage",
+      authorizationId: value["authorization"]["authorizationId"],
+      requestDigest: value["authorization"]["requestDigest"],
+      recoveryReportDigest: value["recoveryReportDigest"],
+      touchedPaths: value["touchedPaths"] as readonly string[],
+      reconciledAt: value["reconciledAt"],
+    });
+  } catch {
+    transactionError(
+      "pack-transaction-corrupt",
+      "$transaction.reconciliation",
+      "reconciliation transaction semantics are invalid",
+    );
+  }
+  if (
+    value["recordDigest"] !== candidate.recordDigest ||
+    canonicalizeJson(value) !== canonicalizeJson(candidate)
+  ) {
+    transactionError(
+      "pack-transaction-corrupt",
+      "$transaction.reconciliation.recordDigest",
+      "reconciliation record digest does not attest its canonical body",
+    );
+  }
+  return candidate;
+}
+
 async function readRecord(
   root: CanonicalProjectRoot,
   path: string,
@@ -875,6 +1058,7 @@ export async function loadPackTransactionJournal(
   const root = request.root as CanonicalProjectRoot;
   const startedPath = packTransactionRecordPath(request.runId, 0);
   const terminalPath = packTransactionRecordPath(request.runId, 1);
+  const reconciliationPath = packTransactionRecordPath(request.runId, 2);
   const startedValue = await readRecord(
     root,
     startedPath,
@@ -891,6 +1075,18 @@ export async function loadPackTransactionJournal(
         "pack-transaction-corrupt",
         terminalPath,
         "pack transaction has a terminal record without its started record",
+      );
+    }
+    const orphanedReconciliation = await readRecord(
+      root,
+      reconciliationPath,
+      request.maxDirectoryEntries,
+    );
+    if (orphanedReconciliation !== undefined) {
+      transactionError(
+        "pack-transaction-corrupt",
+        reconciliationPath,
+        "pack transaction has a reconciliation record without its started record",
       );
     }
     transactionError(
@@ -917,6 +1113,18 @@ export async function loadPackTransactionJournal(
     request.maxDirectoryEntries,
   );
   if (terminalValue === undefined) {
+    const orphanedReconciliation = await readRecord(
+      root,
+      reconciliationPath,
+      request.maxDirectoryEntries,
+    );
+    if (orphanedReconciliation !== undefined) {
+      transactionError(
+        "pack-transaction-corrupt",
+        reconciliationPath,
+        "pack transaction has a reconciliation record without its terminal record",
+      );
+    }
     return Object.freeze({ started });
   }
   const terminal = parseTerminal(terminalValue, started);
@@ -930,5 +1138,18 @@ export async function loadPackTransactionJournal(
       "terminal transaction omits its append-only journal paths",
     );
   }
-  return Object.freeze({ started, terminal });
+  const reconciliationValue = await readRecord(
+    root,
+    reconciliationPath,
+    request.maxDirectoryEntries,
+  );
+  if (reconciliationValue === undefined) {
+    return Object.freeze({ started, terminal });
+  }
+  const reconciliation = parseReconciliation(
+    reconciliationValue,
+    started,
+    terminal,
+  );
+  return Object.freeze({ started, terminal, reconciliation });
 }

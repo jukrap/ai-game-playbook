@@ -83,13 +83,22 @@ function skipped(id: string, code: string, message: string): DoctorCheck {
 
 function inspectRegistry(): DoctorCheck {
   const commands = BUILTIN_REGISTRY_SURFACES.cli.data.commands;
-  const command = commands.find(({ id }) => id === "doctor");
+  const runtimeCommands = BUILTIN_REGISTRY.commands;
+  const surfaceMatchesRuntime =
+    commands.length === runtimeCommands.length &&
+    runtimeCommands.every((runtimeCommand) => {
+      const generated = commands.find(({ id }) => id === runtimeCommand.id);
+      return (
+        generated !== undefined &&
+        generated.input.schemaId === runtimeCommand.input.schemaId &&
+        generated.input.digest === runtimeCommand.input.digest &&
+        generated.output.schemaId === runtimeCommand.output.schemaId &&
+        generated.output.digest === runtimeCommand.output.digest
+      );
+    });
   if (
     BUILTIN_REGISTRY_SURFACES.registryDigest !== BUILTIN_REGISTRY.digest ||
-    commands.length !== 1 ||
-    command === undefined ||
-    command.input.schemaId !== doctorDescriptor().input.schemaId ||
-    command.output.schemaId !== doctorDescriptor().output.schemaId
+    !surfaceMatchesRuntime
   ) {
     return check(
       "control-plane.registry",
@@ -103,7 +112,7 @@ function inspectRegistry(): DoctorCheck {
     "control-plane.registry",
     "passed",
     "registry-current",
-    "The runtime registry and generated doctor surface match.",
+    "The runtime registry and generated command surface match.",
   );
 }
 

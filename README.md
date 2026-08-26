@@ -1,6 +1,6 @@
 # AI Game Playbook
 
-> Status: control-plane contracts, registry, core safety boundaries, managed-pack transactions, and an experimental source-built `agpb doctor` command are in progress. No installable package, MCP server, or engine adapter exists yet.
+> Status: control-plane contracts, registry, core safety boundaries, managed-pack transactions, and experimental source-built `agpb init` planning and `agpb doctor` diagnostics are in progress. No installable package, MCP server, or engine adapter exists yet.
 
 [한국어](README.ko.md)
 
@@ -12,11 +12,11 @@ AI Game Playbook is an AI-assisted game-development control plane for individual
 - A typed registry that validates command, skill, workflow, role-lens, schema, and pack descriptors and generates matching CLI, MCP, documentation, and skill-routing metadata.
 - Safety primitives for canonical project identity, link-safe path resolution, bounded file reads, staged compare-and-swap writes and deletion, bounded direct process execution, project mutation leases, scoped signed approvals, workflow state, and durable checkpoints.
 - A private managed-pack runtime with write-free preflight, exact ownership, add/update/remove transactions, append-only journals, active-transaction barriers, rollback after clear failures, marker-bound directory ownership, and separately approved recovery finalization.
-- An experimental private CLI package and repository-local `agpb` entry point. The only implemented command is read-only `agpb doctor`.
-- A digest-bound public surface that marks `doctor` available and keeps every other command and all engine capabilities planned.
+- An experimental private CLI package and repository-local `agpb` entry point. The implemented commands are plan-only `agpb init` and read-only `agpb doctor`.
+- A digest-bound public surface that marks `init` and `doctor` available and keeps every other command and all engine capabilities planned.
 - English public documentation with Korean mirrors and Windows/Linux conformance checks.
 
-The current CLI slice checks the supported Node.js range, runtime-registry parity, one canonical project root, the fixed project-state directory layout, canonical installed-pack state, and any active pack transaction marker. It emits concise human output or the registered canonical JSON report. It never initializes, repairs, clears, installs, controls an editor, or accesses the network.
+The current CLI slice can plan a fixed 16-target `.ai-game-playbook/` layout and diagnose the supported Node.js range, runtime-registry parity, one canonical project root, the fixed project-state directory layout, canonical installed-pack state, and any active pack transaction marker. Both commands emit concise human output or registered canonical JSON. They never initialize, repair, clear, install, control an editor, or access the network.
 
 Most runtime components remain private libraries. Pack mutation still requires an exact same-process plan, a broker-issued `install` authorization, and an attested project-write lease. The recovery finalizer can close only a stable state already classified by the bounded inspector; it cannot repair pack artifacts or resolve mixed state. Approval reservations and active leases are memory-only, and no general mutation dispatcher or approval UI exists.
 
@@ -27,11 +27,13 @@ No package is published. From a source checkout using the pinned Node.js and pnp
 ```text
 pnpm install --frozen-lockfile
 pnpm build
+pnpm run agpb -- init --project <project-path>
+pnpm run agpb -- init --project <project-path> --json
 pnpm run agpb -- doctor --project <project-path>
 pnpm run agpb -- doctor --project <project-path> --json
 ```
 
-`doctor` returns exit code `0` when diagnostics complete without a blocking finding, including attention-level warnings such as uninitialized project state. It returns `3` for a blocking finding, `2` for invalid CLI usage, and `1` if no validated report can be produced.
+`init` returns exit code `0` when its write-free layout plan has no path conflict and `3` when the selected root or a planned target is blocked. `doctor` returns `0` when diagnostics complete without a blocking finding, including attention-level warnings such as uninitialized project state, and `3` for a blocking finding. Both return `2` for invalid CLI usage and `1` if no validated report can be produced.
 
 ## Product direction
 

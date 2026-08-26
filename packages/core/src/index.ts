@@ -113,6 +113,15 @@ export type {
   ResolveProjectPathOptions,
 } from "./project-path.js";
 export {
+  planProjectInitialization,
+  PROJECT_INITIALIZATION_TARGETS,
+} from "./project-initialization-plan.js";
+export type {
+  PlanProjectInitializationRequest,
+  ProjectInitializationPlan,
+  ProjectInitializationTargetDefinition,
+} from "./project-initialization-plan.js";
+export {
   initializeProjectState,
   PROJECT_STATE_DIRECTORIES,
 } from "./project-state.js";

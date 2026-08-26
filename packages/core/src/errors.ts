@@ -12,6 +12,7 @@ export type CoreBoundaryErrorCode =
   | "invalid-process-request"
   | "invalid-permission-broker-options"
   | "invalid-permission-request"
+  | "invalid-project-initialization-plan-request"
   | "invalid-project-root"
   | "invalid-project-state-request"
   | "invalid-project-path-options"

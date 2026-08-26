@@ -201,7 +201,7 @@ const scenarios = [
     mutate: (root) =>
       updateFile(root, "docs/planned-surface.json", (text) => {
         const surface = JSON.parse(text);
-        surface.availableCommands = ["agpb init"];
+        surface.availableCommands = ["agpb doctor"];
         return `${JSON.stringify(surface, null, 2)}\n`;
       })
   },

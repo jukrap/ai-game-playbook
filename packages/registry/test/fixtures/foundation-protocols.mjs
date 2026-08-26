@@ -30,6 +30,38 @@ export const validFoundationProtocolFixtures = {
       },
     ],
   },
+  "init-request": {
+    schemaVersion: "1.0.0",
+    projectRoot: "D:\\games\\sample",
+  },
+  "init-report": {
+    schemaVersion: "1.0.0",
+    commandId: "init",
+    mode: "plan-only",
+    status: "blocked",
+    controlPlaneVersion: "0.0.0",
+    registryDigest: digest,
+    project: {
+      requestedPath: "D:\\games\\sample",
+    },
+    targets: [],
+    issues: [
+      {
+        code: "project-root-unavailable",
+        message: "The selected project root is unavailable.",
+        nextAction: "Select an existing local project directory and rerun init.",
+      },
+    ],
+    summary: {
+      create: 0,
+      retain: 0,
+      conflict: 0,
+    },
+    mutationPerformed: false,
+    applySupported: false,
+    externalInstallPlanned: false,
+    networkAccessPlanned: false,
+  },
   "approval-grant": {
     schemaVersion: "1.0.0",
     grantId: "approval.network-once",

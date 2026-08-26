@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, managed-pack transactions, and read-only `agpb doctor` exist. General dispatch, evidence storage, MCP, host integration, engines, and bridges remain planned.
+> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, managed-pack transactions, plan-only `agpb init`, and read-only `agpb doctor` exist. General dispatch, evidence storage, MCP, host integration, engines, and bridges remain planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -21,17 +21,17 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Generation creates CLI, MCP, documentation, and skill-routing metadata from the same validated identity. The runtime registry currently contains only `doctor`; CLI help, parsing, input/output validation, and dispatch consume that exact descriptor. The public foundation plan records the runtime-registry digest and keeps unimplemented commands separate.
+The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Generation creates CLI, MCP, documentation, and skill-routing metadata from the same validated identity. The runtime registry currently contains only `init` and `doctor`; CLI help, parsing, input/output validation, and dispatch consume those exact descriptors. The public foundation plan records the runtime-registry digest and keeps unimplemented commands separate.
 
 ## Workspace boundaries
 
 | Boundary | Status | Responsibility |
 | --- | --- | --- |
-| `contracts` | Foundation implemented | Versioned schemas, canonical data, identifiers, approval, workflow, engine, evidence, and doctor protocols |
+| `contracts` | Foundation implemented | Versioned schemas, canonical data, identifiers, approval, workflow, engine, evidence, init-plan, and doctor protocols |
 | `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, workflow-plan resolution, and exact implemented-command inventory |
 | `core` | Partial | Canonical project identity, safe paths, compare-and-swap filesystem operations, bounded processes, mutation leases, in-memory permission admission, workflow state, and durable checkpoints |
 | `pack-runtime` | Partial | Write-free preflight, exact ownership, local lifecycle transactions, journals, active barriers, rollback, directory ownership, recovery inspection, and approved stable-state finalization |
-| `cli` | Experimental partial | Registry-derived help/version, fail-closed parsing, stable exit categories, human/JSON output, and read-only `doctor` |
+| `cli` | Experimental partial | Registry-derived help/version, fail-closed parsing, stable exit categories, human/JSON output, plan-only `init`, and read-only `doctor` |
 | `evidence` | Planned | Content-addressed artifacts, durable receipts, retention, redaction, and explicit export |
 | `mcp` | Planned | Registry-derived tools behind the same broker and result contracts |
 | `codex-adapter` | Planned | Project skills, instruction bootstrap, and host routing without new authority |
@@ -41,19 +41,19 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 
 A partial package is not a claim that its full product surface exists. No current package controls an editor or verifies a live engine frame.
 
-## Current read-only execution flow
+## Current write-free execution flows
 
 The implemented CLI path is deliberately narrow:
 
-1. Parse only global help/version or the exact `doctor` command and its declared flags.
-2. Obtain the `doctor` descriptor from the validated runtime registry.
+1. Parse only global help/version or the exact `init` and `doctor` commands with their declared flags.
+2. Obtain the selected command descriptor from the validated runtime registry.
 3. Validate the request against the descriptor-bound input schema.
-4. Inspect registry parity, Node.js version, project identity, fixed state directories, installed-pack state, and active transaction marker without writing.
-5. Derive `healthy`, `attention`, or `blocked` from individual check outcomes.
-6. Validate the complete report against the descriptor-bound output schema.
+4. For `init`, bind one canonical root and classify the fixed 16-target layout without writing. For `doctor`, inspect registry parity, Node.js version, project identity, fixed state directories, installed-pack state, and active transaction marker without writing.
+5. Derive plan or diagnostic status from bounded target/check outcomes.
+6. Validate semantic counts, identity and digest bindings where applicable, then validate the complete report against the descriptor-bound output schema.
 7. Render human or canonical JSON output and map it to a stable exit category.
 
-The handler digest attests the compiled doctor module. Cross-package tests fail if the executable artifact and registry metadata drift.
+Handler digests attest the compiled init and doctor modules separately. Cross-package tests fail if either executable artifact and registry metadata drift.
 
 ## Planned mutating execution flow
 
@@ -74,7 +74,7 @@ Unknown mutation state goes to `uncertain` and cannot return directly to executi
 
 A consuming game project is planned to contain `.ai-game-playbook/`. Portable profiles, feature contracts, policies, and pack locks are commit-worthy. Cache, logs, screenshots, local receipts, locks, secrets, and machine-specific configuration remain ignored.
 
-The implemented bootstrap can create only six fixed runtime directories. It is idempotent, rejects links and case aliases, verifies parent and target identities, and removes only directories created by a clearly failed call. `doctor` reads this layout but never calls the bootstrap.
+The plan-only `init` command reports 16 fixed targets spanning committed metadata intent and local-only runtime intent. It never supplies profile/policy bytes or calls a mutation primitive. The implemented private bootstrap can create only six fixed runtime directories. It is idempotent, rejects links and case aliases, verifies parent and target identities, and removes only directories created by a clearly failed call. `doctor` reads this layout but never calls the bootstrap.
 
 Pack preflight binds the validated registry, source and target root identities, local artifact bytes, installed-state digest, intended changes, conflicts, and limits into a same-process immutable plan. Execution additionally requires exact `install` authorization and an attested project-write lease. Canonical installed state is committed last. Clear failures roll back already committed files in reverse; uncertain effects stop without retry.
 
@@ -91,7 +91,7 @@ Execution lanes are:
 - `editor-bound` for one exact editor session inside project serialization; and
 - `build-bound` for approved test and build work.
 
-The current `doctor` descriptor declares `parallel-read`, but general parallel-reader coordination is not yet implemented. Mutating lanes remain one lease per project and require explicit renewal.
+The current `init` and `doctor` descriptors declare `parallel-read`, but general parallel-reader coordination is not yet implemented. Mutating lanes remain one lease per project and require explicit renewal.
 
 ## Engine adapter boundary
 

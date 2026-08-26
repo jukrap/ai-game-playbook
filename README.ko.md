@@ -1,12 +1,12 @@
 ---
 source: README.md
-source_sha256: 4fb1e0e1b0caaa905f9b5a59682815f1baca667ce9e21f404e1903a2d8a431b3
+source_sha256: 11a22f0853c9448f5b8ce8f3427324338d22c7549153d6859b37d7cce5fa1d51
 translated_at: 2026-08-26
 ---
 
 # AI Game Playbook
 
-> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction과 소스 빌드 방식의 실험적 `agpb doctor` 명령을 구현하고 있습니다. 설치 가능한 패키지, MCP 서버, 엔진 어댑터는 아직 없습니다.
+> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction과 소스 빌드 방식의 실험적 `agpb init` 계획 및 `agpb doctor` 진단을 구현하고 있습니다. 설치 가능한 패키지, MCP 서버, 엔진 어댑터는 아직 없습니다.
 
 [English](README.md)
 
@@ -18,11 +18,11 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine을 사용하는 개인과 
 - command, skill, workflow, role lens, schema, pack descriptor를 검증하고 서로 일치하는 CLI, MCP, 문서, skill routing metadata를 생성하는 typed registry.
 - canonical project identity, link-safe path resolution, bounded file read, staged compare-and-swap write/delete, bounded direct process execution, project mutation lease, scoped signed approval, workflow state와 durable checkpoint 안전 primitive.
 - write-free preflight, exact ownership, add/update/remove transaction, append-only journal, active-transaction barrier, 명확한 실패 뒤 rollback, marker 결합 directory ownership, 별도 승인 recovery finalization을 제공하는 private managed-pack runtime.
-- 실험적 private CLI package와 repository-local `agpb` entry point. 현재 구현된 명령은 read-only `agpb doctor` 하나뿐입니다.
-- `doctor`만 available로 표시하고 나머지 모든 명령과 엔진 capability를 planned로 유지하는 digest 결합 공개 surface.
+- 실험적 private CLI package와 repository-local `agpb` entry point. 구현된 명령은 plan-only `agpb init`과 read-only `agpb doctor`입니다.
+- `init`과 `doctor`를 available로 표시하고 나머지 모든 명령과 엔진 capability를 planned로 유지하는 digest 결합 공개 surface.
 - 영어 공개 문서와 한국어 mirror, Windows/Linux conformance check.
 
-현재 CLI slice는 지원 Node.js 범위, runtime-registry parity, canonical project root 하나, 고정 project-state directory layout, canonical installed-pack state, active pack transaction marker를 검사합니다. 간결한 human output 또는 등록된 canonical JSON report를 출력합니다. 초기화, repair, marker clear, 설치, Editor 제어, network access는 수행하지 않습니다.
+현재 CLI slice는 고정된 16개 `.ai-game-playbook/` target layout을 계획하고 지원 Node.js 범위, runtime-registry parity, canonical project root 하나, 고정 project-state directory layout, canonical installed-pack state, active pack transaction marker를 진단합니다. 두 명령 모두 간결한 human output 또는 등록된 canonical JSON을 출력합니다. 초기화, repair, marker clear, 설치, Editor 제어, network access는 수행하지 않습니다.
 
 대부분의 runtime component는 여전히 private library입니다. Pack mutation에는 exact same-process plan, broker가 발급한 `install` authorization, attest된 project-write lease가 필요합니다. Recovery finalizer는 bounded inspector가 이미 분류한 stable state만 닫을 수 있으며 pack artifact를 repair하거나 mixed state를 해결할 수 없습니다. Approval reservation과 active lease는 memory-only이고 general mutation dispatcher나 approval UI는 없습니다.
 
@@ -33,11 +33,13 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine을 사용하는 개인과 
 ```text
 pnpm install --frozen-lockfile
 pnpm build
+pnpm run agpb -- init --project <project-path>
+pnpm run agpb -- init --project <project-path> --json
 pnpm run agpb -- doctor --project <project-path>
 pnpm run agpb -- doctor --project <project-path> --json
 ```
 
-`doctor`는 project state 미초기화 같은 attention-level warning을 포함해 blocking finding 없이 진단을 마치면 exit code `0`을 반환합니다. Blocking finding은 `3`, 잘못된 CLI 사용은 `2`, validated report를 만들지 못한 내부 실패는 `1`입니다.
+`init`은 write-free layout plan에 path conflict가 없으면 exit code `0`, 선택한 root나 계획 target이 blocked이면 `3`을 반환합니다. `doctor`는 project state 미초기화 같은 attention-level warning을 포함해 blocking finding 없이 진단을 마치면 `0`, blocking finding이 있으면 `3`을 반환합니다. 두 명령 모두 잘못된 CLI 사용은 `2`, validated report를 만들지 못한 내부 실패는 `1`입니다.
 
 ## 제품 방향
 

@@ -7,6 +7,7 @@ import {
 import { isAbsolute, resolve } from "node:path";
 
 import { runDoctor } from "./doctor.js";
+import { runInit } from "./init.js";
 import { CliDeadlineError, runWithDeadline } from "./deadline.js";
 
 export interface CliExitCodes {
@@ -101,6 +102,22 @@ function doctorHelpText(): string {
   ].join("\n");
 }
 
+function initHelpText(): string {
+  return [
+    "Usage: agpb init [--project <path>] [--json]",
+    "",
+    "Plan the fixed project-local layout without changing any files.",
+    "",
+    "Options:",
+    "  --project <path>  Select a project root; defaults to the current directory",
+    "  --json            Emit the registered plan-only init report as canonical JSON",
+    "  -h, --help        Show command help",
+    "",
+    "Apply is unavailable. This command never initializes, installs, or repairs.",
+    "",
+  ].join("\n");
+}
+
 interface ParsedDoctorArguments {
   readonly json: boolean;
   readonly projectRoot: string;
@@ -163,6 +180,62 @@ function parseDoctorArguments(
   return Object.freeze({ json, projectRoot, help });
 }
 
+function parseInitArguments(
+  args: readonly string[],
+  cwd: string,
+): ParsedDoctorArguments | CliRunResult {
+  let json = false;
+  let help = false;
+  let projectValue: string | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (value === "--json") {
+      if (json) {
+        return result(CLI_EXIT_CODES.usage, "", "Option --json was repeated.\n");
+      }
+      json = true;
+      continue;
+    }
+    if (value === "-h" || value === "--help") {
+      help = true;
+      continue;
+    }
+    if (value === "--project") {
+      const next = args[index + 1];
+      if (next === undefined || next.startsWith("-")) {
+        return result(
+          CLI_EXIT_CODES.usage,
+          "",
+          "Option --project requires one path.\n",
+        );
+      }
+      if (projectValue !== undefined) {
+        return result(
+          CLI_EXIT_CODES.usage,
+          "",
+          "Option --project was repeated.\n",
+        );
+      }
+      projectValue = next;
+      index += 1;
+      continue;
+    }
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Unknown init option.\n${initHelpText()}`,
+    );
+  }
+
+  const projectRoot =
+    projectValue === undefined
+      ? cwd
+      : isAbsolute(projectValue)
+        ? projectValue
+        : resolve(cwd, projectValue);
+  return Object.freeze({ json, projectRoot, help });
+}
+
 function humanDoctorReport(report: Awaited<ReturnType<typeof runDoctor>>): string {
   const lines = [
     "AI Game Playbook doctor",
@@ -177,6 +250,91 @@ function humanDoctorReport(report: Awaited<ReturnType<typeof runDoctor>>): strin
     }
   }
   return `${lines.join("\n")}\n`;
+}
+
+function humanInitReport(report: Awaited<ReturnType<typeof runInit>>): string {
+  const lines = [
+    "AI Game Playbook init plan",
+    `Status: ${report.status}`,
+    `Mode: ${report.mode}`,
+    "Files changed: 0",
+    `Project: ${report.project.canonicalPath ?? report.project.requestedPath}`,
+    `Targets: create ${report.summary.create}, retain ${report.summary.retain}, conflict ${report.summary.conflict}`,
+    "",
+  ];
+  for (const target of report.targets) {
+    lines.push(
+      `${target.action.toUpperCase().padEnd(8)} ${target.policy.padEnd(10)} ${target.kind.padEnd(9)} ${target.path}`,
+    );
+  }
+  for (const issue of report.issues) {
+    lines.push("", `BLOCKED  ${issue.path ?? issue.code}  ${issue.message}`);
+    lines.push(`         Next: ${issue.nextAction}`);
+  }
+  if (report.planDigest !== undefined) {
+    lines.push("", `Plan digest: ${report.planDigest}`);
+  }
+  lines.push("Apply support: unavailable; no project state was changed.");
+  return `${lines.join("\n")}\n`;
+}
+
+async function dispatchInit(
+  args: readonly string[],
+  options: CliRuntimeOptions,
+): Promise<CliRunResult> {
+  const cwd = options.cwd ?? process.cwd();
+  const parsed = parseInitArguments(args, cwd);
+  if ("exitCode" in parsed) {
+    return parsed;
+  }
+  if (parsed.help) {
+    return result(CLI_EXIT_CODES.success, initHelpText());
+  }
+
+  const descriptor = BUILTIN_REGISTRY.commands.find(({ id }) => id === "init");
+  if (descriptor === undefined) {
+    return result(
+      CLI_EXIT_CODES.failure,
+      "",
+      "The init command is unavailable in the runtime registry.\n",
+    );
+  }
+  let input: ReturnType<typeof validateRegisteredContractValue>;
+  try {
+    input = validateRegisteredContractValue(
+      BUILTIN_REGISTRY,
+      descriptor.input,
+      { schemaVersion: "1.0.0", projectRoot: parsed.projectRoot },
+    );
+  } catch {
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      "Init input is outside the registered argument contract.\n",
+    );
+  }
+  try {
+    const report = await runWithDeadline(() => runInit(input), descriptor.timeoutMs);
+    return result(
+      report.status === "blocked"
+        ? CLI_EXIT_CODES.blocked
+        : CLI_EXIT_CODES.success,
+      parsed.json ? `${canonicalizeJson(report)}\n` : humanInitReport(report),
+    );
+  } catch (error) {
+    if (error instanceof CliDeadlineError) {
+      return result(
+        CLI_EXIT_CODES.failure,
+        "",
+        "Init planning exceeded its registered deadline without producing a report.\n",
+      );
+    }
+    return result(
+      CLI_EXIT_CODES.failure,
+      "",
+      "Init planning failed before it could produce a validated report.\n",
+    );
+  }
 }
 
 async function dispatchDoctor(
@@ -275,6 +433,9 @@ export async function runCli(
   }
   if (args[0] === "doctor") {
     return dispatchDoctor(args.slice(1), options);
+  }
+  if (args[0] === "init") {
+    return dispatchInit(args.slice(1), options);
   }
   return result(
     CLI_EXIT_CODES.usage,

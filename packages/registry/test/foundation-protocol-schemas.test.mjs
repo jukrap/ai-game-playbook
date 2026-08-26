@@ -17,6 +17,8 @@ const expectedIds = [
   "engine-operation-result",
   "engine-project-identity",
   "engine-session-identity",
+  "init-report",
+  "init-request",
   "input-replay-trace",
   "resolved-workflow-plan",
   "run-handle",

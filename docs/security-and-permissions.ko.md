@@ -1,6 +1,6 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: 23d0f18f602e378124ae258f06c5f478d65a31e22cd8b9b6ded1400ff07f3395
+source_sha256: 62d8c7b7015069a7ec6e8df40802e4600d94aebc95cf685c5fbb1d80106b4b45
 translated_at: 2026-08-26
 ---
 
@@ -16,7 +16,7 @@ translated_at: 2026-08-26
 
 Authorization 자체는 execution이 아닙니다. Broker는 general mutation dispatcher, MCP server, process workflow, engine bridge와 연결되지 않았습니다. 좁은 pack executor와 stable-state recovery finalizer는 각각 same-process plan, exact `install` decision, attest된 project-write lease를 요구합니다. Grant reservation과 active lease는 memory-only이며 restart 뒤 유지되지 않습니다.
 
-현재 CLI는 read-only `doctor`만 dispatch합니다. Descriptor는 `read-project`, side effect 없음, `parallel-read` lane을 선언합니다. Elevated authority를 요청하거나 repair를 호출할 수 없습니다.
+현재 CLI는 plan-only `init`과 read-only `doctor`를 dispatch합니다. 두 descriptor 모두 `read-project`, side effect 없음, `parallel-read` lane, changed-file/changed-byte budget 0을 선언합니다. 두 명령 모두 elevated authority를 요청하거나 repair를 호출하거나 mutation lane에 진입할 수 없습니다.
 
 ## 기본 permission 모델
 
@@ -34,6 +34,12 @@ Authorization 자체는 execution이 아닙니다. Broker는 general mutation di
 | Publish/release | 매번 별도 승인 |
 
 MCP annotation, skill text, engine bridge, host UI label은 permission을 부여하지 않습니다. Blanket `--yes`로 installation, network, external transmission, paid call, destructive work, publish를 묶어 승인해서는 안 됩니다.
+
+## 초기화 계획 경계
+
+`agpb init`은 고정된 16개 target의 project layout을 관찰하고 검증된 plan만 반환합니다. Directory 생성, profile/policy byte 쓰기, pack 설치, network access, mutation authority 예약을 수행하지 않습니다. 예상 filesystem kind와 일치하는 기존 target은 retain하며 type, case, link, parent, observation conflict는 충돌 대상을 변경하지 않고 plan을 차단합니다. Retain은 기존 metadata 내용의 유효성을 검증하지 않습니다.
+
+Ready plan은 runtime registry, canonical project identity, 정렬된 target intent, 관찰된 target state를 결합한 digest를 가집니다. 이 digest는 plan drift를 탐지하지만 approval grant, write lease, checkpoint, apply token이 아닙니다. 별도 mutation contract와 permission path가 구현되기 전까지 `--apply`는 invalid usage로 거부됩니다.
 
 ## Doctor 경계
 

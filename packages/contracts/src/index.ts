@@ -36,6 +36,31 @@ export type {
   DoctorStatus,
 } from "./doctor-contracts.js";
 export {
+  INIT_PLAN_MAX_ISSUES,
+  INIT_PLAN_MAX_TARGETS,
+  INIT_PLAN_TARGET_ACTIONS,
+  assertInitReportSemantics,
+  computeInitPlanDigest,
+  computeInitPlanStatus,
+  initReportSchema,
+  initRequestSchema,
+  summarizeInitPlanTargets,
+} from "./init-contracts.js";
+export type {
+  InitPlanDigestInput,
+  InitPlanIssue,
+  InitPlanStatus,
+  InitPlanSummary,
+  InitPlanTarget,
+  InitPlanTargetAction,
+  InitPlanTargetContent,
+  InitPlanTargetKind,
+  InitPlanTargetPolicy,
+  InitProjectSummary,
+  InitReport,
+  InitRequest,
+} from "./init-contracts.js";
+export {
   CONTRACT_SCHEMA_DRAFT,
   CONTRACT_SCHEMA_MAX_BYTES,
   defineContractSchema,

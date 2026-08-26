@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: b380d0ea7c6a457311f6b6f1b6a0f609db6dc77a6241673bf70f392107941b0c
+source_sha256: 3cc949d52ed5f5ed7f74c46bb56f3ed35bee10223d5dc1f90fe73d24f39e9119
 translated_at: 2026-08-26
 ---
 
 # 목표 아키텍처
 
-> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, core 안전 primitive, managed-pack transaction과 read-only `agpb doctor`가 존재합니다. General dispatch, evidence store, MCP, host integration, engine, bridge는 계획 단계입니다.
+> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, core 안전 primitive, managed-pack transaction, plan-only `agpb init`, read-only `agpb doctor`가 존재합니다. General dispatch, evidence store, MCP, host integration, engine, bridge는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -27,17 +27,17 @@ flowchart TD
     W --> F[Safe filesystem와 process layer]
 ```
 
-Typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 authoring source입니다. Generation은 같은 validated identity에서 CLI, MCP, 문서, skill-routing metadata를 만듭니다. Runtime registry에는 현재 `doctor`만 있으며 CLI help, parsing, input/output validation, dispatch가 그 exact descriptor를 사용합니다. 공개 foundation plan은 runtime-registry digest를 기록하고 미구현 command를 분리합니다.
+Typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 authoring source입니다. Generation은 같은 validated identity에서 CLI, MCP, 문서, skill-routing metadata를 만듭니다. Runtime registry에는 현재 `init`과 `doctor`만 있으며 CLI help, parsing, input/output validation, dispatch가 그 exact descriptor를 사용합니다. 공개 foundation plan은 runtime-registry digest를 기록하고 미구현 command를 분리합니다.
 
 ## Workspace 경계
 
 | 경계 | 상태 | 책임 |
 | --- | --- | --- |
-| `contracts` | 기반 구현 | Versioned schema, canonical data, identifier, approval, workflow, engine, evidence, doctor protocol |
+| `contracts` | 기반 구현 | Versioned schema, canonical data, identifier, approval, workflow, engine, evidence, init-plan, doctor protocol |
 | `registry` | 기반 구현 | Descriptor validation, generation, digest, routing, workflow-plan resolution, exact implemented-command inventory |
 | `core` | 일부 구현 | Canonical project identity, safe path, compare-and-swap filesystem operation, bounded process, mutation lease, in-memory permission admission, workflow state, durable checkpoint |
 | `pack-runtime` | 일부 구현 | Write-free preflight, exact ownership, local lifecycle transaction, journal, active barrier, rollback, directory ownership, recovery inspection, approved stable-state finalization |
-| `cli` | 실험적 일부 구현 | Registry-derived help/version, fail-closed parsing, stable exit category, human/JSON output, read-only `doctor` |
+| `cli` | 실험적 일부 구현 | Registry-derived help/version, fail-closed parsing, stable exit category, human/JSON output, plan-only `init`, read-only `doctor` |
 | `evidence` | 계획 | Content-addressed artifact, durable receipt, retention, redaction, explicit export |
 | `mcp` | 계획 | 같은 broker와 result contract 뒤의 registry-derived tool |
 | `codex-adapter` | 계획 | 새 authority를 만들지 않는 project skill, instruction bootstrap, host routing |
@@ -47,19 +47,19 @@ Typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 
 Partial package가 존재한다고 전체 product surface가 존재하는 것은 아닙니다. 현재 어떤 package도 Editor를 제어하거나 live engine frame을 검증하지 않습니다.
 
-## 현재 read-only 실행 흐름
+## 현재 write-free 실행 흐름
 
 구현된 CLI 경로는 의도적으로 좁습니다.
 
-1. Global help/version 또는 exact `doctor` command와 선언된 flag만 parse합니다.
-2. Validated runtime registry에서 `doctor` descriptor를 얻습니다.
+1. Global help/version 또는 exact `init`, `doctor` command와 선언된 flag만 parse합니다.
+2. Validated runtime registry에서 선택한 command descriptor를 얻습니다.
 3. Descriptor 결합 input schema로 request를 검증합니다.
-4. Registry parity, Node.js version, project identity, fixed state directory, installed-pack state, active transaction marker를 write 없이 검사합니다.
-5. 개별 check outcome에서 `healthy`, `attention`, `blocked`를 계산합니다.
-6. 완성된 report를 descriptor 결합 output schema로 검증합니다.
+4. `init`은 canonical root 하나를 bind하고 고정된 target 16개를 write 없이 분류합니다. `doctor`는 registry parity, Node.js version, project identity, fixed state directory, installed-pack state, active transaction marker를 write 없이 검사합니다.
+5. Bounded target/check outcome에서 plan 또는 diagnostic status를 계산합니다.
+6. 해당되는 semantic count, identity, digest binding을 검증한 뒤 완성된 report를 descriptor 결합 output schema로 검증합니다.
 7. Human 또는 canonical JSON output을 만들고 stable exit category로 매핑합니다.
 
-Handler digest는 compiled doctor module을 attest합니다. Executable artifact와 registry metadata가 drift하면 cross-package test가 실패합니다.
+Handler digest는 compiled init/doctor module을 각각 attest합니다. 어느 executable artifact든 registry metadata와 drift하면 cross-package test가 실패합니다.
 
 ## 계획된 mutation 실행 흐름
 
@@ -80,7 +80,7 @@ Unknown mutation state는 `uncertain`으로 가며 곧바로 execution으로 돌
 
 소비자 game project에는 `.ai-game-playbook/`을 둘 계획입니다. Portable profile, feature contract, policy, pack lock은 commit 대상입니다. Cache, log, screenshot, local receipt, lock, secret, machine-specific config는 ignore합니다.
 
-구현된 bootstrap은 고정 runtime directory 6개만 만들 수 있습니다. Idempotent하고 link와 case alias를 거부하며 parent/target identity를 검증하고 명확히 실패한 call이 만든 directory만 제거합니다. `doctor`는 이 layout을 읽지만 bootstrap을 호출하지 않습니다.
+Plan-only `init`은 committed metadata intent와 local-only runtime intent에 걸친 고정 target 16개를 보고합니다. Profile/policy byte를 제공하거나 mutation primitive를 호출하지 않습니다. 구현된 private bootstrap은 고정 runtime directory 6개만 만들 수 있습니다. Idempotent하고 link와 case alias를 거부하며 parent/target identity를 검증하고 명확히 실패한 call이 만든 directory만 제거합니다. `doctor`는 이 layout을 읽지만 bootstrap을 호출하지 않습니다.
 
 Pack preflight는 validated registry, source/target root identity, local artifact byte, installed-state digest, intended change, conflict, limit을 same-process immutable plan에 결합합니다. Execution에는 exact `install` authorization과 attest된 project-write lease가 추가로 필요합니다. Canonical installed state는 마지막에 commit합니다. 명확한 실패는 이미 commit한 file을 역순 rollback하며 uncertain effect는 재시도하지 않습니다.
 
@@ -97,7 +97,7 @@ Execution lane은 다음과 같습니다.
 - project serialization 안의 exact Editor session용 `editor-bound`;
 - approved test/build work용 `build-bound`.
 
-현재 `doctor` descriptor는 `parallel-read`를 선언하지만 general parallel-reader coordination은 아직 구현하지 않았습니다. Mutation lane은 project마다 lease 하나이며 명시적 renew가 필요합니다.
+현재 `init`과 `doctor` descriptor는 `parallel-read`를 선언하지만 general parallel-reader coordination은 아직 구현하지 않았습니다. Mutation lane은 project마다 lease 하나이며 명시적 renew가 필요합니다.
 
 ## Engine adapter 경계
 

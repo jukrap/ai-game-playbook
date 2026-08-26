@@ -36,6 +36,7 @@ import {
   doctorReportSchema,
   doctorRequestSchema,
 } from "./doctor-contracts.js";
+import { initReportSchema, initRequestSchema } from "./init-contracts.js";
 import { resolvedWorkflowPlanSchema } from "./workflow-runtime-contracts.js";
 import { workflowCheckpointSchema } from "./workflow-checkpoint-contracts.js";
 
@@ -66,6 +67,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "build-artifact-evidence": buildArtifactEvidenceSchema,
     "doctor-report": doctorReportSchema,
     "doctor-request": doctorRequestSchema,
+    "init-report": initReportSchema,
+    "init-request": initRequestSchema,
     "engine-diagnostic": engineDiagnosticSchema,
     "engine-operation-request": engineOperationRequestSchema,
     "engine-operation-result": engineOperationResultSchema,

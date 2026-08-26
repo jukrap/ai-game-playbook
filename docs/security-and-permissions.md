@@ -10,7 +10,7 @@ The current private broker accepts only a registry validated in the same process
 
 Authorization is not execution. The broker is not connected to a general mutation dispatcher, MCP server, process workflow, or engine bridge. The narrow pack executor and stable-state recovery finalizer require their own same-process plan, exact `install` decision, and attested project-write lease. Grant reservations and active leases are memory-only and do not survive restart.
 
-The current CLI dispatches only read-only `doctor`. Its descriptor declares `read-project`, no side effect, and a `parallel-read` lane. It cannot request elevated authority or call repair.
+The current CLI dispatches plan-only `init` and read-only `doctor`. Both descriptors declare `read-project`, no side effect, a `parallel-read` lane, and zero changed-file and changed-byte budgets. Neither command can request elevated authority, call repair, or enter a mutation lane.
 
 ## Default permission model
 
@@ -28,6 +28,12 @@ The current CLI dispatches only read-only `doctor`. Its descriptor declares `rea
 | Publish or release | Separate approval every time |
 
 MCP annotations, skill text, engine bridges, and host UI labels never grant permission. A blanket `--yes` must not combine installation, network, external transmission, paid calls, destructive work, and publishing.
+
+## Initialization planning boundary
+
+`agpb init` observes a fixed 16-target project layout and returns only a validated plan. It does not create a directory, write profile or policy bytes, install a pack, access the network, or reserve mutation authority. Existing targets with the expected filesystem kind are retained; type, case, link, parent, and observation conflicts block the plan without modifying the conflicting object. Retention does not validate existing metadata content.
+
+A ready plan carries a digest over the runtime registry, canonical project identity, ordered target intent, and observed target state. The digest detects plan drift; it is not an approval grant, write lease, checkpoint, or apply token. `--apply` is rejected as invalid usage until a separate mutation contract and permission path are implemented.
 
 ## Doctor boundary
 

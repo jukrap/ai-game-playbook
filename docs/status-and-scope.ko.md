@@ -1,12 +1,12 @@
 ---
 source: docs/status-and-scope.md
-source_sha256: 5311bdfd1fc27713de0c1419ddd510f9a3425fd57ffd964a7f4a223f5fd28f82
+source_sha256: b16a5c439229ade5a6a7d2297b8cc6965b21723292b50248fbf05cc7b8ace69f
 translated_at: 2026-08-26
 ---
 
 # 현재 상태와 범위
 
-> 상태: 2026-08-26에 검토한 Stage 2 control-plane 구현 단계입니다. Source-built read-only command 하나를 사용할 수 있으며 engine 지원은 planned입니다.
+> 상태: 2026-08-26에 검토한 Stage 2 control-plane 구현 단계입니다. Source-built write-free command 두 개를 사용할 수 있으며 engine 지원은 planned입니다.
 
 [English](status-and-scope.md) · [문서](README.ko.md)
 
@@ -27,17 +27,17 @@ translated_at: 2026-08-26
 
 Private pack runtime은 write-free preflight, canonical installed state, exact dependency/ownership, local add/update/remove transaction, active marker, append-only journal, compare-and-swap promotion, clear-failure rollback, marker-bound direct-parent directory ownership, reversible tombstone, bounded recovery inspection, 별도 승인 stable-state finalization을 구현합니다.
 
-Source-built `agpb` executable은 현재 `doctor`만 노출합니다. Runtime-registry parity, 지원 Node.js 범위, canonical project root 하나, fixed runtime layout, installed-pack-state validity, active transaction marker를 검사합니다. Registered `DoctorReport`에서 human 또는 canonical JSON output을 만들며 write를 수행하지 않습니다.
+Source-built `agpb` executable은 현재 plan-only `init`과 read-only `doctor`를 노출합니다. `init`은 고정된 project-local target 16개를 분류해 identity-bound `InitReport`를 출력하지만 plan을 apply할 수 없습니다. `doctor`는 runtime-registry parity, 지원 Node.js 범위, canonical project root 하나, fixed runtime layout, installed-pack-state validity, active transaction marker를 검사합니다. 두 명령 모두 registered report에서 human 또는 canonical JSON output을 만들며 write를 수행하지 않습니다.
 
 ## 사용할 수 없는 것
 
 Installable/published package, MCP server, Codex integration package, general command dispatcher, approval UI, durable approval store, evidence store, mutating pack CLI, recovery-finalization command, CPU/memory sandbox, engine bridge, engine pack, live-engine automation, playable golden project는 없습니다.
 
-`init`, project inspection, pack/skill command, engine command, workflow execution, verification, evidence command, documentation command integration은 planned입니다. Private library function은 public command가 아니며 runtime registry도 이를 노출하지 않습니다.
+Mutating initialization, project inspection, pack/skill command, engine command, workflow execution, verification, evidence command, documentation command integration은 planned입니다. Private library function은 public command가 아니며 runtime registry도 이러한 planned operation을 노출하지 않습니다.
 
-Project-state bootstrap, pack mutation, recovery inspection, recovery finalization은 private API입니다. 현재 doctor는 unsafe state를 식별할 수 있지만 initialize, repair, clear, recovery classify, finalize할 수 없습니다. Workflow runtime은 general dispatch와 연결되지 않았으며 durable receipt와 evidence payload도 구현하지 않았습니다.
+Project-state bootstrap, pack mutation, recovery inspection, recovery finalization은 private API입니다. 현재 `init`은 layout intent와 conflict를 보고할 수 있지만 profile, policy, ignore, runtime-state byte를 만들 수 없습니다. 현재 doctor는 unsafe state를 식별할 수 있지만 initialize, repair, clear, recovery classify, finalize할 수 없습니다. Workflow runtime은 general dispatch와 연결되지 않았으며 durable receipt와 evidence payload도 구현하지 않았습니다.
 
-Godot, Unity, Unreal capability는 모두 `planned`입니다. `doctor` availability는 control-plane command 상태이며 engine evidence가 아닙니다.
+Godot, Unity, Unreal capability는 모두 `planned`입니다. `init`과 `doctor` availability는 control-plane command 상태이며 engine evidence가 아닙니다.
 
 ## 대상 사용자와 첫 결과
 

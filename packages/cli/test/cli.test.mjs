@@ -18,6 +18,7 @@ test("CLI help and version are derived from the implemented runtime surface", as
   const help = await cli.runCli(["--help"]);
   assert.equal(help.exitCode, cli.CLI_EXIT_CODES.success);
   assert.match(help.stdout, /^AI Game Playbook 0\.0\.0/m);
+  assert.match(help.stdout, /init\s+Plan/);
   assert.match(help.stdout, /doctor\s+Inspect/);
   assert.doesNotMatch(help.stdout, /pack add/);
   assert.equal(help.stderr, "");
@@ -52,6 +53,7 @@ test("CLI fails closed on unknown commands, flags, and missing option values", a
   for (const args of [
     ["pack", "add"],
     ["doctor", "--repair"],
+    ["init", "--apply"],
     ["doctor", "--project"],
   ]) {
     const result = await cli.runCli(args);

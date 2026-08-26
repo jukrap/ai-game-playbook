@@ -11,7 +11,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.match(registry.BUILTIN_REGISTRY.digest, digestPattern);
   assert.deepEqual(
     registry.BUILTIN_REGISTRY.commands.map(({ id }) => id),
-    ["doctor"],
+    ["doctor", "init"],
   );
 
   const doctor = registry.BUILTIN_REGISTRY.commands[0];
@@ -27,24 +27,50 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.equal(doctor.handler.package, "@ai-game-playbook/cli");
   assert.equal(doctor.handler.export, "runDoctor");
   assert.match(doctor.handler.digest, digestPattern);
+
+  const init = registry.BUILTIN_REGISTRY.commands.find(({ id }) => id === "init");
+  assert.notEqual(init, undefined);
+  assert.deepEqual(init.cli, { path: ["init"], aliases: [] });
+  assert.deepEqual(init.permissions, ["read-project"]);
+  assert.deepEqual(init.sideEffects, [
+    {
+      kind: "none",
+      scope: "project-initialization-plan",
+      boundary: "local",
+    },
+  ]);
+  assert.equal(init.lane, "parallel-read");
+  assert.equal(init.input.schemaId, contracts.initRequestSchema.schemaId);
+  assert.equal(init.output.schemaId, contracts.initReportSchema.schemaId);
+  assert.equal(init.handler.package, "@ai-game-playbook/cli");
+  assert.equal(init.handler.export, "runInit");
+  assert.match(init.handler.digest, digestPattern);
 });
 
-test("builtin generated surfaces preserve the doctor schema and command identity", () => {
+test("builtin generated surfaces preserve implemented schema and command identity", () => {
   const surfaces = registry.BUILTIN_REGISTRY_SURFACES;
   assert.equal(surfaces.registryDigest, registry.BUILTIN_REGISTRY.digest);
-  assert.deepEqual(surfaces.cli.data.commands.map(({ id }) => id), ["doctor"]);
-  assert.deepEqual(surfaces.docs.data.commands.map(({ id }) => id), ["doctor"]);
+  assert.deepEqual(surfaces.cli.data.commands.map(({ id }) => id), [
+    "doctor",
+    "init",
+  ]);
+  assert.deepEqual(surfaces.docs.data.commands.map(({ id }) => id), [
+    "doctor",
+    "init",
+  ]);
   assert.deepEqual(surfaces.mcp.data.tools.map(({ commandId }) => commandId), [
     "doctor",
+    "init",
   ]);
   assert.equal(surfaces.mcp.data.tools[0].enabledByDefault, false);
+  assert.equal(surfaces.mcp.data.tools[1].enabledByDefault, false);
   assert.equal(
     surfaces.mcp.data.tools[0].outputSchemaId,
     contracts.doctorReportSchema.schemaId,
   );
 });
 
-test("builtin registry validates doctor input and output values", () => {
+test("builtin registry validates implemented input and output values", () => {
   const doctor = registry.BUILTIN_REGISTRY.commands[0];
   const request = registry.validateRegisteredContractValue(
     registry.BUILTIN_REGISTRY,
@@ -96,4 +122,40 @@ test("builtin registry validates doctor input and output values", () => {
       ),
     (error) => error?.code === "registered-value-invalid",
   );
+
+  const init = registry.BUILTIN_REGISTRY.commands.find(({ id }) => id === "init");
+  const initInput = registry.validateRegisteredContractValue(
+    registry.BUILTIN_REGISTRY,
+    init.input,
+    { schemaVersion: "1.0.0", projectRoot: "D:\\games\\sample" },
+  );
+  assert.equal(initInput.projectRoot, "D:\\games\\sample");
+
+  const initOutput = registry.validateRegisteredContractValue(
+    registry.BUILTIN_REGISTRY,
+    init.output,
+    {
+      schemaVersion: "1.0.0",
+      commandId: "init",
+      mode: "plan-only",
+      status: "blocked",
+      controlPlaneVersion: "0.0.0",
+      registryDigest: registry.BUILTIN_REGISTRY.digest,
+      project: { requestedPath: "D:\\games\\sample" },
+      targets: [],
+      issues: [
+        {
+          code: "project-root-not-found",
+          message: "The selected project root is unavailable.",
+          nextAction: "Select one existing local project directory.",
+        },
+      ],
+      summary: { create: 0, retain: 0, conflict: 0 },
+      mutationPerformed: false,
+      applySupported: false,
+      externalInstallPlanned: false,
+      networkAccessPlanned: false,
+    },
+  );
+  assert.equal(initOutput.mode, "plan-only");
 });

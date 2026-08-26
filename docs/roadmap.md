@@ -12,7 +12,8 @@ The current Stage 2 product slice adds:
 
 - an executable repository-local CLI with stable help, version, parsing, output, and exit behavior;
 - an exact runtime registry that exposes only implemented commands;
-- `DoctorRequest` and `DoctorReport` schemas;
+- `InitRequest`, `InitReport`, `DoctorRequest`, and `DoctorReport` schemas;
+- write-free `agpb init` classification for a fixed 16-target project-local layout;
 - read-only `agpb doctor` checks for runtime, registry, project-state, installed-pack-state, and active-marker safety;
 - compiled-handler digest attestation; and
 - generated/public availability parity.
@@ -23,7 +24,7 @@ This does not make the package installable and does not raise any engine capabil
 
 The next control-plane work is:
 
-1. Add write-plan-only `init`, then bind its mutation to explicit project metadata authority.
+1. Bind mutation behind the existing write-plan-only `init` to explicit project-metadata authority, fresh plan validation, staged writes, and rollback.
 2. Add read-only `project inspect` with engine markers, project identity, stage, targets, budgets, dirty state, and process ambiguity.
 3. Add pack and skill list/check commands before any mutation command.
 4. Connect approved pack add/update/remove and recovery finalization through a general dispatcher without weakening the existing plan, approval, lane, CAS, journal, or rollback requirements.

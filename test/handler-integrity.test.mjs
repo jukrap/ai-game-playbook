@@ -5,14 +5,19 @@ import test from "node:test";
 
 import { BUILTIN_REGISTRY } from "../packages/registry/dist/index.js";
 
-test("runtime command handler metadata attests the exact compiled module", async () => {
-  const doctor = BUILTIN_REGISTRY.commands.find(({ id }) => id === "doctor");
-  assert.notEqual(doctor, undefined);
+test("runtime command handler metadata attests each exact compiled module", async () => {
+  for (const [commandId, moduleName] of [
+    ["doctor", "doctor.js"],
+    ["init", "init.js"],
+  ]) {
+    const command = BUILTIN_REGISTRY.commands.find(({ id }) => id === commandId);
+    assert.notEqual(command, undefined);
 
-  const source = await readFile(
-    new URL("../packages/cli/dist/doctor.js", import.meta.url),
-  );
-  const digest = `sha256:${createHash("sha256").update(source).digest("hex")}`;
+    const source = await readFile(
+      new URL(`../packages/cli/dist/${moduleName}`, import.meta.url),
+    );
+    const digest = `sha256:${createHash("sha256").update(source).digest("hex")}`;
 
-  assert.equal(doctor.handler.digest, digest);
+    assert.equal(command.handler.digest, digest);
+  }
 });

@@ -1,12 +1,12 @@
 ---
 source: docs/roadmap.md
-source_sha256: 230cd1226839b414c29d601f4ad73e61499d39cd33ae54a4ebed79fc40355c15
+source_sha256: 3244b1293a1bd5a16155d02ede822e3911fff27ac3598ecdcb48e3a629a1611e
 translated_at: 2026-08-26
 ---
 
 # 로드맵
 
-> 상태: Stage 1을 진행하고 있습니다. 후속 단계, 일정, 제공 시점은 약속하지 않습니다.
+> 상태: 공통 기반과 Stage 2 안전 primitive를 구현하고 있습니다. 후속 단계, 일정, 제공 시점은 약속하지 않습니다.
 
 [English](roadmap.md) · [문서](README.ko.md)
 
@@ -25,7 +25,8 @@ translated_at: 2026-08-26
 
 ## Stage 2: 실행, 증거, 안전
 
-- permission broker, compare-and-swap write, project/Editor identity, serialized mutation lane을 구현합니다.
+- 구현된 primitive: compare-and-swap write, canonical project-root identity, bounded direct process 실행, 직렬화된 root/project 결합 mutating lease.
+- 남음: permission broker, 완전한 project/Editor identity attestation, automatic lease heartbeat integration, parallel-read coordination.
 - bounded workflow, checkpoint, resume validation, repair limit, cancellation, uncertainty handling을 추가합니다.
 - content-addressed receipt, evidence storage, redacted diagnostic, retention, explicit export를 추가합니다.
 - traversal, symlink escape, invalid token, output growth, timeout, stale process, ambiguous Editor, install lifecycle conflict를 테스트합니다.

@@ -1,6 +1,6 @@
 # Roadmap
 
-> Status: Stage 1 in progress. Later stages, dates, and availability are not promised.
+> Status: common foundation and Stage 2 safety primitives are in progress. Later stages, dates, and availability are not promised.
 
 [한국어](roadmap.ko.md) · [Documentation](README.md)
 
@@ -19,7 +19,8 @@ Approval freezes the initial contracts, risks, permission defaults, evidence thr
 
 ## Stage 2: execution, evidence, and safety
 
-- Implement the permission broker, compare-and-swap writes, project/editor identity, and serialized mutation lanes.
+- Implemented primitives: compare-and-swap writes, canonical project-root identity, bounded direct process execution, and serialized root/project-bound mutating leases.
+- Remaining: permission broker, full project/editor identity attestation, automatic lease heartbeat integration, and parallel-read coordination.
 - Add bounded workflows, checkpoints, resume validation, repair limits, cancellation, and uncertainty handling.
 - Add content-addressed receipts, evidence storage, redacted diagnostics, retention, and explicit export.
 - Test traversal, symlink escape, invalid tokens, output growth, timeouts, stale processes, ambiguous editors, and install lifecycle conflicts.

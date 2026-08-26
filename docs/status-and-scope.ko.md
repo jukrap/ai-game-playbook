@@ -1,6 +1,6 @@
 ---
 source: docs/status-and-scope.md
-source_sha256: 7dc87e90f0ddf2f5882678e95c901ba77c13da3363b3a3574927a7bad85d9933
+source_sha256: 2b7f07bf039d47d8600e3154e06af05d23da7d90e9e2ac7c8dfaa40548644d28
 translated_at: 2026-08-26
 ---
 
@@ -12,9 +12,9 @@ translated_at: 2026-08-26
 
 ## 현재 저장소 상태
 
-현재 저장소에는 private pnpm/TypeScript workspace, versioned contract schema, semantic validator, typed registry 검증 및 projection, digest 결합 foundation plan, test, Windows/Linux CI 설정, 초기 private core package가 있습니다. 구현된 filesystem 경계는 canonical project root를 결합하고 writable link를 따라가지 않으면서 portable project path를 해석하며 directory 검사와 파일 크기를 제한합니다. 또한 precondition, drift, 결과 불확실성 보고를 갖춘 SHA-256 compare-and-swap 쓰기를 stage합니다. process 경계는 local executable identity와 digest를 결합하고 direct argument-array spawn을 사용하며 environment 권한, working directory, time, idle time, output을 제한합니다. cancellation 또는 budget 초과 시 owned process tree를 종료하며, 종료가 확인돼도 중단된 실행은 mutation-uncertain으로 유지합니다.
+현재 저장소에는 private pnpm/TypeScript workspace, versioned contract schema, semantic validator, typed registry 검증 및 projection, digest 결합 foundation plan, test, Windows/Linux CI 설정, 초기 private core package가 있습니다. 구현된 filesystem 경계는 canonical project root를 결합하고 writable link를 따라가지 않으면서 portable project path를 해석하며 directory 검사와 파일 크기를 제한합니다. 또한 precondition, drift, 결과 불확실성 보고를 갖춘 SHA-256 compare-and-swap 쓰기를 stage합니다. process 경계는 local executable identity와 digest를 결합하고 direct argument-array spawn을 사용하며 environment 권한, working directory, time, idle time, output을 제한합니다. cancellation 또는 budget 초과 시 owned process tree를 종료하며, 종료가 확인돼도 중단된 실행은 mutation-uncertain으로 유지합니다. mutating-lane 경계는 고정된 local lock, root/project digest, run/runtime identity, 명시적 lease 갱신, 제한된 대기와 cancellation, dead-owner-only stale recovery를 사용합니다.
 
-설치 가능한 package, `agpb` 실행 파일, MCP server runtime, Codex integration 파일, permission broker, project lane, CPU 또는 memory sandbox, workflow runtime, engine bridge, engine pack, 실행 가능한 golden project는 아직 없습니다. [planned-surface.json](planned-surface.json)의 명령 목록과 생성된 [foundation plan](../generated/foundation-plan.json)은 설계 전용이며 어느 command 또는 engine capability도 `planned`보다 높이지 않습니다.
+설치 가능한 package, `agpb` 실행 파일, MCP server runtime, Codex integration 파일, permission broker, CPU 또는 memory sandbox, workflow runtime, engine bridge, engine pack, 실행 가능한 golden project는 아직 없습니다. lane runtime은 여전히 private primitive이며 automatic heartbeat scheduling, parallel-reader coordination, foreign live process start의 독립적인 OS attestation, durable recovery receipt, 실제 Editor control은 구현되지 않았습니다. [planned-surface.json](planned-surface.json)의 명령 목록과 생성된 [foundation plan](../generated/foundation-plan.json)은 설계 전용이며 어느 command 또는 engine capability도 `planned`보다 높이지 않습니다.
 
 ## 대상 사용자와 첫 결과물
 

@@ -1,6 +1,6 @@
 # Security and Permissions
 
-> Status: planned permission policy. Early filesystem and process enforcement exists; the permission broker, project lanes, and editor or bridge enforcement do not.
+> Status: planned permission policy. Early filesystem, process, and mutating-lane enforcement exists; the permission broker and editor or bridge enforcement do not.
 
 [한국어](security-and-permissions.ko.md) · [Documentation](README.md)
 
@@ -40,7 +40,9 @@ Uncertain mutations are not automatically retried. The workflow first records an
 
 The current private core digest-binds a local executable and project root, spawns it directly with an argument array, limits environment values and project-scoped working directories, caps time, idle time, and combined output, and terminates only the owned process tree on interruption. Windows retains only a minimal non-secret OS baseline and masks inherited user/path values unless explicitly allowlisted. Interrupted execution remains mutation-uncertain and is not safe to retry without reconciliation. This boundary is not a CPU, memory, filesystem, or network sandbox.
 
-Project mutation lanes and editor-bound serialization remain planned. Planned local bridges use authenticated, project-scoped sessions, bounded request bodies and queues, timeouts, cancellation, and normalized outer/inner errors. They bind to loopback by default and do not expose an unauthenticated server.
+The current private core admits `project-write`, `editor-bound`, and `build-bound` work through one fixed local lease per initialized project. The record binds root and project digests, a run UUID, PID, captured runtime-start identity, runtime nonce, lane, and an editor-session digest when applicable. Acquisition has bounded waiting and cancellation; renewal is explicit and compare-and-swap protected. Expiration alone never permits takeover: a live, reused, or unverifiable foreign PID remains blocking, while a dead owner record is atomically quarantined before reacquisition. Foreign live process start time is not yet independently attested by the operating system, automatic heartbeats and parallel-reader coordination do not exist, and no actual editor session is controlled yet.
+
+Planned local bridges use authenticated, project-scoped sessions, bounded request bodies and queues, timeouts, cancellation, and normalized outer/inner errors. They bind to loopback by default and do not expose an unauthenticated server.
 
 ## Filesystem and pack safety
 

@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture. The `contracts` and `registry` foundations and early `core` filesystem/process boundaries exist; the remaining runtime and bridge boundaries are planned.
+> Status: target architecture. The `contracts` and `registry` foundations and early `core` filesystem, process, and mutating-lane boundaries exist; the remaining runtime and bridge boundaries are planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -29,7 +29,7 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 | --- | --- | --- |
 | `contracts` | Foundation implemented | Versioned schemas and shared identifiers with no engine runtime dependency |
 | `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, and parity checks |
-| `core` | Partial | Canonical project identity, portable path resolution, staged filesystem compare-and-swap, and digest-bound direct process execution with time/idle/output/cancellation limits exist; permissions, CPU/memory budgets, lanes, checkpoints, and workflow state remain planned |
+| `core` | Partial | Canonical project identity, portable path resolution, staged filesystem compare-and-swap, digest-bound direct process execution, and root/project-bound mutating leases exist; permissions, CPU/memory budgets, parallel-read coordination, checkpoints, and workflow state remain planned |
 | `cli` | Planned | `agpb` argument parsing, local interaction, stable exit behavior, and help |
 | `mcp` | Planned | Schema-derived tools and resources behind the same permission broker |
 | `codex-adapter` | Planned | Skills, host routing metadata, and project instruction integration |
@@ -55,7 +55,7 @@ Only `contracts`, `registry`, and the partial private `core` currently exist as 
 
 A consuming game project is planned to contain `.ai-game-playbook/`. Commit-worthy state includes the project profile, feature contracts, and policy. Cache, logs, screenshots, locks, receipts containing local details, local secrets, and machine-specific configuration remain ignored.
 
-Writes use owned-path rules and compare-and-swap preimages. Pack lifecycle operations stage changes before promotion and never delete non-owned files. Editor-bound work is serialized per project while read-only inspection may run in parallel.
+Writes use owned-path rules and compare-and-swap preimages. The current private core serializes `project-write`, `editor-bound`, and `build-bound` admission through one fixed project-local lease, but it does not yet discover or control an editor. Pack lifecycle operations remain planned and will stage changes before promotion without deleting non-owned files. Parallel read coordination also remains planned.
 
 ## Host integration
 
@@ -63,4 +63,4 @@ Codex is the first supported host, but contracts do not depend on one chat surfa
 
 ## Failure and recovery
 
-Every mutation records preconditions, changed paths, engine identity, and recovery status. A stale process, changed session, path escape, unexpected dirty file, incomplete result, or exceeded budget stops the workflow. Rollback is a registered operation with its own receipt, not an assumption that a failed command made no changes.
+Every mutation is intended to record preconditions, changed paths, engine identity, and recovery status. The implemented lease stops on root/project mismatch, changed lock-directory identity, malformed records, or a live or unverifiable owner. An expired lease is quarantined only after its owner PID is no longer running. Durable recovery receipts and full workflow reconciliation remain planned. Rollback is a registered operation with its own receipt, not an assumption that a failed command made no changes.

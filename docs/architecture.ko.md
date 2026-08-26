@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: a8be9d48ac45f8c8321c42d6de68152a908372daf5a6d011359a379528973d29
+source_sha256: 6f1c3e2d44326aa4c97978d62fed337d3aa4d427f7317842e673cb97ed8041bf
 translated_at: 2026-08-26
 ---
 
 # 목표 아키텍처
 
-> 상태: 목표 아키텍처입니다. `contracts`, `registry` 기반과 초기 `core` filesystem/process 경계가 존재하며 나머지 runtime과 bridge 경계는 계획 단계입니다.
+> 상태: 목표 아키텍처입니다. `contracts`, `registry` 기반과 초기 `core` filesystem/process/mutating-lane 경계가 존재하며 나머지 runtime과 bridge 경계는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -35,7 +35,7 @@ typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 | --- | --- | --- |
 | `contracts` | 기반 구현 | engine runtime dependency가 없는 versioned schema와 shared identifier |
 | `registry` | 기반 구현 | descriptor validation, generation, digest, routing, parity check |
-| `core` | 일부 구현 | canonical project identity, portable path 해석, staged filesystem compare-and-swap, time·idle·output·cancellation 제한이 있는 digest 결합 direct process 실행은 존재하며 permission, CPU/memory budget, lane, checkpoint, workflow state는 계획 단계 |
+| `core` | 일부 구현 | canonical project identity, portable path 해석, staged filesystem compare-and-swap, digest 결합 direct process 실행, root/project 결합 mutating lease가 존재하며 permission, CPU/memory budget, parallel-read coordination, checkpoint, workflow state는 계획 단계 |
 | `cli` | 계획 | `agpb` argument parsing, local interaction, stable exit behavior, help |
 | `mcp` | 계획 | 동일 permission broker 뒤의 schema-derived tool과 resource |
 | `codex-adapter` | 계획 | skill, host routing metadata, project instruction integration |
@@ -61,7 +61,7 @@ typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 
 게임 project에는 `.ai-game-playbook/`을 둘 계획입니다. project profile, feature contract, policy는 commit 대상입니다. cache, log, screenshot, lock, local detail을 포함한 receipt, local secret, machine-specific configuration은 ignore합니다.
 
-write는 owned-path rule과 compare-and-swap preimage를 사용합니다. pack lifecycle operation은 promote 전에 change를 stage하고 non-owned file을 삭제하지 않습니다. Editor-bound work는 project별로 직렬화하고 read-only inspect는 병렬 실행할 수 있습니다.
+write는 owned-path rule과 compare-and-swap preimage를 사용합니다. 현재 private core는 고정된 project-local lease 하나로 `project-write`, `editor-bound`, `build-bound` admission을 직렬화하지만 아직 Editor를 탐지하거나 제어하지는 않습니다. pack lifecycle operation은 계획 단계이며 promote 전에 change를 stage하고 non-owned file을 삭제하지 않도록 구현할 예정입니다. parallel read coordination도 아직 계획 단계입니다.
 
 ## Host integration
 
@@ -69,4 +69,4 @@ Codex가 첫 지원 host지만 계약은 하나의 chat surface에 의존하지 
 
 ## 실패와 복구
 
-모든 mutation은 precondition, changed path, engine identity, recovery status를 기록합니다. stale process, changed session, path escape, unexpected dirty file, incomplete result, exceeded budget이 있으면 workflow를 중단합니다. rollback은 실패한 command가 아무것도 바꾸지 않았다고 가정하는 대신 자체 receipt를 갖는 등록 operation입니다.
+모든 mutation은 precondition, changed path, engine identity, recovery status를 기록하도록 계획합니다. 구현된 lease는 root/project mismatch, lock directory identity 변경, malformed record, live 또는 확인 불가능한 owner에서 중단합니다. 만료된 lease는 owner PID가 더는 실행 중이지 않을 때만 quarantine합니다. durable recovery receipt와 전체 workflow reconciliation은 아직 계획 단계입니다. rollback은 실패한 command가 아무것도 바꾸지 않았다고 가정하는 대신 자체 receipt를 갖는 등록 operation입니다.

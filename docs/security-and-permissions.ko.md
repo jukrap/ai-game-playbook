@@ -1,12 +1,12 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: b70e959863695c0d953384488e3edd1911cf9a7e3565e35cd7181720bd378784
+source_sha256: bf54b11c04d1b89cae2af1e85a907d742bdba0b39ae425058147a7ca0dc83286
 translated_at: 2026-08-26
 ---
 
 # 보안과 권한
 
-> 상태: 계획된 permission 정책입니다. 초기 filesystem/process enforcement는 존재하지만 permission broker, project lane, Editor 또는 bridge enforcement는 아직 없습니다.
+> 상태: 계획된 permission 정책입니다. 초기 filesystem/process/mutating-lane enforcement는 존재하지만 permission broker, Editor 또는 bridge enforcement는 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
@@ -46,7 +46,9 @@ permission은 control plane이 평가하며 MCP annotation, skill, engine bridge
 
 현재 private core는 local executable과 project root를 digest로 결합하고 argument array로 직접 spawn합니다. environment value와 project-scoped working directory를 제한하고 time, idle time, combined output 상한을 적용하며 중단 시 owned process tree만 종료합니다. Windows에서는 최소한의 비민감 OS 기준값만 유지하고 명시적으로 allowlist하지 않은 inherited user/path value를 가립니다. 중단된 실행은 mutation-uncertain으로 유지하며 reconcile 전에는 안전하게 retry할 수 없습니다. 이 경계는 CPU, memory, filesystem 또는 network sandbox가 아닙니다.
 
-project mutation lane과 Editor-bound 직렬화는 아직 계획 단계입니다. 계획된 local bridge는 인증된 project-scoped session, 제한된 request body/queue, timeout, cancellation, normalized outer/inner error를 사용합니다. 기본으로 loopback에 bind하고 unauthenticated server를 노출하지 않습니다.
+현재 private core는 초기화된 project마다 고정 local lease 하나를 사용해 `project-write`, `editor-bound`, `build-bound` 작업을 admission합니다. record는 root/project digest, run UUID, PID, 캡처한 runtime-start identity, runtime nonce, lane, 필요한 경우 Editor-session digest를 결합합니다. acquisition은 제한된 대기와 cancellation을 사용하며 갱신은 명시적으로 수행하고 compare-and-swap으로 보호합니다. 만료만으로는 takeover할 수 없습니다. live, reused 또는 확인할 수 없는 foreign PID는 계속 차단하고 dead owner record만 재획득 전에 atomic quarantine합니다. foreign live process start time은 아직 OS에서 독립적으로 attest하지 않으며 automatic heartbeat, parallel-reader coordination, 실제 Editor session 제어도 없습니다.
+
+계획된 local bridge는 인증된 project-scoped session, 제한된 request body/queue, timeout, cancellation, normalized outer/inner error를 사용합니다. 기본으로 loopback에 bind하고 unauthenticated server를 노출하지 않습니다.
 
 ## Filesystem과 pack 안전
 

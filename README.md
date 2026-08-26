@@ -1,6 +1,6 @@
 # AI Game Playbook
 
-> Status: control-plane contracts, registry, and early core filesystem/process boundaries are in progress. No installable package, `agpb` executable, MCP server, or engine adapter exists yet.
+> Status: control-plane contracts, registry, and early core filesystem, process, and project-lane boundaries are in progress. No installable package, `agpb` executable, MCP server, or engine adapter exists yet.
 
 [한국어](README.ko.md)
 
@@ -10,12 +10,12 @@ AI Game Playbook is a planned AI-assisted game-development harness for small tea
 
 - A pnpm/TypeScript workspace with versioned public schemas and semantic validation.
 - A typed registry that validates command, skill, workflow, role-lens, schema, and pack descriptors and generates bounded design projections.
-- An early private core package for canonical project-root binding, portable path resolution, staged SHA-256 compare-and-swap writes, and digest-bound direct process execution with time, idle, output, environment, and cancellation limits.
+- An early private core package for canonical project-root binding, portable path resolution, staged SHA-256 compare-and-swap writes, digest-bound direct process execution, and one root/project-bound mutating lease per initialized project.
 - A tracked, digest-bound plan for the intended command and skill surface.
 - English documentation with a Korean mirror.
 - Cross-platform static checks for contracts, generated-plan drift, and documentation parity.
 
-These foundations are development-time libraries and checks, not a usable product. The core boundary does not yet include permission brokering, project lanes, CPU or memory sandboxing, or workflow recovery. The repository does not currently provide an installable npm package or working game-engine automation. Commands shown in the documentation are interface plans, not commands that can be run today.
+These foundations are development-time libraries and checks, not a usable product. The lane primitive requires pre-created local project state and explicit renewal; it does not yet coordinate parallel readers or control an editor. The core boundary does not yet include permission brokering, CPU or memory sandboxing, or workflow recovery. The repository does not currently provide an installable npm package or working game-engine automation. Commands shown in the documentation are interface plans, not commands that can be run today.
 
 ## Product direction
 

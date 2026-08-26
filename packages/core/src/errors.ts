@@ -30,6 +30,17 @@ export type CoreBoundaryErrorCode =
   | "process-executable-not-found"
   | "process-timeout-before-spawn"
   | "process-working-directory-drift"
+  | "invalid-project-lane-request"
+  | "project-lane-busy"
+  | "project-lane-cancelled"
+  | "project-lane-expired"
+  | "project-lane-identity-mismatch"
+  | "project-lane-lock-invalid"
+  | "project-lane-lock-write-failed"
+  | "project-lane-ownership-lost"
+  | "project-lane-recovery-failed"
+  | "project-lane-release-failed"
+  | "project-lane-state-invalid"
   | "unsafe-project-root";
 
 export class CoreBoundaryError extends Error {

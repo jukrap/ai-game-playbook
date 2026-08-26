@@ -54,3 +54,24 @@ export type {
   ResolvedProjectPathKind,
   ResolveProjectPathOptions,
 } from "./project-path.js";
+export {
+  acquireProjectLane,
+  inspectProjectLane,
+  PROJECT_LANE_LOCK_PATH,
+  PROJECT_LANE_MAX_LEASE_MS,
+  PROJECT_LANE_MAX_POLL_MS,
+  PROJECT_LANE_MAX_WAIT_MS,
+  PROJECT_LANE_MIN_LEASE_MS,
+  PROJECT_LANE_MIN_POLL_MS,
+} from "./project-lane.js";
+export type {
+  AcquireProjectLaneRequest,
+  ProjectLaneAcquisition,
+  ProjectLaneInspection,
+  ProjectLaneLease,
+  ProjectLaneLeaseRecord,
+  ProjectLaneLeaseState,
+  ProjectLaneOwnerProcess,
+  ProjectLaneOwnerStatus,
+  ProjectMutationLane,
+} from "./project-lane.js";

@@ -115,11 +115,19 @@ test(
     }
     const root = await core.canonicalizeProjectRoot(project);
 
-    const pending = core.listProjectRootEntries({ root, maxEntries: 1_000 });
+    const pending = core
+      .listProjectRootEntries({ root, maxEntries: 1_000 })
+      .then(
+        () => ({ status: "fulfilled" }),
+        (error) => ({ status: "rejected", error }),
+      );
     await rename(project, join(sandbox, "moved-project"));
     await mkdir(project);
 
-    await assert.rejects(pending, expectCoreError("project-root-drift"));
+    const outcome = await pending;
+    assert.equal(outcome.status, "rejected");
+    assert.equal(outcome.error?.name, "CoreBoundaryError");
+    assert.equal(outcome.error?.code, "project-root-drift");
   },
 );
 

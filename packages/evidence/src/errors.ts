@@ -1,4 +1,10 @@
 export type EvidenceNormalizationErrorCode =
+  | "artifact-assessment-authority-mismatch"
+  | "artifact-inspection-budget-exceeded"
+  | "artifact-provenance-authority-mismatch"
+  | "invalid-artifact-inspection-request"
+  | "invalid-artifact-provenance-request"
+  | "invalid-stored-artifact-assessment-request"
   | "invalid-process-result-observation"
   | "invalid-test-result-observation";
 

@@ -1,4 +1,5 @@
 import {
+  assetProvenanceSchema,
   doctorReportSchema,
   doctorRequestSchema,
   gameProjectProfileSchema,
@@ -184,6 +185,7 @@ const definition: RegistryDefinition = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   controlPlaneVersion: parseSemanticVersion("0.0.0").value,
   schemas: Object.freeze([
+    assetProvenanceSchema,
     doctorRequestSchema,
     doctorReportSchema,
     gameProjectProfileSchema,

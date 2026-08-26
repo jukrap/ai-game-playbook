@@ -20,6 +20,8 @@ const expectedIds = [
   "init-report",
   "init-request",
   "input-replay-trace",
+  "project-inspect-report",
+  "project-inspect-request",
   "resolved-workflow-plan",
   "run-handle",
   "runtime-frame-evidence",

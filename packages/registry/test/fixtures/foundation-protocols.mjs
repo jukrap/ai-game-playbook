@@ -62,6 +62,58 @@ export const validFoundationProtocolFixtures = {
     externalInstallPlanned: false,
     networkAccessPlanned: false,
   },
+  "project-inspect-request": {
+    schemaVersion: "1.0.0",
+    projectRoot: "D:\\games\\sample",
+  },
+  "project-inspect-report": {
+    schemaVersion: "1.0.0",
+    commandId: "project.inspect",
+    status: "blocked",
+    controlPlaneVersion: "0.0.0",
+    registryDigest: digest,
+    project: {
+      requestedPath: "D:\\games\\missing",
+    },
+    engine: {
+      status: "not-inspected",
+      candidates: [],
+    },
+    profile: {
+      status: "not-inspected",
+      path: ".ai-game-playbook/profile.json",
+      reason: "The project root is unavailable.",
+    },
+    dirtyState: {
+      status: "not-inspected",
+      source: "none",
+      reason: "The project root is unavailable.",
+    },
+    instances: {
+      status: "not-inspected",
+      selectionAllowed: false,
+      signals: [],
+      reason: "The project root is unavailable.",
+    },
+    issues: [
+      {
+        severity: "blocked",
+        code: "project-root-unavailable",
+        message: "The selected project root is unavailable.",
+        nextAction: "Select one existing local game project directory.",
+      },
+    ],
+    summary: {
+      engineCandidates: 0,
+      completeEngineCandidates: 0,
+      attentionIssues: 0,
+      blockedIssues: 1,
+    },
+    mutationReady: false,
+    mutationPerformed: false,
+    externalProcessStarted: false,
+    networkAccessPerformed: false,
+  },
   "approval-grant": {
     schemaVersion: "1.0.0",
     grantId: "approval.network-once",

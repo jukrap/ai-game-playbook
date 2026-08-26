@@ -43,6 +43,12 @@ import {
 } from "./project-inspect-contracts.js";
 import { resolvedWorkflowPlanSchema } from "./workflow-runtime-contracts.js";
 import { workflowCheckpointSchema } from "./workflow-checkpoint-contracts.js";
+import {
+  skillCheckReportSchema,
+  skillCheckRequestSchema,
+  skillListReportSchema,
+  skillListRequestSchema,
+} from "./skill-catalog-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -75,6 +81,10 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "init-request": initRequestSchema,
     "project-inspect-report": projectInspectReportSchema,
     "project-inspect-request": projectInspectRequestSchema,
+    "skill-check-report": skillCheckReportSchema,
+    "skill-check-request": skillCheckRequestSchema,
+    "skill-list-report": skillListReportSchema,
+    "skill-list-request": skillListRequestSchema,
     "engine-diagnostic": engineDiagnosticSchema,
     "engine-operation-request": engineOperationRequestSchema,
     "engine-operation-result": engineOperationResultSchema,

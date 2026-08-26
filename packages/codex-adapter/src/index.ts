@@ -3,6 +3,7 @@ export type { CodexSetupBoundaryErrorCode } from "./errors.js";
 export {
   CODEX_CONFIG_MAX_BYTES,
   CODEX_CONFIG_PATH,
+  CODEX_SKILL_MAX_BYTES,
   assertCodexProjectSetupPlan,
   createCodexProjectSetupPlan,
   inspectCodexProjectSetup,
@@ -17,4 +18,3 @@ export type {
   CreateCodexProjectSetupPlanOptions,
 } from "./setup.js";
 export { CODEX_MCP_ENTRY_MAX_BYTES } from "./runtime-entry.js";
-export { CODEX_SKILL_MAX_BYTES } from "./skill-artifact.js";

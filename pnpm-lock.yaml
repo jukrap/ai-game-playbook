@@ -53,6 +53,9 @@ importers:
       '@ai-game-playbook/registry':
         specifier: workspace:*
         version: link:../registry
+      '@ai-game-playbook/skill-runtime':
+        specifier: workspace:*
+        version: link:../skill-runtime
 
   packages/contracts: {}
 
@@ -122,6 +125,18 @@ importers:
       ajv-formats:
         specifier: 'catalog:'
         version: 3.0.1(ajv@8.20.0)
+
+  packages/skill-runtime:
+    dependencies:
+      '@ai-game-playbook/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@ai-game-playbook/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ai-game-playbook/registry':
+        specifier: workspace:*
+        version: link:../registry
 
 packages:
 

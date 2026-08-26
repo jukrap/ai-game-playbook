@@ -25,6 +25,10 @@ const expectedIds = [
   "resolved-workflow-plan",
   "run-handle",
   "runtime-frame-evidence",
+  "skill-check-report",
+  "skill-check-request",
+  "skill-list-report",
+  "skill-list-request",
   "task-routing-selection",
   "workflow-checkpoint",
 ];

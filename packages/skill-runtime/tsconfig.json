@@ -8,9 +8,7 @@
   "references": [
     { "path": "../contracts" },
     { "path": "../registry" },
-    { "path": "../core" },
-    { "path": "../skill-runtime" },
-    { "path": "../mcp" }
+    { "path": "../core" }
   ],
   "include": ["src/**/*.ts"]
 }

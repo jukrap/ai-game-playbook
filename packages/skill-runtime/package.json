@@ -1,8 +1,8 @@
 {
-  "name": "@ai-game-playbook/codex-adapter",
+  "name": "@ai-game-playbook/skill-runtime",
   "version": "0.0.0",
   "private": true,
-  "description": "Plan-only Codex project integration for AI Game Playbook.",
+  "description": "Registry-bound read-only skill catalog and project target runtime.",
   "license": "UNLICENSED",
   "type": "module",
   "exports": {
@@ -11,7 +11,7 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "skills"],
   "scripts": {
     "build": "tsc -b --pretty false",
     "typecheck": "tsc -b --pretty false"
@@ -19,8 +19,6 @@
   "dependencies": {
     "@ai-game-playbook/contracts": "workspace:*",
     "@ai-game-playbook/core": "workspace:*",
-    "@ai-game-playbook/mcp": "workspace:*",
-    "@ai-game-playbook/registry": "workspace:*",
-    "@ai-game-playbook/skill-runtime": "workspace:*"
+    "@ai-game-playbook/registry": "workspace:*"
   }
 }

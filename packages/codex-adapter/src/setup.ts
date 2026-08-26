@@ -1,4 +1,5 @@
 import {
+  SKILL_TARGET_MAX_BYTES,
   compareSemanticVersions,
   digestCanonicalJson,
   parseSemanticVersion,
@@ -27,6 +28,12 @@ import {
   BUILTIN_REGISTRY,
   BUILTIN_REGISTRY_SURFACES,
 } from "@ai-game-playbook/registry";
+import {
+  SkillRuntimeBoundaryError,
+  createProjectSkillPlan,
+  inspectProjectSkillTargets,
+  type ProjectSkillPlan,
+} from "@ai-game-playbook/skill-runtime";
 import { realpath } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
@@ -37,15 +44,10 @@ import {
   snapshotRuntimeEntry,
   type RuntimeEntrySnapshot,
 } from "./runtime-entry.js";
-import {
-  CODEX_SKILL_MAX_BYTES,
-  skillArtifactMatches,
-  snapshotSkillArtifact,
-  type SkillArtifactSnapshot,
-} from "./skill-artifact.js";
 
 export const CODEX_CONFIG_PATH = ".codex/config.toml" as const;
 export const CODEX_CONFIG_MAX_BYTES: number = 256 * 1024;
+export const CODEX_SKILL_MAX_BYTES: number = SKILL_TARGET_MAX_BYTES;
 const SERVER_NAME = "ai_game_playbook" as const;
 const STARTUP_TIMEOUT_SECONDS = 10;
 const MINIMUM_NODE_VERSION = parseSemanticVersion("22.22.0").value;
@@ -145,7 +147,7 @@ interface SetupPlanState {
   readonly node: BoundProcessExecutable;
   readonly entry: RuntimeEntrySnapshot;
   readonly mcp: McpRuntimePlan;
-  readonly skills: readonly SkillArtifactSnapshot[];
+  readonly skillPlan: ProjectSkillPlan;
 }
 
 const setupPlanStates = new WeakMap<object, SetupPlanState>();
@@ -267,51 +269,48 @@ function renderConfig(
   ].join("\n");
 }
 
-async function createSkillTargets(): Promise<{
+async function createSkillTargets(projectRoot: string): Promise<{
   readonly targets: readonly CodexSkillTarget[];
-  readonly snapshots: readonly SkillArtifactSnapshot[];
+  readonly plan: ProjectSkillPlan;
 }> {
-  const targets: CodexSkillTarget[] = [];
-  const snapshots: SkillArtifactSnapshot[] = [];
-  const names = new Set<string>();
-  for (const route of BUILTIN_REGISTRY_SURFACES.skills.data.routes) {
-    const match = /^skills\/([a-z0-9]+(?:-[a-z0-9]+)*)\/SKILL\.md$/u.exec(
-      route.body.path,
-    );
-    const name = match?.[1];
-    if (name === undefined || names.has(name)) {
+  let plan: ProjectSkillPlan;
+  try {
+    plan = await createProjectSkillPlan({ projectRoot });
+  } catch (error) {
+    if (error instanceof SkillRuntimeBoundaryError) {
       throw new CodexSetupBoundaryError(
-        "codex-setup-registry-drift",
-        "Codex skill routing contains an invalid or colliding target.",
+        error.code === "skill-runtime-project-boundary"
+          ? "codex-setup-project-boundary"
+          : "codex-setup-skill-artifact-invalid",
+        "Codex setup could not bind the generated project skill catalog.",
       );
     }
-    names.add(name);
-    const source = fileURLToPath(
-      new URL(`../${route.body.path}`, import.meta.url),
-    );
-    const snapshot = await snapshotSkillArtifact({
-      path: source,
-      expectedName: name,
-      expectedDigest: route.body.digest,
-      maxBytes: CODEX_SKILL_MAX_BYTES,
-    });
-    snapshots.push(snapshot);
-    targets.push(
-      Object.freeze({
-        id: route.id,
-        name,
-        path: `.agents/skills/${name}/SKILL.md`,
-        sourcePath: route.body.path,
-        sourceDigest: snapshot.digest,
-        maxBytes: CODEX_SKILL_MAX_BYTES,
-        content: snapshot.content,
-        materialization: "plan-only" as const,
-      }),
+    throw error;
+  }
+  if (
+    plan.registryDigest !== BUILTIN_REGISTRY.digest ||
+    plan.surfaceDigest !== BUILTIN_REGISTRY_SURFACES.skills.digest
+  ) {
+    throw new CodexSetupBoundaryError(
+      "codex-setup-registry-drift",
+      "Codex skill routing does not match the builtin registry.",
     );
   }
+  const targets = plan.targets.map((target) =>
+    Object.freeze({
+      id: target.id,
+      name: target.name,
+      path: target.targetPath,
+      sourcePath: target.artifactPath,
+      sourceDigest: target.artifactDigest,
+      maxBytes: target.maxBytes,
+      content: target.content,
+      materialization: target.materialization,
+    }),
+  );
   return Object.freeze({
     targets: Object.freeze(targets),
-    snapshots: Object.freeze(snapshots),
+    plan,
   });
 }
 
@@ -400,7 +399,13 @@ export async function createCodexProjectSetupPlan(
       "Codex setup registry and MCP surface are not exact.",
     );
   }
-  const skills = await createSkillTargets();
+  const skills = await createSkillTargets(root.canonicalPath);
+  if (skills.plan.project.identityDigest !== root.identityDigest) {
+    throw new CodexSetupBoundaryError(
+      "codex-setup-runtime-drift",
+      "Codex setup project identity changed while skills were planned.",
+    );
+  }
 
   const content = renderConfig(root, node, entry, mcp);
   const target = {
@@ -469,7 +474,7 @@ export async function createCodexProjectSetupPlan(
   });
   setupPlanStates.set(
     plan,
-    Object.freeze({ root, node, entry, mcp, skills: skills.snapshots }),
+    Object.freeze({ root, node, entry, mcp, skillPlan: skills.plan }),
   );
   return plan;
 }
@@ -506,17 +511,6 @@ async function assertRuntimeState(state: SetupPlanState): Promise<void> {
     );
     if (!runtimeEntryMatches(state.entry, currentEntry)) {
       throw new Error("entrypoint drift");
-    }
-    for (const skill of state.skills) {
-      const currentSkill = await snapshotSkillArtifact({
-        path: skill.canonicalPath,
-        expectedName: skill.name,
-        expectedDigest: skill.digest,
-        maxBytes: CODEX_SKILL_MAX_BYTES,
-      });
-      if (!skillArtifactMatches(skill, currentSkill)) {
-        throw new Error("skill artifact drift");
-      }
     }
   } catch {
     throw new CodexSetupBoundaryError(
@@ -666,14 +660,66 @@ export async function inspectCodexProjectSetup(
     expectedDigest: plan.target.contentDigest,
   });
   const skillTargets: CodexSkillTargetInspection[] = [];
-  for (const skill of plan.skillTargets) {
-    const inspected = await inspectProjectFileTarget(state.root, {
-      path: skill.path,
-      maxBytes: skill.maxBytes,
-      expectedDigest: skill.sourceDigest,
-    });
+  let skillInspection;
+  try {
+    skillInspection = await inspectProjectSkillTargets(state.skillPlan);
+  } catch (error) {
+    if (error instanceof SkillRuntimeBoundaryError) {
+      throw new CodexSetupBoundaryError(
+        "codex-setup-runtime-drift",
+        "Codex setup skill runtime identity changed after planning.",
+      );
+    }
+    throw error;
+  }
+  for (const inspected of skillInspection.checks) {
+    if (inspected.targetStatus === "unsafe") targetUnsafe();
+    const skill = plan.skillTargets.find(({ id }) => id === inspected.id);
+    if (skill === undefined) {
+      throw new CodexSetupBoundaryError(
+        "codex-setup-registry-drift",
+        "Codex skill inspection returned an undeclared target.",
+      );
+    }
+    let mapped: CodexSetupFileTargetInspection<string>;
+    if (inspected.targetStatus === "missing") {
+      mapped = Object.freeze({
+        path: skill.path,
+        action: "create" as const,
+        code: "target-missing" as const,
+        expectedDigest: inspected.artifactDigest,
+      });
+    } else if (inspected.code === "skill-target-byte-budget-exceeded") {
+      mapped = Object.freeze({
+        path: skill.path,
+        action: "conflict" as const,
+        code: "target-byte-budget-exceeded" as const,
+        expectedDigest: inspected.artifactDigest,
+      });
+    } else {
+      if (inspected.actualDigest === undefined || inspected.bytes === undefined) {
+        throw new CodexSetupBoundaryError(
+          "codex-setup-registry-drift",
+          "Codex skill inspection returned an incomplete target state.",
+        );
+      }
+      mapped = Object.freeze({
+        path: skill.path,
+        action:
+          inspected.targetStatus === "current"
+            ? ("retain" as const)
+            : ("conflict" as const),
+        code:
+          inspected.targetStatus === "current"
+            ? ("target-current" as const)
+            : ("target-content-conflict" as const),
+        expectedDigest: inspected.artifactDigest,
+        actualDigest: inspected.actualDigest,
+        bytes: inspected.bytes,
+      });
+    }
     skillTargets.push(
-      Object.freeze({ id: skill.id, name: skill.name, ...inspected }),
+      Object.freeze({ id: skill.id, name: skill.name, ...mapped }),
     );
   }
   return finishInspection(

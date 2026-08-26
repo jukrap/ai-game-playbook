@@ -1,11 +1,13 @@
-import { sha256Digest, type Sha256Digest } from "@ai-game-playbook/contracts";
+import {
+  SKILL_TARGET_MAX_BYTES,
+  sha256Digest,
+  type Sha256Digest,
+} from "@ai-game-playbook/contracts";
 import { constants, type BigIntStats } from "node:fs";
 import { lstat, open, realpath, type FileHandle } from "node:fs/promises";
 import { isAbsolute, normalize } from "node:path";
 
-import { CodexSetupBoundaryError } from "./errors.js";
-
-export const CODEX_SKILL_MAX_BYTES: number = 64 * 1024;
+import { SkillRuntimeBoundaryError } from "./errors.js";
 
 export interface SkillArtifactSnapshot {
   readonly canonicalPath: string;
@@ -27,9 +29,9 @@ export interface SnapshotSkillArtifactOptions {
 }
 
 function invalidSkillArtifact(): never {
-  throw new CodexSetupBoundaryError(
-    "codex-setup-skill-artifact-invalid",
-    "Codex skill source does not satisfy its bounded artifact contract.",
+  throw new SkillRuntimeBoundaryError(
+    "skill-runtime-artifact-invalid",
+    "Skill source does not satisfy its bounded artifact contract.",
   );
 }
 
@@ -73,7 +75,7 @@ function validateOptions(value: SnapshotSkillArtifactOptions): {
     !/^sha256:[0-9a-f]{64}$/u.test(value.expectedDigest) ||
     !Number.isSafeInteger(value.maxBytes) ||
     value.maxBytes < 1 ||
-    value.maxBytes > CODEX_SKILL_MAX_BYTES
+    value.maxBytes > SKILL_TARGET_MAX_BYTES
   ) {
     invalidSkillArtifact();
   }
@@ -124,7 +126,7 @@ async function closeHandle(handle: FileHandle, error: unknown): Promise<void> {
     failure ??= closeError;
   }
   if (failure !== undefined) {
-    if (failure instanceof CodexSetupBoundaryError) throw failure;
+    if (failure instanceof SkillRuntimeBoundaryError) throw failure;
     invalidSkillArtifact();
   }
 }

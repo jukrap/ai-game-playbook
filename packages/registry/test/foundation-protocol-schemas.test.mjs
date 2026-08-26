@@ -16,6 +16,7 @@ const expectedIds = [
   "engine-project-identity",
   "engine-session-identity",
   "input-replay-trace",
+  "resolved-workflow-plan",
   "run-handle",
   "runtime-frame-evidence",
   "task-routing-selection",
@@ -73,6 +74,14 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       },
     ],
     ["run-handle", { ...fixtures["run-handle"], status: "done" }],
+    [
+      "resolved-workflow-plan",
+      (() => {
+        const invalid = structuredClone(fixtures["resolved-workflow-plan"]);
+        delete invalid.steps[1].rollbackCommand;
+        return invalid;
+      })(),
+    ],
     [
       "run-handle",
       (() => {

@@ -139,6 +139,17 @@ export type {
   WorkflowStep,
 } from "./orchestration-contracts.js";
 export {
+  computeResolvedWorkflowPlanDigest,
+  isResolvedWorkflowPlanDigestValid,
+  resolvedWorkflowPlanSchema,
+} from "./workflow-runtime-contracts.js";
+export type {
+  ResolvedWorkflowCommand,
+  ResolvedWorkflowPlan,
+  ResolvedWorkflowPlanDigestInput,
+  ResolvedWorkflowStep,
+} from "./workflow-runtime-contracts.js";
+export {
   engineCapabilityReportSchema,
   gameProjectProfileSchema,
 } from "./project-engine-contracts.js";
@@ -187,6 +198,7 @@ export {
   checkEngineCapabilityReportSemantics,
   checkFeatureContractSemantics,
   checkInputReplayTraceSemantics,
+  checkResolvedWorkflowPlanSemantics,
   checkRunHandleSemantics,
   checkRunReceiptSemantics,
 } from "./semantic-validation.js";

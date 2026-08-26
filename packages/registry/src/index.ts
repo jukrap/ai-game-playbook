@@ -11,6 +11,9 @@ export type {
   TaskRoutingDiagnosticCode,
 } from "./routing-errors.js";
 export { validateTaskRoutingSelection } from "./routing.js";
+export { WorkflowPlanResolutionError } from "./workflow-plan-errors.js";
+export type { WorkflowPlanResolutionErrorCode } from "./workflow-plan-errors.js";
+export { resolveWorkflowPlan } from "./workflow-plan.js";
 export {
   FOUNDATION_PLAN_ARTIFACT,
   serializeFoundationPlanArtifact,

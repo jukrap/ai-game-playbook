@@ -1,6 +1,6 @@
 ---
 source: docs/roadmap.md
-source_sha256: 70d2847c218b8f6cca6e49a6ddc4d8f3ab7698ec4105338acdb1f5131d76ef52
+source_sha256: 5cbce4c17f84aa8347aa72a0b983098a4ed8efaef1a4034e0e6052e4ba48b7d5
 translated_at: 2026-08-26
 ---
 
@@ -18,7 +18,7 @@ translated_at: 2026-08-26
 
 ## Stage 1: 공통 기반 — 진행 중
 
-- 완료: pnpm workspace, versioned contract schema, semantic validation, typed registry 검증 및 projection, pack dependency graph 검증, 추적 가능한 digest 결합 foundation plan.
+- 완료: pnpm workspace, versioned contract schema, semantic validation, typed registry 검증 및 projection, pack dependency graph 검증, 결정적 resolved workflow-plan attestation, 추적 가능한 digest 결합 foundation plan.
 - 남음: core runtime, 실행 가능한 CLI, MCP server, Codex adapter, runtime parity generation.
 - 남음: digest-owned pack staging, install, update, conflict handling, rollback, uninstall.
 - package는 private으로 유지하고 publish를 별도로 승인하기 전까지 `ai-game-playbook`과 `agpb`를 예약된 interface 이름으로만 사용합니다.
@@ -27,7 +27,7 @@ translated_at: 2026-08-26
 
 - 구현된 primitive: compare-and-swap write, canonical project-root identity, bounded direct process 실행, 직렬화된 root/project 결합 mutating lease, exact signed grant와 effect settlement를 사용하는 in-memory registry 결합 permission admission.
 - 남음: dispatcher/lane integration, durable approval consumption과 uncertainty reconciliation, 완전한 project/Editor identity attestation, automatic lease heartbeat integration, parallel-read coordination.
-- bounded workflow, checkpoint, resume validation, repair limit, cancellation, uncertainty handling을 추가합니다.
+- resolved-plan contract를 중심으로 bounded workflow state machine, checkpoint, resume validation, repair limit, cancellation, uncertainty handling을 완성합니다.
 - content-addressed receipt, evidence storage, redacted diagnostic, retention, explicit export를 추가합니다.
 - traversal, symlink escape, invalid token, output growth, timeout, stale process, ambiguous Editor, install lifecycle conflict를 테스트합니다.
 

@@ -10,9 +10,15 @@ import {
   isCanonicalApprovalScope,
   type ApprovalGrant,
 } from "./approval-contracts.js";
+import { compareCanonicalText } from "./canonical-json.js";
 import type { InputReplayTrace } from "./engine-evidence-contracts.js";
 import type { EngineCapabilityReport } from "./project-engine-contracts.js";
 import type { RunHandle } from "./run-engine-contracts.js";
+import {
+  isResolvedWorkflowPlanDigestValid,
+  type ResolvedWorkflowCommand,
+  type ResolvedWorkflowPlan,
+} from "./workflow-runtime-contracts.js";
 
 export type ContractSemanticIssueCode =
   | "approval-grant-destination-noncanonical"
@@ -55,6 +61,10 @@ export type ContractSemanticIssueCode =
   | "run-handle-checkpoint-contradiction"
   | "run-handle-command-identity-collision"
   | "run-handle-timestamp-invalid"
+  | "resolved-workflow-plan-canonical-invalid"
+  | "resolved-workflow-plan-dependency-invalid"
+  | "resolved-workflow-plan-digest-mismatch"
+  | "resolved-workflow-plan-order-invalid"
   | "run-receipt-uncertain-mutation-contradiction"
   | "run-receipt-unexpected-dirty-success";
 
@@ -90,6 +100,105 @@ function decimalMicros(value: string): bigint | undefined {
   }
   const fraction = (match[2] ?? "").padEnd(6, "0");
   return BigInt(match[1]) * 1_000_000n + BigInt(fraction || "0");
+}
+
+function isStrictlyCanonical(values: readonly string[]): boolean {
+  return values.every(
+    (value, index) =>
+      index === 0 ||
+      compareCanonicalText(values[index - 1] ?? "", value) < 0,
+  );
+}
+
+function commandPermissionsAreCanonical(
+  command: ResolvedWorkflowCommand,
+): boolean {
+  return isStrictlyCanonical(command.permissions);
+}
+
+function bindingKey(binding: {
+  readonly target: string;
+  readonly source: string;
+}): string {
+  return `${binding.target}\u0000${binding.source}`;
+}
+
+export function checkResolvedWorkflowPlanSemantics(
+  plan: ResolvedWorkflowPlan,
+): readonly ContractSemanticIssue[] {
+  const issues: ContractSemanticIssue[] = [];
+  if (!isResolvedWorkflowPlanDigestValid(plan)) {
+    issues.push(
+      issue(
+        "resolved-workflow-plan-digest-mismatch",
+        "/resolvedPlanDigest",
+        "Resolved workflow plan digest does not attest the immutable plan body.",
+      ),
+    );
+  }
+
+  const stepIndexes = new Map<string, number>();
+  let orderInvalid = false;
+  let dependencyInvalid = false;
+  let canonicalInvalid = !isStrictlyCanonical(plan.requiredEvidence);
+  for (const [index, step] of plan.steps.entries()) {
+    if (step.ordinal !== index || stepIndexes.has(step.id)) {
+      orderInvalid = true;
+    }
+    stepIndexes.set(step.id, index);
+
+    if (!isStrictlyCanonical(step.dependsOn)) {
+      canonicalInvalid = true;
+    }
+    for (const dependency of step.dependsOn) {
+      const dependencyIndex = stepIndexes.get(dependency);
+      if (dependencyIndex === undefined || dependencyIndex >= index) {
+        dependencyInvalid = true;
+      }
+    }
+
+    const bindingKeys = step.bindings.map(bindingKey);
+    const bindingTargets = step.bindings.map(({ target }) => target);
+    if (
+      !isStrictlyCanonical(bindingKeys) ||
+      new Set(bindingTargets).size !== bindingTargets.length ||
+      !commandPermissionsAreCanonical(step.command) ||
+      (step.rollbackCommand !== undefined &&
+        !commandPermissionsAreCanonical(step.rollbackCommand))
+    ) {
+      canonicalInvalid = true;
+    }
+  }
+
+  if (orderInvalid) {
+    issues.push(
+      issue(
+        "resolved-workflow-plan-order-invalid",
+        "/steps",
+        "Resolved workflow steps must have unique IDs and contiguous ordinals matching array order.",
+      ),
+    );
+  }
+  if (dependencyInvalid) {
+    issues.push(
+      issue(
+        "resolved-workflow-plan-dependency-invalid",
+        "/steps",
+        "Every workflow dependency must identify an earlier resolved step.",
+      ),
+    );
+  }
+  if (canonicalInvalid) {
+    issues.push(
+      issue(
+        "resolved-workflow-plan-canonical-invalid",
+        "/steps",
+        "Resolved workflow arrays and bindings must be strictly canonical and unambiguous.",
+      ),
+    );
+  }
+
+  return freezeIssues(issues);
 }
 
 export function checkApprovalGrantSemantics(

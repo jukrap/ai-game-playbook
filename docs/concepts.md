@@ -1,6 +1,6 @@
 # Core Concepts and Public Types
 
-> Status: versioned schemas and semantic validators are implemented, and an early private permission consumer exists. Executable runtime surfaces and engine capability remain planned.
+> Status: versioned schemas, semantic validators, deterministic workflow-plan resolution, and an early private permission consumer are implemented. Executable runtime surfaces and engine capability remain planned.
 
 [한국어](concepts.ko.md) · [Documentation](README.md)
 
@@ -16,7 +16,7 @@ An adapter may report a step as unsupported. It must not silently skip a require
 
 ## Public contract types
 
-The current foundation implements these contracts as versioned JSON schemas and TypeScript definitions with fail-closed semantic checks. This does not make any CLI command, workflow, or engine operation executable.
+The current foundation implements these contracts as versioned JSON schemas and TypeScript definitions with fail-closed semantic checks. The registry can derive one immutable workflow plan from validated descriptors, but this does not make any CLI command, workflow, or engine operation executable.
 
 | Type | Responsibility |
 | --- | --- |
@@ -26,6 +26,7 @@ The current foundation implements these contracts as versioned JSON schemas and 
 | `EngineCapabilityReport` | Detected operations, limitations, identity, and support grade for the current environment |
 | `FeatureContract` | Player-visible outcome, allowed change scope, completion conditions, risks, budgets, and rollback plan |
 | `ApprovalGrant` | One signed permission bound to exact project, command, request, scope, budget, expiration, and optional feature, workflow, or editor session identity |
+| `ResolvedWorkflowPlan` | One finite DAG bound to exact registry, workflow, stage, command and handler authority, lanes, permissions, budgets, transitions, and evidence duties before execution |
 | `RunReceipt` | Run identity, tools and commands, timing, exit and inner results, logs, tests, captures, artifact hashes, changed files, and recovery result |
 | `AssetProvenance` | Asset source and lineage, rights, transformations, provider/model/checkpoint/seed when applicable, cost and approvals, file hashes, and QA state |
 
@@ -41,9 +42,9 @@ Identity is checked before mutation, after editor reload or restart, and before 
 
 - A **skill** is a progressively loaded method with triggers, exclusions, required capabilities, and verification criteria. It cannot grant permission.
 - A **role lens** is a review perspective with decision questions and evidence duties, not a virtual employee or an independent executor.
-- A **workflow** is a bounded sequence of registered commands with checkpoints, budgets, and stop conditions.
+- A **workflow** is a bounded sequence of registered commands with checkpoints, budgets, and stop conditions. Before execution, its descriptor is resolved into a domain-separated plan with deterministic topological order and exact implementation authority.
 
-The default plan selects one to five skills and no more than three role lenses for a task. One executor owns mutations; parallel work is limited to safe reads and independent analysis.
+The default plan selects one to five skills and no more than three role lenses for a task. One executor owns mutations; parallel work is limited to safe reads and independent analysis. The workflow state machine and checkpoint runtime that will consume a resolved plan are not implemented yet.
 
 ## Run outcomes
 

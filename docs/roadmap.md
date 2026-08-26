@@ -12,7 +12,7 @@ Approval freezes the initial contracts, risks, permission defaults, evidence thr
 
 ## Stage 1: common foundation — in progress
 
-- Completed: pnpm workspace, versioned contract schemas, semantic validation, typed registry validation and projections, pack dependency-graph validation, and a tracked digest-bound foundation plan.
+- Completed: pnpm workspace, versioned contract schemas, semantic validation, typed registry validation and projections, pack dependency-graph validation, deterministic resolved workflow-plan attestation, and a tracked digest-bound foundation plan.
 - Remaining: core runtime, executable CLI, MCP server, Codex adapter, and runtime parity generation.
 - Remaining: digest-owned pack staging, install, update, conflict handling, rollback, and uninstall.
 - Keep the package private and use `ai-game-playbook` and `agpb` as reserved interface names until publication is separately authorized.
@@ -21,7 +21,7 @@ Approval freezes the initial contracts, risks, permission defaults, evidence thr
 
 - Implemented primitives: compare-and-swap writes, canonical project-root identity, bounded direct process execution, serialized root/project-bound mutating leases, and in-memory registry-bound permission admission with exact signed grants and effect settlement.
 - Remaining: dispatcher/lane integration, durable approval consumption and uncertainty reconciliation, full project/editor identity attestation, automatic lease heartbeat integration, and parallel-read coordination.
-- Add bounded workflows, checkpoints, resume validation, repair limits, cancellation, and uncertainty handling.
+- Complete the bounded workflow state machine, checkpoints, resume validation, repair limits, cancellation, and uncertainty handling around the resolved-plan contract.
 - Add content-addressed receipts, evidence storage, redacted diagnostics, retention, and explicit export.
 - Test traversal, symlink escape, invalid tokens, output growth, timeouts, stale processes, ambiguous editors, and install lifecycle conflicts.
 

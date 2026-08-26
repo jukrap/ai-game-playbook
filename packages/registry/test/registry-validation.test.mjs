@@ -729,4 +729,11 @@ test("registry validation requires finite resolvable workflow DAGs", () => {
   const missingRollback = createValidRegistryDefinition();
   missingRollback.workflows[0].steps[1].rollbackCommandId = "missing.rollback";
   expectDiagnostic(missingRollback, "workflow-rollback-command-missing");
+
+  const ambiguousBinding = createValidRegistryDefinition();
+  ambiguousBinding.workflows[0].steps[1].bindings = [
+    { target: "/feature/id", source: "/input/first" },
+    { target: "/feature/id", source: "/input/second" },
+  ];
+  expectDiagnostic(ambiguousBinding, "workflow-binding-ambiguous");
 });

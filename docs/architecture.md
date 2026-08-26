@@ -21,14 +21,14 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Its current generators produce validated design projections for CLI, MCP, help, documentation metadata, and host routing. The private permission primitive consumes validated command and schema authority, while generated CLI/MCP/host execution consumers remain planned. Generated surfaces cannot grant permissions or invent capabilities.
+The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Its current generators produce validated design projections for CLI, MCP, help, documentation metadata, and host routing. It also resolves a supported workflow stage into a finite, domain-separated plan bound to the exact registry, workflow, schemas, commands, handlers, lanes, permissions, budgets, failure transitions, and evidence duties. The private permission primitive consumes validated command and schema authority, while generated CLI/MCP/host execution consumers and the workflow state machine remain planned. Generated surfaces cannot grant permissions or invent capabilities.
 
 ## Workspace boundaries
 
 | Boundary | Status | Responsibility |
 | --- | --- | --- |
 | `contracts` | Foundation implemented | Versioned schemas and shared identifiers with no engine runtime dependency |
-| `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, and parity checks |
+| `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, parity checks, and deterministic workflow-plan resolution |
 | `core` | Partial | Canonical project identity, portable path resolution, staged filesystem compare-and-swap, digest-bound direct process execution, root/project-bound mutating leases, and in-memory signed permission admission/settlement exist; dispatcher integration, durable approvals, CPU/memory enforcement, parallel-read coordination, checkpoints, and workflow state remain planned |
 | `cli` | Planned | `agpb` argument parsing, local interaction, stable exit behavior, and help |
 | `mcp` | Planned | Schema-derived tools and resources behind the same permission broker |
@@ -46,16 +46,17 @@ Only `contracts`, `registry`, and the partial private `core` currently exist as 
 1. Detect a project and build an exact `GameProjectProfile`.
 2. Negotiate an `EngineCapabilityReport`; unsupported operations retain a reason and fallback grade.
 3. Validate a `FeatureContract`, permission classes, budgets, owned paths, and expected dirty state.
-4. Acquire the project lane and, when needed, bind one editor session.
-5. Execute registry commands with bounded output, timeout, cancellation, and no default mutation retry.
-6. Save artifacts and state transitions into a hash-linked `RunReceipt`.
-7. Reconcile identity and dirty state after reload, restart, failure, or rollback.
+4. Resolve and attest the finite workflow plan against the current registry and project stage.
+5. Acquire the project lane and, when needed, bind one editor session.
+6. Execute registry commands with bounded output, timeout, cancellation, and no default mutation retry.
+7. Save artifacts and state transitions into a hash-linked `RunReceipt`.
+8. Reconcile identity and dirty state after reload, restart, failure, or rollback.
 
 ## Consumer project state
 
 A consuming game project is planned to contain `.ai-game-playbook/`. Commit-worthy state includes the project profile, feature contracts, and policy. Cache, logs, screenshots, locks, receipts containing local details, local secrets, and machine-specific configuration remain ignored.
 
-Writes use owned-path rules and compare-and-swap preimages. The current private core serializes `project-write`, `editor-bound`, and `build-bound` admission through one fixed project-local lease, but it does not yet discover or control an editor. Its permission primitive resolves a command from a validated registry, validates the actual input schema, narrows feature/workflow/session scope and budgets, consumes exact signed grants in memory, and rejects reported undeclared effects. It is not yet wired to lane acquisition or command dispatch, and its approval consumption and uncertainty barrier are not durable across process restart. Pack lifecycle operations and parallel-read coordination remain planned.
+Writes use owned-path rules and compare-and-swap preimages. The registry can derive and semantically validate an immutable workflow plan before execution, but no runtime currently advances that plan or binds it to checkpoints. The current private core serializes `project-write`, `editor-bound`, and `build-bound` admission through one fixed project-local lease, but it does not yet discover or control an editor. Its permission primitive resolves a command from a validated registry, validates the actual input schema, narrows feature/workflow/session scope and budgets, consumes exact signed grants in memory, and rejects reported undeclared effects. It is not yet wired to lane acquisition or command dispatch, and its approval consumption and uncertainty barrier are not durable across process restart. Pack lifecycle operations and parallel-read coordination remain planned.
 
 ## Host integration
 

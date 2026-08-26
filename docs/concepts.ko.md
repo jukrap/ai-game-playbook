@@ -1,12 +1,12 @@
 ---
 source: docs/concepts.md
-source_sha256: b7ff1c8648f3ea0f373cb34bbb3e62aea20f54e0fa4f8c5b46eb56526eda7a74
+source_sha256: a3c93edfb0451dc1ee8f7c68f76a5bb886053c7dc8c32655030c1011f8cb8c21
 translated_at: 2026-08-26
 ---
 
 # 핵심 개념과 공개 타입
 
-> 상태: versioned schema와 semantic validator를 구현했고 초기 private permission consumer가 존재합니다. 실행 가능한 runtime surface와 engine capability는 아직 계획 단계입니다.
+> 상태: versioned schema, semantic validator, 결정적 workflow-plan 해석, 초기 private permission consumer를 구현했습니다. 실행 가능한 runtime surface와 engine capability는 아직 계획 단계입니다.
 
 [English](concepts.md) · [문서](README.ko.md)
 
@@ -22,7 +22,7 @@ adapter는 지원하지 않는 단계를 보고할 수 있습니다. 필수 단�
 
 ## 공개 계약 타입
 
-현재 기반은 이 계약을 versioned JSON schema와 TypeScript 정의 및 fail-closed semantic check로 구현합니다. 이것만으로 CLI command, workflow, engine operation을 실행할 수 있는 것은 아닙니다.
+현재 기반은 이 계약을 versioned JSON schema와 TypeScript 정의 및 fail-closed semantic check로 구현합니다. registry는 검증된 descriptor에서 하나의 immutable workflow plan을 파생할 수 있지만 이것만으로 CLI command, workflow, engine operation을 실행할 수 있는 것은 아닙니다.
 
 | 타입 | 책임 |
 | --- | --- |
@@ -32,6 +32,7 @@ adapter는 지원하지 않는 단계를 보고할 수 있습니다. 필수 단�
 | `EngineCapabilityReport` | 현재 환경에서 탐지한 operation, limitation, identity, support grade |
 | `FeatureContract` | 플레이어가 볼 결과, 허용 변경 범위, 완료 조건, 위험, budget, rollback plan |
 | `ApprovalGrant` | exact project, command, request, scope, budget, expiration, 필요한 경우 feature/workflow/Editor session identity에 결합된 단일 signed permission |
+| `ResolvedWorkflowPlan` | 실행 전 exact registry, workflow, stage, command와 handler authority, lane, permission, budget, transition, evidence duty에 결합된 하나의 유한 DAG |
 | `RunReceipt` | run identity, tool/command, 시간, exit/inner result, log, test, capture, artifact hash, changed file, recovery result |
 | `AssetProvenance` | asset source와 lineage, 권리, transform, 필요 시 provider/model/checkpoint/seed, cost/approval, file hash, QA state |
 
@@ -47,9 +48,9 @@ mutation 전, Editor reload/restart 후, evidence 승격 전에 identity를 검�
 
 - **skill**은 trigger, exclusion, required capability, verification criteria를 갖고 점진적으로 불러오는 작업 방법입니다. 권한을 부여할 수 없습니다.
 - **role lens**는 판단 질문과 evidence 책임을 가진 검토 관점이며 가상 직원이나 독립 executor가 아닙니다.
-- **workflow**는 checkpoint, budget, stop condition을 갖춘 등록 command의 제한된 순서입니다.
+- **workflow**는 checkpoint, budget, stop condition을 갖춘 등록 command의 제한된 순서입니다. 실행 전에 descriptor를 결정적인 위상 순서와 exact implementation authority를 가진 domain-separated plan으로 해석합니다.
 
-기본 계획은 작업마다 skill 1~5개와 role lens 최대 3개를 선택합니다. 하나의 executor가 mutation을 소유하고 병렬 작업은 안전한 read와 독립 분석으로 제한합니다.
+기본 계획은 작업마다 skill 1~5개와 role lens 최대 3개를 선택합니다. 하나의 executor가 mutation을 소유하고 병렬 작업은 안전한 read와 독립 분석으로 제한합니다. resolved plan을 소비할 workflow state machine과 checkpoint runtime은 아직 구현하지 않았습니다.
 
 ## 실행 결과
 

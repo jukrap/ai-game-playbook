@@ -1977,6 +1977,28 @@ function validateWorkflows(
         continue;
       }
       const stepPath = `${basePath}.steps[${stepIndex}]`;
+      const bindingTargets = new Set<string>();
+      for (
+        let bindingIndex = 0;
+        bindingIndex < (step.bindings?.length ?? 0);
+        bindingIndex += 1
+      ) {
+        const binding = step.bindings?.[bindingIndex];
+        if (binding === undefined) {
+          continue;
+        }
+        if (bindingTargets.has(binding.target)) {
+          appendDiagnostic(
+            diagnostics,
+            diagnostic(
+              "workflow-binding-ambiguous",
+              `${stepPath}.bindings[${bindingIndex}].target`,
+              `binding target ${binding.target} is assigned more than once`,
+            ),
+          );
+        }
+        bindingTargets.add(binding.target);
+      }
       if (stepIds.has(step.id)) {
         appendDiagnostic(
           diagnostics,

@@ -34,6 +34,7 @@ export type RegistryDiagnosticCode =
   | "side-effect-without-permission"
   | "unsafe-retry-policy"
   | "unsupported-registry-version"
+  | "workflow-binding-ambiguous"
   | "workflow-command-missing"
   | "workflow-cycle"
   | "workflow-dependency-missing"

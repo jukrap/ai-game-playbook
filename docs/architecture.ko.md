@@ -1,6 +1,6 @@
 ---
 source: docs/architecture.md
-source_sha256: f3b3faf0492c3522812175dbcff713d469cd2f71d01d93b2159e4771d7361a4a
+source_sha256: c10da07498302b318a67afbb71fa77fce441a60256e65495e925572b7d5a8a31
 translated_at: 2026-08-26
 ---
 
@@ -27,14 +27,14 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 작성 원본입니다. 현재 generator는 CLI, MCP, help, 문서 metadata, host routing용으로 검증된 설계 projection을 생성합니다. private permission primitive는 검증된 command와 schema authority를 소비하지만 생성된 CLI/MCP/host 실행 consumer는 아직 계획 단계입니다. 생성 표면은 권한을 부여하거나 capability를 지어낼 수 없습니다.
+typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 작성 원본입니다. 현재 generator는 CLI, MCP, help, 문서 metadata, host routing용으로 검증된 설계 projection을 생성합니다. 또한 지원되는 workflow stage를 exact registry, workflow, schema, command, handler, lane, permission, budget, failure transition, evidence duty에 결합된 유한하고 domain-separated된 plan으로 해석합니다. private permission primitive는 검증된 command와 schema authority를 소비하지만 생성된 CLI/MCP/host 실행 consumer와 workflow state machine은 아직 계획 단계입니다. 생성 표면은 권한을 부여하거나 capability를 지어낼 수 없습니다.
 
 ## Workspace 경계
 
 | 경계 | 상태 | 책임 |
 | --- | --- | --- |
 | `contracts` | 기반 구현 | engine runtime dependency가 없는 versioned schema와 shared identifier |
-| `registry` | 기반 구현 | descriptor validation, generation, digest, routing, parity check |
+| `registry` | 기반 구현 | descriptor validation, generation, digest, routing, parity check, 결정적 workflow-plan 해석 |
 | `core` | 일부 구현 | canonical project identity, portable path 해석, staged filesystem compare-and-swap, digest 결합 direct process 실행, root/project 결합 mutating lease, in-memory signed permission admission/settlement가 존재하며 dispatcher integration, durable approval, CPU/memory enforcement, parallel-read coordination, checkpoint, workflow state는 계획 단계 |
 | `cli` | 계획 | `agpb` argument parsing, local interaction, stable exit behavior, help |
 | `mcp` | 계획 | 동일 permission broker 뒤의 schema-derived tool과 resource |
@@ -52,16 +52,17 @@ typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 1. project를 탐지하고 exact `GameProjectProfile`을 만듭니다.
 2. `EngineCapabilityReport`를 협상하며 지원하지 않는 operation은 reason과 fallback grade를 유지합니다.
 3. `FeatureContract`, permission class, budget, owned path, expected dirty state를 검증합니다.
-4. project lane을 획득하고 필요하면 Editor session 하나를 결합합니다.
-5. bounded output, timeout, cancellation, mutation 기본 retry 없음 조건으로 registry command를 실행합니다.
-6. artifact와 state transition을 hash-linked `RunReceipt`에 저장합니다.
-7. reload, restart, failure, rollback 뒤 identity와 dirty state를 reconcile합니다.
+4. 현재 registry와 project stage에 대해 유한한 workflow plan을 해석하고 attest합니다.
+5. project lane을 획득하고 필요하면 Editor session 하나를 결합합니다.
+6. bounded output, timeout, cancellation, mutation 기본 retry 없음 조건으로 registry command를 실행합니다.
+7. artifact와 state transition을 hash-linked `RunReceipt`에 저장합니다.
+8. reload, restart, failure, rollback 뒤 identity와 dirty state를 reconcile합니다.
 
 ## 소비자 project 상태
 
 게임 project에는 `.ai-game-playbook/`을 둘 계획입니다. project profile, feature contract, policy는 commit 대상입니다. cache, log, screenshot, lock, local detail을 포함한 receipt, local secret, machine-specific configuration은 ignore합니다.
 
-write는 owned-path rule과 compare-and-swap preimage를 사용합니다. 현재 private core는 고정된 project-local lease 하나로 `project-write`, `editor-bound`, `build-bound` admission을 직렬화하지만 아직 Editor를 탐지하거나 제어하지는 않습니다. permission primitive는 검증된 registry에서 command를 resolve하고 실제 input schema를 검증하며 feature/workflow/session scope와 budget을 좁히고 exact signed grant를 memory에서 소비하며 보고된 undeclared effect를 거부합니다. 아직 lane 획득이나 command dispatch와 연결되지 않았고 approval consumption과 uncertainty barrier는 process restart를 넘어 보존되지 않습니다. pack lifecycle operation과 parallel read coordination도 계획 단계입니다.
+write는 owned-path rule과 compare-and-swap preimage를 사용합니다. registry는 실행 전에 immutable workflow plan을 파생하고 의미 검증할 수 있지만 현재 이를 진행하거나 checkpoint에 결합하는 runtime은 없습니다. 현재 private core는 고정된 project-local lease 하나로 `project-write`, `editor-bound`, `build-bound` admission을 직렬화하지만 아직 Editor를 탐지하거나 제어하지는 않습니다. permission primitive는 검증된 registry에서 command를 resolve하고 실제 input schema를 검증하며 feature/workflow/session scope와 budget을 좁히고 exact signed grant를 memory에서 소비하며 보고된 undeclared effect를 거부합니다. 아직 lane 획득이나 command dispatch와 연결되지 않았고 approval consumption과 uncertainty barrier는 process restart를 넘어 보존되지 않습니다. pack lifecycle operation과 parallel read coordination도 계획 단계입니다.
 
 ## Host integration
 

@@ -113,6 +113,16 @@ export type {
   ResolveProjectPathOptions,
 } from "./project-path.js";
 export {
+  listProjectRootEntries,
+  PROJECT_ROOT_ENTRY_MAX_CODE_UNITS,
+  PROJECT_ROOT_LISTING_MAX_ENTRIES,
+} from "./project-root-listing.js";
+export type {
+  ListProjectRootEntriesRequest,
+  ProjectRootEntry,
+  ProjectRootEntryKindHint,
+} from "./project-root-listing.js";
+export {
   planProjectInitialization,
   PROJECT_INITIALIZATION_TARGETS,
 } from "./project-initialization-plan.js";

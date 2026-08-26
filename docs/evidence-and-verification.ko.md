@@ -1,12 +1,12 @@
 ---
 source: docs/evidence-and-verification.md
-source_sha256: 00233a0097d5d151ab6a15a3ba55045481ce58d1c94c4ed00e0169150553b204
-translated_at: 2026-08-26
+source_sha256: 89735bd040c9184e7e77f5f7d5bde91cb2105ca1e896e7f3c2c5d1798d2939b5
+translated_at: 2026-08-27
 ---
 
 # 증거와 검증
 
-> 상태: receipt/checkpoint 계약, settlement 경계, durable checkpoint chain을 구현했습니다. durable receipt payload와 engine evidence는 아직 없습니다.
+> 상태: receipt/checkpoint 계약, settlement 경계, durable checkpoint chain, private durable receipt-record store를 구현했습니다. Content-addressed artifact payload, evidence command, export, engine evidence는 아직 없습니다.
 
 [English](evidence-and-verification.md) · [문서](README.ko.md)
 
@@ -33,7 +33,11 @@ translated_at: 2026-08-26
 - changed file, before/after hash, dirty-state reconciliation, rollback attempt, recovery result.
 - 필요 시 approval, network destination, transmitted data class, provider/model information, cost.
 
-private state machine은 immutable checkpoint를 가로질러 domain-separated hash-linked receipt chain을 만들고 성공적으로 정산된 complete artifact만 수용합니다. canonical checkpoint record는 compare-and-swap head와 함께 append-only로 유지됩니다. load는 제한된 parent chain, transition 적법성, record/head digest, 현재 registry plan, project identity, input, feature, dirty-state, session binding을 검증합니다. malformed state를 대체하지 않고 그대로 보존한 채 거부합니다. safe hydration은 직렬화된 authorization을 되살리지 않습니다. dispatch하지 않은 admission은 authorization checkpoint로 돌아가고 dispatch 후 정산하지 못한 action은 `uncertain`이 됩니다. receipt body, approval reservation, artifact payload, uncertainty를 해제하는 action은 아직 영속화하지 않습니다.
+private workflow state machine은 immutable checkpoint를 가로질러 domain-separated hash-linked receipt chain을 만들고 성공적으로 정산된 complete artifact만 수용합니다. canonical checkpoint record는 compare-and-swap head와 함께 append-only로 유지됩니다. load는 제한된 parent chain, transition 적법성, record/head digest, 현재 registry plan, project identity, input, feature, dirty-state, session binding을 검증합니다. malformed state를 대체하지 않고 그대로 보존한 채 거부합니다. safe hydration은 직렬화된 authorization을 되살리지 않습니다. dispatch하지 않은 admission은 authorization checkpoint로 돌아가고 dispatch 후 정산하지 못한 action은 `uncertain`이 됩니다.
+
+별도 private receipt store는 검증된 `RunReceipt` body를 run별 compare-and-swap head 뒤의 canonical immutable record로 영속화합니다. Persistence는 canonical project root, 현재 control-plane platform/architecture/Node.js version, current registry digest, exact command descriptor/handler, workflow plan, 선택적 feature contract를 결합합니다. Diagnostic에는 explicit redaction marker가 필요하고 명백한 credential-shaped text와 absolute private-machine path pattern을 거부하며 record, chain, artifact count, artifact byte에 고정 budget을 적용합니다. Complete artifact locator는 지정한 project-local regular file을 exact byte count와 SHA-256 digest로 다시 열 수 있을 때만 수용하며 reload에서도 이를 다시 검사합니다. Missing, malformed, noncanonical, tampered, relocated, stale, competing state는 repair하거나 조용히 교체하지 않고 그대로 보존한 채 거부합니다.
+
+이 store는 receipt JSON과 artifact locator만 보존합니다. Artifact byte를 managed content-addressed storage로 복사하거나 engine artifact를 parse/decode하지 않으며 retention cleanup, list/show/export command, record encryption, 다른 registry authority 아래의 과거 chain load도 제공하지 않습니다. Approval reservation과 uncertainty를 해제하는 action도 아직 durable하지 않습니다.
 
 ## Test 판정 기준
 

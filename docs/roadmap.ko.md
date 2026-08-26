@@ -1,7 +1,7 @@
 ---
 source: docs/roadmap.md
-source_sha256: a32eccdaf9fcdafcac3d9999ceabfbd4c1270a70fe1359d881e825d85bc7a6aa
-translated_at: 2026-08-26
+source_sha256: c5459badfd64cf289cf714e264919f29365dda0928663740213dae6c222b48e6
+translated_at: 2026-08-27
 ---
 
 # 로드맵
@@ -12,7 +12,7 @@ translated_at: 2026-08-26
 
 ## 현재 체크포인트
 
-완료된 기반에는 versioned contract, strict registry validation, generated surface, deterministic workflow plan, canonical project/path handling, compare-and-swap filesystem operation, bounded process, project mutation lease, signed scoped permission admission, workflow checkpoint, recovery boundary가 있는 managed-pack transaction이 포함됩니다.
+완료된 기반에는 versioned contract, strict registry validation, generated surface, deterministic workflow plan, canonical project/path handling, compare-and-swap filesystem operation, bounded process, project mutation lease, signed scoped permission admission, workflow checkpoint, durable private receipt record, recovery boundary가 있는 managed-pack transaction이 포함됩니다.
 
 현재 Stage 2 product slice에는 다음이 추가됐습니다.
 
@@ -22,6 +22,7 @@ translated_at: 2026-08-26
 - 고정된 project-local target 16개를 분류하는 write-free `agpb init`;
 - runtime, registry, project state, installed-pack state, active marker를 검사하는 read-only `agpb doctor`;
 - bounded engine marker, canonical profile compatibility, marker-only dirty state, unbound Editor signal을 검사하는 static read-only `agpb project inspect`;
+- exact runtime/registry authority, compare-and-swap head, redaction check, complete project-local artifact-locator 검증을 포함한 canonical append-only run-receipt persistence;
 - compiled-handler digest attestation;
 - generated/public availability parity.
 
@@ -34,14 +35,14 @@ translated_at: 2026-08-26
 1. 기존 write-plan-only `init` 뒤의 mutation을 explicit project-metadata authority, fresh plan validation, staged write, rollback에 결합합니다.
 2. Mutation command보다 먼저 pack/skill list와 check command를 추가합니다.
 3. 기존 plan, approval, lane, CAS, journal, rollback 요구를 약화하지 않고 approved pack add/update/remove와 recovery finalization을 general dispatcher에 연결합니다.
-4. Approval interaction, stable error envelope, command deadline, durable command receipt를 추가합니다.
+4. Approval interaction과 stable error envelope를 추가한 뒤 command deadline과 settlement를 durable receipt store에 연결합니다.
 5. Executable surface에서 clean install, reinstall, update, conflict, interruption, rollback, recovery, uninstall을 검증합니다.
 
 Private library function이 있다는 이유만으로 command를 available로 표시하지 않습니다.
 
 ## Stage 3 — evidence, MCP, Codex integration
 
-Content-addressed artifact, canonical receipt chain, checkpoint/handoff reconciliation, retention/redaction, explicit evidence export, registry-generated STDIO MCP tool, project-scoped Codex skill과 instruction을 계획합니다.
+Content-addressed artifact byte, receipt-history migration/forensic access, checkpoint/handoff reconciliation, retention cleanup, explicit evidence list/show/export command, registry-generated STDIO MCP tool, project-scoped Codex skill과 instruction을 계획합니다.
 
 CLI, MCP, 문서, skill routing은 동일한 command ID, schema digest, permission, handler identity를 유지해야 합니다. MCP annotation은 hint이며 permission broker를 override할 수 없습니다. Background upload나 telemetry path는 계획하지 않습니다.
 

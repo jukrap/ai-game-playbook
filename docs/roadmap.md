@@ -6,7 +6,7 @@
 
 ## Current checkpoint
 
-Completed foundations include versioned contracts, strict registry validation, generated surfaces, deterministic workflow plans, canonical project/path handling, compare-and-swap filesystem operations, bounded processes, project mutation leases, signed scoped permission admission, workflow checkpoints, and managed-pack transactions with recovery boundaries.
+Completed foundations include versioned contracts, strict registry validation, generated surfaces, deterministic workflow plans, canonical project/path handling, compare-and-swap filesystem operations, bounded processes, project mutation leases, signed scoped permission admission, workflow checkpoints, durable private receipt records, and managed-pack transactions with recovery boundaries.
 
 The current Stage 2 product slice adds:
 
@@ -16,6 +16,7 @@ The current Stage 2 product slice adds:
 - write-free `agpb init` classification for a fixed 16-target project-local layout;
 - read-only `agpb doctor` checks for runtime, registry, project-state, installed-pack-state, and active-marker safety;
 - static read-only `agpb project inspect` for bounded engine markers, canonical profile compatibility, marker-only dirty state, and unbound Editor signals;
+- canonical append-only run-receipt persistence with exact runtime and registry authority, compare-and-swap heads, redaction checks, and complete project-local artifact-locator verification;
 - compiled-handler digest attestation; and
 - generated/public availability parity.
 
@@ -28,14 +29,14 @@ The next control-plane work is:
 1. Bind mutation behind the existing write-plan-only `init` to explicit project-metadata authority, fresh plan validation, staged writes, and rollback.
 2. Add pack and skill list/check commands before any mutation command.
 3. Connect approved pack add/update/remove and recovery finalization through a general dispatcher without weakening the existing plan, approval, lane, CAS, journal, or rollback requirements.
-4. Add approval interaction, stable error envelopes, command deadlines, and durable command receipts.
+4. Add approval interaction and stable error envelopes, then connect command deadlines and settlements to the durable receipt store.
 5. Verify clean install, reinstall, update, conflict, interruption, rollback, recovery, and uninstall behavior from the executable surface.
 
 No command may be marked available merely because a private library function exists.
 
 ## Stage 3 — evidence, MCP, and Codex integration
 
-Planned work includes content-addressed artifacts, canonical receipt chains, checkpoint/handoff reconciliation, retention and redaction, explicit evidence export, registry-generated STDIO MCP tools, and project-scoped Codex skills and instructions.
+Planned work includes content-addressed artifact bytes, receipt-history migration and forensic access, checkpoint/handoff reconciliation, retention cleanup, explicit evidence list/show/export commands, registry-generated STDIO MCP tools, and project-scoped Codex skills and instructions.
 
 CLI, MCP, documentation, and skill routing must preserve identical command IDs, schema digests, permissions, and handler identities. MCP annotations remain hints and can never override the permission broker. No background upload or telemetry path is planned.
 

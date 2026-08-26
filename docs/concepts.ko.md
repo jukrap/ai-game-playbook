@@ -1,12 +1,12 @@
 ---
 source: docs/concepts.md
-source_sha256: a9d5c6ac17c67f61d4e5ca953fee81b362805c2d712b52f1d8f57a5e8f21f9a0
-translated_at: 2026-08-26
+source_sha256: 210192897f56ca58abe42e4e238567e688b9c74b96de83505e44481da0381357
+translated_at: 2026-08-27
 ---
 
 # 핵심 개념과 공개 타입
 
-> 상태: versioned schema, semantic validator, 결정적 workflow-plan 해석, 초기 private permission 및 workflow-state consumer를 구현했습니다. 실행 가능한 제품 surface와 engine capability는 아직 계획 단계입니다.
+> 상태: versioned schema, semantic validator, 결정적 workflow-plan 해석, 초기 private permission, workflow-state, checkpoint, receipt consumer를 구현했습니다. 대부분의 실행 가능한 제품 surface와 engine capability는 아직 계획 단계입니다.
 
 [English](concepts.md) · [문서](README.ko.md)
 
@@ -51,7 +51,7 @@ mutation 전, Editor reload/restart 후, evidence 승격 전에 identity를 검�
 - **role lens**는 판단 질문과 evidence 책임을 가진 검토 관점이며 가상 직원이나 독립 executor가 아닙니다.
 - **workflow**는 checkpoint, budget, stop condition을 갖춘 등록 command의 제한된 순서입니다. 실행 전에 descriptor를 결정적인 위상 순서와 exact implementation authority를 가진 domain-separated plan으로 해석합니다.
 
-기본 계획은 작업마다 skill 1~5개와 role lens 최대 3개를 선택합니다. 하나의 executor가 mutation을 소유하고 병렬 작업은 안전한 read와 독립 분석으로 제한합니다. private state machine은 이제 resolved plan을 소비하고 authorization과 dispatch 경계를 분리하며 exact permission settlement와 receipt를 검증하고 선언된 failure/rollback transition을 진행하며 uncertainty나 누적 budget 초과를 차단합니다. append-only checkpoint store는 제한된 parent chain을 검증하고 stale authorization을 복원하지 않는 restart hydration을 지원합니다. dispatch하지 않은 admission은 재승인이 필요하고 dispatch 후 정산하지 못한 step은 reconciliation이 필요합니다. command dispatch, durable approval과 receipt payload, uncertainty 해제, engine 실행은 아직 구현하지 않았습니다.
+기본 계획은 작업마다 skill 1~5개와 role lens 최대 3개를 선택합니다. 하나의 executor가 mutation을 소유하고 병렬 작업은 안전한 read와 독립 분석으로 제한합니다. private state machine은 이제 resolved plan을 소비하고 authorization과 dispatch 경계를 분리하며 exact permission settlement와 receipt를 검증하고 선언된 failure/rollback transition을 진행하며 uncertainty나 누적 budget 초과를 차단합니다. append-only checkpoint store는 제한된 parent chain을 검증하고 stale authorization을 복원하지 않는 restart hydration을 지원합니다. dispatch하지 않은 admission은 재승인이 필요하고 dispatch 후 정산하지 못한 step은 reconciliation이 필요합니다. 별도 private store는 canonical receipt body를 compare-and-swap head 뒤에 영속화하고 complete project-local artifact locator를 다시 검증합니다. command dispatch, durable approval, artifact payload storage, retention/export, uncertainty 해제, engine 실행은 아직 구현하지 않았습니다.
 
 ## 실행 결과
 

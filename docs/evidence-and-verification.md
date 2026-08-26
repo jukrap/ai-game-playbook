@@ -1,6 +1,6 @@
 # Evidence and Verification
 
-> Status: the receipt and checkpoint contracts, settlement boundary, and durable checkpoint chain are implemented. Durable receipt payloads and engine evidence do not exist yet.
+> Status: the receipt and checkpoint contracts, settlement boundary, durable checkpoint chain, and a private durable receipt-record store are implemented. Content-addressed artifact payloads, evidence commands, export, and engine evidence do not exist yet.
 
 [한국어](evidence-and-verification.ko.md) · [Documentation](README.md)
 
@@ -27,7 +27,11 @@ The implemented receipt contract binds the following to one run identity:
 - Changed files, before/after hashes, dirty-state reconciliation, rollback attempt, and recovery result.
 - Approvals, network destinations, transmitted data classes, provider/model information, and cost when applicable.
 
-The private state machine forms a domain-separated, hash-linked receipt chain across immutable checkpoints and accepts only complete artifacts from successful settlements. Canonical checkpoint records persist append-only with a compare-and-swap head. Loading validates the bounded parent chain, transition legality, record and head digests, current registry plan, project identity, input, feature, dirty-state, and session bindings. It preserves and rejects malformed state instead of replacing it. Safe hydration never revives a serialized authorization: an undispatched admission returns to an authorization checkpoint, and a dispatched unsettled action becomes `uncertain`. Receipt bodies, approval reservations, artifact payloads, and an action that can clear uncertainty are not durable yet.
+The private workflow state machine forms a domain-separated, hash-linked receipt chain across immutable checkpoints and accepts only complete artifacts from successful settlements. Canonical checkpoint records persist append-only with a compare-and-swap head. Loading validates the bounded parent chain, transition legality, record and head digests, current registry plan, project identity, input, feature, dirty-state, and session bindings. It preserves and rejects malformed state instead of replacing it. Safe hydration never revives a serialized authorization: an undispatched admission returns to an authorization checkpoint, and a dispatched unsettled action becomes `uncertain`.
+
+A separate private receipt store now persists validated `RunReceipt` bodies as canonical immutable records behind one compare-and-swap head per run. Persistence binds the canonical project root, current control-plane platform, architecture and Node.js version, current registry digest, exact command descriptor and handler, workflow plan, and optional feature contract. Diagnostics require an explicit redaction marker, obvious credential-shaped and absolute private-machine text patterns are rejected, and fixed record, chain, artifact-count, and artifact-byte budgets apply. A complete artifact locator is accepted only when the named project-local regular file can be reopened with the exact recorded byte count and SHA-256 digest; reload performs that check again. Missing, malformed, noncanonical, tampered, relocated, stale, and competing state is preserved and rejected rather than repaired or silently replaced.
+
+This store retains receipt JSON and artifact locators only. It does not copy artifact bytes into managed content-addressed storage, parse or decode engine artifacts, provide retention cleanup, list/show/export commands, encrypt records, or load old chains under a different registry authority. Approval reservations and an action that can clear uncertainty are also not durable yet.
 
 ## Test authority
 

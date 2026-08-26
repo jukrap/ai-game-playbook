@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, managed-pack transactions, plan-only `agpb init`, read-only `agpb doctor`, and static read-only `agpb project inspect` exist. General mutation dispatch, evidence storage, MCP runtime, host integration, engines, and bridges remain planned.
+> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, durable private receipt records, managed-pack transactions, plan-only `agpb init`, read-only `agpb doctor`, and static read-only `agpb project inspect` exist. General mutation dispatch, content-addressed artifact storage and export, MCP runtime, host integration, engines, and bridges remain planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -29,10 +29,10 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 | --- | --- | --- |
 | `contracts` | Foundation implemented | Versioned schemas, canonical data, identifiers, approval, workflow, engine, evidence, init-plan, doctor, and project-inspection protocols |
 | `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, workflow-plan resolution, and exact implemented-command inventory |
-| `core` | Partial | Canonical project identity, safe paths, compare-and-swap filesystem operations, bounded processes, mutation leases, in-memory permission admission, workflow state, and durable checkpoints |
+| `core` | Partial | Canonical project identity, safe paths, compare-and-swap filesystem operations, bounded processes, mutation leases, in-memory permission admission, workflow state, durable checkpoints, and append-only run receipts |
 | `pack-runtime` | Partial | Write-free preflight, exact ownership, local lifecycle transactions, journals, active barriers, rollback, directory ownership, recovery inspection, and approved stable-state finalization |
 | `cli` | Experimental partial | Registry-derived help/version, fail-closed parsing, stable exit categories, human/JSON output, plan-only `init`, read-only `doctor`, and static `project inspect` |
-| `evidence` | Planned | Content-addressed artifacts, durable receipts, retention, redaction, and explicit export |
+| `evidence` | Partial private foundation | Canonical receipt records and verified project-local artifact locators exist; content-addressed artifact bytes, retention, migration, listing, and explicit export remain planned |
 | `mcp` | Planned | Registry-derived tools behind the same broker and result contracts |
 | `codex-adapter` | Planned | Project skills, instruction bootstrap, and host routing without new authority |
 | `engine-common` | Contract only | Common capability negotiation and engine-operation contracts |
@@ -74,7 +74,9 @@ Unknown mutation state goes to `uncertain` and cannot return directly to executi
 
 A consuming game project is planned to contain `.ai-game-playbook/`. Portable profiles, feature contracts, policies, and pack locks are commit-worthy. Cache, logs, screenshots, local receipts, locks, secrets, and machine-specific configuration remain ignored.
 
-The plan-only `init` command reports 16 fixed targets spanning committed metadata intent and local-only runtime intent. It never supplies profile/policy bytes or calls a mutation primitive. The implemented private bootstrap can create only six fixed runtime directories. It is idempotent, rejects links and case aliases, verifies parent and target identities, and removes only directories created by a clearly failed call. `doctor` reads this layout but never calls the bootstrap. `project inspect` may validate the fixed committed profile path, but it cannot create, repair, or promote profile data.
+The plan-only `init` command reports 16 fixed targets spanning committed metadata intent and local-only runtime intent. It never supplies profile/policy bytes or calls a mutation primitive. The implemented private bootstrap can create only eight fixed runtime directories, including the local receipt directory. It is idempotent, rejects links and case aliases, verifies parent and target identities, and removes only directories created by a clearly failed call. `doctor` reads this layout but never calls the bootstrap. `project inspect` may validate the fixed committed profile path, but it cannot create, repair, or promote profile data.
+
+The private receipt store requires that fixed local directory to exist. It binds each receipt to the canonical project root, current control-plane runtime, validated registry, command descriptor, handler, workflow plan, and optional feature contract. Canonical immutable records advance through a compare-and-swap run head; reload verifies the bounded predecessor chain and reopens complete artifact locators by exact size and digest. Corrupt or competing state is preserved and rejected. Artifact bytes are not copied into a managed CAS yet, and no evidence CLI, retention cleanup, export, or historical-registry migration path exists.
 
 Pack preflight binds the validated registry, source and target root identities, local artifact bytes, installed-state digest, intended changes, conflicts, and limits into a same-process immutable plan. Execution additionally requires exact `install` authorization and an attested project-write lease. Canonical installed state is committed last. Clear failures roll back already committed files in reverse; uncertain effects stop without retry.
 

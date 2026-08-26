@@ -61,6 +61,10 @@ import {
   godotVersionProbeReportSchema,
   godotVersionProbeRequestSchema,
 } from "./godot-version-probe-contracts.js";
+import {
+  godotHeadlessPreflightReportSchema,
+  godotHeadlessPreflightRequestSchema,
+} from "./godot-headless-preflight-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -93,6 +97,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "engine-status-request": engineStatusRequestSchema,
     "godot-executable-discovery-report": godotExecutableDiscoveryReportSchema,
     "godot-executable-discovery-request": godotExecutableDiscoveryRequestSchema,
+    "godot-headless-preflight-report": godotHeadlessPreflightReportSchema,
+    "godot-headless-preflight-request": godotHeadlessPreflightRequestSchema,
     "godot-version-probe-report": godotVersionProbeReportSchema,
     "godot-version-probe-request": godotVersionProbeRequestSchema,
     "init-report": initReportSchema,

@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, durable private receipt records and artifact objects, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions, six write-free `agpb` commands including static Godot status, private permission-bound Godot executable discovery and version probing, a project-bound read-only STDIO MCP runtime, a registry-derived project-inspection skill artifact, and a write-free Codex setup planner exist. General mutation dispatch, evidence export, applied host installation, live engines, and bridges remain planned.
+> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, durable private receipt records and artifact objects, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions, six write-free `agpb` commands including static Godot status, private permission-bound Godot executable discovery and version probing, a fail-closed Godot headless-preflight admission with blocked receipt retention, a project-bound read-only STDIO MCP runtime, a registry-derived project-inspection skill artifact, and a write-free Codex setup planner exist. General mutation dispatch, evidence export, applied host installation, live engines, and bridges remain planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -21,13 +21,13 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Generation creates CLI, MCP, documentation, and skill-routing metadata from the same validated identity. The public runtime surface currently contains `init`, `doctor`, `project.inspect`, `skill.list`, `skill.check`, and `engine.status`; CLI help, parsing, input/output validation, and dispatch consume those exact descriptors. The registry also owns internal `engine.executable-discovery` and `engine.version-probe` descriptors that are excluded from CLI, MCP, and generated public command inventory. The experimental MCP runtime registers an explicitly selected read-only subset from the generated MCP metadata and exact schemas. The public foundation plan records the runtime-registry digest and keeps unimplemented commands separate.
+The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Generation creates CLI, MCP, documentation, and skill-routing metadata from the same validated identity. The public runtime surface currently contains `init`, `doctor`, `project.inspect`, `skill.list`, `skill.check`, and `engine.status`; CLI help, parsing, input/output validation, and dispatch consume those exact descriptors. The registry also owns internal `engine.executable-discovery`, `engine.version-probe`, and `engine.headless-preflight` descriptors plus one finite internal headless-preflight workflow. They are excluded from CLI, MCP, and generated public command inventory. The experimental MCP runtime registers an explicitly selected read-only subset from the generated MCP metadata and exact schemas. The public foundation plan records the runtime-registry digest and keeps unimplemented commands separate.
 
 ## Workspace boundaries
 
 | Boundary | Status | Responsibility |
 | --- | --- | --- |
-| `contracts` | Foundation implemented | Versioned schemas, canonical data, identifiers, approval, workflow, engine, evidence, init-plan, doctor, project-inspection, static engine-status, Godot executable-discovery, and version-probe protocols |
+| `contracts` | Foundation implemented | Versioned schemas, canonical data, identifiers, approval, workflow, engine, evidence, init-plan, doctor, project-inspection, static engine-status, Godot executable-discovery, version-probe, and fail-closed headless-preflight protocols |
 | `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, workflow-plan resolution, and exact implemented-command inventory |
 | `core` | Partial | Canonical project identity, safe paths, compare-and-swap filesystem operations, bounded processes, mutation leases, in-memory permission admission, workflow state, durable checkpoints, append-only run receipts, bounded receipt-head queries, and private artifact promotion |
 | `pack-runtime` | Partial | Write-free preflight, exact ownership, local lifecycle transactions, journals, active barriers, rollback, directory ownership, recovery inspection, and approved stable-state finalization |
@@ -37,13 +37,13 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 | `mcp` | Experimental private runtime | Modern STDIO transport for an explicit generated read-only tool allowlist, exact project binding, schema parity, bounded messages, and canonical results; mutation and network tools are unavailable |
 | `codex-adapter` | Partial private planner | Deterministic local-only project MCP configuration and project-inspection skill target planning plus create/retain/conflict inspection without writes, merge, trust changes, or skill materialization |
 | `engine-common` | Contract only | Common capability negotiation and engine-operation contracts |
-| `godot-adapter` | Experimental private boundary | Project-only public status plus signed single-use host-tool discovery and exact-version probing; no support promotion or live-engine claim |
+| `godot-adapter` | Experimental private boundary | Project-only public status, signed single-use host-tool discovery and exact-version probing, and workflow-bound blocked headless-preflight receipt retention; no contained project process, support promotion, or live-engine claim |
 | Unity and Unreal adapters | Planned | Engine-specific orchestration without broad host authority |
 | Project bridges | Planned | Minimum editor/runtime code needed to expose verified operations |
 
 A partial package is not a claim that its full product surface exists. No current package controls an editor or verifies a live engine frame.
 
-## Current write-free execution flows
+## Current bounded execution flows
 
 The implemented CLI path is deliberately narrow:
 
@@ -55,9 +55,9 @@ The implemented CLI path is deliberately narrow:
 6. Validate semantic counts, identity and digest bindings where applicable, then validate the complete report against the descriptor-bound output schema.
 7. Render human or canonical JSON output and map it to a stable exit category.
 
-Handler digests attest all eight registered compiled command modules: six public write-free commands and two internal Godot operations. Cross-package tests fail if any executable artifact and registry metadata drift.
+Handler digests attest all nine registered compiled command modules: six public write-free commands and three internal Godot operations. Cross-package tests fail if any executable artifact and registry metadata drift.
 
-The private Godot host-tool flow is separate from public status. Preparation first binds only the project and a digest of bounded explicit sources. The broker then requires a signed single-use `host-tool-inspection` grant before exact candidate files are read. Discovery checks configured paths and fixed direct executable names in selected PATH directories without recursion or process launch, settles the lease, and returns an original same-process report without source paths or execution authority. Version preparation accepts only a selected candidate from that report; a second grant bound to the executable content and identity digests is required before the bounded `--version` process can start. Cloned plans, reports, or authorization decisions cannot carry authority across the runtime boundary.
+The private Godot host-tool flow is separate from public status. Preparation first binds only the project and a digest of bounded explicit sources. The broker then requires a signed single-use `host-tool-inspection` grant before exact candidate files are read. Discovery checks configured paths and fixed direct executable names in selected PATH directories without recursion or process launch, settles the lease, and returns an original same-process report without source paths or execution authority. Version preparation accepts only a selected candidate from that report; a second grant bound to the executable content and identity digests is required before the bounded `--version` process can start. Headless-preflight preparation then accepts only the original completed version report, revalidates project and executable identities, resolves one exact one-step workflow, and binds fixed headless startup arguments and zero-change budgets to a third grant. The current process layer cannot deny project writes, network access, and child processes, so the executor starts Godot zero times, settles that lease as a clean failure, and persists one canonical `blocked` receipt in initialized local evidence storage. Cloned plans, reports, or authorization decisions cannot carry authority across the runtime boundary.
 
 The current MCP path is also write-free. Startup requires one project root, one or more explicit generated tool names, and acknowledgement that selected project diagnostics may enter the active host context. The runtime binds the canonical project identity, registers only read-only closed-world tools, limits each STDIO message to 1 MiB, validates exact registered input and output schemas, and returns canonical bounded results. It has no HTTP transport, network access, editor control, or mutation route.
 
@@ -111,7 +111,7 @@ The common target contract is `detect → negotiate → inspect → mutate → s
 
 Each adapter must separate offline inspection, headless execution, editor preview, actual play, and packaged runtime evidence. Thin bridges receive only typed bounded operations. They must authenticate the exact project/session, limit request and output sizes, report both outer transport and inner operation outcomes, and return changed objects, files, save/import state, logs, and evidence locators.
 
-Godot now has the first static adapter boundary and a private permission-bound executable identity/version boundary. Its public command still accepts no executable path, and the private probe does not establish headless project execution, editor control, runtime frames, or retained engine evidence. Live Godot execution and the Unity and Unreal adapters remain planned. The current engine support grade for all three remains `planned`.
+Godot now has the first static adapter boundary, a private permission-bound executable identity/version boundary, and a finite headless-preflight admission. Its public command still accepts no executable path. The preflight records why required containment prevented dispatch; it does not establish headless project execution, editor control, runtime frames, or retained engine evidence. Live Godot execution and the Unity and Unreal adapters remain planned. The current engine support grade for all three remains `planned`.
 
 ## Degradation and support claims
 

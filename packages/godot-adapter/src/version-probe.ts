@@ -101,6 +101,12 @@ interface PreparedGodotVersionProbeInternals {
   readonly statusRequest: EngineStatusRequest;
 }
 
+export interface GodotVersionProbeRuntimeBinding {
+  readonly root: CanonicalProjectRoot;
+  readonly executable: BoundProcessExecutable;
+  readonly statusRequest: EngineStatusRequest;
+}
+
 interface ValidatedPreparationIdentity {
   readonly runId: string;
   readonly projectId: StableId;
@@ -116,6 +122,17 @@ const preparedProbeInternals = new WeakMap<
   object,
   PreparedGodotVersionProbeInternals
 >();
+const completedProbeInternals = new WeakMap<
+  object,
+  GodotVersionProbeRuntimeBinding
+>();
+
+export function boundGodotVersionProbeRuntime(
+  value: unknown,
+): GodotVersionProbeRuntimeBinding | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  return completedProbeInternals.get(value);
+}
 
 function fail(
   code: string,
@@ -698,6 +715,7 @@ function adapterError(
 
 function reportFrom(
   plan: PreparedGodotVersionProbe,
+  internals: PreparedGodotVersionProbeInternals,
   processResult: BoundedProcessResult,
   probe: GodotVersionProbeResult,
   settlement: PermissionSettlement,
@@ -758,6 +776,14 @@ function reportFrom(
     report,
   ) as unknown as GodotVersionProbeReport;
   assertGodotVersionProbeReportSemantics(validated);
+  completedProbeInternals.set(
+    validated,
+    Object.freeze({
+      root: internals.root,
+      executable: internals.executable,
+      statusRequest: internals.statusRequest,
+    }),
+  );
   return validated;
 }
 
@@ -920,5 +946,11 @@ export async function runGodotVersionProbe(
     Math.max(0, Math.ceil(performance.now() - startedAt)),
     processResult.output.observedBytes,
   );
-  return reportFrom(request.plan, processResult, probe, settlement);
+  return reportFrom(
+    request.plan,
+    request.internals,
+    processResult,
+    probe,
+    settlement,
+  );
 }

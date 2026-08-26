@@ -21,6 +21,8 @@ const expectedIds = [
   "engine-status-request",
   "godot-executable-discovery-report",
   "godot-executable-discovery-request",
+  "godot-headless-preflight-report",
+  "godot-headless-preflight-request",
   "godot-version-probe-report",
   "godot-version-probe-request",
   "init-report",

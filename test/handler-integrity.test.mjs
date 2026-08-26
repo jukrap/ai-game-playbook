@@ -13,6 +13,7 @@ test("runtime command handler metadata attests each exact compiled module", asyn
       "godot-adapter",
       "executable-discovery.js",
     ],
+    ["engine.headless-preflight", "godot-adapter", "headless-preflight.js"],
     ["engine.status", "godot-adapter", "status.js"],
     ["engine.version-probe", "godot-adapter", "version-probe.js"],
     ["init", "cli", "init.js"],

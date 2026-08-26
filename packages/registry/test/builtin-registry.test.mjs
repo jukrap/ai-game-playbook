@@ -14,6 +14,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     [
       "doctor",
       "engine.executable-discovery",
+      "engine.headless-preflight",
       "engine.status",
       "engine.version-probe",
       "init",
@@ -113,6 +114,57 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   );
   assert.equal(executableDiscovery.handler.export, "runGodotExecutableDiscovery");
   assert.match(executableDiscovery.handler.digest, digestPattern);
+
+  const headlessPreflight = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "engine.headless-preflight",
+  );
+  assert.notEqual(headlessPreflight, undefined);
+  assert.equal(headlessPreflight.lifecycle, "internal");
+  assert.deepEqual(headlessPreflight.cli, {
+    path: ["internal", "engine", "headless-preflight"],
+    aliases: [],
+  });
+  assert.deepEqual(headlessPreflight.capabilities, [
+    "engine.headless-preflight",
+  ]);
+  assert.deepEqual(headlessPreflight.permissions, [
+    "read-project",
+    "host-tool-inspection",
+    "test-build",
+  ]);
+  assert.deepEqual(headlessPreflight.sideEffects, [
+    {
+      kind: "process",
+      scope: "godot-headless-project-startup",
+      boundary: "local",
+    },
+  ]);
+  assert.equal(headlessPreflight.lane, "build-bound");
+  assert.equal(headlessPreflight.timeoutMs, 10_000);
+  assert.deepEqual(headlessPreflight.cancellation, {
+    mode: "process-tree",
+    graceMs: 1_000,
+  });
+  assert.deepEqual(headlessPreflight.retry, { mode: "never", maxAttempts: 1 });
+  assert.equal(headlessPreflight.budgets.maxChangedFiles, 0);
+  assert.equal(headlessPreflight.budgets.maxChangedBytes, 0);
+  assert.equal(headlessPreflight.budgets.maxDurationMs, 10_000);
+  assert.equal(headlessPreflight.budgets.maxOutputBytes, 1_048_576);
+  assert.equal(headlessPreflight.budgets.maxRepairCycles, 0);
+  assert.equal(
+    headlessPreflight.input.schemaId,
+    contracts.godotHeadlessPreflightRequestSchema.schemaId,
+  );
+  assert.equal(
+    headlessPreflight.output.schemaId,
+    contracts.godotHeadlessPreflightReportSchema.schemaId,
+  );
+  assert.equal(
+    headlessPreflight.handler.package,
+    "@ai-game-playbook/godot-adapter",
+  );
+  assert.equal(headlessPreflight.handler.export, "runGodotHeadlessPreflight");
+  assert.match(headlessPreflight.handler.digest, digestPattern);
 
   const versionProbe = registry.BUILTIN_REGISTRY.commands.find(
     ({ id }) => id === "engine.version-probe",
@@ -234,6 +286,49 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     assert.equal(command.handler.export, exportName);
     assert.match(command.handler.digest, digestPattern);
   }
+});
+
+test("the builtin registry binds headless preflight to one finite workflow step", () => {
+  assert.deepEqual(
+    registry.BUILTIN_REGISTRY.workflows.map(({ id }) => id),
+    ["workflow.godot-headless-preflight"],
+  );
+  const workflow = registry.BUILTIN_REGISTRY.workflows[0];
+  assert.equal(workflow.lifecycle, "internal");
+  assert.equal(
+    workflow.input.schemaId,
+    contracts.godotHeadlessPreflightRequestSchema.schemaId,
+  );
+  assert.equal(
+    workflow.output.schemaId,
+    contracts.godotHeadlessPreflightReportSchema.schemaId,
+  );
+  assert.deepEqual(workflow.steps, [
+    {
+      id: "step.godot-headless-preflight",
+      commandId: "engine.headless-preflight",
+      dependsOn: [],
+      onFailure: "blocked",
+      approvalCheckpoint: false,
+    },
+  ]);
+  assert.deepEqual(workflow.requiredEvidence, [
+    "godot-headless-preflight",
+    "run-receipt",
+  ]);
+
+  const plan = registry.resolveWorkflowPlan(
+    registry.BUILTIN_REGISTRY,
+    workflow.id,
+    "vertical-slice",
+  );
+  assert.equal(plan.steps.length, 1);
+  assert.equal(plan.steps[0].command.id, "engine.headless-preflight");
+  assert.equal(plan.steps[0].command.lane, "build-bound");
+  assert.equal(
+    contracts.isResolvedWorkflowPlanDigestValid(plan),
+    true,
+  );
 });
 
 test("builtin generated surfaces preserve implemented schema and command identity", () => {

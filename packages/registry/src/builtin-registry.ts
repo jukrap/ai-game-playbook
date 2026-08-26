@@ -5,10 +5,15 @@ import {
   doctorRequestSchema,
   engineStatusReportSchema,
   engineStatusRequestSchema,
+  GODOT_HEADLESS_PREFLIGHT_COMMAND_TIMEOUT_MS,
+  GODOT_HEADLESS_PREFLIGHT_MAX_OUTPUT_BYTES,
+  GODOT_HEADLESS_PREFLIGHT_TERMINATION_GRACE_MS,
   GODOT_VERSION_PROBE_MAX_OUTPUT_BYTES,
   gameProjectProfileSchema,
   godotExecutableDiscoveryReportSchema,
   godotExecutableDiscoveryRequestSchema,
+  godotHeadlessPreflightReportSchema,
+  godotHeadlessPreflightRequestSchema,
   godotVersionProbeReportSchema,
   godotVersionProbeRequestSchema,
   initReportSchema,
@@ -27,6 +32,7 @@ import {
   type PermissionClass,
   type ProjectStage,
   type SkillDescriptor,
+  type WorkflowDescriptor,
 } from "@ai-game-playbook/contracts";
 
 import { generateRegistrySurfaces } from "./generation.js";
@@ -297,7 +303,67 @@ const engineVersionProbeCommand: CommandDescriptor = Object.freeze({
     package: "@ai-game-playbook/godot-adapter",
     export: "runGodotVersionProbe",
     digest: parseSha256Digest(
-      "sha256:222107de2ed1fde70ee56e0c4b007f7c5788cb3a46340855e1dbfd5e9ec63b0f",
+      "sha256:de01f617326dec440551a99f6b5ad1701411921cd4b98020874ddb48fce811aa",
+    ),
+  }),
+});
+
+const engineHeadlessPreflightCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("engine.headless-preflight"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Admit one identity-bound Godot project startup only when required containment is available.",
+  cli: Object.freeze({
+    path: Object.freeze(["internal", "engine", "headless-preflight"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: godotHeadlessPreflightRequestSchema.schemaId,
+    digest: godotHeadlessPreflightRequestSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: godotHeadlessPreflightReportSchema.schemaId,
+    digest: godotHeadlessPreflightReportSchema.digest,
+  }),
+  capabilities: Object.freeze([parseStableId("engine.headless-preflight")]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>([
+    "read-project",
+    "host-tool-inspection",
+    "test-build",
+  ]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "process",
+      scope: "godot-headless-project-startup",
+      boundary: "local",
+    }),
+  ]),
+  lane: "build-bound",
+  timeoutMs: GODOT_HEADLESS_PREFLIGHT_COMMAND_TIMEOUT_MS,
+  cancellation: Object.freeze({
+    mode: "process-tree",
+    graceMs: GODOT_HEADLESS_PREFLIGHT_TERMINATION_GRACE_MS,
+  }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: GODOT_HEADLESS_PREFLIGHT_COMMAND_TIMEOUT_MS,
+    maxOutputBytes: GODOT_HEADLESS_PREFLIGHT_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([
+    parseStableId("godot-headless-preflight"),
+    parseStableId("run-receipt"),
+  ]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/godot-adapter",
+    export: "runGodotHeadlessPreflight",
+    digest: parseSha256Digest(
+      "sha256:9c1f31d79cc9aab0d131f53191e6b9982e4235f90faadd5470cc793a112c151c",
     ),
   }),
 });
@@ -485,6 +551,47 @@ const projectInspectionSkill: SkillDescriptor = Object.freeze({
   ]),
 });
 
+const godotHeadlessPreflightWorkflow: WorkflowDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("workflow.godot-headless-preflight"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Evaluate one bounded Godot main-scene startup admission and retain its receipt.",
+  input: Object.freeze({
+    schemaId: godotHeadlessPreflightRequestSchema.schemaId,
+    digest: godotHeadlessPreflightRequestSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: godotHeadlessPreflightReportSchema.schemaId,
+    digest: godotHeadlessPreflightReportSchema.digest,
+  }),
+  supportedStages: supportedStages(),
+  steps: Object.freeze([
+    Object.freeze({
+      id: parseStableId("step.godot-headless-preflight"),
+      commandId: parseStableId("engine.headless-preflight"),
+      dependsOn: Object.freeze([]),
+      onFailure: "blocked" as const,
+      approvalCheckpoint: false,
+    }),
+  ]),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: GODOT_HEADLESS_PREFLIGHT_COMMAND_TIMEOUT_MS,
+    maxOutputBytes: GODOT_HEADLESS_PREFLIGHT_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  resumePolicy: "never",
+  terminalOracle:
+    "The command must retain a blocked receipt without launching Godot until filesystem, network, and child-process containment are enforced.",
+  requiredEvidence: Object.freeze([
+    parseStableId("godot-headless-preflight"),
+    parseStableId("run-receipt"),
+  ]),
+});
+
 const definition: RegistryDefinition = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   controlPlaneVersion: parseSemanticVersion("0.0.0").value,
@@ -497,6 +604,8 @@ const definition: RegistryDefinition = Object.freeze({
     engineStatusReportSchema,
     godotExecutableDiscoveryRequestSchema,
     godotExecutableDiscoveryReportSchema,
+    godotHeadlessPreflightRequestSchema,
+    godotHeadlessPreflightReportSchema,
     godotVersionProbeRequestSchema,
     godotVersionProbeReportSchema,
     gameProjectProfileSchema,
@@ -513,6 +622,7 @@ const definition: RegistryDefinition = Object.freeze({
   commands: Object.freeze([
     doctorCommand,
     engineExecutableDiscoveryCommand,
+    engineHeadlessPreflightCommand,
     engineStatusCommand,
     engineVersionProbeCommand,
     initCommand,
@@ -522,7 +632,7 @@ const definition: RegistryDefinition = Object.freeze({
   ]),
   skills: Object.freeze([projectInspectionSkill]),
   roleLenses: Object.freeze([]),
-  workflows: Object.freeze([]),
+  workflows: Object.freeze([godotHeadlessPreflightWorkflow]),
   packs: Object.freeze([]),
 });
 

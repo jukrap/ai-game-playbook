@@ -49,3 +49,17 @@ export type {
   PreparedGodotVersionProbe,
   RunGodotVersionProbeRequest,
 } from "./version-probe.js";
+export {
+  GODOT_HEADLESS_PREFLIGHT_COMMAND_ID,
+  GODOT_HEADLESS_PREFLIGHT_STEP_ID,
+  GODOT_HEADLESS_PREFLIGHT_WORKFLOW_ID,
+  createGodotHeadlessPreflightAuthorizationRequest,
+  prepareGodotHeadlessPreflightFromVersionProbe,
+  runGodotHeadlessPreflight,
+} from "./headless-preflight.js";
+export type {
+  CreateGodotHeadlessPreflightAuthorizationRequest,
+  PrepareGodotHeadlessPreflightFromVersionProbeRequest,
+  PreparedGodotHeadlessPreflight,
+  RunGodotHeadlessPreflightRequest,
+} from "./headless-preflight.js";

@@ -140,6 +140,28 @@ export type {
   GodotVersionProcessCode,
   ParsedGodotVersionProbeOutput,
 } from "./godot-version-probe-contracts.js";
+export {
+  GODOT_HEADLESS_PREFLIGHT_COMMAND_TIMEOUT_MS,
+  GODOT_HEADLESS_PREFLIGHT_FRAME_BUDGET,
+  GODOT_HEADLESS_PREFLIGHT_IDLE_TIMEOUT_MS,
+  GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+  GODOT_HEADLESS_PREFLIGHT_MAX_OUTPUT_BYTES,
+  GODOT_HEADLESS_PREFLIGHT_PROCESS_TIMEOUT_MS,
+  GODOT_HEADLESS_PREFLIGHT_TERMINATION_GRACE_MS,
+  assertGodotHeadlessPreflightReportSemantics,
+  assertGodotHeadlessPreflightRequestSemantics,
+  computeGodotHeadlessPreflightDigest,
+  godotHeadlessPreflightReportSchema,
+  godotHeadlessPreflightRequestSchema,
+} from "./godot-headless-preflight-contracts.js";
+export type {
+  GodotHeadlessPreflightAuthorization,
+  GodotHeadlessPreflightBlocker,
+  GodotHeadlessPreflightCommandInput,
+  GodotHeadlessPreflightDigestInput,
+  GodotHeadlessPreflightReceiptPointer,
+  GodotHeadlessPreflightReport,
+} from "./godot-headless-preflight-contracts.js";
 export type {
   SkillCatalogDigestInput,
   SkillCatalogEntry,

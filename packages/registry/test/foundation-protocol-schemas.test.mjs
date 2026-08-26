@@ -63,6 +63,20 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
     ],
     [
       "run-handle",
+      {
+        ...fixtures["run-handle"],
+        status: "waiting-approval",
+      },
+    ],
+    [
+      "run-handle",
+      {
+        ...fixtures["run-handle"],
+        status: "queued",
+      },
+    ],
+    [
+      "run-handle",
       (() => {
         const { latestReceiptDigest: _, ...terminalWithoutReceipt } = {
           ...fixtures["run-handle"],
@@ -220,6 +234,57 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       "build-artifact-evidence",
       {
         ...fixtures["build-artifact-evidence"],
+        support: "planned",
+      },
+    ],
+    [
+      "build-artifact-evidence",
+      {
+        ...fixtures["build-artifact-evidence"],
+        support: "headless",
+        evidenceGrade: "implemented",
+      },
+    ],
+    [
+      "build-artifact-evidence",
+      {
+        ...fixtures["build-artifact-evidence"],
+        support: "editor-preview",
+        evidenceGrade: "locally-executed",
+      },
+    ],
+    [
+      "build-artifact-evidence",
+      (() => {
+        const fixture = structuredClone(fixtures["build-artifact-evidence"]);
+        delete fixture.startup.logsDigest;
+        return fixture;
+      })(),
+    ],
+    [
+      "build-artifact-evidence",
+      (() => {
+        const fixture = structuredClone(fixtures["build-artifact-evidence"]);
+        delete fixture.startup.exitCode;
+        return fixture;
+      })(),
+    ],
+    [
+      "build-artifact-evidence",
+      {
+        ...fixtures["build-artifact-evidence"],
+        startup: {
+          attempted: false,
+          outcome: "passed",
+          durationMs: 0,
+          logsDigest: fixtures["build-artifact-evidence"].startup.logsDigest,
+        },
+      },
+    ],
+    [
+      "build-artifact-evidence",
+      {
+        ...fixtures["build-artifact-evidence"],
         startup: {
           ...fixtures["build-artifact-evidence"].startup,
           exitCode: 17,
@@ -235,6 +300,25 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
     );
     assert.equal(validate(fixture), false, `${id} accepted unsafe evidence`);
   }
+});
+
+test("build evidence separates an unattempted startup from verified execution", () => {
+  const validate = validator().compile(
+    contracts.FOUNDATION_PROTOCOL_SCHEMAS["build-artifact-evidence"].schema,
+  );
+  const fixture = structuredClone(
+    validFoundationProtocolFixtures["build-artifact-evidence"],
+  );
+  delete fixture.scenarioReceiptDigest;
+  fixture.support = "headless";
+  fixture.evidenceGrade = "locally-executed";
+  fixture.startup = {
+    attempted: false,
+    outcome: "not-run",
+    durationMs: 0,
+  };
+
+  assert.equal(validate(fixture), true, JSON.stringify(validate.errors));
 });
 
 test("engine sessions distinguish editor and standalone runtime instances", () => {

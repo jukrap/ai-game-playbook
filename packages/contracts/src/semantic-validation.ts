@@ -5,7 +5,9 @@ import {
   type FeatureContract,
   type RunReceipt,
 } from "./feature-evidence-contracts.js";
+import type { InputReplayTrace } from "./engine-evidence-contracts.js";
 import type { EngineCapabilityReport } from "./project-engine-contracts.js";
+import type { RunHandle } from "./run-engine-contracts.js";
 
 export type ContractSemanticIssueCode =
   | "asset-provenance-approval-missing"
@@ -21,6 +23,10 @@ export type ContractSemanticIssueCode =
   | "feature-contract-approval-window-invalid"
   | "feature-contract-digest-mismatch"
   | "feature-contract-rollback-contradiction"
+  | "input-replay-event-identity-collision"
+  | "input-replay-event-order-invalid"
+  | "input-replay-event-overlap"
+  | "input-replay-oracle-contradiction"
   | "engine-capability-duplicate-id"
   | "engine-capability-duplicate-operation"
   | "engine-capability-future-observation"
@@ -37,6 +43,9 @@ export type ContractSemanticIssueCode =
   | "run-receipt-success-contradiction"
   | "run-receipt-test-count-mismatch"
   | "run-receipt-test-pass-contradiction"
+  | "run-handle-checkpoint-contradiction"
+  | "run-handle-command-identity-collision"
+  | "run-handle-timestamp-invalid"
   | "run-receipt-uncertain-mutation-contradiction"
   | "run-receipt-unexpected-dirty-success";
 
@@ -72,6 +81,133 @@ function decimalMicros(value: string): bigint | undefined {
   }
   const fraction = (match[2] ?? "").padEnd(6, "0");
   return BigInt(match[1]) * 1_000_000n + BigInt(fraction || "0");
+}
+
+export function checkRunHandleSemantics(
+  handle: RunHandle,
+): readonly ContractSemanticIssue[] {
+  const issues: ContractSemanticIssue[] = [];
+  const createdAt = timestampMillis(handle.createdAt);
+  const updatedAt = timestampMillis(handle.updatedAt);
+  if (
+    createdAt === undefined ||
+    updatedAt === undefined ||
+    updatedAt < createdAt
+  ) {
+    issues.push(
+      issue(
+        "run-handle-timestamp-invalid",
+        "/updatedAt",
+        "Run update time must be valid and cannot precede creation time.",
+      ),
+    );
+  }
+
+  if (new Set(Object.values(handle.commands)).size !== 3) {
+    issues.push(
+      issue(
+        "run-handle-command-identity-collision",
+        "/commands",
+        "Run status, cancel, and resume commands must have distinct identities.",
+      ),
+    );
+  }
+
+  const terminal =
+    handle.status === "succeeded" ||
+    handle.status === "failed" ||
+    handle.status === "blocked" ||
+    handle.status === "cancelled" ||
+    handle.status === "uncertain";
+  const checkpointRequired =
+    handle.status === "waiting-approval" || handle.status === "blocked";
+  const checkpointContradiction =
+    (terminal && handle.latestReceiptDigest === undefined) ||
+    (checkpointRequired && handle.checkpointDigest === undefined) ||
+    (handle.status === "queued" &&
+      (handle.checkpointDigest !== undefined ||
+        handle.latestReceiptDigest !== undefined));
+  if (checkpointContradiction) {
+    issues.push(
+      issue(
+        "run-handle-checkpoint-contradiction",
+        "/status",
+        "Run status is inconsistent with retained checkpoint or receipt evidence.",
+      ),
+    );
+  }
+
+  return freezeIssues(issues);
+}
+
+export function checkInputReplayTraceSemantics(
+  trace: InputReplayTrace,
+): readonly ContractSemanticIssue[] {
+  const issues: ContractSemanticIssue[] = [];
+  const eventIdentities = new Set<string>();
+  const actionEndTicks = new Map<string, number>();
+  let previousTick: number | undefined;
+
+  for (const [index, event] of trace.events.entries()) {
+    const path = `/events/${index}`;
+    if (previousTick !== undefined && event.tick < previousTick) {
+      issues.push(
+        issue(
+          "input-replay-event-order-invalid",
+          `${path}/tick`,
+          "Replay events must be ordered by nondecreasing tick.",
+        ),
+      );
+    }
+    previousTick = event.tick;
+
+    const identity = `${event.tick}:${event.action}`;
+    if (eventIdentities.has(identity)) {
+      issues.push(
+        issue(
+          "input-replay-event-identity-collision",
+          path,
+          "A replay cannot contain the same action more than once at one tick.",
+        ),
+      );
+    }
+    eventIdentities.add(identity);
+
+    const previousActionEnd = actionEndTicks.get(event.action);
+    if (previousActionEnd !== undefined && event.tick < previousActionEnd) {
+      issues.push(
+        issue(
+          "input-replay-event-overlap",
+          path,
+          "Intervals for the same replay action must not overlap.",
+        ),
+      );
+    }
+    const endTick = event.tick + event.durationTicks;
+    if (!Number.isSafeInteger(endTick)) {
+      issues.push(
+        issue(
+          "input-replay-event-order-invalid",
+          `${path}/durationTicks`,
+          "Replay event duration exceeds the safe tick range.",
+        ),
+      );
+    } else {
+      actionEndTicks.set(event.action, endTick);
+    }
+  }
+
+  if (trace.oracle.outcome === "passed" && trace.divergenceCount !== 0) {
+    issues.push(
+      issue(
+        "input-replay-oracle-contradiction",
+        "/divergenceCount",
+        "A passing deterministic replay cannot report divergence.",
+      ),
+    );
+  }
+
+  return freezeIssues(issues);
 }
 
 export function checkAssetProvenanceSemantics(

@@ -164,6 +164,8 @@ export {
   checkAssetProvenanceSemantics,
   checkEngineCapabilityReportSemantics,
   checkFeatureContractSemantics,
+  checkInputReplayTraceSemantics,
+  checkRunHandleSemantics,
   checkRunReceiptSemantics,
 } from "./semantic-validation.js";
 export type {

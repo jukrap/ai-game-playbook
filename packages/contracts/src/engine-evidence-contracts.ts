@@ -266,7 +266,7 @@ export interface BuildArtifactEvidence {
     readonly logsDigest?: Sha256Digest;
   };
   readonly scenarioReceiptDigest?: Sha256Digest;
-  readonly support: CapabilitySupportGrade;
+  readonly support: Exclude<CapabilitySupportGrade, "planned">;
   readonly evidenceGrade: EvidenceGrade;
 }
 
@@ -279,7 +279,7 @@ const buildTarget = closedObject(
   ["platform", "architecture", "configuration"],
 );
 
-const startupEvidence = closedObject(
+const startupEvidenceRoot = closedObject(
   {
     attempted: { type: "boolean" },
     outcome: reference("componentOutcome"),
@@ -289,6 +289,67 @@ const startupEvidence = closedObject(
   },
   ["attempted", "outcome", "durationMs"],
 );
+
+const startupEvidence = {
+  ...startupEvidenceRoot,
+  allOf: [
+    {
+      if: {
+        type: "object",
+        properties: { attempted: { const: false } },
+        required: ["attempted"],
+      },
+      then: {
+        type: "object",
+        properties: {
+          outcome: { const: "not-run" },
+          exitCode: false,
+          durationMs: { const: 0 },
+          logsDigest: false,
+        },
+        required: ["outcome", "durationMs"],
+      },
+    },
+    {
+      if: {
+        type: "object",
+        properties: { attempted: { const: true } },
+        required: ["attempted"],
+      },
+      then: {
+        type: "object",
+        properties: {
+          outcome: enumSchema([
+            "passed",
+            "failed",
+            "blocked",
+            "cancelled",
+            "uncertain",
+            "unverified",
+          ]),
+          logsDigest: reference("sha256Digest"),
+        },
+        required: ["outcome", "logsDigest"],
+      },
+    },
+    {
+      if: {
+        type: "object",
+        properties: { outcome: { const: "passed" } },
+        required: ["outcome"],
+      },
+      then: {
+        type: "object",
+        properties: {
+          attempted: { const: true },
+          exitCode: { const: 0 },
+          logsDigest: reference("sha256Digest"),
+        },
+        required: ["attempted", "exitCode", "logsDigest"],
+      },
+    },
+  ],
+};
 
 const buildArtifactRoot = contractRoot(
   {
@@ -304,7 +365,7 @@ const buildArtifactRoot = contractRoot(
     createdAt: reference("timestamp"),
     startup: startupEvidence,
     scenarioReceiptDigest: reference("sha256Digest"),
-    support: reference("supportGrade"),
+    support: enumSchema(["detected", "headless", "editor-preview", "verified"]),
     evidenceGrade: reference("evidenceGrade"),
   },
   [
@@ -337,6 +398,37 @@ export const buildArtifactEvidenceSchema: VersionedContractSchema =
         {
           if: {
             type: "object",
+            properties: { support: { enum: ["detected", "headless"] } },
+            required: ["support"],
+          },
+          then: {
+            type: "object",
+            properties: {
+              evidenceGrade: enumSchema([
+                "locally-executed",
+                "engine-verified",
+              ]),
+            },
+            required: ["evidenceGrade"],
+          },
+        },
+        {
+          if: {
+            type: "object",
+            properties: {
+              support: { enum: ["editor-preview", "verified"] },
+            },
+            required: ["support"],
+          },
+          then: {
+            type: "object",
+            properties: { evidenceGrade: { const: "engine-verified" } },
+            required: ["evidenceGrade"],
+          },
+        },
+        {
+          if: {
+            type: "object",
             properties: { support: { const: "verified" } },
             required: ["support"],
           },
@@ -351,8 +443,9 @@ export const buildArtifactEvidenceSchema: VersionedContractSchema =
                   attempted: { const: true },
                   outcome: { const: "passed" },
                   exitCode: { const: 0 },
+                  logsDigest: reference("sha256Digest"),
                 },
-                required: ["attempted", "outcome"],
+                required: ["attempted", "outcome", "exitCode", "logsDigest"],
               },
               evidenceGrade: { const: "engine-verified" },
             },

@@ -137,6 +137,34 @@ export const runHandleSchema: VersionedContractSchema = defineContractSchema({
           required: ["latestReceiptDigest"],
         },
       },
+      {
+        if: {
+          type: "object",
+          properties: {
+            status: { enum: ["waiting-approval", "blocked"] },
+          },
+          required: ["status"],
+        },
+        then: {
+          type: "object",
+          properties: { checkpointDigest: reference("sha256Digest") },
+          required: ["checkpointDigest"],
+        },
+      },
+      {
+        if: {
+          type: "object",
+          properties: { status: { const: "queued" } },
+          required: ["status"],
+        },
+        then: {
+          type: "object",
+          properties: {
+            checkpointDigest: false,
+            latestReceiptDigest: false,
+          },
+        },
+      },
     ],
   },
 });

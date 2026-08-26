@@ -1,12 +1,12 @@
 ---
 source: docs/evidence-and-verification.md
-source_sha256: 89735bd040c9184e7e77f5f7d5bde91cb2105ca1e896e7f3c2c5d1798d2939b5
+source_sha256: 8022111bed2bd5aeaa9bc0c0e73cc4ac065d22c291e9b6ab2648d17b7359e51f
 translated_at: 2026-08-27
 ---
 
 # 증거와 검증
 
-> 상태: receipt/checkpoint 계약, settlement 경계, durable checkpoint chain, private durable receipt-record store를 구현했습니다. Content-addressed artifact payload, evidence command, export, engine evidence는 아직 없습니다.
+> 상태: receipt/checkpoint 계약, settlement 경계, durable checkpoint chain, private durable receipt record와 private content-addressed artifact payload를 구현했습니다. Evidence command, export, format QA, engine evidence는 아직 없습니다.
 
 [English](evidence-and-verification.md) · [문서](README.ko.md)
 
@@ -35,9 +35,11 @@ translated_at: 2026-08-27
 
 private workflow state machine은 immutable checkpoint를 가로질러 domain-separated hash-linked receipt chain을 만들고 성공적으로 정산된 complete artifact만 수용합니다. canonical checkpoint record는 compare-and-swap head와 함께 append-only로 유지됩니다. load는 제한된 parent chain, transition 적법성, record/head digest, 현재 registry plan, project identity, input, feature, dirty-state, session binding을 검증합니다. malformed state를 대체하지 않고 그대로 보존한 채 거부합니다. safe hydration은 직렬화된 authorization을 되살리지 않습니다. dispatch하지 않은 admission은 authorization checkpoint로 돌아가고 dispatch 후 정산하지 못한 action은 `uncertain`이 됩니다.
 
-별도 private receipt store는 검증된 `RunReceipt` body를 run별 compare-and-swap head 뒤의 canonical immutable record로 영속화합니다. Persistence는 canonical project root, 현재 control-plane platform/architecture/Node.js version, current registry digest, exact command descriptor/handler, workflow plan, 선택적 feature contract를 결합합니다. Diagnostic에는 explicit redaction marker가 필요하고 명백한 credential-shaped text와 absolute private-machine path pattern을 거부하며 record, chain, artifact count, artifact byte에 고정 budget을 적용합니다. Complete artifact locator는 지정한 project-local regular file을 exact byte count와 SHA-256 digest로 다시 열 수 있을 때만 수용하며 reload에서도 이를 다시 검사합니다. Missing, malformed, noncanonical, tampered, relocated, stale, competing state는 repair하거나 조용히 교체하지 않고 그대로 보존한 채 거부합니다.
+Private promotion API는 complete artifact source를 stable project-local regular-file snapshot으로 검증하고 선언한 byte count와 SHA-256 digest를 확인한 뒤 immutable digest-addressed object를 기록합니다. Promoted receipt는 original portable source path와 canonical manifest digest를 직접 증명합니다. Create-only manifest는 해당 source와 retained object를 receipt 실행 context, project/runtime identity, registry, command descriptor, handler, input, authorization, pack, approval에 결합합니다. 같은 receipt/artifact identity를 다른 byte나 authority에 재사용하면 거부하며 동일한 동시 promotion은 수렴합니다. Partial failure는 receipt head를 전진시키지 않지만 후속 retention 분석 대상인 unreachable immutable byte가 남을 수 있습니다.
 
-이 store는 receipt JSON과 artifact locator만 보존합니다. Artifact byte를 managed content-addressed storage로 복사하거나 engine artifact를 parse/decode하지 않으며 retention cleanup, list/show/export command, record encryption, 다른 registry authority 아래의 과거 chain load도 제공하지 않습니다. Approval reservation과 uncertainty를 해제하는 action도 아직 durable하지 않습니다.
+Private receipt store는 promoted `RunReceipt` body를 run별 compare-and-swap head 뒤의 canonical immutable record로 영속화합니다. Persistence는 같은 canonical project root, runtime, registry, command, workflow plan, 선택적 feature contract를 결합합니다. Diagnostic에는 explicit redaction marker가 필요하고 명백한 credential-shaped text와 absolute private-machine path pattern을 거부하며 record, chain, artifact count, artifact byte에 고정 budget을 적용합니다. 모든 complete artifact는 exact CAS object path와 일치하는 manifest를 사용해야 하며 load는 둘을 두 번 다시 엽니다. Promotion 뒤 source file은 evidence authority가 아닙니다. Missing, malformed, noncanonical, tampered, relocated, rebound, stale, competing state는 repair하거나 조용히 교체하지 않고 그대로 보존한 채 거부합니다.
+
+현재 artifact slice는 검증하는 receipt chain 하나에서 complete artifact 최대 256개, 총 64 MiB, manifest 128 KiB로 제한됩니다. Engine artifact parse/decode, image dimension 또는 receipt field를 넘어선 runtime-frame provenance 검증, retention cleanup/reachable-head GC, list/show/export command, record encryption, 다른 registry authority 아래의 과거 chain load는 제공하지 않습니다. Approval reservation과 uncertainty를 해제하는 action도 아직 durable하지 않습니다.
 
 ## Test 판정 기준
 

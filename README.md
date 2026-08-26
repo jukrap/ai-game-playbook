@@ -1,6 +1,6 @@
 # AI Game Playbook
 
-> Status: control-plane contracts, registry, core safety boundaries, managed-pack transactions, durable private receipt records, and three experimental source-built read-only commands are in progress. No installable package, MCP server, or engine adapter exists yet.
+> Status: control-plane contracts, registry, core safety boundaries, managed-pack transactions, durable private receipts and artifact bytes, and three experimental source-built read-only commands are in progress. No installable package, MCP server, or engine adapter exists yet.
 
 [한국어](README.ko.md)
 
@@ -10,7 +10,7 @@ AI Game Playbook is an AI-assisted game-development control plane for individual
 
 - A private pnpm/TypeScript workspace with versioned schemas, semantic validation, and deterministic digests.
 - A typed registry that validates command, skill, workflow, role-lens, schema, and pack descriptors and generates matching CLI, MCP, documentation, and skill-routing metadata.
-- Safety primitives for canonical project identity, link-safe path resolution, bounded file reads, staged compare-and-swap writes and deletion, bounded direct process execution, project mutation leases, scoped signed approvals, workflow state, durable checkpoints, and append-only run receipts.
+- Safety primitives for canonical project identity, link-safe path resolution, bounded file reads, staged compare-and-swap writes and deletion, bounded direct process execution, project mutation leases, scoped signed approvals, workflow state, durable checkpoints, append-only run receipts, and immutable content-addressed artifact objects with receipt-attested manifests.
 - A private managed-pack runtime with write-free preflight, exact ownership, add/update/remove transactions, append-only journals, active-transaction barriers, rollback after clear failures, marker-bound directory ownership, and separately approved recovery finalization.
 - An experimental private CLI package and repository-local `agpb` entry point. The implemented commands are plan-only `agpb init`, read-only `agpb doctor`, and static read-only `agpb project inspect`.
 - A digest-bound public surface that marks `init`, `doctor`, and `project inspect` available while keeping every other command and all engine capabilities planned.
@@ -18,7 +18,7 @@ AI Game Playbook is an AI-assisted game-development control plane for individual
 
 The current CLI slice can plan a fixed 16-target `.ai-game-playbook/` layout; diagnose the supported Node.js range, runtime-registry parity, project state, installed-pack state, and active transaction markers; and inspect bounded Godot, Unity, or Unreal project markers plus a canonical committed project profile. Project inspection reports dirty state as unknown when only `.git` is observed and never treats a static lock as a process or selectable Editor session. All three commands emit concise human output or registered canonical JSON and perform no writes, process launches, network access, or Editor control.
 
-Most runtime components remain private libraries. Pack mutation still requires an exact same-process plan, a broker-issued `install` authorization, and an attested project-write lease. The recovery finalizer can close only a stable state already classified by the bounded inspector; it cannot repair pack artifacts or resolve mixed state. The private receipt store persists canonical records behind a compare-and-swap head and reopens complete project-local artifact locators, but it does not yet copy artifact bytes into content-addressed storage or provide retention, listing, export, or migration-ready historical access. Approval reservations and active leases are memory-only, and no general mutation dispatcher or approval UI exists.
+Most runtime components remain private libraries. Pack mutation still requires an exact same-process plan, a broker-issued `install` authorization, and an attested project-write lease. The recovery finalizer can close only a stable state already classified by the bounded inspector; it cannot repair pack artifacts or resolve mixed state. A private promotion API snapshots each complete project-local artifact into an immutable SHA-256 object. The receipt directly attests each canonical manifest digest and original source path, while each manifest binds the retained object and source to the receipt execution context, project, runtime, registry, command, and handler. Receipt persistence and reload require those bytes and manifests to remain exact. Format/decode QA, retention and cleanup, listing, export, and migration-ready historical access do not exist yet. Approval reservations and active leases are memory-only, and no general mutation dispatcher or approval UI exists.
 
 ## Run the current CLI
 

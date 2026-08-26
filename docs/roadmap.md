@@ -17,6 +17,7 @@ The current Stage 2 product slice adds:
 - read-only `agpb doctor` checks for runtime, registry, project-state, installed-pack-state, and active-marker safety;
 - static read-only `agpb project inspect` for bounded engine markers, canonical profile compatibility, marker-only dirty state, and unbound Editor signals;
 - canonical append-only run-receipt persistence with exact runtime and registry authority, compare-and-swap heads, redaction checks, and complete project-local artifact-locator verification;
+- private promotion of complete artifact snapshots into immutable SHA-256 objects with receipt-attested canonical manifests;
 - compiled-handler digest attestation; and
 - generated/public availability parity.
 
@@ -36,7 +37,7 @@ No command may be marked available merely because a private library function exi
 
 ## Stage 3 — evidence, MCP, and Codex integration
 
-Planned work includes content-addressed artifact bytes, receipt-history migration and forensic access, checkpoint/handoff reconciliation, retention cleanup, explicit evidence list/show/export commands, registry-generated STDIO MCP tools, and project-scoped Codex skills and instructions.
+Planned work includes artifact format and provenance QA, receipt-history migration and forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export commands, registry-generated STDIO MCP tools, and project-scoped Codex skills and instructions.
 
 CLI, MCP, documentation, and skill routing must preserve identical command IDs, schema digests, permissions, and handler identities. MCP annotations remain hints and can never override the permission broker. No background upload or telemetry path is planned.
 

@@ -1,6 +1,6 @@
 ---
 source: docs/roadmap.md
-source_sha256: c5459badfd64cf289cf714e264919f29365dda0928663740213dae6c222b48e6
+source_sha256: cccd97cba5261e92a448c8062c5f38f36b0a41c52fe49626f7bc69b8f66e1d9f
 translated_at: 2026-08-27
 ---
 
@@ -23,6 +23,7 @@ translated_at: 2026-08-27
 - runtime, registry, project state, installed-pack state, active marker를 검사하는 read-only `agpb doctor`;
 - bounded engine marker, canonical profile compatibility, marker-only dirty state, unbound Editor signal을 검사하는 static read-only `agpb project inspect`;
 - exact runtime/registry authority, compare-and-swap head, redaction check, complete project-local artifact-locator 검증을 포함한 canonical append-only run-receipt persistence;
+- complete artifact snapshot을 receipt가 증명하는 canonical manifest와 함께 immutable SHA-256 object로 승격하는 private promotion;
 - compiled-handler digest attestation;
 - generated/public availability parity.
 
@@ -42,7 +43,7 @@ Private library function이 있다는 이유만으로 command를 available로 �
 
 ## Stage 3 — evidence, MCP, Codex integration
 
-Content-addressed artifact byte, receipt-history migration/forensic access, checkpoint/handoff reconciliation, retention cleanup, explicit evidence list/show/export command, registry-generated STDIO MCP tool, project-scoped Codex skill과 instruction을 계획합니다.
+Artifact format/provenance QA, receipt-history migration/forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export command, registry-generated STDIO MCP tool, project-scoped Codex skill과 instruction을 계획합니다.
 
 CLI, MCP, 문서, skill routing은 동일한 command ID, schema digest, permission, handler identity를 유지해야 합니다. MCP annotation은 hint이며 permission broker를 override할 수 없습니다. Background upload나 telemetry path는 계획하지 않습니다.
 

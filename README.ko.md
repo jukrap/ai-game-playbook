@@ -1,12 +1,12 @@
 ---
 source: README.md
-source_sha256: 5b51e856d979b3fa38692937676a58b8fb3cdefd1fadf8511aa655804f49866f
+source_sha256: 556cd3aca90737739e26ad50282a05585540ba7f18a811656b264a797831a8c3
 translated_at: 2026-08-27
 ---
 
 # AI Game Playbook
 
-> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction, durable private receipt record와 소스 빌드 방식의 실험적 read-only command 세 개를 구현하고 있습니다. 설치 가능한 패키지, MCP 서버, 엔진 어댑터는 아직 없습니다.
+> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction, durable private receipt와 artifact byte, 소스 빌드 방식의 실험적 read-only command 세 개를 구현하고 있습니다. 설치 가능한 패키지, MCP 서버, 엔진 어댑터는 아직 없습니다.
 
 [English](README.md)
 
@@ -16,7 +16,7 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine을 사용하는 개인과 
 
 - versioned schema, semantic validation과 결정적 digest를 포함한 private pnpm/TypeScript workspace.
 - command, skill, workflow, role lens, schema, pack descriptor를 검증하고 서로 일치하는 CLI, MCP, 문서, skill routing metadata를 생성하는 typed registry.
-- canonical project identity, link-safe path resolution, bounded file read, staged compare-and-swap write/delete, bounded direct process execution, project mutation lease, scoped signed approval, workflow state, durable checkpoint와 append-only run receipt 안전 primitive.
+- canonical project identity, link-safe path resolution, bounded file read, staged compare-and-swap write/delete, bounded direct process execution, project mutation lease, scoped signed approval, workflow state, durable checkpoint, append-only run receipt, receipt-attested manifest가 있는 immutable content-addressed artifact object 안전 primitive.
 - write-free preflight, exact ownership, add/update/remove transaction, append-only journal, active-transaction barrier, 명확한 실패 뒤 rollback, marker 결합 directory ownership, 별도 승인 recovery finalization을 제공하는 private managed-pack runtime.
 - 실험적 private CLI package와 repository-local `agpb` entry point. 구현된 명령은 plan-only `agpb init`, read-only `agpb doctor`, static read-only `agpb project inspect`입니다.
 - `init`, `doctor`, `project inspect`를 available로 표시하고 나머지 모든 명령과 엔진 capability를 planned로 유지하는 digest 결합 공개 surface.
@@ -24,7 +24,7 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine을 사용하는 개인과 
 
 현재 CLI slice는 고정된 16개 `.ai-game-playbook/` target layout을 계획하고, 지원 Node.js 범위, runtime-registry parity, project state, installed-pack state, active transaction marker를 진단하며, bounded Godot/Unity/Unreal project marker와 canonical committed project profile을 검사합니다. Project inspection은 `.git` marker만 관찰하면 dirty state를 unknown으로 유지하고 static lock을 process나 선택 가능한 Editor session으로 간주하지 않습니다. 세 명령 모두 간결한 human output 또는 등록된 canonical JSON을 출력하며 write, process launch, network access, Editor control을 수행하지 않습니다.
 
-대부분의 runtime component는 여전히 private library입니다. Pack mutation에는 exact same-process plan, broker가 발급한 `install` authorization, attest된 project-write lease가 필요합니다. Recovery finalizer는 bounded inspector가 이미 분류한 stable state만 닫을 수 있으며 pack artifact를 repair하거나 mixed state를 해결할 수 없습니다. Private receipt store는 canonical record를 compare-and-swap head 뒤에 영속화하고 complete project-local artifact locator를 다시 열어 검증하지만, artifact byte를 content-addressed storage로 복사하거나 retention, listing, export, migration-ready historical access를 제공하지는 않습니다. Approval reservation과 active lease는 memory-only이고 general mutation dispatcher나 approval UI는 없습니다.
+대부분의 runtime component는 여전히 private library입니다. Pack mutation에는 exact same-process plan, broker가 발급한 `install` authorization, attest된 project-write lease가 필요합니다. Recovery finalizer는 bounded inspector가 이미 분류한 stable state만 닫을 수 있으며 pack artifact를 repair하거나 mixed state를 해결할 수 없습니다. Private promotion API는 complete project-local artifact마다 stable snapshot을 immutable SHA-256 object로 저장합니다. Receipt는 각 canonical manifest digest와 원본 source path를 직접 증명하고, 각 manifest는 보존 object와 source를 receipt 실행 context, project, runtime, registry, command, handler에 결합합니다. Receipt persistence와 reload는 해당 byte와 manifest가 exact하게 유지될 것을 요구합니다. Format/decode QA, retention/cleanup, listing, export, migration-ready historical access는 아직 없습니다. Approval reservation과 active lease는 memory-only이고 general mutation dispatcher나 approval UI는 없습니다.
 
 ## 현재 CLI 실행
 

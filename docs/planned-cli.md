@@ -61,7 +61,7 @@ The plan digest binds the runtime registry, canonical project identity, ordered 
 - runtime-registry and generated-surface parity;
 - the supported Node.js range;
 - one canonical local project root;
-- the eight fixed runtime directories;
+- the 11 fixed runtime directories, including receipt and artifact storage;
 - canonical installed-pack state; and
 - an active or malformed pack transaction marker.
 

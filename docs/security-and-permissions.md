@@ -1,6 +1,6 @@
 # Security and Permissions
 
-> Status: planned permission policy with implemented private admission, workflow checkpoints, durable receipt records, managed-pack transactions, and read-only CLI diagnostics. General mutation dispatch and engine enforcement do not exist.
+> Status: planned permission policy with implemented private admission, workflow checkpoints, durable receipt and artifact records, managed-pack transactions, and read-only CLI diagnostics. General mutation dispatch and engine enforcement do not exist.
 
 [한국어](security-and-permissions.ko.md) · [Documentation](README.md)
 
@@ -14,7 +14,7 @@ The current CLI dispatches plan-only `init`, read-only `doctor`, and static read
 
 Static project inspection binds one local root, limits directory observations and file bytes, rejects unsafe links and case ambiguity, and rechecks identities around reads. A `.git` marker never grants permission to execute Git, and an Editor lock never grants process, session, liveness, connection, or mutation authority. The report explicitly records no mutation, process launch, or network access. Invalid profiles and ambiguous engine candidates block later authority instead of selecting a likely target.
 
-The private receipt store accepts only the current same-process validated registry and a receipt bound to the exact project, runtime, command descriptor, handler, workflow plan, and optional feature contract. It requires a pre-existing ignored local directory, canonical immutable JSON, a compare-and-swap head, explicit diagnostic redaction markers, bounded text and artifacts, and exact re-opening of complete artifact locators. It does not grant execution authority, repair corruption, retry a mutation, copy artifact bytes, or export data.
+The private artifact promotion and receipt stores accept only the current same-process validated registry and a receipt bound to the exact project, runtime, command descriptor, handler, workflow plan, and optional feature contract. They require pre-existing ignored local directories, stable project-local source snapshots, digest-addressed create-only objects, canonical producer manifests, canonical receipt JSON, compare-and-swap heads, explicit diagnostic redaction markers, and bounded text and artifacts. Complete artifact objects and manifests are reopened twice during verification. These stores do not grant execution authority, repair corruption, retry a mutation, perform format QA, remove unreachable objects, or export data.
 
 ## Default permission model
 
@@ -79,7 +79,7 @@ Planned local bridges use authenticated project-scoped sessions, bounded request
 
 ## Filesystem and pack safety
 
-The core binds one canonical local project root, rejects path ambiguity and writable links, bounds directory traversal and file size, and stages exact compare-and-swap writes, deletion, and reversible empty-directory removal. The fixed bootstrap creates only eight predetermined runtime directories and rolls back only identities created by the failed call.
+The core binds one canonical local project root, rejects path ambiguity and writable links, bounds directory traversal and file size, and stages exact compare-and-swap writes, deletion, and reversible empty-directory removal. The fixed bootstrap creates only 11 predetermined runtime directories and rolls back only identities created by the failed call.
 
 Pack preflight is write-free and accepts only validated offline regular-file artifacts. It verifies content digests, canonical installed state, dependencies, downgrade policy, ownership, non-owned collisions, reserved namespaces, and budgets. Existing directories remain shared. Only explicitly declared missing direct artifact parents may receive pack-digest-bound ownership markers.
 

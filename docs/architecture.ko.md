@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: c80cb2968723f6be4a92bcae52aa9da991f63fdb2e13e7770d060d9e327b736a
+source_sha256: d9cf0b4c39d21f485e75df57c2c1ab2ee5892ccad15c9108654ddee8b30064e9
 translated_at: 2026-08-27
 ---
 
 # 목표 아키텍처
 
-> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, core 안전 primitive, durable private receipt record, managed-pack transaction, plan-only `agpb init`, read-only `agpb doctor`, static read-only `agpb project inspect`가 존재합니다. General mutation dispatch, content-addressed artifact storage/export, MCP runtime, host integration, engine, bridge는 계획 단계입니다.
+> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, core 안전 primitive, durable private receipt record와 artifact object, managed-pack transaction, plan-only `agpb init`, read-only `agpb doctor`, static read-only `agpb project inspect`가 존재합니다. General mutation dispatch, evidence export, MCP runtime, host integration, engine, bridge는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -35,10 +35,10 @@ Typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 | --- | --- | --- |
 | `contracts` | 기반 구현 | Versioned schema, canonical data, identifier, approval, workflow, engine, evidence, init-plan, doctor, project-inspection protocol |
 | `registry` | 기반 구현 | Descriptor validation, generation, digest, routing, workflow-plan resolution, exact implemented-command inventory |
-| `core` | 일부 구현 | Canonical project identity, safe path, compare-and-swap filesystem operation, bounded process, mutation lease, in-memory permission admission, workflow state, durable checkpoint, append-only run receipt |
+| `core` | 일부 구현 | Canonical project identity, safe path, compare-and-swap filesystem operation, bounded process, mutation lease, in-memory permission admission, workflow state, durable checkpoint, append-only run receipt, private artifact promotion |
 | `pack-runtime` | 일부 구현 | Write-free preflight, exact ownership, local lifecycle transaction, journal, active barrier, rollback, directory ownership, recovery inspection, approved stable-state finalization |
 | `cli` | 실험적 일부 구현 | Registry-derived help/version, fail-closed parsing, stable exit category, human/JSON output, plan-only `init`, read-only `doctor`, static `project inspect` |
-| `evidence` | Private 기반 일부 구현 | Canonical receipt record와 검증된 project-local artifact locator가 존재하며 content-addressed artifact byte, retention, migration, listing, explicit export는 계획 단계 |
+| `evidence` | Private 기반 일부 구현 | Canonical receipt record, content-addressed artifact byte, producer-bound manifest가 존재하며 format QA, retention, migration, listing, explicit export는 계획 단계 |
 | `mcp` | 계획 | 같은 broker와 result contract 뒤의 registry-derived tool |
 | `codex-adapter` | 계획 | 새 authority를 만들지 않는 project skill, instruction bootstrap, host routing |
 | `engine-common` | Contract만 존재 | 공통 capability negotiation과 engine-operation contract |
@@ -80,9 +80,9 @@ Unknown mutation state는 `uncertain`으로 가며 곧바로 execution으로 돌
 
 소비자 game project에는 `.ai-game-playbook/`을 둘 계획입니다. Portable profile, feature contract, policy, pack lock은 commit 대상입니다. Cache, log, screenshot, local receipt, lock, secret, machine-specific config는 ignore합니다.
 
-Plan-only `init`은 committed metadata intent와 local-only runtime intent에 걸친 고정 target 16개를 보고합니다. Profile/policy byte를 제공하거나 mutation primitive를 호출하지 않습니다. 구현된 private bootstrap은 local receipt directory를 포함한 고정 runtime directory 8개만 만들 수 있습니다. Idempotent하고 link와 case alias를 거부하며 parent/target identity를 검증하고 명확히 실패한 call이 만든 directory만 제거합니다. `doctor`는 이 layout을 읽지만 bootstrap을 호출하지 않습니다. `project inspect`는 fixed committed profile path를 검증할 수 있지만 profile data를 생성, repair, promote할 수 없습니다.
+Plan-only `init`은 committed metadata intent와 local-only runtime intent에 걸친 고정 target 16개를 보고합니다. Profile/policy byte를 제공하거나 mutation primitive를 호출하지 않습니다. 구현된 private bootstrap은 receipt, artifact object, artifact manifest directory를 포함한 고정 runtime directory 11개만 만들 수 있습니다. Idempotent하고 link와 case alias를 거부하며 parent/target identity를 검증하고 명확히 실패한 call이 만든 directory만 제거합니다. `doctor`는 이 layout을 읽지만 bootstrap을 호출하지 않습니다. `project inspect`는 fixed committed profile path를 검증할 수 있지만 profile data를 생성, repair, promote할 수 없습니다.
 
-Private receipt store는 해당 고정 local directory가 이미 존재해야 동작합니다. 각 receipt를 canonical project root, current control-plane runtime, validated registry, command descriptor, handler, workflow plan, 선택적 feature contract에 결합합니다. Canonical immutable record는 compare-and-swap run head로 전진하며 reload는 제한된 predecessor chain을 검증하고 complete artifact locator를 exact size/digest로 다시 엽니다. Corrupt 또는 competing state는 보존한 채 거부합니다. Artifact byte는 아직 managed CAS로 복사하지 않으며 evidence CLI, retention cleanup, export, historical-registry migration path도 없습니다.
+Private receipt와 artifact store는 해당 고정 local directory가 이미 존재해야 동작합니다. Artifact promotion은 complete project-local source마다 stable snapshot을 digest-addressed immutable object로 저장합니다. Promoted receipt는 각 canonical manifest digest와 원본 source path를 직접 증명하고, 각 manifest는 보존 object와 source를 receipt 실행 context, project/runtime identity, registry, command descriptor, handler에 결합합니다. Receipt persistence는 같은 authority를 compare-and-swap run head 뒤의 canonical immutable record에 결합합니다. Reload는 제한된 predecessor chain을 검증하고 선언한 byte budget 안에서 각 complete artifact object와 manifest를 두 번 다시 엽니다. 승격 뒤 원본 source가 바뀌어도 보존된 evidence는 변하지 않습니다. Corrupt, relocated, rebound, competing state는 보존한 채 거부합니다. Format/decode QA, retention cleanup, evidence CLI, export, historical-registry migration은 없습니다.
 
 Pack preflight는 validated registry, source/target root identity, local artifact byte, installed-state digest, intended change, conflict, limit을 same-process immutable plan에 결합합니다. Execution에는 exact `install` authorization과 attest된 project-write lease가 추가로 필요합니다. Canonical installed state는 마지막에 commit합니다. 명확한 실패는 이미 commit한 file을 역순 rollback하며 uncertain effect는 재시도하지 않습니다.
 

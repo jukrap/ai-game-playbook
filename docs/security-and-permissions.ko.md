@@ -1,12 +1,12 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: 83b7b14c07e412bd5ca8a361622eea8287ee345d6a892cd8e59a6ad9458b8e2c
+source_sha256: 4eed30225372834d9fd8ab177a7b5eb6463db230c0a0310c56f8ad62001a98f4
 translated_at: 2026-08-27
 ---
 
 # 보안과 권한
 
-> 상태: private admission, workflow checkpoint, durable receipt record, managed-pack transaction, read-only CLI diagnostic가 구현된 계획 permission policy입니다. General mutation dispatch와 engine enforcement는 아직 없습니다.
+> 상태: private admission, workflow checkpoint, durable receipt/artifact record, managed-pack transaction, read-only CLI diagnostic가 구현된 계획 permission policy입니다. General mutation dispatch와 engine enforcement는 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
@@ -20,7 +20,7 @@ Authorization 자체는 execution이 아닙니다. Broker는 general mutation di
 
 Static project inspection은 local root 하나를 bind하고 directory observation과 file byte를 제한하며 unsafe link와 case ambiguity를 거부하고 read 전후 identity를 다시 확인합니다. `.git` marker는 Git 실행 permission을 부여하지 않으며 Editor lock은 process, session, liveness, connection, mutation authority를 부여하지 않습니다. Report는 mutation, process launch, network access가 없음을 명시합니다. Invalid profile과 ambiguous engine candidate는 그럴듯한 target을 선택하지 않고 이후 authority를 차단합니다.
 
-Private receipt store는 current same-process validated registry와 exact project, runtime, command descriptor, handler, workflow plan, 선택적 feature contract에 결합된 receipt만 수용합니다. 미리 존재하는 ignored local directory, canonical immutable JSON, compare-and-swap head, explicit diagnostic redaction marker, bounded text/artifact, complete artifact locator의 exact 재개방을 요구합니다. Execution authority를 부여하거나 corruption을 repair하거나 mutation을 retry하거나 artifact byte를 복사하거나 data를 export하지 않습니다.
+Private artifact promotion과 receipt store는 current same-process validated registry와 exact project, runtime, command descriptor, handler, workflow plan, 선택적 feature contract에 결합된 receipt만 수용합니다. 미리 존재하는 ignored local directory, stable project-local source snapshot, digest-addressed create-only object, canonical producer manifest, canonical receipt JSON, compare-and-swap head, explicit diagnostic redaction marker, bounded text/artifact를 요구합니다. 검증 중 complete artifact object와 manifest를 두 번 다시 엽니다. Execution authority를 부여하거나 corruption을 repair하거나 mutation을 retry하거나 format QA를 수행하거나 unreachable object를 제거하거나 data를 export하지 않습니다.
 
 ## 기본 permission 모델
 
@@ -85,7 +85,7 @@ Mutation lane은 고정 project-local lease 하나를 사용합니다. Record는
 
 ## Filesystem과 pack safety
 
-Core는 canonical local project root 하나를 bind하고 path ambiguity와 writable link를 거부하며 directory traversal/file size를 제한하고 exact compare-and-swap write, delete, reversible empty-directory removal을 stage합니다. Fixed bootstrap은 predetermined runtime directory 8개만 만들며 실패한 call이 직접 만든 identity만 rollback합니다.
+Core는 canonical local project root 하나를 bind하고 path ambiguity와 writable link를 거부하며 directory traversal/file size를 제한하고 exact compare-and-swap write, delete, reversible empty-directory removal을 stage합니다. Fixed bootstrap은 predetermined runtime directory 11개만 만들며 실패한 call이 직접 만든 identity만 rollback합니다.
 
 Pack preflight는 write-free이고 validated offline regular-file artifact만 받습니다. Content digest, canonical installed state, dependency, downgrade policy, ownership, non-owned collision, reserved namespace, budget을 검증합니다. Existing directory는 shared입니다. Explicitly declared missing direct artifact parent만 pack-digest-bound ownership marker를 받을 수 있습니다.
 

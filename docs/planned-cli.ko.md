@@ -1,6 +1,6 @@
 ---
 source: docs/planned-cli.md
-source_sha256: ea9c04f94130e56db4c41050f256702716edf97deb9d5ee4d83d9cef4994eae2
+source_sha256: 2b93813f1cefc183cde372654a9aebacf19bf470db2899eabd16acf739324318
 translated_at: 2026-08-27
 ---
 
@@ -67,7 +67,7 @@ Plan digest는 runtime registry, canonical project identity, 정렬된 target pa
 - runtime-registry와 generated-surface parity;
 - 지원 Node.js 범위;
 - canonical local project root 하나;
-- 고정 runtime directory 8개;
+- receipt와 artifact storage를 포함한 고정 runtime directory 11개;
 - canonical installed-pack state;
 - active 또는 malformed pack transaction marker.
 

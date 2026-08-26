@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture. The `contracts` and `registry` foundations and an early `core` filesystem boundary exist; the remaining runtime and bridge boundaries are planned.
+> Status: target architecture. The `contracts` and `registry` foundations and early `core` filesystem/process boundaries exist; the remaining runtime and bridge boundaries are planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -29,7 +29,7 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 | --- | --- | --- |
 | `contracts` | Foundation implemented | Versioned schemas and shared identifiers with no engine runtime dependency |
 | `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, and parity checks |
-| `core` | Partial | Canonical project identity, portable path resolution, and staged filesystem compare-and-swap exist; permissions, process budgets, lanes, checkpoints, and workflow state remain planned |
+| `core` | Partial | Canonical project identity, portable path resolution, staged filesystem compare-and-swap, and digest-bound direct process execution with time/idle/output/cancellation limits exist; permissions, CPU/memory budgets, lanes, checkpoints, and workflow state remain planned |
 | `cli` | Planned | `agpb` argument parsing, local interaction, stable exit behavior, and help |
 | `mcp` | Planned | Schema-derived tools and resources behind the same permission broker |
 | `codex-adapter` | Planned | Skills, host routing metadata, and project instruction integration |

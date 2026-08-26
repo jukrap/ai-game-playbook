@@ -1,6 +1,6 @@
 # Security and Permissions
 
-> Status: planned policy. No permission broker or runtime enforcement exists yet.
+> Status: planned permission policy. Early filesystem and process enforcement exists; the permission broker, project lanes, and editor or bridge enforcement do not.
 
 [한국어](security-and-permissions.ko.md) · [Documentation](README.md)
 
@@ -38,13 +38,13 @@ Uncertain mutations are not automatically retried. The workflow first records an
 
 ## Process and editor isolation
 
-Each project has one mutation lane, and editor-bound work is serialized within it. Process identity is more than a PID: it includes executable/build identity, project root, start time, session token, and engine-specific context. Commands target only the bound process; broad process termination is forbidden.
+The current private core digest-binds a local executable and project root, spawns it directly with an argument array, limits environment values and project-scoped working directories, caps time, idle time, and combined output, and terminates only the owned process tree on interruption. Windows retains only a minimal non-secret OS baseline and masks inherited user/path values unless explicitly allowlisted. Interrupted execution remains mutation-uncertain and is not safe to retry without reconciliation. This boundary is not a CPU, memory, filesystem, or network sandbox.
 
-Local bridges use authenticated, project-scoped sessions, bounded request bodies and queues, timeouts, cancellation, and normalized outer/inner errors. They bind to loopback by default and do not expose an unauthenticated server.
+Project mutation lanes and editor-bound serialization remain planned. Planned local bridges use authenticated, project-scoped sessions, bounded request bodies and queues, timeouts, cancellation, and normalized outer/inner errors. They bind to loopback by default and do not expose an unauthenticated server.
 
 ## Filesystem and pack safety
 
-Managed files are hash-owned. Install and update operations stage content, validate digests and manifests, check paths and symlinks, detect user changes, and promote atomically where possible. Uninstall removes only files still matching owned hashes. Non-owned or modified files are preserved and reported as conflicts.
+The current core binds a canonical project root, rejects writable path links and portable path ambiguity, and performs bounded staged SHA-256 compare-and-swap writes. The managed pack lifecycle remains planned: install and update will stage content, validate digests and manifests, detect user changes, and promote only owned paths. Uninstall will remove only files still matching owned hashes.
 
 Path checks resolve the final target and reject traversal, absolute-path injection, and symlink escape. Engine and system tools are detected but not installed automatically.
 

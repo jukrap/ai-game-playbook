@@ -8,6 +8,8 @@ export type CoreBoundaryErrorCode =
   | "cas-state-invalid"
   | "filesystem-operation-failed"
   | "invalid-cas-request"
+  | "invalid-process-executable"
+  | "invalid-process-request"
   | "invalid-project-root"
   | "invalid-project-path-options"
   | "project-path-budget-exceeded"
@@ -20,6 +22,14 @@ export type CoreBoundaryErrorCode =
   | "project-root-drift"
   | "project-root-not-directory"
   | "project-root-not-found"
+  | "process-cancelled-before-spawn"
+  | "process-executable-budget-exceeded"
+  | "process-executable-drift"
+  | "process-executable-link"
+  | "process-executable-not-file"
+  | "process-executable-not-found"
+  | "process-timeout-before-spawn"
+  | "process-working-directory-drift"
   | "unsafe-project-root";
 
 export class CoreBoundaryError extends Error {

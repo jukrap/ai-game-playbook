@@ -1,12 +1,12 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: 1067cebfe3d6d8addef214dabe3dc75342d46805a798784c2bed7b10185a826f
+source_sha256: b70e959863695c0d953384488e3edd1911cf9a7e3565e35cd7181720bd378784
 translated_at: 2026-08-26
 ---
 
 # 보안과 권한
 
-> 상태: 계획된 정책입니다. permission broker나 runtime enforcement는 아직 없습니다.
+> 상태: 계획된 permission 정책입니다. 초기 filesystem/process enforcement는 존재하지만 permission broker, project lane, Editor 또는 bridge enforcement는 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
@@ -44,13 +44,13 @@ permission은 control plane이 평가하며 MCP annotation, skill, engine bridge
 
 ## Process와 Editor 격리
 
-각 project에는 mutation lane이 하나 있고 Editor-bound work는 그 안에서 직렬화합니다. process identity는 PID 이상이며 executable/build identity, project root, start time, session token, engine-specific context를 포함합니다. command는 결합된 process만 대상으로 하며 광범위한 process 종료를 금지합니다.
+현재 private core는 local executable과 project root를 digest로 결합하고 argument array로 직접 spawn합니다. environment value와 project-scoped working directory를 제한하고 time, idle time, combined output 상한을 적용하며 중단 시 owned process tree만 종료합니다. Windows에서는 최소한의 비민감 OS 기준값만 유지하고 명시적으로 allowlist하지 않은 inherited user/path value를 가립니다. 중단된 실행은 mutation-uncertain으로 유지하며 reconcile 전에는 안전하게 retry할 수 없습니다. 이 경계는 CPU, memory, filesystem 또는 network sandbox가 아닙니다.
 
-local bridge는 인증된 project-scoped session, 제한된 request body/queue, timeout, cancellation, normalized outer/inner error를 사용합니다. 기본으로 loopback에 bind하고 unauthenticated server를 노출하지 않습니다.
+project mutation lane과 Editor-bound 직렬화는 아직 계획 단계입니다. 계획된 local bridge는 인증된 project-scoped session, 제한된 request body/queue, timeout, cancellation, normalized outer/inner error를 사용합니다. 기본으로 loopback에 bind하고 unauthenticated server를 노출하지 않습니다.
 
 ## Filesystem과 pack 안전
 
-managed file은 hash-owned입니다. install/update operation은 content를 stage하고 digest/manifest를 검증하며 path/symlink를 검사하고 사용자 변경을 탐지한 뒤 가능하면 원자적으로 promote합니다. uninstall은 여전히 owned hash와 일치하는 file만 제거합니다. non-owned 또는 modified file은 보존하고 conflict로 보고합니다.
+현재 core는 canonical project root를 결합하고 writable path link와 portable path ambiguity를 거부하며 제한된 staged SHA-256 compare-and-swap 쓰기를 수행합니다. managed pack lifecycle은 아직 계획 단계입니다. install/update는 content를 stage하고 digest/manifest를 검증하며 사용자 변경을 탐지한 뒤 owned path만 promote할 예정입니다. uninstall은 owned hash와 계속 일치하는 file만 제거할 예정입니다.
 
 path 검사는 최종 target을 resolve하고 traversal, absolute-path injection, symlink escape를 거부합니다. engine과 system tool은 탐지하지만 자동 설치하지 않습니다.
 

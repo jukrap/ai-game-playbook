@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: f2aceaa6c0e2e7d714404bc64368b36a7dd895ba295bbbe7a3e7af72824d502a
+source_sha256: a8be9d48ac45f8c8321c42d6de68152a908372daf5a6d011359a379528973d29
 translated_at: 2026-08-26
 ---
 
 # 목표 아키텍처
 
-> 상태: 목표 아키텍처입니다. `contracts`, `registry` 기반과 초기 `core` filesystem 경계가 존재하며 나머지 runtime과 bridge 경계는 계획 단계입니다.
+> 상태: 목표 아키텍처입니다. `contracts`, `registry` 기반과 초기 `core` filesystem/process 경계가 존재하며 나머지 runtime과 bridge 경계는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -35,7 +35,7 @@ typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 | --- | --- | --- |
 | `contracts` | 기반 구현 | engine runtime dependency가 없는 versioned schema와 shared identifier |
 | `registry` | 기반 구현 | descriptor validation, generation, digest, routing, parity check |
-| `core` | 일부 구현 | canonical project identity, portable path 해석, staged filesystem compare-and-swap은 존재하며 permission, process budget, lane, checkpoint, workflow state는 계획 단계 |
+| `core` | 일부 구현 | canonical project identity, portable path 해석, staged filesystem compare-and-swap, time·idle·output·cancellation 제한이 있는 digest 결합 direct process 실행은 존재하며 permission, CPU/memory budget, lane, checkpoint, workflow state는 계획 단계 |
 | `cli` | 계획 | `agpb` argument parsing, local interaction, stable exit behavior, help |
 | `mcp` | 계획 | 동일 permission broker 뒤의 schema-derived tool과 resource |
 | `codex-adapter` | 계획 | skill, host routing metadata, project instruction integration |

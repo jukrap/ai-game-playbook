@@ -7,3 +7,12 @@ export type {
   NormalizedProcessResult,
   ProcessResultCode,
 } from "./process-result.js";
+export { normalizeTestResult } from "./test-result.js";
+export type {
+  NormalizedTestResult,
+  NormalizeTestResultRequest,
+  ParsedTestReportObservation,
+  TestReportObservation,
+  TestReportState,
+  TestResultCode,
+} from "./test-result.js";

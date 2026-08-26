@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   chmod,
+  copyFile,
   mkdir,
   mkdtemp,
   readFile,
@@ -13,9 +14,8 @@ import { join } from "node:path";
 import test from "node:test";
 
 import * as contracts from "@ai-game-playbook/contracts";
-import * as core from "@ai-game-playbook/core";
-import * as registry from "@ai-game-playbook/registry";
 import * as godot from "../dist/index.js";
+import { authorizeHostTool } from "./host-tool-approval.mjs";
 
 async function fixture(t) {
   const sandbox = await mkdtemp(join(tmpdir(), "agpb-godot-version-probe-"));
@@ -41,7 +41,29 @@ async function manifest(project) {
 
 async function prepared(t) {
   const { project } = await fixture(t);
-  const plan = await godot.prepareGodotVersionProbe({
+  const discoveryPlan = await godot.prepareGodotExecutableDiscovery({
+    runId: crypto.randomUUID(),
+    projectId: "sample.graybox",
+    request: {
+      schemaVersion: "1.0.0",
+      projectRoot: project,
+      engine: "godot",
+      sources: {
+        configuredPaths: [process.execPath],
+        pathDirectories: [],
+      },
+    },
+  });
+  const discoveryAuthorization = authorizeHostTool({
+    plan: discoveryPlan,
+    createRequest: godot.createGodotExecutableDiscoveryAuthorizationRequest,
+    maxOutputBytes: godot.GODOT_EXECUTABLE_DISCOVERY_MAX_OUTPUT_BYTES,
+  });
+  const discovery = await godot.runGodotExecutableDiscovery({
+    plan: discoveryPlan,
+    authorization: discoveryAuthorization.decision,
+  });
+  const plan = await godot.prepareGodotVersionProbeFromDiscovery({
     runId: crypto.randomUUID(),
     projectId: "sample.graybox",
     request: {
@@ -49,40 +71,19 @@ async function prepared(t) {
       projectRoot: project,
       engine: "godot",
     },
-    executablePath: process.execPath,
+    discovery,
+    candidateIdentityDigest: discovery.candidates[0].identityDigest,
   });
   return { project, plan };
 }
 
-function brokerFor(plan) {
-  return core.createPermissionBroker({
-    registry: registry.BUILTIN_REGISTRY,
-    project: {
-      id: plan.project.id,
-      identityDigest: plan.project.identityDigest,
-      stage: "vertical-slice",
-      budgets: {
-        maxChangedFiles: 0,
-        maxChangedBytes: 0,
-        maxDurationMs: 10_000,
-        maxOutputBytes: contracts.GODOT_VERSION_PROBE_MAX_OUTPUT_BYTES,
-        maxRepairCycles: 0,
-      },
-    },
-    trustedApprovalKeys: [],
-    now: () => Date.now(),
-  });
-}
-
 function authorize(plan) {
-  const now = Date.now();
-  const request = godot.createGodotVersionProbeAuthorizationRequest({
+  const authorization = authorizeHostTool({
     plan,
-    deadlineAt: new Date(now + 9_000).toISOString(),
+    createRequest: godot.createGodotVersionProbeAuthorizationRequest,
+    maxOutputBytes: contracts.GODOT_VERSION_PROBE_MAX_OUTPUT_BYTES,
   });
-  const decision = brokerFor(plan).authorize(request, []);
-  assert.equal(decision.status, "authorized");
-  return { decision, request };
+  return { decision: authorization.decision, request: authorization.request };
 }
 
 function expectGodotError(code, uncertain = false) {
@@ -95,6 +96,7 @@ function expectGodotError(code, uncertain = false) {
 test("version probe preparation binds static project and executable identities without paths", async (t) => {
   const { project, plan } = await prepared(t);
 
+  assert.equal("prepareGodotVersionProbe" in godot, false);
   assert.equal(plan.disposition, "ready");
   assert.equal(plan.commandId, "engine.version-probe");
   assert.equal(plan.project.identityDigest, plan.project.rootIdentityDigest);
@@ -117,18 +119,23 @@ test("version probe preparation binds static project and executable identities w
   );
 });
 
-test("version probe authority is automatic but exact to one internal process command", async (t) => {
+test("version probe authority requires one exact host-tool approval", async (t) => {
   const { plan } = await prepared(t);
   const { decision, request } = authorize(plan);
 
   assert.equal(request.commandId, "engine.version-probe");
   assert.deepEqual(request.scope.paths, ["project.godot"]);
+  assert.deepEqual(request.scope.objectIds, [
+    plan.executable.digest,
+    plan.executable.identityDigest,
+  ].sort());
   assert.deepEqual(decision.challenge.permissions, [
+    { permission: "host-tool-inspection", mode: "approval-required" },
     { permission: "read-project", mode: "automatic" },
   ]);
   assert.equal(decision.challenge.inputDigest, contracts.digestCanonicalJson(plan.input));
   assert.equal(decision.challenge.project.identityDigest, plan.project.identityDigest);
-  assert.equal(decision.lease.grantIds.length, 0);
+  assert.deepEqual(decision.lease.grantIds, ["approval.host-tool-inspection"]);
 
   await assert.rejects(
     godot.runGodotVersionProbe({
@@ -225,9 +232,31 @@ test("pre-dispatch cancellation settles authority without starting the executabl
 test("executable drift fails before process dispatch and settles authority", async (t) => {
   const { project } = await fixture(t);
   const executable = join(project, "candidate.exe");
-  await writeFile(executable, "first executable identity");
+  await copyFile(process.execPath, executable);
   await chmod(executable, 0o700);
-  const plan = await godot.prepareGodotVersionProbe({
+  const discoveryPlan = await godot.prepareGodotExecutableDiscovery({
+    runId: crypto.randomUUID(),
+    projectId: "sample.graybox",
+    request: {
+      schemaVersion: "1.0.0",
+      projectRoot: project,
+      engine: "godot",
+      sources: {
+        configuredPaths: [executable],
+        pathDirectories: [],
+      },
+    },
+  });
+  const discoveryAuthorization = authorizeHostTool({
+    plan: discoveryPlan,
+    createRequest: godot.createGodotExecutableDiscoveryAuthorizationRequest,
+    maxOutputBytes: godot.GODOT_EXECUTABLE_DISCOVERY_MAX_OUTPUT_BYTES,
+  });
+  const discovery = await godot.runGodotExecutableDiscovery({
+    plan: discoveryPlan,
+    authorization: discoveryAuthorization.decision,
+  });
+  const plan = await godot.prepareGodotVersionProbeFromDiscovery({
     runId: crypto.randomUUID(),
     projectId: "sample.graybox",
     request: {
@@ -235,7 +264,8 @@ test("executable drift fails before process dispatch and settles authority", asy
       projectRoot: project,
       engine: "godot",
     },
-    executablePath: executable,
+    discovery,
+    candidateIdentityDigest: discovery.candidates[0].identityDigest,
   });
   const { decision } = authorize(plan);
   await writeFile(executable, "second executable identity");

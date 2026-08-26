@@ -13,6 +13,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     registry.BUILTIN_REGISTRY.commands.map(({ id }) => id),
     [
       "doctor",
+      "engine.executable-discovery",
       "engine.status",
       "engine.version-probe",
       "init",
@@ -63,6 +64,56 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.equal(engineStatus.handler.export, "runGodotEngineStatus");
   assert.match(engineStatus.handler.digest, digestPattern);
 
+  const executableDiscovery = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "engine.executable-discovery",
+  );
+  assert.notEqual(executableDiscovery, undefined);
+  assert.equal(executableDiscovery.lifecycle, "internal");
+  assert.deepEqual(executableDiscovery.cli, {
+    path: ["internal", "engine", "executable-discovery"],
+    aliases: [],
+  });
+  assert.deepEqual(executableDiscovery.capabilities, [
+    "engine.executable-discovery",
+  ]);
+  assert.deepEqual(executableDiscovery.permissions, [
+    "read-project",
+    "host-tool-inspection",
+  ]);
+  assert.deepEqual(executableDiscovery.sideEffects, [
+    {
+      kind: "none",
+      scope: "godot-executable-discovery",
+      boundary: "local",
+    },
+  ]);
+  assert.equal(executableDiscovery.lane, "parallel-read");
+  assert.equal(executableDiscovery.timeoutMs, 10_000);
+  assert.deepEqual(executableDiscovery.cancellation, {
+    mode: "not-applicable",
+    graceMs: 0,
+  });
+  assert.deepEqual(executableDiscovery.retry, {
+    mode: "never",
+    maxAttempts: 1,
+  });
+  assert.equal(executableDiscovery.budgets.maxChangedFiles, 0);
+  assert.equal(executableDiscovery.budgets.maxChangedBytes, 0);
+  assert.equal(
+    executableDiscovery.input.schemaId,
+    contracts.godotExecutableDiscoveryRequestSchema.schemaId,
+  );
+  assert.equal(
+    executableDiscovery.output.schemaId,
+    contracts.godotExecutableDiscoveryReportSchema.schemaId,
+  );
+  assert.equal(
+    executableDiscovery.handler.package,
+    "@ai-game-playbook/godot-adapter",
+  );
+  assert.equal(executableDiscovery.handler.export, "runGodotExecutableDiscovery");
+  assert.match(executableDiscovery.handler.digest, digestPattern);
+
   const versionProbe = registry.BUILTIN_REGISTRY.commands.find(
     ({ id }) => id === "engine.version-probe",
   );
@@ -73,7 +124,10 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     aliases: [],
   });
   assert.deepEqual(versionProbe.capabilities, ["engine.version-probe"]);
-  assert.deepEqual(versionProbe.permissions, ["read-project"]);
+  assert.deepEqual(versionProbe.permissions, [
+    "read-project",
+    "host-tool-inspection",
+  ]);
   assert.deepEqual(versionProbe.sideEffects, [
     { kind: "process", scope: "godot-version-probe", boundary: "local" },
   ]);

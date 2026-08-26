@@ -21,6 +21,7 @@ export type EffectBoundary = "local" | "network" | "external";
 
 export type PermissionClass =
   | "read-project"
+  | "host-tool-inspection"
   | "write-project-metadata"
   | "write-project-source"
   | "editor-control"
@@ -138,6 +139,7 @@ export const EFFECT_BOUNDARIES: readonly EffectBoundary[] = Object.freeze([
 
 export const PERMISSION_CLASSES: readonly PermissionClass[] = Object.freeze([
   "read-project",
+  "host-tool-inspection",
   "write-project-metadata",
   "write-project-source",
   "editor-control",

@@ -7,6 +7,8 @@ import {
   engineStatusRequestSchema,
   GODOT_VERSION_PROBE_MAX_OUTPUT_BYTES,
   gameProjectProfileSchema,
+  godotExecutableDiscoveryReportSchema,
+  godotExecutableDiscoveryRequestSchema,
   godotVersionProbeReportSchema,
   godotVersionProbeRequestSchema,
   initReportSchema,
@@ -187,7 +189,63 @@ const engineStatusCommand: CommandDescriptor = Object.freeze({
     package: "@ai-game-playbook/godot-adapter",
     export: "runGodotEngineStatus",
     digest: parseSha256Digest(
-      "sha256:196803e948c170e1e86a8b50642e22277755118dcdc860894ea661273fa11500",
+      "sha256:308742c6fa837ebb6c2343c38a82997f59faacffdf97ba2ec2d0e38d70f95622",
+    ),
+  }),
+});
+
+const engineExecutableDiscoveryCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("engine.executable-discovery"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary: "Discover bounded Godot executable identities without execution.",
+  cli: Object.freeze({
+    path: Object.freeze(["internal", "engine", "executable-discovery"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: godotExecutableDiscoveryRequestSchema.schemaId,
+    digest: godotExecutableDiscoveryRequestSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: godotExecutableDiscoveryReportSchema.schemaId,
+    digest: godotExecutableDiscoveryReportSchema.digest,
+  }),
+  capabilities: Object.freeze([
+    parseStableId("engine.executable-discovery"),
+  ]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>([
+    "read-project",
+    "host-tool-inspection",
+  ]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "none",
+      scope: "godot-executable-discovery",
+      boundary: "local",
+    }),
+  ]),
+  lane: "parallel-read",
+  timeoutMs: 10_000,
+  cancellation: Object.freeze({ mode: "not-applicable", graceMs: 0 }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: 10_000,
+    maxOutputBytes: 1_048_576,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([
+    parseStableId("godot-executable-discovery"),
+  ]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/godot-adapter",
+    export: "runGodotExecutableDiscovery",
+    digest: parseSha256Digest(
+      "sha256:c03c64fca514ed9273344cca53296fadd7e327b5901281b66f472dd9f95bfcdc",
     ),
   }),
 });
@@ -212,7 +270,10 @@ const engineVersionProbeCommand: CommandDescriptor = Object.freeze({
   }),
   capabilities: Object.freeze([parseStableId("engine.version-probe")]),
   supportedStages: supportedStages(),
-  permissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  permissions: Object.freeze<PermissionClass[]>([
+    "read-project",
+    "host-tool-inspection",
+  ]),
   sideEffects: Object.freeze([
     Object.freeze({
       kind: "process",
@@ -236,7 +297,7 @@ const engineVersionProbeCommand: CommandDescriptor = Object.freeze({
     package: "@ai-game-playbook/godot-adapter",
     export: "runGodotVersionProbe",
     digest: parseSha256Digest(
-      "sha256:78dca1711999053ba63098dedbd67fe26d688511ac4696d627123dc14108ddeb",
+      "sha256:222107de2ed1fde70ee56e0c4b007f7c5788cb3a46340855e1dbfd5e9ec63b0f",
     ),
   }),
 });
@@ -434,6 +495,8 @@ const definition: RegistryDefinition = Object.freeze({
     doctorReportSchema,
     engineStatusRequestSchema,
     engineStatusReportSchema,
+    godotExecutableDiscoveryRequestSchema,
+    godotExecutableDiscoveryReportSchema,
     godotVersionProbeRequestSchema,
     godotVersionProbeReportSchema,
     gameProjectProfileSchema,
@@ -449,6 +512,7 @@ const definition: RegistryDefinition = Object.freeze({
   ]),
   commands: Object.freeze([
     doctorCommand,
+    engineExecutableDiscoveryCommand,
     engineStatusCommand,
     engineVersionProbeCommand,
     initCommand,

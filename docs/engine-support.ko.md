@@ -1,6 +1,6 @@
 ---
 source: docs/engine-support.md
-source_sha256: 7f29bf51fcf724ae61510758d79386895edfbddc911f472c684a77cd80830bf2
+source_sha256: 85f8e4b1ad6fe990015a742a08692bd2a7f2dbf654ed0e19a08142e5ba772f06
 translated_at: 2026-08-27
 ---
 
@@ -33,7 +33,7 @@ translated_at: 2026-08-27
 
 Source-built `agpb engine status --engine godot` command는 support grade가 아니라 control-plane observation입니다. Static Godot project candidate 하나를 검증하고 major/minor hint를 pin된 `4.7.2` target과 비교합니다. Executable path를 받지 않고 host-tool discovery/version probe나 process start를 수행하지 않으며 matrix의 모든 cell을 `planned`로 유지합니다.
 
-Internal-only 후속 component는 explicit executable candidate 하나와 static status digest 하나를 same-process plan에 결합하고 project-scoped broker authority를 얻은 뒤 bounded process runner를 통해 `--version`만 호출할 수 있습니다. Dispatch 전 identity drift를 거부하고 실행 뒤 identity를 다시 확인하며 authorization을 정산하고 raw path/output 없이 normalized process와 output digest를 출력합니다. Filesystem/network isolation은 명시적으로 `not-enforced`로 유지합니다. 이 component에는 automated local witness가 있지만 실제 Godot binary의 retained execution이 없고 CLI/MCP에 노출되지 않으므로 matrix를 변경하지 않습니다.
+Internal-only 후속 흐름은 discovery와 execution을 분리합니다. Project-only 준비는 host candidate를 읽지 않고 bounded explicit source count와 source digest를 bind합니다. Discovery가 exact configured file 또는 선택한 PATH directory의 고정 direct name을 읽기 전에 signed single-use `host-tool-inspection` grant가 필요합니다. Discovery는 nonrecursive이고 process를 시작하지 않으며 source path나 execution authority를 반환하지 않고 원본 same-process report 뒤에만 candidate를 보존합니다. Version 준비는 선택한 retained candidate 하나만 받고 bounded runner가 `--version`만 호출하기 전에 content/filesystem-identity digest에 결합된 두 번째 signed grant를 요구합니다. Probe는 dispatch 전 drift를 거부하고 실행 뒤 identity를 다시 확인하며 authorization을 정산하고 raw path/output 없이 normalized process와 output digest를 출력합니다. Filesystem/network isolation은 명시적으로 `not-enforced`로 유지합니다. 이 component들에는 automated local witness가 있지만 실제 Godot binary의 retained execution이 없고 CLI/MCP에 노출되지 않으므로 matrix를 변경하지 않습니다.
 
 ## Godot 방향
 

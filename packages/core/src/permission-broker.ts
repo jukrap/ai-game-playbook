@@ -88,6 +88,10 @@ const FILESYSTEM_MUTATION_PERMISSIONS = new Set<PermissionClass>([
 const OBJECT_MUTATION_PERMISSIONS = new Set<PermissionClass>([
   "destructive",
 ]);
+const OBJECT_SCOPE_PERMISSIONS = new Set<PermissionClass>([
+  "host-tool-inspection",
+  "destructive",
+]);
 const REMOTE_SCOPE_PERMISSIONS = new Set<PermissionClass>([
   "network",
   "external-transmission",
@@ -894,13 +898,23 @@ function validatePermissionScope(
     );
   }
   if (
-    scope.objectIds.length > 0 &&
-    !hasPermissionFrom(OBJECT_MUTATION_PERMISSIONS)
+    permissions.includes("host-tool-inspection") &&
+    scope.objectIds.length === 0
   ) {
     throw boundaryError(
       "permission-scope-invalid",
       "$request.scope.objectIds",
-      "editor object effects remain closed unless exact destructive targets are approved",
+      "host-tool inspection requires at least one exact source or executable identity",
+    );
+  }
+  if (
+    scope.objectIds.length > 0 &&
+    !hasPermissionFrom(OBJECT_SCOPE_PERMISSIONS)
+  ) {
+    throw boundaryError(
+      "permission-scope-invalid",
+      "$request.scope.objectIds",
+      "object scope requires exact host-tool inspection or destructive authority",
     );
   }
   if (

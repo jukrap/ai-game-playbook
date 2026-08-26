@@ -1,18 +1,18 @@
 ---
 source: docs/status-and-scope.md
-source_sha256: fab6350b32011b95779368fd405b28d50599fd87f812a0e5aac52ae1a516cb69
+source_sha256: e254cdab91a669e54bc3a887940aab5d42dc0c736d1b9f561986e4eaa37aa2a5
 translated_at: 2026-08-27
 ---
 
 # 현재 상태와 범위
 
-> 상태: 2026-08-27에 검토한 Stage 2 control-plane 구현 단계입니다. Source-built write-free command 여섯 개, static Godot status adapter, internal permission-bound Godot version probe, explicit read-only STDIO MCP runtime이 존재하며 Codex setup은 plan-only이고 live-engine 지원은 planned입니다.
+> 상태: 2026-08-27에 검토한 Stage 2 control-plane 구현 단계입니다. Source-built write-free command 여섯 개, static Godot status adapter, internal permission-bound Godot executable discovery와 version probe, explicit read-only STDIO MCP runtime이 존재하며 Codex setup은 plan-only이고 live-engine 지원은 planned입니다.
 
 [English](status-and-scope.md) · [문서](README.ko.md)
 
 ## 현재 저장소 상태
 
-저장소에는 private pnpm/TypeScript workspace, versioned schema, semantic validator, typed registry validation/generation, deterministic workflow-plan attestation, implemented command용 runtime registry, digest 결합 공개 surface, test, Windows/Linux CI, 초기 core package, private evidence package, managed-pack/skill runtime, internal exact-version process 경계가 있는 static Godot status adapter, experimental CLI package, experimental MCP package, plan-only Codex adapter package가 있습니다.
+저장소에는 private pnpm/TypeScript workspace, versioned schema, semantic validator, typed registry validation/generation, deterministic workflow-plan attestation, implemented command용 runtime registry, digest 결합 공개 surface, test, Windows/Linux CI, 초기 core package, private evidence package, managed-pack/skill runtime, internal permission-bound executable discovery와 exact-version process 경계가 있는 static Godot status adapter, experimental CLI package, experimental MCP package, plan-only Codex adapter package가 있습니다.
 
 구현된 core 경계는 다음을 포함합니다.
 
@@ -28,7 +28,8 @@ translated_at: 2026-08-27
 - canonical filename check, latest-record 존재, same-process load witness, 고정 entry/head/byte limit을 포함한 bounded whole-directory receipt-head query;
 - complete project-local artifact snapshot을 receipt가 증명하는 manifest와 함께 immutable SHA-256 object로 승격하는 private promotion;
 - raw process output을 복사하지 않고 bounded process와 structured test-report observation을 fail-closed로 정규화하는 경계;
-- same-process plan identity, exact project/executable digest, automatic project-read authority, 고정 process-tree/time/idle/output limit, 실행 후 identity check, effect settlement, raw path/output 없는 result field, 명시적 `not-enforced` filesystem/network isolation을 가진 internal Godot `--version` executor;
+- project-only preparation, exact bounded source selection, signed single-use `host-tool-inspection` 승인, recursion/process launch 없음, scan 후 identity check, effect settlement, source-path 없는 result field를 가진 internal Godot executable-discovery 경계;
+- 원본 same-process discovery candidate만 받고 exact executable digest에 결합된 두 번째 signed single-use 승인을 요구하며 고정 process-tree/time/idle/output limit, 실행 후 identity check, effect settlement, raw path/output 없는 result field, 명시적 `not-enforced` filesystem/network isolation을 가진 internal Godot `--version` executor;
 - raw content를 출력하지 않으면서 보존된 UTF-8, canonical JSON 또는 non-interlaced PNG artifact 하나와 선택적 current-registry `AssetProvenance` 일치를 fail-closed로 평가하는 경계;
 - exact project binding, host-disclosure acknowledgement, schema validation, bounded message, canonical result를 포함해 explicit generated read-only tool subset을 modern STDIO로 등록하는 경계;
 - filesystem mutation 없이 machine-specific local-only Codex project MCP configuration 하나와 registry-derived project-inspection skill target 하나를 deterministic하게 계획하고 검사하는 경계.
@@ -45,7 +46,7 @@ Installable/published package, 지원되는 MCP/Codex setup command, configurati
 
 Mutating initialization, pack command, `skill install`, MCP/Codex configuration apply, project-skill materialization, `engine capabilities`, `engine connect`, engine-backed operation, workflow execution, verification, evidence command, documentation command integration은 planned입니다. Private library function은 public command가 아니며 runtime registry도 이러한 planned operation을 노출하지 않습니다.
 
-Project-state bootstrap, artifact promotion, receipt persistence와 bounded head query, component result normalization, retained-artifact assessment, pack mutation, recovery inspection, recovery finalization, explicit executable-candidate binding, permission-bound Godot exact-version process는 private API입니다. 현재 `init`은 layout intent와 conflict를 보고할 수 있지만 profile, policy, ignore, runtime-state byte를 만들 수 없습니다. 현재 doctor는 unsafe state를 식별할 수 있지만 initialize, repair, clear, recovery classify, finalize할 수 없습니다. Project inspection과 public Godot status는 Git 실행, process 열거, Editor liveness/session identity 확립, stage evidence content 검증, engine 연결, engine support grade 승격을 수행하지 않습니다. 공개 status request는 host executable path를 선택할 수 없습니다. Private version executor는 executable discovery, headless project validation, Editor connection, runtime verification이 아니며 실제 Godot binary를 목격하지 않았습니다. Workflow runtime은 general dispatch와 연결되지 않았습니다. Durable receipt JSON, bounded head summary, bounded content-addressed artifact byte, pure process/test outcome normalization, 제한된 Godot version-output parsing, 제한된 UTF-8/canonical-JSON/non-interlaced-PNG 및 provenance assessment는 존재합니다. Head summary는 canonical head data와 latest-record 존재만 증명하며 full-chain validity에는 원본 same-process query witness와 상세 load가 필요합니다. 더 넓은 engine process/report parsing, 더 넓은 format/decode QA, assessment persistence, runtime-frame provenance, retention, historical migration, evidence command, export는 없습니다.
+Project-state bootstrap, artifact promotion, receipt persistence와 bounded head query, component result normalization, retained-artifact assessment, pack mutation, recovery inspection, recovery finalization, permission-bound executable discovery, permission-bound Godot exact-version process는 private API입니다. 현재 `init`은 layout intent와 conflict를 보고할 수 있지만 profile, policy, ignore, runtime-state byte를 만들 수 없습니다. 현재 doctor는 unsafe state를 식별할 수 있지만 initialize, repair, clear, recovery classify, finalize할 수 없습니다. Project inspection과 public Godot status는 Git 실행, process 열거, Editor liveness/session identity 확립, stage evidence content 검증, engine 연결, engine support grade 승격을 수행하지 않습니다. 공개 status request는 host executable path를 선택할 수 없습니다. Private discovery는 승인한 exact source만 검사하고 recursive search나 process launch를 수행하지 않으며 source path나 execution authority를 반환하지 않습니다. Private version executor는 그 원본 same-process selected report만 받고 별도 process authority를 요구하며 headless project validation, Editor connection, runtime verification이 아닙니다. 실제 Godot binary를 목격하지 않았습니다. Workflow runtime은 general dispatch와 연결되지 않았습니다. Durable receipt JSON, bounded head summary, bounded content-addressed artifact byte, pure process/test outcome normalization, 제한된 Godot version-output parsing, 제한된 UTF-8/canonical-JSON/non-interlaced-PNG 및 provenance assessment는 존재합니다. Head summary는 canonical head data와 latest-record 존재만 증명하며 full-chain validity에는 원본 same-process query witness와 상세 load가 필요합니다. 더 넓은 engine process/report parsing, 더 넓은 format/decode QA, assessment persistence, runtime-frame provenance, retention, historical migration, evidence command, export는 없습니다.
 
 Godot, Unity, Unreal live-engine support grade는 모두 `planned`입니다. `init`, `doctor`, `project inspect`, `skill list`, `skill check`, static `engine status` availability는 control-plane command 상태이며 engine execution evidence가 아닙니다.
 

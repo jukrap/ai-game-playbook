@@ -1,5 +1,4 @@
 import {
-  ENGINE_STATUS_MAX_EXECUTABLE_BYTES,
   GODOT_VERSION_PROBE_MAX_OUTPUT_BYTES,
   GODOT_VERSION_PROBE_TARGET_RELEASE_STATUS,
   GODOT_VERSION_PROBE_TARGET_VERSION,
@@ -10,10 +9,12 @@ import {
   engineStatusRequestSchema,
   godotVersionProbeReportSchema,
   godotVersionProbeRequestSchema,
+  isSha256Digest,
   parseStableId,
   type EngineStatusReport,
   type EngineStatusRequest,
   type ExecutionBudgets,
+  type GodotExecutableDiscoveryReport,
   type GodotVersionProbeCommandInput,
   type GodotVersionProbeDigestInput,
   type GodotVersionProbeReport,
@@ -25,7 +26,6 @@ import {
   assertAuthorizedPermissionDecision,
   assertProcessExecutableIdentity,
   assertProjectRootIdentity,
-  bindProcessExecutable,
   canonicalizeProjectRoot,
   runBoundedProcess,
   type AuthorizedPermissionDecision,
@@ -41,7 +41,8 @@ import {
 } from "@ai-game-playbook/registry";
 
 import { GodotAdapterBoundaryError } from "./errors.js";
-import { runGodotEngineStatus } from "./status.js";
+import { selectedGodotDiscoveryExecutable } from "./executable-discovery.js";
+import { runGodotEngineStatusWithExecutable } from "./status.js";
 import {
   classifyGodotVersionProbeResult,
   type GodotVersionProbeResult,
@@ -54,11 +55,12 @@ export const GODOT_VERSION_PROBE_IDLE_TIMEOUT_MS: number = 2_000;
 export const GODOT_VERSION_PROBE_TERMINATION_GRACE_MS: number = 1_000;
 export const GODOT_VERSION_PROBE_COMMAND_TIMEOUT_MS: number = 10_000;
 
-export interface PrepareGodotVersionProbeRequest {
+export interface PrepareGodotVersionProbeFromDiscoveryRequest {
   readonly runId: string;
   readonly projectId: StableId;
   readonly request: EngineStatusRequest;
-  readonly executablePath: string;
+  readonly discovery: GodotExecutableDiscoveryReport;
+  readonly candidateIdentityDigest: Sha256Digest;
 }
 
 export interface PreparedGodotVersionProbe {
@@ -97,6 +99,12 @@ interface PreparedGodotVersionProbeInternals {
   readonly root: CanonicalProjectRoot;
   readonly executable: BoundProcessExecutable;
   readonly statusRequest: EngineStatusRequest;
+}
+
+interface ValidatedPreparationIdentity {
+  readonly runId: string;
+  readonly projectId: StableId;
+  readonly request: EngineStatusRequest;
 }
 
 type DataRecord = Record<string, unknown>;
@@ -180,20 +188,9 @@ function canonicalTimestamp(value: unknown, code: string): string {
   return value;
 }
 
-function validatePreparationRequest(
-  value: unknown,
-): Readonly<PrepareGodotVersionProbeRequest> {
-  const record = dataRecord(
-    value,
-    "godot-version-preparation-invalid",
-    "Godot version probe preparation contains invalid authority.",
-  );
-  exactKeys(
-    record,
-    ["executablePath", "projectId", "request", "runId"],
-    "godot-version-preparation-invalid",
-    "Godot version probe preparation contains undeclared fields.",
-  );
+function validatePreparationIdentity(
+  record: DataRecord,
+): ValidatedPreparationIdentity {
   if (typeof record["runId"] !== "string" || !uuidPattern.test(record["runId"])) {
     fail(
       "godot-version-preparation-invalid",
@@ -214,17 +211,44 @@ function validatePreparationRequest(
     schemaReference(engineStatusRequestSchema),
     record["request"],
   ) as unknown as EngineStatusRequest;
-  if (typeof record["executablePath"] !== "string") {
-    fail(
-      "godot-version-preparation-invalid",
-      "Godot version probe requires one explicit executable candidate.",
-    );
-  }
   return Object.freeze({
     runId: record["runId"] as string,
     projectId,
     request,
-    executablePath: record["executablePath"] as string,
+  });
+}
+
+function validateDiscoveryPreparationRequest(
+  value: unknown,
+): Readonly<PrepareGodotVersionProbeFromDiscoveryRequest> {
+  const record = dataRecord(
+    value,
+    "godot-version-preparation-invalid",
+    "Godot discovery preparation contains invalid authority.",
+  );
+  exactKeys(
+    record,
+    [
+      "candidateIdentityDigest",
+      "discovery",
+      "projectId",
+      "request",
+      "runId",
+    ],
+    "godot-version-preparation-invalid",
+    "Godot discovery preparation contains undeclared fields.",
+  );
+  const identity = validatePreparationIdentity(record);
+  if (!isSha256Digest(record["candidateIdentityDigest"])) {
+    fail(
+      "godot-version-preparation-invalid",
+      "Godot discovery preparation requires one candidate identity digest.",
+    );
+  }
+  return Object.freeze({
+    ...identity,
+    discovery: record["discovery"] as GodotExecutableDiscoveryReport,
+    candidateIdentityDigest: record["candidateIdentityDigest"],
   });
 }
 
@@ -276,23 +300,17 @@ function planBody(
   return Object.freeze(value);
 }
 
-export async function prepareGodotVersionProbe(
-  value: unknown,
+async function prepareGodotVersionProbeWithExecutable(
+  request: ValidatedPreparationIdentity,
+  executable: BoundProcessExecutable,
+  firstStatus: EngineStatusReport,
 ): Promise<PreparedGodotVersionProbe> {
-  const request = validatePreparationRequest(value);
-  const firstStatus = await runGodotEngineStatus(request.request, {
-    executablePath: request.executablePath,
-  });
   assertReadyStatus(firstStatus);
   const root = await canonicalizeProjectRoot(request.request.projectRoot);
-  const executable = await bindProcessExecutable({
-    path: request.executablePath,
-    maxBytes: ENGINE_STATUS_MAX_EXECUTABLE_BYTES,
-    allowedEnvironmentKeys: Object.freeze([]),
-  });
-  const secondStatus = await runGodotEngineStatus(request.request, {
-    executablePath: executable.canonicalPath,
-  });
+  const secondStatus = await runGodotEngineStatusWithExecutable(
+    request.request,
+    executable,
+  );
   assertReadyStatus(secondStatus);
   if (
     !sameStatus(firstStatus, secondStatus) ||
@@ -367,6 +385,34 @@ export async function prepareGodotVersionProbe(
   return plan;
 }
 
+export async function prepareGodotVersionProbeFromDiscovery(
+  value: unknown,
+): Promise<PreparedGodotVersionProbe> {
+  const request = validateDiscoveryPreparationRequest(value);
+  const executable = await selectedGodotDiscoveryExecutable(
+    request.discovery,
+    request.candidateIdentityDigest,
+  );
+  const firstStatus = await runGodotEngineStatusWithExecutable(
+    request.request,
+    executable,
+  );
+  if (
+    !request.discovery.project.ready ||
+    request.discovery.project.canonicalPath !== firstStatus.project.canonicalPath ||
+    request.discovery.project.rootIdentityDigest !==
+      firstStatus.project.rootIdentityDigest ||
+    request.discovery.project.inspectionDigest !==
+      firstStatus.project.inspectionDigest
+  ) {
+    fail(
+      "godot-discovery-project-drift",
+      "Godot discovery project identity no longer matches version probe preparation.",
+    );
+  }
+  return prepareGodotVersionProbeWithExecutable(request, executable, firstStatus);
+}
+
 function internalsForPlan(
   plan: PreparedGodotVersionProbe,
 ): PreparedGodotVersionProbeInternals {
@@ -421,7 +467,9 @@ export function createGodotVersionProbeAuthorizationRequest(
     input: plan.input,
     scope: Object.freeze({
       paths: Object.freeze(["project.godot"]),
-      objectIds: Object.freeze([]),
+      objectIds: Object.freeze(
+        [plan.executable.digest, plan.executable.identityDigest].sort(),
+      ),
       destinations: Object.freeze([]),
       dataClasses: Object.freeze([]),
       changeKinds: Object.freeze([]),
@@ -473,8 +521,9 @@ function validateAuthorization(
     command === undefined ||
     command.lifecycle !== "internal" ||
     command.lane !== "parallel-read" ||
-    command.permissions.length !== 1 ||
+    command.permissions.length !== 2 ||
     command.permissions[0] !== "read-project" ||
+    command.permissions[1] !== "host-tool-inspection" ||
     command.sideEffects.length !== 1 ||
     command.sideEffects[0]?.kind !== "process" ||
     command.sideEffects[0]?.scope !== "godot-version-probe" ||
@@ -504,9 +553,11 @@ function validateAuthorization(
     challenge.command.version !== command.version ||
     challenge.command.handlerDigest !== command.handler.digest ||
     challenge.inputDigest !== digestCanonicalJson(plan.input) ||
-    challenge.permissions.length !== 1 ||
-    challenge.permissions[0]?.permission !== "read-project" ||
-    challenge.permissions[0]?.mode !== "automatic" ||
+    challenge.permissions.length !== 2 ||
+    challenge.permissions[0]?.permission !== "host-tool-inspection" ||
+    challenge.permissions[0]?.mode !== "approval-required" ||
+    challenge.permissions[1]?.permission !== "read-project" ||
+    challenge.permissions[1]?.mode !== "automatic" ||
     challenge.feature !== undefined ||
     challenge.workflow !== undefined ||
     challenge.editorSessionIdentityDigest !== undefined ||
@@ -515,7 +566,7 @@ function validateAuthorization(
     authorization.lease.commandId !== command.id ||
     authorization.lease.projectId !== plan.project.id ||
     authorization.lease.requestDigest !== challenge.requestDigest ||
-    authorization.lease.grantIds.length !== 0
+    authorization.lease.grantIds.length !== 1
   ) {
     fail(
       "godot-version-authorization-invalid",
@@ -566,9 +617,10 @@ async function assertPlanStable(
 ): Promise<void> {
   await assertProjectRootIdentity(internals.root);
   await assertProcessExecutableIdentity(internals.executable);
-  const status = await runGodotEngineStatus(internals.statusRequest, {
-    executablePath: internals.executable.canonicalPath,
-  });
+  const status = await runGodotEngineStatusWithExecutable(
+    internals.statusRequest,
+    internals.executable,
+  );
   assertReadyStatus(status);
   if (
     status.statusDigest !== plan.statusDigest ||
@@ -819,9 +871,10 @@ export async function runGodotVersionProbe(
   try {
     await assertProjectRootIdentity(request.internals.root);
     await assertProcessExecutableIdentity(request.internals.executable);
-    const postStatus = await runGodotEngineStatus(request.internals.statusRequest, {
-      executablePath: request.internals.executable.canonicalPath,
-    });
+    const postStatus = await runGodotEngineStatusWithExecutable(
+      request.internals.statusRequest,
+      request.internals.executable,
+    );
     assertReadyStatus(postStatus);
     if (
       postStatus.statusDigest !== request.plan.statusDigest ||

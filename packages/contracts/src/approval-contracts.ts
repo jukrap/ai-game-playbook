@@ -299,6 +299,25 @@ export const approvalGrantSchema: VersionedContractSchema =
         {
           if: {
             type: "object",
+            properties: { permission: { const: "host-tool-inspection" } },
+            required: ["permission"],
+          },
+          then: {
+            type: "object",
+            properties: {
+              scope: {
+                type: "object",
+                properties: {
+                  objectIds: { type: "array", minItems: 1 },
+                },
+                required: ["objectIds"],
+              },
+            },
+          },
+        },
+        {
+          if: {
+            type: "object",
             properties: {
               permission: {
                 enum: ["network", "external-transmission", "paid-call"],

@@ -54,6 +54,10 @@ import {
   engineStatusRequestSchema,
 } from "./engine-status-contracts.js";
 import {
+  godotExecutableDiscoveryReportSchema,
+  godotExecutableDiscoveryRequestSchema,
+} from "./godot-executable-discovery-contracts.js";
+import {
   godotVersionProbeReportSchema,
   godotVersionProbeRequestSchema,
 } from "./godot-version-probe-contracts.js";
@@ -87,6 +91,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "doctor-request": doctorRequestSchema,
     "engine-status-report": engineStatusReportSchema,
     "engine-status-request": engineStatusRequestSchema,
+    "godot-executable-discovery-report": godotExecutableDiscoveryReportSchema,
+    "godot-executable-discovery-request": godotExecutableDiscoveryRequestSchema,
     "godot-version-probe-report": godotVersionProbeReportSchema,
     "godot-version-probe-request": godotVersionProbeRequestSchema,
     "init-report": initReportSchema,

@@ -91,6 +91,31 @@ export type {
   EngineStatusVersionPrecision,
 } from "./engine-status-contracts.js";
 export {
+  GODOT_EXECUTABLE_DISCOVERY_MAX_CANDIDATES,
+  GODOT_EXECUTABLE_DISCOVERY_MAX_CONFIGURED_PATHS,
+  GODOT_EXECUTABLE_DISCOVERY_MAX_CONSIDERED_PATHS,
+  GODOT_EXECUTABLE_DISCOVERY_MAX_PATH_DIRECTORIES,
+  assertGodotExecutableDiscoveryReportSemantics,
+  assertGodotExecutableDiscoveryRequestSemantics,
+  computeGodotExecutableDiscoveryDigest,
+  computeGodotExecutableDiscoveryStatus,
+  godotExecutableDiscoveryReportSchema,
+  godotExecutableDiscoveryRequestSchema,
+} from "./godot-executable-discovery-contracts.js";
+export type {
+  GodotExecutableDiscoveryAuthorization,
+  GodotExecutableDiscoveryCandidate,
+  GodotExecutableDiscoveryCandidateSource,
+  GodotExecutableDiscoveryDigestInput,
+  GodotExecutableDiscoveryIssue,
+  GodotExecutableDiscoveryIssueSeverity,
+  GodotExecutableDiscoveryProject,
+  GodotExecutableDiscoveryReport,
+  GodotExecutableDiscoveryRequest,
+  GodotExecutableDiscoverySourceSummary,
+  GodotExecutableDiscoveryStatus,
+} from "./godot-executable-discovery-contracts.js";
+export {
   GODOT_VERSION_PROCESS_CODES,
   GODOT_VERSION_PROBE_CODES,
   GODOT_VERSION_PROBE_MAX_OUTPUT_BYTES,

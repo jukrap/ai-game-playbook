@@ -1,6 +1,6 @@
 # Security and Permissions
 
-> Status: planned permission policy with implemented private admission, workflow checkpoints, durable receipt and artifact records, bounded private receipt-head queries, managed-pack transactions, six write-free CLI commands including static Godot status, a read-only STDIO MCP boundary, and write-free skill-target and Codex configuration planning. General mutation dispatch and engine enforcement do not exist.
+> Status: planned permission policy with implemented private admission, workflow checkpoints, durable receipt and artifact records, bounded private receipt-head queries, managed-pack transactions, six write-free CLI commands including static Godot status, private permission-bound Godot executable discovery and version probing, a read-only STDIO MCP boundary, and write-free skill-target and Codex configuration planning. General mutation dispatch and engine enforcement do not exist.
 
 [한국어](security-and-permissions.ko.md) · [Documentation](README.md)
 
@@ -8,7 +8,7 @@
 
 The current private broker accepts only a registry validated in the same process. It validates command input against the registered schema and binds authorization to project, command and handler, registry, feature, workflow step, optional editor session, normalized scope, budgets, deadline, and run identity. Sensitive authority uses one-permission Ed25519 grants, exact scope, expiration, and single-use reservation.
 
-Authorization is not execution. The broker is not connected to a general mutation dispatcher, process workflow, or engine bridge. The current MCP runtime exposes only commands whose generated metadata and registered descriptors prove they are read-only, closed-world, and non-mutating; it has no elevated permission path to the broker. The narrow pack executor and stable-state recovery finalizer require their own same-process plan, exact `install` decision, and attested project-write lease. Grant reservations and active leases are memory-only and do not survive restart.
+Authorization is not execution. The broker is not connected to a general mutation dispatcher or engine bridge. Two private Godot operations consume exact broker decisions directly: executable discovery settles a signed single-use host-tool inspection lease without starting a process, and version probing settles a separate lease around one bounded process. The current MCP runtime exposes only commands whose generated metadata and registered descriptors prove they are read-only, closed-world, and non-mutating; it has no elevated permission path to the broker. The narrow pack executor and stable-state recovery finalizer require their own same-process plan, exact `install` decision, and attested project-write lease. Grant reservations and active leases are memory-only and do not survive restart.
 
 The current CLI dispatches plan-only `init`; read-only `doctor`, static `project inspect`, `skill list`, and `skill check`; and static read-only `engine status --engine godot`. All six descriptors declare `read-project`, no side effect, a `parallel-read` lane, and zero changed-file and changed-byte budgets. None can request elevated authority, call repair, materialize a skill, or enter a mutation lane.
 
@@ -18,7 +18,9 @@ The shared skill runtime and Codex setup planner accept no caller-selected scrip
 
 Static project inspection binds one local root, limits directory observations and file bytes, rejects unsafe links and case ambiguity, and rechecks identities around reads. A `.git` marker never grants permission to execute Git, and an Editor lock never grants process, session, liveness, connection, or mutation authority. The report explicitly records no mutation, process launch, or network access. Invalid profiles and ambiguous engine candidates block later authority instead of selecting a likely target.
 
-Static Godot status inherits that exact project boundary. Its public request accepts only the selected project and the literal `godot` engine identity. It cannot carry an executable path, search host tools, read a file outside the bound project, launch a process, control an Editor, or promote support. Explicit executable-candidate identity remains a private adapter option until a separately scoped local-tool permission contract exists.
+Static Godot status inherits that exact project boundary. Its public request accepts only the selected project and the literal `godot` engine identity. It cannot carry an executable path, search host tools, read a file outside the bound project, launch a process, control an Editor, or promote support.
+
+Private host-tool inspection uses a separate `host-tool-inspection` permission class that is never automatic. Discovery preparation performs project-only reads and binds one digest over at most eight configured paths and 32 selected PATH directories. The broker challenge exposes that digest as an exact object scope and requires one signed single-use grant. Only then may discovery inspect configured candidates and the fixed direct names `godot`/`godot4` or `godot.exe`/`godot4.exe`; it never recursively scans, reads ambient PATH state, launches a process, installs software, accesses the network, or returns source paths. The resulting report grants no execution authority and is usable only in the creating process. Version preparation accepts only a candidate retained behind that original report, and dispatch requires another signed single-use grant scoped to the selected content and filesystem-identity digests. Project and executable identities are checked before and after each boundary, and every active lease is settled on success or failure.
 
 The private artifact promotion and receipt stores accept only the current same-process validated registry and a receipt bound to the exact project, runtime, command descriptor, handler, workflow plan, and optional feature contract. They require pre-existing ignored local directories, stable project-local source snapshots, digest-addressed create-only objects, canonical producer manifests, canonical receipt JSON, compare-and-swap heads, explicit diagnostic redaction markers, and bounded text and artifacts. Complete artifact objects and manifests are reopened twice during verification. These stores do not grant execution authority, repair corruption, retry a mutation, perform format QA, remove unreachable objects, or export data.
 
@@ -31,6 +33,7 @@ A separate private artifact assessor inherits no additional authority. It snapsh
 | Action | Default |
 | --- | --- |
 | Read selected project files and inspect local state | Allowed within bounded paths |
+| Inspect exact host-tool candidates outside the project | Separate signed single-use approval every time |
 | Change source inside an approved feature contract | Allowed only within declared path, change, and budget scope |
 | Control an editor | One approval per project and editor session |
 | Run approved tests and builds | Allowed within configured time, output, and resource budgets |

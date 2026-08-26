@@ -1,5 +1,4 @@
 import {
-  ENGINE_STATUS_MAX_EXECUTABLE_BYTES,
   assertEngineStatusReportSemantics,
   compareCanonicalText,
   computeEngineStatusDigest,
@@ -20,9 +19,7 @@ import {
   type SemanticVersion,
 } from "@ai-game-playbook/contracts";
 import {
-  CoreBoundaryError,
   assertProcessExecutableIdentity,
-  bindProcessExecutable,
   type BoundProcessExecutable,
 } from "@ai-game-playbook/core";
 import { runProjectInspect } from "@ai-game-playbook/project-runtime";
@@ -30,16 +27,12 @@ import {
   BUILTIN_REGISTRY,
   validateRegisteredContractValue,
 } from "@ai-game-playbook/registry";
-import { basename, isAbsolute } from "node:path";
+import { basename } from "node:path";
 
 import { GodotAdapterBoundaryError } from "./errors.js";
 
 export const GODOT_STATUS_TARGET_VERSION: SemanticVersion =
   parseSemanticVersion("4.7.2").value;
-
-export interface GodotEngineStatusOptions {
-  readonly executablePath?: string;
-}
 
 interface IssueCollector {
   readonly add: (
@@ -258,62 +251,14 @@ function compatibilityFor(
 }
 
 function sourceWithoutCandidate(
-  executablePath: string | undefined,
+  executableProvided: boolean,
   status: "invalid" | "not-found" | "not-inspected" | "not-provided",
 ): EngineStatusExecutableObservation {
   return Object.freeze({
     status,
-    source: executablePath === undefined ? "none" : "explicit",
+    source: executableProvided ? "explicit" : "none",
     versionProbePerformed: false,
   });
-}
-
-function validateOptions(input: unknown): Readonly<GodotEngineStatusOptions> {
-  if (input === undefined) return Object.freeze({});
-  const prototype =
-    typeof input === "object" && input !== null
-      ? Object.getPrototypeOf(input)
-      : undefined;
-  if (
-    typeof input !== "object" ||
-    input === null ||
-    Array.isArray(input) ||
-    (prototype !== Object.prototype && prototype !== null)
-  ) {
-    throw new GodotAdapterBoundaryError(
-      "godot-status-options-invalid",
-      "Godot status options are outside the private adapter contract.",
-    );
-  }
-  const keys = Reflect.ownKeys(input);
-  if (keys.length === 0) return Object.freeze({});
-  const descriptor = Object.getOwnPropertyDescriptor(input, "executablePath");
-  if (
-    keys.length !== 1 ||
-    keys[0] !== "executablePath" ||
-    descriptor === undefined ||
-    !("value" in descriptor) ||
-    descriptor.enumerable !== true
-  ) {
-    throw new GodotAdapterBoundaryError(
-      "godot-status-options-invalid",
-      "Godot status options require one own executable-path data property.",
-    );
-  }
-  const executablePath = descriptor.value;
-  if (
-    typeof executablePath !== "string" ||
-    executablePath.length === 0 ||
-    executablePath.length > 32_767 ||
-    /[\u0000-\u001f\u007f]/u.test(executablePath) ||
-    !isAbsolute(executablePath)
-  ) {
-    throw new GodotAdapterBoundaryError(
-      "godot-status-options-invalid",
-      "Godot status requires one bounded absolute executable candidate path.",
-    );
-  }
-  return Object.freeze({ executablePath });
 }
 
 function operatingSystem(): OperatingSystem {
@@ -371,17 +316,15 @@ function validateReport(report: EngineStatusReport): EngineStatusReport {
   return validated;
 }
 
-export async function runGodotEngineStatus(
+async function runGodotEngineStatusInternal(
   input: unknown,
-  privateOptions?: GodotEngineStatusOptions,
+  executableCandidateAuthority?: BoundProcessExecutable,
 ): Promise<EngineStatusReport> {
   const request = validateRegisteredContractValue(
     BUILTIN_REGISTRY,
     schemaReference(engineStatusRequestSchema),
     input,
   ) as unknown as EngineStatusRequest;
-  const options = validateOptions(privateOptions);
-
   const issues = createIssueCollector();
   const firstInspection = await runProjectInspect({
     schemaVersion: "1.0.0",
@@ -390,8 +333,10 @@ export async function runGodotEngineStatus(
   let project = mapProjectInspection(firstInspection, issues);
   let compatibility = compatibilityFor(project, issues);
   let executable: EngineStatusExecutableObservation = sourceWithoutCandidate(
-    options.executablePath,
-    options.executablePath === undefined ? "not-provided" : "not-inspected",
+    executableCandidateAuthority !== undefined,
+    executableCandidateAuthority === undefined
+      ? "not-provided"
+      : "not-inspected",
   );
 
   const projectCanBind =
@@ -399,41 +344,32 @@ export async function runGodotEngineStatus(
     compatibility.status !== "major-minor-mismatch";
   if (!projectCanBind) {
     executable = sourceWithoutCandidate(
-      options.executablePath,
-      options.executablePath === undefined ? "not-provided" : "not-inspected",
+      executableCandidateAuthority !== undefined,
+      executableCandidateAuthority === undefined
+        ? "not-provided"
+        : "not-inspected",
     );
-  } else if (options.executablePath === undefined) {
+  } else if (executableCandidateAuthority === undefined) {
     issues.add(
       "attention",
       "godot-executable-not-provided",
       "No explicit Godot executable candidate was provided.",
-      "Pass one trusted absolute executable path to bind its static identity.",
+      "Run approved executable discovery before selecting a static identity.",
     );
-    executable = sourceWithoutCandidate(undefined, "not-provided");
+    executable = sourceWithoutCandidate(false, "not-provided");
   } else {
-    let bound: BoundProcessExecutable | undefined;
+    let bound: BoundProcessExecutable | undefined = executableCandidateAuthority;
     try {
-      bound = await bindProcessExecutable({
-        path: options.executablePath,
-        maxBytes: ENGINE_STATUS_MAX_EXECUTABLE_BYTES,
-        allowedEnvironmentKeys: Object.freeze([]),
-      });
-    } catch (error) {
-      const missing =
-        error instanceof CoreBoundaryError &&
-        error.code === "process-executable-not-found";
+      await assertProcessExecutableIdentity(bound);
+    } catch {
       issues.add(
         "blocked",
-        missing ? "godot-executable-not-found" : "godot-executable-invalid",
-        missing
-          ? "The explicit executable candidate does not exist."
-          : "The explicit executable candidate could not be bound safely.",
-        "Choose one existing local regular executable without links or identity conflicts.",
+        "godot-executable-invalid",
+        "The approved executable identity could not be revalidated safely.",
+        "Run approved executable discovery again and select a stable candidate identity.",
       );
-      executable = sourceWithoutCandidate(
-        options.executablePath,
-        missing ? "not-found" : "invalid",
-      );
+      executable = sourceWithoutCandidate(true, "invalid");
+      bound = undefined;
     }
 
     if (bound !== undefined) {
@@ -454,7 +390,7 @@ export async function runGodotEngineStatus(
         issues.add(
           "blocked",
           "godot-project-identity-drift",
-          "Project identity changed while the executable candidate was being bound.",
+          "Project identity changed while the approved executable was being revalidated.",
           "Stabilize the project and rerun engine status without reusing this observation.",
         );
         project = blockedProject(secondInspection ?? firstInspection);
@@ -469,7 +405,7 @@ export async function runGodotEngineStatus(
           "Executable candidate identity changed before status settlement.",
           "Select a stable executable file and rerun engine status.",
         );
-        executable = sourceWithoutCandidate(options.executablePath, "invalid");
+        executable = sourceWithoutCandidate(true, "invalid");
       }
     }
   }
@@ -505,4 +441,29 @@ export async function runGodotEngineStatus(
       editorControlPerformed: false,
     }),
   );
+}
+
+export async function runGodotEngineStatus(
+  input: unknown,
+): Promise<EngineStatusReport> {
+  if (arguments.length !== 1) {
+    throw new GodotAdapterBoundaryError(
+      "godot-status-options-invalid",
+      "Registered Godot status cannot accept host executable authority.",
+    );
+  }
+  return runGodotEngineStatusInternal(input);
+}
+
+export async function runGodotEngineStatusWithExecutable(
+  input: unknown,
+  executable: BoundProcessExecutable,
+): Promise<EngineStatusReport> {
+  if (arguments.length !== 2) {
+    throw new GodotAdapterBoundaryError(
+      "godot-status-options-invalid",
+      "Internal Godot status requires one bound executable authority.",
+    );
+  }
+  return runGodotEngineStatusInternal(input, executable);
 }

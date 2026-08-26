@@ -6,7 +6,7 @@
 
 ## Current checkpoint
 
-Completed foundations include versioned contracts, strict registry validation, generated surfaces, deterministic workflow plans, canonical project/path handling, compare-and-swap filesystem operations, bounded processes, project mutation leases, signed scoped permission admission, workflow checkpoints, durable private receipt records, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions with recovery boundaries, a project-bound read-only STDIO MCP runtime, one registry-derived project-inspection skill artifact with a shared read-only runtime, and write-free Codex project-configuration and skill-target planning.
+Completed foundations include versioned contracts, strict registry validation, generated surfaces, deterministic workflow plans, canonical project/path handling, compare-and-swap filesystem operations, bounded processes, project mutation leases, signed scoped permission admission including explicit host-tool inspection, workflow checkpoints, durable private receipt records, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions with recovery boundaries, a project-bound read-only STDIO MCP runtime, one registry-derived project-inspection skill artifact with a shared read-only runtime, and write-free Codex project-configuration and skill-target planning.
 
 The current Stage 2 product slice adds:
 
@@ -18,6 +18,8 @@ The current Stage 2 product slice adds:
 - static read-only `agpb project inspect` for bounded engine markers, canonical profile compatibility, marker-only dirty state, and unbound Editor signals;
 - read-only `agpb skill list` and `agpb skill check` for a bounded registry catalog and missing/current/conflicting/oversized/unsafe project-target observations without materialization;
 - static read-only `agpb engine status --engine godot` for one complete Godot project candidate, `4.7.2` major/minor compatibility, explicit evidence gaps, and no host executable path or process launch;
+- private Godot executable discovery with project-only preparation, bounded exact sources, signed single-use approval, no recursive search or process launch, identity rechecks, settled authority, and no source-path result fields;
+- private Godot exact-version probing that accepts only an original same-process discovery candidate, requires a second exact approval, runs one bounded `--version` process, and retains explicit isolation gaps without promoting support;
 - canonical append-only run-receipt persistence with exact runtime and registry authority, compare-and-swap heads, redaction checks, and complete project-local artifact-locator verification;
 - private whole-directory receipt-head query with fixed entry/head/byte limits, explicit summary validation level, and same-process detailed-load witnesses;
 - private promotion of complete artifact snapshots into immutable SHA-256 objects with receipt-attested canonical manifests;
@@ -44,13 +46,13 @@ No command may be marked available merely because a private library function exi
 
 ## Stage 3 — evidence, MCP, and Codex integration
 
-The process/test normalization, limited artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, one registry-derived project-inspection skill artifact, public read-only skill list/check and static Godot status commands, and plan-only Codex project-configuration and skill-target foundations are implemented. Engine process/version/report parsers, required-test selection, gameplay/capture/performance/build normalizers, broader artifact formats, runtime-frame provenance, assessment persistence, and runtime-to-receipt integration remain planned. Other planned work includes filtered and persistent evidence indexing, receipt-history migration and forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export commands, approved Codex configuration and skill materialization, and an approved mutating skill lifecycle.
+The process/test normalization, limited artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, one registry-derived project-inspection skill artifact, public read-only skill list/check and static Godot status commands, private Godot executable discovery and exact-version probing, and plan-only Codex project-configuration and skill-target foundations are implemented. Broader engine process/report parsers, required-test selection, gameplay/capture/performance/build normalizers, broader artifact formats, runtime-frame provenance, assessment persistence, and runtime-to-receipt integration remain planned. Other planned work includes filtered and persistent evidence indexing, receipt-history migration and forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export commands, approved Codex configuration and skill materialization, and an approved mutating skill lifecycle.
 
 CLI, MCP, documentation, and skill routing must preserve identical command IDs, schema digests, permissions, and handler identities. MCP annotations remain hints and can never override the permission broker. No background upload or telemetry path is planned.
 
 ## Stage 4 — Godot alpha
 
-Godot has the first static status adapter and is the first planned live engine adapter. The common 3D graybox must prove movement, camera behavior, collision, a collectible, HUD count, save/load across process restart, failure/restart handling, win state, actual runtime frames, Windows export, and exported-player startup.
+Godot has the first static status adapter and private executable identity/version boundary and remains the first planned live engine adapter. The next engine checkpoint is a permission-bound headless preflight with retained receipts; it must not promote support until an actual Godot executable is witnessed. The common 3D graybox must then prove movement, camera behavior, collision, a collectible, HUD count, save/load across process restart, failure/restart handling, win state, actual runtime frames, Windows export, and exported-player startup.
 
 `0.1.0-alpha` is allowed only after the required Godot capabilities reach `verified`, pack lifecycle and recovery are stable, clean external installation passes, and licensing and release authority are resolved. Unity and Unreal remain planned at that point.
 

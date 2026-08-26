@@ -77,7 +77,27 @@ function brokerRegistry({
     export: "installPackContent",
     digest: `sha256:${"8".repeat(64)}`,
   };
-  definition.commands.push(network, install);
+  const hostInspection = structuredClone(
+    definition.commands.find(({ id }) => id === "project.inspect"),
+  );
+  hostInspection.id = "engine.host-tool-inspect";
+  hostInspection.version = "1.0.0";
+  hostInspection.summary = "Inspect exact local host-tool identities.";
+  hostInspection.cli = {
+    path: ["internal", "engine", "host-tool-inspect"],
+    aliases: [],
+  };
+  hostInspection.capabilities = ["engine.host-tool-inspect"];
+  hostInspection.permissions = ["read-project", "host-tool-inspection"];
+  hostInspection.sideEffects = [
+    { kind: "none", scope: "exact-host-tools", boundary: "local" },
+  ];
+  hostInspection.handler = {
+    package: "@ai-game-playbook/core",
+    export: "inspectHostTools",
+    digest: `sha256:${"7".repeat(64)}`,
+  };
+  definition.commands.push(network, install, hostInspection);
   const verifyStep = definition.workflows[0].steps.find(
     ({ id }) => id === "step.verify",
   );
@@ -189,6 +209,38 @@ test("permission broker auto-authorizes bounded reads from a validated registry"
   assert.deepEqual(decision.lease.grantIds, []);
   assert.equal(Object.isFrozen(decision.challenge), true);
   assert.equal(Object.isFrozen(decision.challenge.scope), true);
+});
+
+test("host-tool inspection requires one exact object-scoped approval", () => {
+  assert.equal(contracts.PERMISSION_CLASSES.includes("host-tool-inspection"), true);
+  const broker = createBroker();
+  const hostRequest = request("engine.host-tool-inspect", {
+    scope: scope({ objectIds: [`sha256:${"1".repeat(64)}`] }),
+  });
+  const pending = broker.authorize(hostRequest, []);
+
+  assert.equal(pending.status, "approval-required");
+  assert.deepEqual(pending.missingPermissions, ["host-tool-inspection"]);
+  assert.deepEqual(pending.challenge.permissions, [
+    { permission: "host-tool-inspection", mode: "approval-required" },
+    { permission: "read-project", mode: "automatic" },
+  ]);
+
+  const grant = signedGrant(pending.challenge, "host-tool-inspection");
+  const authorized = broker.authorize(hostRequest, [grant]);
+  assert.equal(authorized.status, "authorized");
+  assert.deepEqual(authorized.lease.grantIds, [grant.grantId]);
+
+  assert.throws(
+    () =>
+      createBroker().authorize(
+        request("engine.host-tool-inspect", {
+          scope: scope({ objectIds: [] }),
+        }),
+        [],
+      ),
+    expectCoreError("permission-scope-invalid"),
+  );
 });
 
 test("source and test authority require a current feature and registered workflow", () => {

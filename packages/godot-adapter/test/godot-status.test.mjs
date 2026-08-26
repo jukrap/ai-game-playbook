@@ -56,58 +56,14 @@ test("Godot status preserves a detected project and missing executable without w
   assert.doesNotThrow(() => contracts.assertEngineStatusReportSemantics(report));
 });
 
-test("explicit executable bytes are bound as an unverified candidate only", async (t) => {
-  const { project } = await fixture(t);
-  const report = await godot.runGodotEngineStatus(
-    request(project),
-    { executablePath: process.execPath },
-  );
-
-  assert.equal(report.status, "ready");
-  assert.equal(report.project.status, "detected");
-  assert.equal(report.executable.status, "candidate");
-  assert.equal(report.executable.source, "explicit");
-  assert.equal(report.executable.versionProbePerformed, false);
-  assert.equal(report.executable.candidate.bytes > 0, true);
-  assert.match(report.executable.candidate.digest, /^sha256:[0-9a-f]{64}$/u);
-  assert.equal(report.support.grade, "planned");
-  assert.equal(report.externalProcessStarted, false);
-  assert.equal(JSON.stringify(report).includes(process.execPath), false);
-});
-
-test("missing and non-file executable candidates fail closed without path reflection", async (t) => {
-  const { sandbox, project } = await fixture(t);
-  const missing = join(sandbox, "missing.exe");
-
-  const absent = await godot.runGodotEngineStatus(request(project), {
-    executablePath: missing,
-  });
-  assert.equal(absent.status, "blocked");
-  assert.equal(absent.executable.status, "not-found");
-  assert.equal(JSON.stringify(absent).includes(missing), false);
-
-  const directory = join(sandbox, "candidate-directory");
-  await mkdir(directory);
-  const invalid = await godot.runGodotEngineStatus(request(project), {
-    executablePath: directory,
-  });
-  assert.equal(invalid.status, "blocked");
-  assert.equal(invalid.executable.status, "invalid");
-  assert.equal(JSON.stringify(invalid).includes(directory), false);
-});
-
-test("project mismatch blocks executable binding and support promotion", async (t) => {
+test("project mismatch blocks support promotion before host inspection", async (t) => {
   const { project } = await fixture(t, "4.8");
-
-  const report = await godot.runGodotEngineStatus(
-    request(project),
-    { executablePath: process.execPath },
-  );
+  const report = await godot.runGodotEngineStatus(request(project));
 
   assert.equal(report.status, "blocked");
   assert.equal(report.project.status, "detected");
   assert.equal(report.compatibility.status, "major-minor-mismatch");
-  assert.equal(report.executable.status, "not-inspected");
+  assert.equal(report.executable.status, "not-provided");
   assert.equal(report.support.grade, "planned");
   assert.equal(report.externalProcessStarted, false);
 });
@@ -141,11 +97,15 @@ test("the registered handler input cannot select a host executable path", async 
   );
 });
 
-test("private executable options snapshot only an own data property", async (t) => {
+test("registered status rejects every unapproved host executable option", async (t) => {
   const { project } = await fixture(t);
 
-  const empty = await godot.runGodotEngineStatus(request(project), {});
-  assert.equal(empty.executable.status, "not-provided");
+  await assert.rejects(
+    godot.runGodotEngineStatus(request(project), {}),
+    (error) =>
+      error?.name === "GodotAdapterBoundaryError" &&
+      error?.code === "godot-status-options-invalid",
+  );
 
   const inherited = Object.create({ executablePath: process.execPath });
   await assert.rejects(() =>

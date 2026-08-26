@@ -1,6 +1,7 @@
 import {
   digestCanonicalJson,
   isSha256Digest,
+  sha256Digest,
   type ComponentOutcome,
 } from "@ai-game-playbook/contracts";
 import {
@@ -188,6 +189,15 @@ function validateOutput(value: unknown): { readonly truncated: boolean } {
   ) {
     invalid("$process.output", "process output observation is malformed or unbounded");
   }
+  if (
+    sha256Digest(output["stdout"]) !== output["stdoutDigest"] ||
+    sha256Digest(output["stderr"]) !== output["stderrDigest"]
+  ) {
+    invalid(
+      "$process.output",
+      "process output digests do not attest the captured text",
+    );
+  }
   const stdoutObservedBytes = nonnegativeInteger(
     output["stdoutObservedBytes"],
     "$process.output.stdoutObservedBytes",
@@ -204,8 +214,12 @@ function validateOutput(value: unknown): { readonly truncated: boolean } {
     output["observedBytes"],
     "$process.output.observedBytes",
   );
+  const capturedTextBytes =
+    Buffer.byteLength(output["stdout"], "utf8") +
+    Buffer.byteLength(output["stderr"], "utf8");
   if (
     capturedBytes > PROCESS_MAX_OUTPUT_BYTES ||
+    capturedBytes !== capturedTextBytes ||
     stdoutObservedBytes + stderrObservedBytes !== observedBytes ||
     capturedBytes > observedBytes ||
     (!output["truncated"] && capturedBytes !== observedBytes)

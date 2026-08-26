@@ -134,6 +134,20 @@ test("process normalization rejects contradictory or open observations", () => {
         stdoutDigest: "sha256:not-a-digest",
       },
     },
+    {
+      ...processResult(),
+      output: {
+        ...processResult().output,
+        stdoutDigest: "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      },
+    },
+    {
+      ...processResult(),
+      output: {
+        ...processResult().output,
+        stdout: "changed after capture",
+      },
+    },
   ];
 
   for (const value of invalid) {

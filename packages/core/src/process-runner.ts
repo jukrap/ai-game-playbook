@@ -31,6 +31,7 @@ export const PROCESS_MAX_ENVIRONMENT_BYTES: number = 64 * 1024;
 export const PROCESS_MAX_OUTPUT_BYTES: number = 64 * 1024 * 1024;
 export const PROCESS_MAX_DURATION_MS: number = 7 * 24 * 60 * 60 * 1000;
 export const PROCESS_MAX_TERMINATION_GRACE_MS: number = 30_000;
+const PROCESS_WINDOWS_TERMINATION_CONFIRMATION_MS: number = 5_000;
 
 export type ProcessStopReason =
   | "cancelled"
@@ -632,16 +633,15 @@ async function runTaskkill(pid: number, timeoutMs: number): Promise<boolean> {
 
 async function terminateWindowsProcessTree(
   pid: number,
-  graceMs: number,
   closePromise: Promise<CloseObservation>,
 ): Promise<TerminationObservation> {
   const killed = await runTaskkill(
     pid,
-    Math.max(1_000, Math.min(5_000, graceMs || 1_000)),
+    PROCESS_WINDOWS_TERMINATION_CONFIRMATION_MS,
   );
   const close = await waitForClose(
     closePromise,
-    Math.max(1_000, Math.min(5_000, graceMs || 1_000)),
+    PROCESS_WINDOWS_TERMINATION_CONFIRMATION_MS,
   );
   return {
     escalated: true,
@@ -656,7 +656,7 @@ async function terminateProcessTree(
   closePromise: Promise<CloseObservation>,
 ): Promise<TerminationObservation> {
   return process.platform === "win32"
-    ? terminateWindowsProcessTree(pid, graceMs, closePromise)
+    ? terminateWindowsProcessTree(pid, closePromise)
     : terminatePosixProcessTree(pid, graceMs, closePromise);
 }
 

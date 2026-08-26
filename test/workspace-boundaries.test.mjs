@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
@@ -180,4 +180,31 @@ test("package-local compiler paths are not inherited from the root config", asyn
   assert.equal(projectRuntime.compilerOptions.rootDir, "src");
   assert.equal(godotAdapter.compilerOptions.rootDir, "src");
   assert.equal(cli.compilerOptions.rootDir, "src");
+});
+
+test("package compiler references cover every local workspace dependency", async () => {
+  const entries = await readdir(new URL("../packages/", import.meta.url), {
+    withFileTypes: true,
+  });
+  for (const entry of entries.filter((candidate) => candidate.isDirectory())) {
+    const packageJson = await readJson(
+      new URL(`../packages/${entry.name}/package.json`, import.meta.url),
+    );
+    const tsconfig = await readJson(
+      new URL(`../packages/${entry.name}/tsconfig.json`, import.meta.url),
+    );
+    const expected = Object.keys(packageJson.dependencies ?? {})
+      .filter((name) => name.startsWith("@ai-game-playbook/"))
+      .map((name) => `../${name.slice("@ai-game-playbook/".length)}`)
+      .sort();
+    const actual = (tsconfig.references ?? [])
+      .map(({ path }) => path)
+      .sort();
+
+    assert.deepEqual(
+      actual,
+      expected,
+      `${entry.name} compiler references must match local dependencies`,
+    );
+  }
 });

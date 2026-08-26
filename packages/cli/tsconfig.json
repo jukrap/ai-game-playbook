@@ -9,6 +9,7 @@
     { "path": "../contracts" },
     { "path": "../registry" },
     { "path": "../core" },
+    { "path": "../godot-adapter" },
     { "path": "../pack-runtime" },
     { "path": "../project-runtime" },
     { "path": "../skill-runtime" }

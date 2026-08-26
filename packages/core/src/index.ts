@@ -24,6 +24,7 @@ export type {
 export {
   createProjectDirectoryCas,
   deleteProjectDirectoryCas,
+  finalizeDetachedProjectDirectoryCasRemoval,
   readProjectDirectoryIdentity,
   stageProjectDirectoryCasCreate,
   stageProjectDirectoryCasDelete,

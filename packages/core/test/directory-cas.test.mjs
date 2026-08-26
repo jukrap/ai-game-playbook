@@ -397,6 +397,89 @@ test("staged directory removal finalizes only an exact empty tombstone", async (
   await assert.rejects(staged.restore(), expectCoreError("cas-state-invalid"));
 });
 
+test("detached directory removal can be finalized after the staging capability is lost", async (t) => {
+  assert.equal(
+    typeof core.finalizeDetachedProjectDirectoryCasRemoval,
+    "function",
+  );
+  const { project, root } = await fixture(t);
+  const created = await core.createProjectDirectoryCas({
+    root,
+    path: "Packs/managed",
+  });
+  const tombstonePath =
+    "Packs/.agpb-cas-dir-77777777777777777777777777777777.deleted";
+  const staged = await core.stageProjectDirectoryCasRemoval({
+    root,
+    path: "Packs/managed",
+    expectedIdentity: created.identity,
+    tombstonePath,
+  });
+  await staged.detach();
+
+  const finalized = await core.finalizeDetachedProjectDirectoryCasRemoval({
+    root,
+    path: "Packs/managed",
+    expectedIdentity: created.identity,
+    tombstonePath,
+  });
+
+  assert.deepEqual(finalized, {
+    status: "deleted",
+    path: "Packs/managed",
+    tombstonePath,
+    identity: created.identity,
+  });
+  await assert.rejects(
+    lstat(join(project, "Packs", "managed")),
+    (error) => error?.code === "ENOENT",
+  );
+  await assert.rejects(
+    lstat(join(project, ...tombstonePath.split("/"))),
+    (error) => error?.code === "ENOENT",
+  );
+});
+
+test("restart finalization preserves a detached directory that received content", async (t) => {
+  const { project, root } = await fixture(t);
+  const created = await core.createProjectDirectoryCas({
+    root,
+    path: "Packs/managed",
+  });
+  const tombstonePath =
+    "Packs/.agpb-cas-dir-88888888888888888888888888888888.deleted";
+  const staged = await core.stageProjectDirectoryCasRemoval({
+    root,
+    path: "Packs/managed",
+    expectedIdentity: created.identity,
+    tombstonePath,
+  });
+  await staged.detach();
+  const latePath = join(
+    project,
+    ...tombstonePath.split("/"),
+    "owned",
+    "late.txt",
+  );
+  await writeFile(latePath, "keep\n", "utf8");
+
+  await assert.rejects(
+    core.finalizeDetachedProjectDirectoryCasRemoval({
+      root,
+      path: "Packs/managed",
+      expectedIdentity: created.identity,
+      tombstonePath,
+    }),
+    expectCoreError("cas-precondition-failed", false),
+  );
+
+  assert.equal(await readFile(latePath, "utf8"), "keep\n");
+  await assert.rejects(
+    lstat(join(project, "Packs", "managed")),
+    (error) => error?.code === "ENOENT",
+  );
+});
+
 test("staged directory removal preserves content and competing tombstones", async (t) => {
   const contentFixture = await fixture(t);
   const contentCreated = await core.createProjectDirectoryCas({

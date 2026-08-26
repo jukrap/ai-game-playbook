@@ -136,6 +136,7 @@ interface ValidatedDeleteRequest extends ValidatedCreateRequest {
 }
 
 interface ValidatedRemovalRequest extends ValidatedDeleteRequest {
+  readonly path: PortableProjectPath;
   readonly tombstonePath: PortableProjectPath;
   readonly detachedPath: PortableProjectPath;
 }
@@ -384,16 +385,30 @@ function createDirectoryIdentity(
       true,
     );
   }
+  return createDirectoryIdentityFromParts(
+    root,
+    target.relativePath,
+    target.parentIdentity,
+    target.targetIdentity,
+  );
+}
+
+function createDirectoryIdentityFromParts(
+  root: CanonicalProjectRoot,
+  path: PortableProjectPath,
+  parentIdentity: FilesystemIdentity,
+  targetIdentity: FilesystemIdentity,
+): ProjectDirectoryIdentity {
   return Object.freeze({
     schemaVersion: "1.0.0",
-    path: target.relativePath,
+    path,
     rootIdentityDigest: root.identityDigest,
     identityDigest: digestCanonicalJson({
       domain: "ai-game-playbook.project-directory-identity.v1",
-      path: target.relativePath,
+      path,
       rootIdentityDigest: root.identityDigest,
-      parentIdentity: target.parentIdentity,
-      targetIdentity: target.targetIdentity,
+      parentIdentity,
+      targetIdentity,
     }),
   });
 }
@@ -1433,6 +1448,71 @@ export async function stageProjectDirectoryCasRemoval(
     identity: confirmed.identity,
     tombstone,
   });
+}
+
+export async function finalizeDetachedProjectDirectoryCasRemoval(
+  value: ProjectDirectoryCasRemovalRequest,
+): Promise<ProjectDirectoryCasFinalizeResult> {
+  const request = validateRemovalRequest(value);
+  await assertProjectRootIdentity(request.root);
+  const original = await resolveRemovalDirectory(
+    request,
+    request.path,
+    "optional",
+  );
+  if (original.kind !== "absent") {
+    preconditionFailure(
+      original.relativePath,
+      "detached directory finalization requires an absent original target",
+    );
+  }
+  const tombstone = await resolveRemovalDirectory(
+    request,
+    request.tombstonePath,
+    "required",
+  );
+  const detached = await resolveRemovalDirectory(
+    request,
+    request.detachedPath,
+    "required",
+  );
+  if (
+    tombstone.targetIdentity === undefined ||
+    detached.targetIdentity === undefined ||
+    !sameIdentity(original.parentIdentity, tombstone.parentIdentity) ||
+    !sameIdentity(tombstone.targetIdentity, detached.parentIdentity)
+  ) {
+    preconditionFailure(
+      request.tombstonePath,
+      "detached directory tombstone identity is inconsistent",
+    );
+  }
+  const reconstructed = createDirectoryIdentityFromParts(
+    request.root,
+    original.relativePath,
+    original.parentIdentity,
+    detached.targetIdentity,
+  );
+  if (!identitiesMatch(request.expectedIdentity, reconstructed)) {
+    preconditionFailure(
+      original.relativePath,
+      "detached directory does not match the original ownership witness",
+    );
+  }
+  const snapshot: DetachedDirectorySnapshot = Object.freeze({
+    containerIdentity: tombstone.targetIdentity,
+    targetIdentity: detached.targetIdentity,
+  });
+  const context: DirectoryRemovalContext = {
+    request,
+    target: original,
+    parentPath: dirname(original.absolutePath),
+    parentIdentity: original.parentIdentity,
+    targetIdentity: detached.targetIdentity,
+    identity: request.expectedIdentity,
+    tombstone,
+  };
+  return finalizeRemovalTarget(context, snapshot);
 }
 
 export async function deleteProjectDirectoryCas(

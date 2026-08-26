@@ -6,7 +6,14 @@ import {
   type Sha256Digest,
 } from "@ai-game-playbook/contracts";
 import type { BigIntStats } from "node:fs";
-import { lstat, mkdir, open, opendir, rmdir } from "node:fs/promises";
+import {
+  lstat,
+  mkdir,
+  open,
+  opendir,
+  rename,
+  rmdir,
+} from "node:fs/promises";
 import { dirname } from "node:path";
 
 import type { StagedCasState } from "./cas-write.js";
@@ -66,6 +73,56 @@ export interface StagedProjectDirectoryCasDelete {
   abort(): Promise<void>;
 }
 
+export interface ProjectDirectoryCasRemovalRequest
+  extends ProjectDirectoryCasDeleteRequest {
+  readonly tombstonePath: unknown;
+}
+
+export type StagedProjectDirectoryRemovalState =
+  | "aborted"
+  | "detached"
+  | "detaching"
+  | "finalized"
+  | "finalizing"
+  | "restored"
+  | "restoring"
+  | "staged"
+  | "uncertain";
+
+export interface ProjectDirectoryCasDetachResult {
+  readonly status: "detached";
+  readonly path: PortableProjectPath;
+  readonly tombstonePath: PortableProjectPath;
+  readonly detachedPath: PortableProjectPath;
+  readonly identity: ProjectDirectoryIdentity;
+}
+
+export interface ProjectDirectoryCasRestoreResult {
+  readonly status: "restored";
+  readonly path: PortableProjectPath;
+  readonly tombstonePath: PortableProjectPath;
+  readonly identity: ProjectDirectoryIdentity;
+}
+
+export interface ProjectDirectoryCasFinalizeResult {
+  readonly status: "deleted";
+  readonly path: PortableProjectPath;
+  readonly tombstonePath: PortableProjectPath;
+  readonly identity: ProjectDirectoryIdentity;
+}
+
+export interface StagedProjectDirectoryCasRemoval {
+  readonly state: StagedProjectDirectoryRemovalState;
+  readonly path: PortableProjectPath;
+  readonly tombstonePath: PortableProjectPath;
+  readonly detachedPath: PortableProjectPath;
+  readonly expectedIdentity: ProjectDirectoryIdentity;
+  detach(): Promise<ProjectDirectoryCasDetachResult>;
+  restore(): Promise<ProjectDirectoryCasRestoreResult>;
+  finalize(): Promise<ProjectDirectoryCasFinalizeResult>;
+  abort(): Promise<void>;
+}
+
 interface ValidatedCreateRequest {
   readonly root: CanonicalProjectRoot;
   readonly path: unknown;
@@ -74,6 +131,11 @@ interface ValidatedCreateRequest {
 
 interface ValidatedDeleteRequest extends ValidatedCreateRequest {
   readonly expectedIdentity: ProjectDirectoryIdentity;
+}
+
+interface ValidatedRemovalRequest extends ValidatedDeleteRequest {
+  readonly tombstonePath: PortableProjectPath;
+  readonly detachedPath: PortableProjectPath;
 }
 
 interface DirectoryCreateContext {
@@ -90,6 +152,20 @@ interface DirectoryDeleteContext {
   readonly parentIdentity: FilesystemIdentity;
   readonly identity: ProjectDirectoryIdentity;
 }
+
+interface DirectoryRemovalContext extends DirectoryDeleteContext {
+  readonly request: ValidatedRemovalRequest;
+  readonly targetIdentity: FilesystemIdentity;
+  readonly tombstone: ResolvedProjectPath;
+}
+
+interface DetachedDirectorySnapshot {
+  readonly containerIdentity: FilesystemIdentity;
+  readonly targetIdentity: FilesystemIdentity;
+}
+
+const DIRECTORY_TOMBSTONE_NAME =
+  /^\.agpb-cas-dir-[0-9a-f]{32}\.deleted$/;
 
 function objectHasExactKeys(value: object, keys: readonly string[]): boolean {
   const actual = Object.keys(value).sort();
@@ -218,6 +294,54 @@ function validateDeleteRequest(
   });
 }
 
+function portableParent(path: PortableProjectPath): string {
+  const separator = path.lastIndexOf("/");
+  return separator === -1 ? "." : path.slice(0, separator);
+}
+
+function portableName(path: PortableProjectPath): string {
+  const separator = path.lastIndexOf("/");
+  return separator === -1 ? path : path.slice(separator + 1);
+}
+
+function validateRemovalRequest(
+  value: ProjectDirectoryCasRemovalRequest,
+): ValidatedRemovalRequest {
+  const common = validateCommonRequest(value, [
+    "root",
+    "path",
+    "expectedIdentity",
+    "tombstonePath",
+  ]);
+  const expectedIdentity = validateExpectedIdentity(value.expectedIdentity);
+  const targetPath = parsePortableProjectPath(
+    value.path,
+    "$request.path",
+  );
+  const tombstonePath = parsePortableProjectPath(
+    value.tombstonePath,
+    "$request.tombstonePath",
+  );
+  if (
+    portableParent(targetPath) !== portableParent(tombstonePath) ||
+    !DIRECTORY_TOMBSTONE_NAME.test(portableName(tombstonePath))
+  ) {
+    invalidRequest(
+      "directory removal tombstone must be a fixed-format direct sibling",
+    );
+  }
+  return Object.freeze({
+    ...common,
+    path: targetPath,
+    expectedIdentity,
+    tombstonePath,
+    detachedPath: parsePortableProjectPath(
+      `${tombstonePath}/owned`,
+      "$request.tombstonePath",
+    ),
+  });
+}
+
 function resolveOptions(
   request: ValidatedCreateRequest,
   existence: "optional" | "required",
@@ -320,6 +444,41 @@ async function assertEmptyDirectory(
     );
   } finally {
     await handle?.close();
+  }
+}
+
+async function assertDirectoryEntries(
+  target: ResolvedProjectPath,
+  expectedNames: readonly string[],
+): Promise<void> {
+  const actual: string[] = [];
+  let handle;
+  try {
+    handle = await opendir(target.absolutePath);
+    while (actual.length <= expectedNames.length) {
+      const entry = await handle.read();
+      if (entry === null) break;
+      actual.push(entry.name);
+    }
+  } catch {
+    throw new CoreBoundaryError(
+      "cas-stage-failed",
+      target.relativePath,
+      "directory entries could not be inspected",
+    );
+  } finally {
+    await handle?.close();
+  }
+  const sortedActual = actual.sort();
+  const sortedExpected = [...expectedNames].sort();
+  if (
+    sortedActual.length !== sortedExpected.length ||
+    sortedActual.some((name, index) => name !== sortedExpected[index])
+  ) {
+    preconditionFailure(
+      target.relativePath,
+      "directory entries changed outside the removal stage",
+    );
   }
 }
 
@@ -666,6 +825,592 @@ export async function stageProjectDirectoryCasDelete(
     parentPath: dirname(confirmed.target.absolutePath),
     parentIdentity: confirmed.target.parentIdentity,
     identity: confirmed.identity,
+  });
+}
+
+async function resolveRemovalDirectory(
+  request: ValidatedRemovalRequest,
+  path: PortableProjectPath,
+  existence: "optional" | "required",
+): Promise<ResolvedProjectPath> {
+  return resolveProjectPath(
+    request.root,
+    path,
+    resolveOptions(request, existence),
+  );
+}
+
+function assertResolvedIdentity(
+  target: ResolvedProjectPath,
+  expected: FilesystemIdentity,
+  message: string,
+): void {
+  if (!sameIdentity(expected, target.targetIdentity)) {
+    preconditionFailure(target.relativePath, message);
+  }
+}
+
+async function assertTombstoneAbsent(
+  context: DirectoryRemovalContext,
+): Promise<ResolvedProjectPath> {
+  const tombstone = await resolveRemovalDirectory(
+    context.request,
+    context.request.tombstonePath,
+    "optional",
+  );
+  if (
+    tombstone.kind !== "absent" ||
+    !sameIdentity(context.parentIdentity, tombstone.parentIdentity)
+  ) {
+    preconditionFailure(
+      context.request.tombstonePath,
+      "directory removal tombstone is no longer absent under the bound parent",
+    );
+  }
+  return tombstone;
+}
+
+async function assertRemovalTarget(
+  context: DirectoryRemovalContext,
+): Promise<ResolvedProjectPath> {
+  const current = await assertExpectedDirectory(context.request);
+  if (
+    !sameIdentity(context.parentIdentity, current.target.parentIdentity) ||
+    !sameIdentity(context.targetIdentity, current.target.targetIdentity)
+  ) {
+    preconditionFailure(
+      context.target.relativePath,
+      "directory removal target changed after staging",
+    );
+  }
+  await assertEmptyDirectory(current.target);
+  return current.target;
+}
+
+async function assertTombstoneContainer(
+  context: DirectoryRemovalContext,
+  snapshot: DetachedDirectorySnapshot,
+): Promise<ResolvedProjectPath> {
+  const container = await resolveRemovalDirectory(
+    context.request,
+    context.request.tombstonePath,
+    "required",
+  );
+  if (
+    !sameIdentity(context.parentIdentity, container.parentIdentity) ||
+    !sameIdentity(snapshot.containerIdentity, container.targetIdentity)
+  ) {
+    preconditionFailure(
+      context.request.tombstonePath,
+      "directory removal tombstone identity changed",
+    );
+  }
+  return container;
+}
+
+async function inspectMoveState(
+  context: DirectoryRemovalContext,
+  snapshot: DetachedDirectorySnapshot,
+): Promise<"ambiguous" | "detached" | "restored"> {
+  try {
+    await assertProjectRootIdentity(context.request.root);
+    const container = await assertTombstoneContainer(context, snapshot);
+    const original = await resolveRemovalDirectory(
+      context.request,
+      context.target.relativePath,
+      "optional",
+    );
+    const detached = await resolveRemovalDirectory(
+      context.request,
+      context.request.detachedPath,
+      "optional",
+    );
+    const originalMatches =
+      original.kind === "directory" &&
+      sameIdentity(snapshot.targetIdentity, original.targetIdentity) &&
+      sameIdentity(context.parentIdentity, original.parentIdentity);
+    const detachedMatches =
+      detached.kind === "directory" &&
+      sameIdentity(snapshot.targetIdentity, detached.targetIdentity) &&
+      sameIdentity(container.targetIdentity!, detached.parentIdentity);
+    if (original.kind === "absent" && detachedMatches) {
+      return "detached";
+    }
+    if (originalMatches && detached.kind === "absent") {
+      return "restored";
+    }
+    return "ambiguous";
+  } catch {
+    return "ambiguous";
+  }
+}
+
+async function removeEmptyTombstoneContainer(
+  context: DirectoryRemovalContext,
+  snapshot: DetachedDirectorySnapshot,
+): Promise<void> {
+  const container = await assertTombstoneContainer(context, snapshot);
+  await assertEmptyDirectory(container);
+  try {
+    await rmdir(container.absolutePath);
+  } catch {
+    throw new CoreBoundaryError(
+      "cas-cleanup-conflict",
+      context.request.tombstonePath,
+      "empty directory removal tombstone could not be cleaned",
+      true,
+    );
+  }
+  const after = await resolveRemovalDirectory(
+    context.request,
+    context.request.tombstonePath,
+    "optional",
+  );
+  if (
+    after.kind !== "absent" ||
+    !sameIdentity(context.parentIdentity, after.parentIdentity)
+  ) {
+    throw new CoreBoundaryError(
+      "cas-cleanup-conflict",
+      context.request.tombstonePath,
+      "directory removal tombstone cleanup could not be verified",
+      true,
+    );
+  }
+  await syncDirectory(context.parentPath);
+}
+
+async function createTombstoneContainer(
+  context: DirectoryRemovalContext,
+): Promise<DetachedDirectorySnapshot> {
+  const tombstone = await assertTombstoneAbsent(context);
+  try {
+    await mkdir(tombstone.absolutePath, { mode: 0o700 });
+  } catch (error) {
+    if (isFilesystemError(error, "EEXIST")) {
+      preconditionFailure(
+        context.request.tombstonePath,
+        "directory removal tombstone was claimed before detach",
+      );
+    }
+    throw new CoreBoundaryError(
+      "cas-commit-failed",
+      context.request.tombstonePath,
+      "directory removal tombstone creation outcome could not be proven",
+      true,
+    );
+  }
+  let container: ResolvedProjectPath;
+  try {
+    container = await resolveRemovalDirectory(
+      context.request,
+      context.request.tombstonePath,
+      "required",
+    );
+  } catch {
+    throw new CoreBoundaryError(
+      "cas-postcondition-failed",
+      context.request.tombstonePath,
+      "new directory removal tombstone could not be attested",
+      true,
+    );
+  }
+  if (
+    container.targetIdentity === undefined ||
+    !sameIdentity(context.parentIdentity, container.parentIdentity)
+  ) {
+    throw new CoreBoundaryError(
+      "cas-postcondition-failed",
+      context.request.tombstonePath,
+      "directory removal tombstone parent changed during creation",
+      true,
+    );
+  }
+  await assertEmptyDirectory(container);
+  return Object.freeze({
+    containerIdentity: container.targetIdentity,
+    targetIdentity: context.targetIdentity,
+  });
+}
+
+async function detachRemovalTarget(
+  context: DirectoryRemovalContext,
+): Promise<{
+  readonly result: ProjectDirectoryCasDetachResult;
+  readonly snapshot: DetachedDirectorySnapshot;
+}> {
+  await assertProjectRootIdentity(context.request.root);
+  const target = await assertRemovalTarget(context);
+  const snapshot = await createTombstoneContainer(context);
+  const container = await assertTombstoneContainer(context, snapshot);
+  await assertDirectoryEntries(container, []);
+  const detached = await resolveRemovalDirectory(
+    context.request,
+    context.request.detachedPath,
+    "optional",
+  );
+  if (
+    detached.kind !== "absent" ||
+    !sameIdentity(snapshot.containerIdentity, detached.parentIdentity)
+  ) {
+    await removeEmptyTombstoneContainer(context, snapshot);
+    preconditionFailure(
+      context.request.detachedPath,
+      "directory removal destination was claimed before detach",
+    );
+  }
+
+  let renameError: unknown;
+  try {
+    await rename(target.absolutePath, detached.absolutePath);
+  } catch (error) {
+    renameError = error;
+  }
+  const moveState = await inspectMoveState(context, snapshot);
+  if (moveState === "restored") {
+    await removeEmptyTombstoneContainer(context, snapshot);
+    throw new CoreBoundaryError(
+      "cas-commit-failed",
+      context.target.relativePath,
+      renameError === undefined
+        ? "directory detach did not reach its postcondition"
+        : "directory detach was not committed",
+    );
+  }
+  if (moveState !== "detached") {
+    throw new CoreBoundaryError(
+      "cas-postcondition-failed",
+      context.target.relativePath,
+      "directory detach outcome could not be reconciled",
+      true,
+    );
+  }
+  try {
+    await syncDirectory(context.parentPath);
+    await syncDirectory(container.absolutePath);
+    await assertDirectoryEntries(container, ["owned"]);
+  } catch {
+    throw new CoreBoundaryError(
+      "cas-postcondition-failed",
+      context.target.relativePath,
+      "detached directory could not be durably attested",
+      true,
+    );
+  }
+  return Object.freeze({
+    result: Object.freeze({
+      status: "detached",
+      path: context.target.relativePath,
+      tombstonePath: context.request.tombstonePath,
+      detachedPath: context.request.detachedPath,
+      identity: context.identity,
+    }),
+    snapshot,
+  });
+}
+
+async function restoreRemovalTarget(
+  context: DirectoryRemovalContext,
+  snapshot: DetachedDirectorySnapshot,
+): Promise<ProjectDirectoryCasRestoreResult> {
+  await assertProjectRootIdentity(context.request.root);
+  const original = await resolveRemovalDirectory(
+    context.request,
+    context.target.relativePath,
+    "optional",
+  );
+  if (
+    original.kind !== "absent" ||
+    !sameIdentity(context.parentIdentity, original.parentIdentity)
+  ) {
+    preconditionFailure(
+      context.target.relativePath,
+      "directory restore target is no longer absent",
+    );
+  }
+  const container = await assertTombstoneContainer(context, snapshot);
+  await assertDirectoryEntries(container, ["owned"]);
+  const detached = await resolveRemovalDirectory(
+    context.request,
+    context.request.detachedPath,
+    "required",
+  );
+  assertResolvedIdentity(
+    detached,
+    snapshot.targetIdentity,
+    "detached directory identity changed before restore",
+  );
+
+  let renameError: unknown;
+  try {
+    await rename(detached.absolutePath, original.absolutePath);
+  } catch (error) {
+    renameError = error;
+  }
+  const moveState = await inspectMoveState(context, snapshot);
+  if (moveState === "detached") {
+    throw new CoreBoundaryError(
+      "cas-commit-failed",
+      context.target.relativePath,
+      renameError === undefined
+        ? "directory restore did not reach its postcondition"
+        : "directory restore was not committed",
+    );
+  }
+  if (moveState !== "restored") {
+    throw new CoreBoundaryError(
+      "cas-postcondition-failed",
+      context.target.relativePath,
+      "directory restore outcome could not be reconciled",
+      true,
+    );
+  }
+  await removeEmptyTombstoneContainer(context, snapshot);
+  const restored = await resolveRemovalDirectory(
+    context.request,
+    context.target.relativePath,
+    "required",
+  );
+  const restoredIdentity = createDirectoryIdentity(context.request.root, restored);
+  if (!identitiesMatch(context.identity, restoredIdentity)) {
+    throw new CoreBoundaryError(
+      "cas-postcondition-failed",
+      context.target.relativePath,
+      "restored directory no longer matches its original identity witness",
+      true,
+    );
+  }
+  return Object.freeze({
+    status: "restored",
+    path: context.target.relativePath,
+    tombstonePath: context.request.tombstonePath,
+    identity: context.identity,
+  });
+}
+
+async function finalizeRemovalTarget(
+  context: DirectoryRemovalContext,
+  snapshot: DetachedDirectorySnapshot,
+): Promise<ProjectDirectoryCasFinalizeResult> {
+  await assertProjectRootIdentity(context.request.root);
+  const original = await resolveRemovalDirectory(
+    context.request,
+    context.target.relativePath,
+    "optional",
+  );
+  if (
+    original.kind !== "absent" ||
+    !sameIdentity(context.parentIdentity, original.parentIdentity)
+  ) {
+    preconditionFailure(
+      context.target.relativePath,
+      "directory removal target reappeared before finalization",
+    );
+  }
+  const container = await assertTombstoneContainer(context, snapshot);
+  await assertDirectoryEntries(container, ["owned"]);
+  const detached = await resolveRemovalDirectory(
+    context.request,
+    context.request.detachedPath,
+    "required",
+  );
+  assertResolvedIdentity(
+    detached,
+    snapshot.targetIdentity,
+    "detached directory identity changed before finalization",
+  );
+  await assertEmptyDirectory(detached);
+  try {
+    await rmdir(detached.absolutePath);
+  } catch (error) {
+    if (
+      isFilesystemError(error, "ENOTEMPTY") ||
+      isFilesystemError(error, "EEXIST")
+    ) {
+      preconditionFailure(
+        context.request.detachedPath,
+        "detached directory received content before finalization",
+      );
+    }
+    throw new CoreBoundaryError(
+      "cas-commit-failed",
+      context.request.detachedPath,
+      "detached directory could not be finalized",
+    );
+  }
+  try {
+    const afterDetached = await resolveRemovalDirectory(
+      context.request,
+      context.request.detachedPath,
+      "optional",
+    );
+    if (afterDetached.kind !== "absent") {
+      throw new Error("detached directory remained after removal");
+    }
+    await removeEmptyTombstoneContainer(context, snapshot);
+    const finalOriginal = await resolveRemovalDirectory(
+      context.request,
+      context.target.relativePath,
+      "optional",
+    );
+    if (finalOriginal.kind !== "absent") {
+      throw new Error("removed directory reappeared");
+    }
+  } catch {
+    throw new CoreBoundaryError(
+      "cas-cleanup-conflict",
+      context.target.relativePath,
+      "directory was deleted but tombstone cleanup could not be reconciled",
+      true,
+    );
+  }
+  return Object.freeze({
+    status: "deleted",
+    path: context.target.relativePath,
+    tombstonePath: context.request.tombstonePath,
+    identity: context.identity,
+  });
+}
+
+function createStagedRemoval(
+  context: DirectoryRemovalContext,
+): StagedProjectDirectoryCasRemoval {
+  let state: StagedProjectDirectoryRemovalState = "staged";
+  let detachedSnapshot: DetachedDirectorySnapshot | undefined;
+  const requireState = (
+    expected: StagedProjectDirectoryRemovalState,
+    operation: string,
+  ): void => {
+    if (state !== expected) {
+      throw new CoreBoundaryError(
+        "cas-state-invalid",
+        context.target.relativePath,
+        `directory removal cannot ${operation} from ${state}`,
+        state === "uncertain",
+      );
+    }
+  };
+  const detach = async (): Promise<ProjectDirectoryCasDetachResult> => {
+    requireState("staged", "detach");
+    state = "detaching";
+    try {
+      const detached = await detachRemovalTarget(context);
+      detachedSnapshot = detached.snapshot;
+      state = "detached";
+      return detached.result;
+    } catch (error) {
+      state =
+        error instanceof CoreBoundaryError && error.mutationUncertain
+          ? "uncertain"
+          : "staged";
+      throw error;
+    }
+  };
+  const restore = async (): Promise<ProjectDirectoryCasRestoreResult> => {
+    requireState("detached", "restore");
+    if (detachedSnapshot === undefined) {
+      throw new CoreBoundaryError(
+        "cas-state-invalid",
+        context.target.relativePath,
+        "directory removal lost its detached identity",
+        true,
+      );
+    }
+    state = "restoring";
+    try {
+      const result = await restoreRemovalTarget(context, detachedSnapshot);
+      state = "restored";
+      return result;
+    } catch (error) {
+      state =
+        error instanceof CoreBoundaryError && error.mutationUncertain
+          ? "uncertain"
+          : "detached";
+      throw error;
+    }
+  };
+  const finalize = async (): Promise<ProjectDirectoryCasFinalizeResult> => {
+    requireState("detached", "finalize");
+    if (detachedSnapshot === undefined) {
+      throw new CoreBoundaryError(
+        "cas-state-invalid",
+        context.target.relativePath,
+        "directory removal lost its detached identity",
+        true,
+      );
+    }
+    state = "finalizing";
+    try {
+      const result = await finalizeRemovalTarget(context, detachedSnapshot);
+      state = "finalized";
+      return result;
+    } catch (error) {
+      state =
+        error instanceof CoreBoundaryError && error.mutationUncertain
+          ? "uncertain"
+          : "detached";
+      throw error;
+    }
+  };
+  const abort = async (): Promise<void> => {
+    requireState("staged", "abort");
+    state = "aborted";
+  };
+  return Object.freeze({
+    get state(): StagedProjectDirectoryRemovalState {
+      return state;
+    },
+    path: context.target.relativePath,
+    tombstonePath: context.request.tombstonePath,
+    detachedPath: context.request.detachedPath,
+    expectedIdentity: context.identity,
+    detach,
+    restore,
+    finalize,
+    abort,
+  });
+}
+
+export async function stageProjectDirectoryCasRemoval(
+  value: ProjectDirectoryCasRemovalRequest,
+): Promise<StagedProjectDirectoryCasRemoval> {
+  const request = validateRemovalRequest(value);
+  await assertProjectRootIdentity(request.root);
+  const current = await assertExpectedDirectory(request);
+  await assertEmptyDirectory(current.target);
+  const tombstone = await resolveRemovalDirectory(
+    request,
+    request.tombstonePath,
+    "optional",
+  );
+  if (
+    tombstone.kind !== "absent" ||
+    !sameIdentity(current.target.parentIdentity, tombstone.parentIdentity)
+  ) {
+    preconditionFailure(
+      request.tombstonePath,
+      "directory removal tombstone must be absent under the target parent",
+    );
+  }
+  const confirmed = await assertExpectedDirectory(request);
+  await assertEmptyDirectory(confirmed.target);
+  if (
+    confirmed.target.targetIdentity === undefined ||
+    !sameIdentity(current.target.parentIdentity, confirmed.target.parentIdentity)
+  ) {
+    preconditionFailure(
+      confirmed.target.relativePath,
+      "directory identity changed while removal was staged",
+    );
+  }
+  return createStagedRemoval({
+    request,
+    target: confirmed.target,
+    parentPath: dirname(confirmed.target.absolutePath),
+    parentIdentity: confirmed.target.parentIdentity,
+    targetIdentity: confirmed.target.targetIdentity,
+    identity: confirmed.identity,
+    tombstone,
   });
 }
 

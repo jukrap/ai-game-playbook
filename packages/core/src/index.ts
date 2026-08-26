@@ -26,15 +26,22 @@ export {
   deleteProjectDirectoryCas,
   stageProjectDirectoryCasCreate,
   stageProjectDirectoryCasDelete,
+  stageProjectDirectoryCasRemoval,
 } from "./directory-cas.js";
 export type {
+  ProjectDirectoryCasDetachResult,
   ProjectDirectoryCasCreateRequest,
   ProjectDirectoryCasCreateResult,
   ProjectDirectoryCasDeleteRequest,
   ProjectDirectoryCasDeleteResult,
+  ProjectDirectoryCasFinalizeResult,
+  ProjectDirectoryCasRemovalRequest,
+  ProjectDirectoryCasRestoreResult,
   ProjectDirectoryIdentity,
+  StagedProjectDirectoryCasRemoval,
   StagedProjectDirectoryCasCreate,
   StagedProjectDirectoryCasDelete,
+  StagedProjectDirectoryRemovalState,
 } from "./directory-cas.js";
 export {
   assertProcessExecutableIdentity,

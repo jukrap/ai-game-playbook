@@ -238,9 +238,13 @@ export async function assertProjectRootIdentity(
       "project root was not bound by this core runtime",
     );
   }
-  let current: BigIntStats;
+  let before: BigIntStats;
+  let currentCanonicalPath: string;
+  let after: BigIntStats;
   try {
-    current = await stat(root.canonicalPath, { bigint: true });
+    before = await lstat(root.canonicalPath, { bigint: true });
+    currentCanonicalPath = await realpath(root.canonicalPath);
+    after = await lstat(root.canonicalPath, { bigint: true });
   } catch (error) {
     if (isMissing(error)) {
       throw new CoreBoundaryError(
@@ -256,9 +260,15 @@ export async function assertProjectRootIdentity(
     );
   }
   if (
-    !current.isDirectory() ||
-    current.dev.toString() !== root.device ||
-    current.ino.toString() !== root.inode
+    before.isSymbolicLink() ||
+    after.isSymbolicLink() ||
+    !before.isDirectory() ||
+    !after.isDirectory() ||
+    !samePath(currentCanonicalPath, root.canonicalPath) ||
+    before.dev !== after.dev ||
+    before.ino !== after.ino ||
+    after.dev.toString() !== root.device ||
+    after.ino.toString() !== root.inode
   ) {
     throw new CoreBoundaryError(
       "project-root-drift",

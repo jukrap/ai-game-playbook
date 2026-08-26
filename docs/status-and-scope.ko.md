@@ -1,20 +1,20 @@
 ---
 source: docs/status-and-scope.md
-source_sha256: fd235e52ad01452bf3aed7ad65046ad614488f034d48803923e2f4a4d4376ed6
+source_sha256: ec17dfa0ae05c64805b3b81f554ea32b31acb0d37dc76b633555f8fde3727ffa
 translated_at: 2026-08-26
 ---
 
 # 현재 상태와 범위
 
-> 상태: 2026-08-26에 검토한 Stage 1 control plane 기반 구현 단계입니다.
+> 상태: 2026-08-26에 검토한 Stage 2 control plane 안전 경계 구현 단계입니다.
 
 [English](status-and-scope.md) · [문서](README.ko.md)
 
 ## 현재 저장소 상태
 
-현재 저장소에는 private pnpm/TypeScript workspace, versioned contract schema, semantic validator, typed registry 검증 및 projection, digest 결합 foundation plan, test, Windows/Linux CI 설정이 있습니다.
+현재 저장소에는 private pnpm/TypeScript workspace, versioned contract schema, semantic validator, typed registry 검증 및 projection, digest 결합 foundation plan, test, Windows/Linux CI 설정, 초기 private core package가 있습니다. 구현된 core 경계는 canonical project root를 결합하고 writable link를 따라가지 않으면서 portable project path를 해석하며 directory 검사와 파일 크기를 제한합니다. 또한 precondition, drift, 결과 불확실성 보고를 갖춘 SHA-256 compare-and-swap 쓰기를 stage합니다.
 
-설치 가능한 package, `agpb` 실행 파일, MCP server runtime, Codex integration 파일, permission 또는 workflow runtime, engine bridge, engine pack, 실행 가능한 golden project는 아직 없습니다. [planned-surface.json](planned-surface.json)의 명령 목록과 생성된 [foundation plan](../generated/foundation-plan.json)은 설계 전용이며 어느 command 또는 engine capability도 `planned`보다 높이지 않습니다.
+설치 가능한 package, `agpb` 실행 파일, MCP server runtime, Codex integration 파일, permission broker, project lane, bounded process runner, workflow runtime, engine bridge, engine pack, 실행 가능한 golden project는 아직 없습니다. [planned-surface.json](planned-surface.json)의 명령 목록과 생성된 [foundation plan](../generated/foundation-plan.json)은 설계 전용이며 어느 command 또는 engine capability도 `planned`보다 높이지 않습니다.
 
 ## 대상 사용자와 첫 결과물
 

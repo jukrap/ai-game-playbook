@@ -1,14 +1,14 @@
 # Current Status and Scope
 
-> Status: Stage 1 control-plane foundation in progress, reviewed on 2026-08-26.
+> Status: Stage 2 control-plane safety boundary in progress, reviewed on 2026-08-26.
 
 [한국어](status-and-scope.ko.md) · [Documentation](README.md)
 
 ## Current repository state
 
-The repository now contains a private pnpm/TypeScript workspace, versioned contract schemas, semantic validators, typed registry validation and projections, a digest-bound foundation plan, tests, and Windows/Linux CI configuration.
+The repository now contains a private pnpm/TypeScript workspace, versioned contract schemas, semantic validators, typed registry validation and projections, a digest-bound foundation plan, tests, Windows/Linux CI configuration, and an early private core package. The implemented core boundary binds canonical project roots, resolves portable project paths without writable link traversal, bounds directory inspection and file sizes, and stages SHA-256 compare-and-swap writes with precondition, drift, and uncertain-outcome reporting.
 
-It does not yet contain an installable package, `agpb` executable, MCP server runtime, Codex integration files, permission or workflow runtime, engine bridges, engine packs, or a playable golden project. The command inventory in [planned-surface.json](planned-surface.json) and the generated [foundation plan](../generated/foundation-plan.json) remains design-only; neither raises any command or engine capability above `planned`.
+It does not yet contain an installable package, `agpb` executable, MCP server runtime, Codex integration files, permission broker, project lane, bounded process runner, workflow runtime, engine bridges, engine packs, or a playable golden project. The command inventory in [planned-surface.json](planned-surface.json) and the generated [foundation plan](../generated/foundation-plan.json) remains design-only; neither raises any command or engine capability above `planned`.
 
 ## Intended users and first outcome
 

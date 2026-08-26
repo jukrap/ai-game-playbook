@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: bca4e845dd9b8bc1283b4429406877522cad7515cebe69c9feb1cf3a0fc307f8
+source_sha256: f2aceaa6c0e2e7d714404bc64368b36a7dd895ba295bbbe7a3e7af72824d502a
 translated_at: 2026-08-26
 ---
 
 # 목표 아키텍처
 
-> 상태: 목표 아키텍처입니다. `contracts`와 `registry` 기반은 존재하며 runtime과 bridge 경계는 아직 계획 단계입니다.
+> 상태: 목표 아키텍처입니다. `contracts`, `registry` 기반과 초기 `core` filesystem 경계가 존재하며 나머지 runtime과 bridge 경계는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -35,7 +35,7 @@ typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 | --- | --- | --- |
 | `contracts` | 기반 구현 | engine runtime dependency가 없는 versioned schema와 shared identifier |
 | `registry` | 기반 구현 | descriptor validation, generation, digest, routing, parity check |
-| `core` | 계획 | project identity, permission, budget, lane, checkpoint, workflow state |
+| `core` | 일부 구현 | canonical project identity, portable path 해석, staged filesystem compare-and-swap은 존재하며 permission, process budget, lane, checkpoint, workflow state는 계획 단계 |
 | `cli` | 계획 | `agpb` argument parsing, local interaction, stable exit behavior, help |
 | `mcp` | 계획 | 동일 permission broker 뒤의 schema-derived tool과 resource |
 | `codex-adapter` | 계획 | skill, host routing metadata, project instruction integration |
@@ -45,7 +45,7 @@ typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 | Engine adapter | 계획 | 넓은 host 권한 없이 Godot, Unity, Unreal orchestration |
 | Project bridge | 계획 | 검증된 engine operation 노출에 필요한 최소 Editor/runtime code |
 
-현재 workspace package로 존재하는 경계는 `contracts`와 `registry`뿐입니다. 표에 있다는 사실만으로 runtime package나 capability가 존재한다고 주장하지 않습니다.
+현재 workspace package로 존재하는 경계는 `contracts`, `registry`, 일부 구현된 private `core`입니다. 표에 있다는 사실만으로 runtime package나 capability가 존재한다고 주장하지 않습니다.
 
 ## 실행 흐름
 

@@ -155,6 +155,30 @@ test("bound roots stop after the project directory is replaced", async (t) => {
   );
 });
 
+test("bound roots stop when their canonical path becomes a link", async (t) => {
+  const { sandbox, project } = await fixture(t);
+  const root = await core.canonicalizeProjectRoot(project);
+  const original = join(sandbox, "moved-project");
+  await rename(project, original);
+  await symlink(
+    original,
+    project,
+    process.platform === "win32" ? "junction" : "dir",
+  );
+
+  await assert.rejects(
+    core.assertProjectRootIdentity(root),
+    expectCoreError("project-root-drift"),
+  );
+  await assert.rejects(
+    core.resolveProjectPath(root, "Assets/Player.cs", {
+      expectedType: "file",
+      existence: "required",
+    }),
+    expectCoreError("project-root-drift"),
+  );
+});
+
 test("project path APIs reject caller-constructed roots and malformed options", async (t) => {
   const { project } = await fixture(t);
   const root = await core.canonicalizeProjectRoot(project);

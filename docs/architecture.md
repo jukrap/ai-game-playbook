@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture. The `contracts` and `registry` foundations exist; runtime and bridge boundaries remain planned.
+> Status: target architecture. The `contracts` and `registry` foundations and an early `core` filesystem boundary exist; the remaining runtime and bridge boundaries are planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -29,7 +29,7 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 | --- | --- | --- |
 | `contracts` | Foundation implemented | Versioned schemas and shared identifiers with no engine runtime dependency |
 | `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, and parity checks |
-| `core` | Planned | Project identity, permissions, budgets, lanes, checkpoints, and workflow state |
+| `core` | Partial | Canonical project identity, portable path resolution, and staged filesystem compare-and-swap exist; permissions, process budgets, lanes, checkpoints, and workflow state remain planned |
 | `cli` | Planned | `agpb` argument parsing, local interaction, stable exit behavior, and help |
 | `mcp` | Planned | Schema-derived tools and resources behind the same permission broker |
 | `codex-adapter` | Planned | Skills, host routing metadata, and project instruction integration |
@@ -39,7 +39,7 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 | Engine adapters | Planned | Godot, Unity, and Unreal orchestration without broad host authority |
 | Project bridges | Planned | Minimum editor/runtime code needed to expose verified engine operations |
 
-Only `contracts` and `registry` currently exist as workspace packages. A listed boundary is not a claim that its runtime package or capability already exists.
+Only `contracts`, `registry`, and the partial private `core` currently exist as workspace packages. A listed boundary is not a claim that its runtime package or capability already exists.
 
 ## Execution flow
 

@@ -1,5 +1,13 @@
 export type CoreBoundaryErrorCode =
+  | "cas-budget-exceeded"
+  | "cas-cleanup-conflict"
+  | "cas-commit-failed"
+  | "cas-postcondition-failed"
+  | "cas-precondition-failed"
+  | "cas-stage-failed"
+  | "cas-state-invalid"
   | "filesystem-operation-failed"
+  | "invalid-cas-request"
   | "invalid-project-root"
   | "invalid-project-path-options"
   | "project-path-budget-exceeded"

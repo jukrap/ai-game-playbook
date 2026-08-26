@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { deflateSync } from "node:zlib";
 
 import * as contracts from "@ai-game-playbook/contracts";
 import * as evidence from "../dist/index.js";
-import { rgbaPng } from "./fixtures/png.mjs";
+import { indexedPng, rgbaPng } from "./fixtures/png.mjs";
 
 function pngExpectation(overrides = {}) {
   return {
@@ -177,6 +178,61 @@ test("interlaced PNG degrades explicitly instead of claiming decode", () => {
   assert.equal(result.code, "artifact.format-png-interlace-unsupported");
   assert.equal(result.format.validation, "unsupported");
   assert.equal(result.format.interlaced, true);
+});
+
+test("indexed PNG inspection rejects impossible palettes and pixel indices", () => {
+  const valid = inspect(indexedPng(), pngExpectation());
+  assert.equal(valid.status, "passed");
+
+  const cases = [
+    {
+      name: "palette exceeds bit depth",
+      content: indexedPng({
+        width: 1,
+        bitDepth: 1,
+        paletteEntries: 3,
+        indices: [0],
+      }),
+    },
+    {
+      name: "pixel index exceeds palette",
+      content: indexedPng({
+        width: 1,
+        paletteEntries: 1,
+        indices: [1],
+      }),
+    },
+  ];
+  for (const fixture of cases) {
+    const result = inspect(fixture.content, pngExpectation());
+    assert.equal(result.status, "failed", fixture.name);
+    assert.equal(result.code, "artifact.format-invalid-png", fixture.name);
+  }
+});
+
+test("PNG inspection rejects trailing compressed bytes and invalid reserved chunk bits", () => {
+  const compressed = deflateSync(
+    Buffer.from([0, ...new Array(8).fill(0x7f)]),
+  );
+  const cases = [
+    {
+      name: "trailing compressed bytes",
+      content: rgbaPng({
+        compressed: Buffer.concat([compressed, Buffer.from([1, 2, 3])]),
+      }),
+    },
+    {
+      name: "reserved chunk bit",
+      content: rgbaPng({
+        beforeIdatChunks: [{ type: "abca" }],
+      }),
+    },
+  ];
+  for (const fixture of cases) {
+    const result = inspect(fixture.content, pngExpectation());
+    assert.equal(result.status, "failed", fixture.name);
+    assert.equal(result.code, "artifact.format-invalid-png", fixture.name);
+  }
 });
 
 test("artifact format inspection rejects open or unbounded requests", () => {

@@ -32,6 +32,7 @@ export function rgbaPng({
   filter = 0,
   interlace = 0,
   compressed,
+  beforeIdatChunks = [],
 } = {}) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
@@ -48,7 +49,56 @@ export function rgbaPng({
   return Buffer.concat([
     PNG_SIGNATURE,
     pngChunk("IHDR", ihdr),
+    ...beforeIdatChunks.map(({ type, data = Buffer.alloc(0) }) =>
+      pngChunk(type, data),
+    ),
     pngChunk("IDAT", compressed ?? deflateSync(Buffer.concat(rows))),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+function packIndexedSamples(samples, bitDepth) {
+  const samplesPerByte = 8 / bitDepth;
+  const mask = (1 << bitDepth) - 1;
+  const packed = Buffer.alloc(Math.ceil(samples.length / samplesPerByte));
+  for (let index = 0; index < samples.length; index++) {
+    const byteIndex = Math.floor(index / samplesPerByte);
+    const shift = 8 - bitDepth - (index % samplesPerByte) * bitDepth;
+    packed[byteIndex] |= (samples[index] & mask) << shift;
+  }
+  return packed;
+}
+
+export function indexedPng({
+  width = 2,
+  height = 1,
+  bitDepth = 8,
+  paletteEntries = 2,
+  indices = [0, 1],
+} = {}) {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = bitDepth;
+  ihdr[9] = 3;
+  ihdr[10] = 0;
+  ihdr[11] = 0;
+  ihdr[12] = 0;
+  const palette = Buffer.alloc(paletteEntries * 3, 0x7f);
+  const rows = [];
+  for (let row = 0; row < height; row++) {
+    rows.push(
+      Buffer.concat([
+        Buffer.from([0]),
+        packIndexedSamples(indices.slice(row * width, (row + 1) * width), bitDepth),
+      ]),
+    );
+  }
+  return Buffer.concat([
+    PNG_SIGNATURE,
+    pngChunk("IHDR", ihdr),
+    pngChunk("PLTE", palette),
+    pngChunk("IDAT", deflateSync(Buffer.concat(rows))),
     pngChunk("IEND", Buffer.alloc(0)),
   ]);
 }

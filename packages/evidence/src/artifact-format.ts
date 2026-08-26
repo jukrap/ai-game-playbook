@@ -122,6 +122,11 @@ interface PngParseState {
   readonly paletteEntries?: number;
 }
 
+interface InflatedPngStream {
+  readonly buffer: Buffer;
+  readonly consumedBytes: number;
+}
+
 function invalid(
   path: string,
   message: string,
@@ -647,6 +652,7 @@ function parsePng(
     ) {
       return undefined;
     }
+    if (((typeBytes[2] ?? 0) & 0x20) !== 0) return undefined;
     const type = typeBytes.toString("ascii");
     const storedCrc = content.readUInt32BE(dataEnd);
     if (crc32(content.subarray(offset + 4, dataEnd)) !== storedCrc) {
@@ -671,7 +677,11 @@ function parsePng(
       ) {
         return undefined;
       }
-      paletteEntries = length / 3;
+      const entries = length / 3;
+      if (header.colorType === 3 && entries > 2 ** header.bitDepth) {
+        return undefined;
+      }
+      paletteEntries = entries;
     } else if (type === "IDAT") {
       if (header === undefined || idatClosed || length === 0) return undefined;
       sawIdat = true;
@@ -721,7 +731,28 @@ function paeth(left: number, above: number, upperLeft: number): number {
       : upperLeft;
 }
 
-function decodePngScanlines(inflated: Buffer, header: PngHeader): boolean {
+function indexedRowFitsPalette(
+  row: Buffer,
+  width: number,
+  bitDepth: number,
+  paletteEntries: number,
+): boolean {
+  const samplesPerByte = 8 / bitDepth;
+  const mask = (1 << bitDepth) - 1;
+  for (let pixel = 0; pixel < width; pixel++) {
+    const byte = row[Math.floor(pixel / samplesPerByte)];
+    if (byte === undefined) return false;
+    const shift = 8 - bitDepth - (pixel % samplesPerByte) * bitDepth;
+    if (((byte >>> shift) & mask) >= paletteEntries) return false;
+  }
+  return true;
+}
+
+function decodePngScanlines(
+  inflated: Buffer,
+  header: PngHeader,
+  paletteEntries: number | undefined,
+): boolean {
   if (inflated.byteLength !== header.decodedBytes) return false;
   const bytesPerPixel = Math.max(
     1,
@@ -754,6 +785,18 @@ function decodePngScanlines(inflated: Buffer, header: PngHeader): boolean {
                 ? Math.floor((left + above) / 2)
                 : paeth(left, above, upperLeft);
       current[index] = (source + predictor) & 0xff;
+    }
+    if (
+      header.colorType === 3 &&
+      (paletteEntries === undefined ||
+        !indexedRowFitsPalette(
+          current,
+          header.width,
+          header.bitDepth,
+          paletteEntries,
+        ))
+    ) {
+      return false;
     }
     previous = current;
     offset += header.rowBytes;
@@ -795,6 +838,32 @@ function pngFailure(
   );
 }
 
+function inflatePngStream(
+  compressed: Buffer,
+  maxOutputLength: number,
+): InflatedPngStream | undefined {
+  const result: unknown = inflateSync(compressed, {
+    info: true,
+    maxOutputLength,
+  });
+  if (result === null || typeof result !== "object") return undefined;
+  const buffer = (result as { readonly buffer?: unknown }).buffer;
+  const engine = (result as { readonly engine?: unknown }).engine;
+  if (
+    !Buffer.isBuffer(buffer) ||
+    engine === null ||
+    typeof engine !== "object"
+  ) {
+    return undefined;
+  }
+  const consumedBytes = (engine as { readonly bytesWritten?: unknown })
+    .bytesWritten;
+  if (!Number.isSafeInteger(consumedBytes) || (consumedBytes as number) < 0) {
+    return undefined;
+  }
+  return { buffer, consumedBytes: consumedBytes as number };
+}
+
 function inspectPng(
   content: Buffer,
   expectation: Extract<ArtifactFormatExpectation, { readonly format: "png" }>,
@@ -823,13 +892,21 @@ function inspectPng(
   }
   let inflated: Buffer;
   try {
-    inflated = inflateSync(parsed.compressed, {
-      maxOutputLength: expectation.maxDecodedBytes,
-    });
+    const result = inflatePngStream(
+      parsed.compressed,
+      parsed.header.decodedBytes,
+    );
+    if (
+      result === undefined ||
+      result.consumedBytes !== parsed.compressed.byteLength
+    ) {
+      return pngFailure("artifact.format-invalid-png", digest, content.byteLength);
+    }
+    inflated = result.buffer;
   } catch {
     return pngFailure("artifact.format-invalid-png", digest, content.byteLength);
   }
-  if (!decodePngScanlines(inflated, parsed.header)) {
+  if (!decodePngScanlines(inflated, parsed.header, parsed.paletteEntries)) {
     return pngFailure("artifact.format-invalid-png", digest, content.byteLength);
   }
   return assessment(

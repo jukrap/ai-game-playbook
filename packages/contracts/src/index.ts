@@ -1,4 +1,10 @@
-export { canonicalizeJson, compareCanonicalText } from "./canonical-json.js";
+export {
+  CANONICAL_JSON_MAX_CONTAINER_ENTRIES,
+  CANONICAL_JSON_MAX_DEPTH,
+  CANONICAL_JSON_MAX_NODES,
+  canonicalizeJson,
+  compareCanonicalText,
+} from "./canonical-json.js";
 export type {
   CanonicalJsonPrimitive,
   CanonicalJsonValue,

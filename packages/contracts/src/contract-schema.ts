@@ -212,6 +212,21 @@ export function defineContractSchema(
   definition: ContractSchemaDefinition,
 ): VersionedContractSchema {
   const record = dataRecord(definition, "$definition");
+  const allowedKeys = new Set([
+    "id",
+    "version",
+    "title",
+    "description",
+    "schema",
+  ]);
+  for (const key of Object.keys(record)) {
+    if (!allowedKeys.has(key)) {
+      throw invalidSchema(
+        `$definition[${JSON.stringify(key)}]`,
+        "undeclared definition field",
+      );
+    }
+  }
   const idValue = ownValue(record, "id", "$definition.id");
   if (!isStableId(idValue)) {
     throw invalidSchema("$definition.id", "expected a canonical stable ID");

@@ -59,6 +59,7 @@ test("semantic versions reject non-canonical input", () => {
     "1.2.3-alpha..1",
     "1.2.3+",
     123,
+    `1.0.0+${"a".repeat(257)}`,
   ]) {
     assert.throws(
       () => contracts.parseSemanticVersion(value),
@@ -67,4 +68,12 @@ test("semantic versions reject non-canonical input", () => {
         error?.code === "invalid-semantic-version",
     );
   }
+});
+
+test("semantic version parts are immutable", () => {
+  const parsed = contracts.parseSemanticVersion("1.2.3-alpha+build");
+  assert.equal(Object.isFrozen(parsed), true);
+  assert.equal(Object.isFrozen(parsed.prerelease), true);
+  assert.equal(Object.isFrozen(parsed.build), true);
+  assert.throws(() => parsed.prerelease.push("mutated"), TypeError);
 });

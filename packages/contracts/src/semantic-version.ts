@@ -19,6 +19,7 @@ export type VersionComparison = -1 | 0 | 1;
 
 const semanticVersionPattern =
   /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+const semanticVersionMaxLength = 256;
 
 function invalidVersion(path: string): ContractValueError {
   return new ContractValueError(
@@ -32,7 +33,7 @@ export function parseSemanticVersion(
   value: unknown,
   path = "$version",
 ): SemanticVersionParts {
-  if (typeof value !== "string") {
+  if (typeof value !== "string" || value.length > semanticVersionMaxLength) {
     throw invalidVersion(path);
   }
 
@@ -53,14 +54,14 @@ export function parseSemanticVersion(
     throw invalidVersion(path);
   }
 
-  return {
+  return Object.freeze({
     value: value as SemanticVersion,
     major: match[1] ?? "0",
     minor: match[2] ?? "0",
     patch: match[3] ?? "0",
-    prerelease,
-    build: match[5]?.split(".") ?? [],
-  };
+    prerelease: Object.freeze(prerelease),
+    build: Object.freeze(match[5]?.split(".") ?? []),
+  });
 }
 
 function compareNumericText(left: string, right: string): VersionComparison {

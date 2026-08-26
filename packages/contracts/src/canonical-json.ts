@@ -6,6 +6,15 @@ export type CanonicalJsonValue =
   | readonly CanonicalJsonValue[]
   | { readonly [key: string]: CanonicalJsonValue };
 
+export const CANONICAL_JSON_MAX_DEPTH = 128;
+export const CANONICAL_JSON_MAX_CONTAINER_ENTRIES = 100_000;
+export const CANONICAL_JSON_MAX_NODES = 1_000_000;
+
+interface SerializationState {
+  readonly ancestors: Set<object>;
+  nodes: number;
+}
+
 export function compareCanonicalText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
@@ -45,21 +54,21 @@ function serializeString(value: string, path: string): string {
 function serializeArray(
   value: readonly unknown[],
   path: string,
-  ancestors: Set<object>,
+  depth: number,
+  state: SerializationState,
 ): string {
+  if (value.length > CANONICAL_JSON_MAX_CONTAINER_ENTRIES) {
+    throw invalidCanonicalJson(
+      path,
+      `array exceeds ${CANONICAL_JSON_MAX_CONTAINER_ENTRIES} entries`,
+    );
+  }
   const ownKeys = Reflect.ownKeys(value);
   if (ownKeys.some((key) => typeof key === "symbol")) {
     throw invalidCanonicalJson(path, "symbol array properties are not allowed");
   }
 
-  const expectedKeys = new Set<string>([
-    "length",
-    ...Array.from({ length: value.length }, (_, index) => String(index)),
-  ]);
-  if (
-    ownKeys.length !== expectedKeys.size ||
-    ownKeys.some((key) => !expectedKeys.has(key as string))
-  ) {
+  if (ownKeys.length !== value.length + 1) {
     throw invalidCanonicalJson(
       path,
       "sparse arrays and custom array properties are not allowed",
@@ -79,7 +88,9 @@ function serializeArray(
         "array elements must be enumerable data properties",
       );
     }
-    items.push(serialize(descriptor.value, `${path}[${index}]`, ancestors));
+    items.push(
+      serialize(descriptor.value, `${path}[${index}]`, depth + 1, state),
+    );
   }
 
   return `[${items.join(",")}]`;
@@ -88,7 +99,8 @@ function serializeArray(
 function serializeObject(
   value: object,
   path: string,
-  ancestors: Set<object>,
+  depth: number,
+  state: SerializationState,
 ): string {
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) {
@@ -100,6 +112,12 @@ function serializeObject(
 
   const entries: string[] = [];
   const keys = Object.getOwnPropertyNames(value).sort(compareCanonicalText);
+  if (keys.length > CANONICAL_JSON_MAX_CONTAINER_ENTRIES) {
+    throw invalidCanonicalJson(
+      path,
+      `object exceeds ${CANONICAL_JSON_MAX_CONTAINER_ENTRIES} fields`,
+    );
+  }
   for (const key of keys) {
     if (hasLoneSurrogate(key)) {
       throw invalidCanonicalJson(path, "object key contains a lone surrogate");
@@ -122,7 +140,8 @@ function serializeObject(
       `${serializeString(key, path)}:${serialize(
         descriptor.value,
         childPath,
-        ancestors,
+        depth + 1,
+        state,
       )}`,
     );
   }
@@ -130,7 +149,26 @@ function serializeObject(
   return `{${entries.join(",")}}`;
 }
 
-function serialize(value: unknown, path: string, ancestors: Set<object>): string {
+function serialize(
+  value: unknown,
+  path: string,
+  depth: number,
+  state: SerializationState,
+): string {
+  if (depth > CANONICAL_JSON_MAX_DEPTH) {
+    throw invalidCanonicalJson(
+      path,
+      `nesting exceeds ${CANONICAL_JSON_MAX_DEPTH} levels`,
+    );
+  }
+  state.nodes += 1;
+  if (state.nodes > CANONICAL_JSON_MAX_NODES) {
+    throw invalidCanonicalJson(
+      path,
+      `value contains more than ${CANONICAL_JSON_MAX_NODES} nodes`,
+    );
+  }
+
   if (value === null) {
     return "null";
   }
@@ -147,17 +185,17 @@ function serialize(value: unknown, path: string, ancestors: Set<object>): string
     case "string":
       return serializeString(value, path);
     case "object": {
-      if (ancestors.has(value)) {
+      if (state.ancestors.has(value)) {
         throw invalidCanonicalJson(path, "circular value is not allowed");
       }
 
-      ancestors.add(value);
+      state.ancestors.add(value);
       try {
         return Array.isArray(value)
-          ? serializeArray(value, path, ancestors)
-          : serializeObject(value, path, ancestors);
+          ? serializeArray(value, path, depth, state)
+          : serializeObject(value, path, depth, state);
       } finally {
-        ancestors.delete(value);
+        state.ancestors.delete(value);
       }
     }
     default:
@@ -169,5 +207,8 @@ function serialize(value: unknown, path: string, ancestors: Set<object>): string
 }
 
 export function canonicalizeJson(value: unknown): string {
-  return serialize(value, "$", new Set<object>());
+  return serialize(value, "$", 0, {
+    ancestors: new Set<object>(),
+    nodes: 0,
+  });
 }

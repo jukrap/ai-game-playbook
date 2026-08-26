@@ -62,6 +62,7 @@ test("contract schema definitions reject ambiguous or unsafe roots", () => {
     [{ ...definition, id: "Command" }, "$definition.id"],
     [{ ...definition, version: "1" }, "$definition.version"],
     [{ ...definition, title: "" }, "$definition.title"],
+    [{ ...definition, hidden: true }, '$definition["hidden"]'],
     [
       {
         ...definition,

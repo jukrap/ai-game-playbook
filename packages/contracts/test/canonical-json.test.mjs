@@ -62,3 +62,26 @@ test("canonical JSON rejects values that cannot be safely attested", () => {
     );
   }
 });
+
+test("canonical JSON rejects resource-exhausting containers before traversal", () => {
+  assert.equal(contracts.CANONICAL_JSON_MAX_DEPTH, 128);
+  assert.equal(contracts.CANONICAL_JSON_MAX_CONTAINER_ENTRIES, 100000);
+  assert.equal(contracts.CANONICAL_JSON_MAX_NODES, 1000000);
+
+  const oversizedSparseArray = [];
+  oversizedSparseArray.length = contracts.CANONICAL_JSON_MAX_CONTAINER_ENTRIES + 1;
+
+  let tooDeep = null;
+  for (let depth = 0; depth <= contracts.CANONICAL_JSON_MAX_DEPTH; depth += 1) {
+    tooDeep = { nested: tooDeep };
+  }
+
+  for (const value of [oversizedSparseArray, tooDeep]) {
+    assert.throws(
+      () => contracts.canonicalizeJson(value),
+      (error) =>
+        error?.name === "ContractValueError" &&
+        error?.code === "invalid-canonical-json",
+    );
+  }
+});

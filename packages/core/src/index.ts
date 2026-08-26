@@ -22,6 +22,21 @@ export type {
   StagedProjectFileCasWrite,
 } from "./cas-write.js";
 export {
+  createProjectDirectoryCas,
+  deleteProjectDirectoryCas,
+  stageProjectDirectoryCasCreate,
+  stageProjectDirectoryCasDelete,
+} from "./directory-cas.js";
+export type {
+  ProjectDirectoryCasCreateRequest,
+  ProjectDirectoryCasCreateResult,
+  ProjectDirectoryCasDeleteRequest,
+  ProjectDirectoryCasDeleteResult,
+  ProjectDirectoryIdentity,
+  StagedProjectDirectoryCasCreate,
+  StagedProjectDirectoryCasDelete,
+} from "./directory-cas.js";
+export {
   assertProcessExecutableIdentity,
   bindProcessExecutable,
   PROCESS_MAX_ENVIRONMENT_KEYS,

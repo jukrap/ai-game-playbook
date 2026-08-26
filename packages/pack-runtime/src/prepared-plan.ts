@@ -15,7 +15,7 @@ export interface PreparedPackOperationInternals {
   readonly registry: ValidatedRegistry;
   readonly targetRoot: CanonicalProjectRoot;
   readonly sourceRoot?: CanonicalProjectRoot;
-  readonly manifest: PackManifest;
+  readonly manifest?: PackManifest;
   readonly installed: LoadedInstalledPackState;
   readonly sourceArtifacts: readonly PreparedArtifactContent[];
   readonly preimages: readonly PreparedArtifactContent[];

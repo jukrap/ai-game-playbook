@@ -42,6 +42,10 @@ const PACK_RUNTIME_MAX_ARTIFACTS = 64;
 const PACK_RUNTIME_MAX_ARTIFACT_BYTES = 64 * 1024 * 1024;
 const PACK_RUNTIME_MAX_TOTAL_BYTES = 256 * 1024 * 1024;
 const PACK_RUNTIME_MAX_DIRECTORY_ENTRIES = 100_000;
+const PACK_RUNTIME_RESERVED_TARGET_ROOTS = Object.freeze([
+  ".ai-game-playbook/locks",
+  ".ai-game-playbook/state",
+]);
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -230,6 +234,13 @@ function assertSupportedManifest(manifest: PackManifest): void {
     Object.keys(manifest.lifecycleHooks).length > 0 ||
     manifest.artifacts.length > PACK_RUNTIME_MAX_ARTIFACTS ||
     manifest.artifacts.some(({ mode }) => mode !== "file") ||
+    manifest.artifacts.some(({ target }) => {
+      const foldedTarget = target.toLowerCase();
+      return PACK_RUNTIME_RESERVED_TARGET_ROOTS.some(
+        (root) =>
+          foldedTarget === root || foldedTarget.startsWith(`${root}/`),
+      );
+    }) ||
     manifest.ownedPaths.some(({ kind }) => kind !== "file") ||
     artifactTargets.size !== manifest.artifacts.length ||
     ownedFilePaths.size !== manifest.ownedPaths.length ||
@@ -239,7 +250,7 @@ function assertSupportedManifest(manifest: PackManifest): void {
     throw new PackRuntimeError(
       "pack-surface-unsupported",
       `$pack.${manifest.id}`,
-      "initial local runtime accepts only offline, hook-free, regular-file packs for the current operating system",
+      "initial local runtime accepts only offline, hook-free regular files outside reserved control-plane state",
     );
   }
 }
@@ -433,6 +444,12 @@ async function inspectOwnedRecord(
         expectedDigest: artifact.digest,
         actualDigest: snapshot.digest,
       });
+    } else if (snapshot.bytes !== artifact.bytes) {
+      throw new PackRuntimeError(
+        "pack-state-corrupt",
+        artifact.path,
+        "installed artifact byte count does not match its owned file",
+      );
     } else {
       snapshots.set(artifact.path, snapshot);
     }
@@ -443,7 +460,69 @@ async function inspectOwnedRecord(
   };
 }
 
-async function planChanges(
+function dependentConflicts(
+  installed: LoadedInstalledPackState,
+  packId: StableId,
+): PackConflict[] {
+  return installed.state.packs
+    .filter((dependent) =>
+      dependent.dependencies.some(({ id }) => id === packId),
+    )
+    .map((dependent) => ({
+      code: "dependency-in-use" as const,
+      path: `.ai-game-playbook/state/packs/${dependent.id}`,
+      packId: dependent.id,
+    }));
+}
+
+async function planRemovalChanges(
+  request: NormalizedPrepareRequest,
+  installed: LoadedInstalledPackState,
+): Promise<{
+  readonly changes: readonly PackChange[];
+  readonly conflicts: readonly PackConflict[];
+  readonly preimages: readonly SnapshotByPath[];
+}> {
+  const active = installed.state.packs.find(({ id }) => id === request.packId);
+  if (active === undefined) {
+    return {
+      changes: Object.freeze([]),
+      conflicts: Object.freeze([]),
+      preimages: Object.freeze([]),
+    };
+  }
+  const conflicts = dependentConflicts(installed, active.id);
+  const inspected = await inspectOwnedRecord(request, active);
+  conflicts.push(...inspected.conflicts);
+  const preimages = [...inspected.snapshots.values()].map((snapshot) => ({
+    path: snapshot.path,
+    snapshot,
+  }));
+  if (conflicts.length > 0) {
+    return {
+      changes: Object.freeze([]),
+      conflicts: Object.freeze(conflicts.sort(conflictSort)),
+      preimages: Object.freeze(preimages),
+    };
+  }
+  return {
+    changes: Object.freeze(
+      active.artifacts
+        .filter(({ path }) => inspected.snapshots.has(path))
+        .map((artifact) => ({
+          kind: "delete" as const,
+          path: artifact.path,
+          beforeDigest: artifact.digest,
+          bytes: artifact.bytes,
+        }))
+        .sort(changeSort),
+    ),
+    conflicts: Object.freeze([]),
+    preimages: Object.freeze(preimages),
+  };
+}
+
+async function planInstallChanges(
   request: NormalizedPrepareRequest,
   manifest: PackManifest,
   installed: LoadedInstalledPackState,
@@ -453,10 +532,25 @@ async function planChanges(
   readonly conflicts: readonly PackConflict[];
   readonly preimages: readonly SnapshotByPath[];
 }> {
+  if (request.operation === "remove") {
+    throw new PackRuntimeError(
+      "invalid-pack-request",
+      "$request.operation",
+      "remove must use installed-state removal planning",
+    );
+  }
   const active = installed.state.packs.find(({ id }) => id === manifest.id);
   const conflicts: PackConflict[] = [];
   const changes: PackChange[] = [];
   const preimages: SnapshotByPath[] = [];
+
+  if (
+    request.operation === "update" &&
+    active !== undefined &&
+    (active.version !== manifest.version || active.digest !== manifest.digest)
+  ) {
+    conflicts.push(...dependentConflicts(installed, active.id));
+  }
 
   if (request.operation === "add" && active !== undefined) {
     const inspected = await inspectOwnedRecord(request, active);
@@ -490,21 +584,7 @@ async function planChanges(
       path: `.ai-game-playbook/state/packs/${manifest.id}`,
       packId: manifest.id,
     });
-  } else if (request.operation === "remove" && active === undefined) {
-    return { changes: Object.freeze([]), conflicts: Object.freeze([]), preimages: Object.freeze([]) };
   } else if (active !== undefined) {
-    for (const dependent of installed.state.packs) {
-      if (
-        request.operation === "remove" &&
-        dependent.dependencies.some(({ id }) => id === active.id)
-      ) {
-        conflicts.push({
-          code: "dependency-in-use",
-          path: `.ai-game-playbook/state/packs/${dependent.id}`,
-          packId: dependent.id,
-        });
-      }
-    }
     const inspected = await inspectOwnedRecord(request, active);
     conflicts.push(...inspected.conflicts);
     for (const snapshot of inspected.snapshots.values()) {
@@ -541,17 +621,6 @@ async function planChanges(
             path: artifact.path,
             beforeDigest: artifact.digest,
             afterDigest: artifact.digest,
-            bytes: artifact.bytes,
-          });
-        }
-      }
-    } else if (request.operation === "remove") {
-      for (const artifact of active.artifacts) {
-        if (inspected.snapshots.has(artifact.path)) {
-          changes.push({
-            kind: "delete",
-            path: artifact.path,
-            beforeDigest: artifact.digest,
             bytes: artifact.bytes,
           });
         }
@@ -648,9 +717,7 @@ async function planChanges(
     }
   }
 
-  if (request.operation !== "remove") {
-    conflicts.push(...dependencyConflicts(manifest, installed, request.registry));
-  }
+  conflicts.push(...dependencyConflicts(manifest, installed, request.registry));
   if (conflicts.length > 0) {
     return {
       changes: Object.freeze([]),
@@ -681,34 +748,62 @@ export async function preparePackOperation(
   if (request.sourceRoot !== undefined) {
     await assertProjectRootIdentity(request.sourceRoot);
   }
-  const manifest = request.registry.packs.find(({ id }) => id === request.packId);
-  if (manifest === undefined) {
-    throw new PackRuntimeError(
-      "pack-not-found",
-      "$request.packId",
-      "pack is not present in the validated registry",
-    );
-  }
-  assertSupportedManifest(manifest);
   const installed = await loadInstalledPackState(
     request.targetRoot,
     request.project,
     request.limits.maxDirectoryEntries,
   );
-  const sourceArtifacts = await readSourceArtifacts(request, manifest);
-  const planned = await planChanges(
-    request,
-    manifest,
-    installed,
-    sourceArtifacts,
-  );
+  const manifest = request.registry.packs.find(({ id }) => id === request.packId);
+  const active = installed.state.packs.find(({ id }) => id === request.packId);
+  if (manifest === undefined && active === undefined) {
+    throw new PackRuntimeError(
+      "pack-not-found",
+      "$request.packId",
+      "pack is neither installed nor present in the validated registry",
+    );
+  }
+  if (request.operation !== "remove" && manifest === undefined) {
+    throw new PackRuntimeError(
+      "pack-not-found",
+      "$request.packId",
+      "add and update require a pack from the validated registry",
+    );
+  }
+  if (request.operation !== "remove") {
+    assertSupportedManifest(manifest as PackManifest);
+  }
+  const sourceArtifacts =
+    request.operation === "remove"
+      ? Object.freeze([])
+      : await readSourceArtifacts(request, manifest as PackManifest);
+  const planned =
+    request.operation === "remove"
+      ? await planRemovalChanges(request, installed)
+      : await planInstallChanges(
+          request,
+          manifest as PackManifest,
+          installed,
+          sourceArtifacts,
+        );
+  const selectedPack =
+    request.operation === "remove" && active !== undefined
+      ? active
+      : (manifest as PackManifest);
   const mutatingChanges = planned.changes.filter(
     ({ kind }) => kind !== "unchanged",
   );
+  const requiresInstalledStateMutation =
+    request.operation === "remove"
+      ? active !== undefined
+      : request.operation === "add"
+        ? active === undefined
+        : active !== undefined &&
+          manifest !== undefined &&
+          (active.version !== manifest.version || active.digest !== manifest.digest);
   const disposition: PreparedPackOperation["disposition"] =
     planned.conflicts.length > 0
       ? "conflicted"
-      : mutatingChanges.length === 0
+      : mutatingChanges.length === 0 && !requiresInstalledStateMutation
         ? "no-op"
         : "ready";
   const body = {
@@ -726,9 +821,9 @@ export async function preparePackOperation(
       : { sourceRootIdentityDigest: request.sourceRoot.identityDigest }),
     registryDigest: request.registry.digest,
     pack: {
-      id: manifest.id,
-      version: manifest.version,
-      digest: manifest.digest,
+      id: selectedPack.id,
+      version: selectedPack.version,
+      digest: selectedPack.digest,
     },
     installedState: {
       revision: installed.state.revision,
@@ -753,7 +848,7 @@ export async function preparePackOperation(
     registry: request.registry,
     targetRoot: request.targetRoot,
     ...(request.sourceRoot === undefined ? {} : { sourceRoot: request.sourceRoot }),
-    manifest,
+    ...(manifest === undefined ? {} : { manifest }),
     installed,
     sourceArtifacts: Object.freeze(
       sourceArtifacts.map(({ path, snapshot }) =>

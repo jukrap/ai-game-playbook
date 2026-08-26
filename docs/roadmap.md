@@ -12,15 +12,15 @@ Approval freezes the initial contracts, risks, permission defaults, evidence thr
 
 ## Stage 1: common foundation — in progress
 
-- Completed: pnpm workspace, versioned contract schemas, semantic validation, typed registry validation and projections, pack dependency-graph validation, deterministic resolved workflow-plan attestation, a tracked digest-bound foundation plan, and read-only managed-pack preflight.
+- Completed: pnpm workspace, versioned contract schemas, semantic validation, typed registry validation and projections, pack dependency-graph validation, deterministic resolved workflow-plan attestation, a tracked digest-bound foundation plan, and a private managed-pack preflight and transaction executor.
 - Remaining: core runtime, executable CLI, MCP server, Codex adapter, and runtime parity generation.
-- Remaining: approval-bound pack staging, durable transaction journaling, promotion, rollback, and uninstall execution; preflight digest, installed-state, dependency, downgrade, ownership, and conflict checks exist.
+- Remaining: project-state bootstrap, executable pack CLI and registry parity, interrupted-transaction reconciliation and doctor flow, broader lifecycle evaluation, and pack distribution; local approval/lane-bound add, update, installed-state-owned removal, journaling, clear-failure rollback, and conflict checks exist as private library primitives.
 - Keep the package private and use `ai-game-playbook` and `agpb` as reserved interface names until publication is separately authorized.
 
 ## Stage 2: execution, evidence, and safety
 
-- Implemented primitives: compare-and-swap writes and single-file deletion, canonical project-root identity, bounded direct process execution, serialized root/project-bound mutating leases, in-memory registry-bound permission admission with exact signed grants and effect settlement, immutable resolved-plan checkpoint transitions with receipt-chain, rollback, evidence, and cumulative-budget enforcement, append-only checkpoint persistence with bounded chain validation and restart-safe hydration, plus immutable write-free local pack plans.
-- Remaining: durable approval/receipt/evidence storage, uncertainty reconciliation, dispatcher/lane integration, full project/editor identity attestation, automatic lease heartbeat integration, and parallel-read coordination.
+- Implemented primitives: compare-and-swap writes and single-file deletion, canonical project-root identity, bounded direct process execution, serialized root/project-bound mutating leases, in-memory registry-bound permission admission with exact signed grants and effect settlement, immutable resolved-plan checkpoint transitions with receipt-chain, rollback, evidence, and cumulative-budget enforcement, append-only checkpoint persistence with bounded chain validation and restart-safe hydration, plus immutable local pack plans and an authorization/lane-bound transaction executor with append-only started/terminal records and bounded reverse rollback.
+- Remaining: durable approval/receipt/evidence storage, uncertainty reconciliation, general workflow dispatcher integration, full project/editor identity attestation, automatic lease heartbeat integration, and parallel-read coordination.
 - Complete repair/retry and cancellation transitions, dispatcher-owned checkpoint persistence, receipt/evidence storage, and explicit reconciliation around the current bounded state machine.
 - Add content-addressed receipts, evidence storage, redacted diagnostics, retention, and explicit export.
 - Test traversal, symlink escape, invalid tokens, output growth, timeouts, stale processes, ambiguous editors, and install lifecycle conflicts.

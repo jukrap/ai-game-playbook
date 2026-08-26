@@ -3,6 +3,13 @@ export type { PackRuntimeErrorCode } from "./errors.js";
 export {
   assertPreparedPackOperation,
 } from "./prepared-plan.js";
+export {
+  createPackOperationAuthorizationRequest,
+  createPackOperationCommandInput,
+  packOperationAuthorizationPaths,
+  packOperationCommandId,
+} from "./authorization.js";
+export { executePreparedPackOperation } from "./execute.js";
 export { preparePackOperation } from "./prepare.js";
 export {
   computeInstalledPackStateDigest,
@@ -10,7 +17,15 @@ export {
   PACK_INSTALLED_STATE_MAX_BYTES,
   PACK_INSTALLED_STATE_PATH,
 } from "./state.js";
+export {
+  computePackTransactionRecordDigest,
+  loadPackTransactionJournal,
+  PACK_TRANSACTION_DIRECTORY,
+  PACK_TRANSACTION_MAX_RECORD_BYTES,
+  packTransactionRecordPath,
+} from "./transaction-journal.js";
 export type {
+  CreateNextInstalledPackStateRequest,
   InstalledPackArtifact,
   InstalledPackDependency,
   InstalledPackRecord,
@@ -19,11 +34,25 @@ export type {
   LoadedInstalledPackState,
 } from "./state.js";
 export type {
+  LoadPackTransactionJournalRequest,
+  LoadedPackTransactionJournal,
+  PackTransactionOutcome,
+  PackTransactionRecord,
+  PackTransactionStartedRecord,
+  PackTransactionTerminalRecord,
+} from "./transaction-journal.js";
+export type {
+  CreatePackOperationAuthorizationRequest,
+  ExecutePackOperationRequest,
   PackChange,
   PackConflict,
   PackConflictCode,
   PackOperation,
+  PackOperationAuthorizationRequest,
   PackOperationLimits,
+  PackExecutionEffects,
+  PackExecutionErrorSummary,
+  PackExecutionResult,
   PreparePackOperationRequest,
   PreparedPackOperation,
 } from "./types.js";

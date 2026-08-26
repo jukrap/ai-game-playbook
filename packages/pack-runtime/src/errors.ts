@@ -1,13 +1,24 @@
 export type PackRuntimeErrorCode =
   | "invalid-pack-request"
+  | "invalid-pack-execution-request"
   | "pack-artifact-budget-exceeded"
   | "pack-artifact-digest-mismatch"
+  | "pack-authorization-invalid"
+  | "pack-execution-failed"
+  | "pack-execution-uncertain"
+  | "pack-lane-invalid"
   | "pack-not-found"
+  | "pack-plan-conflicted"
+  | "pack-plan-not-executable"
   | "pack-plan-untrusted"
   | "pack-registry-untrusted"
   | "pack-state-corrupt"
+  | "pack-storage-not-initialized"
   | "pack-surface-unsupported"
-  | "pack-target-invalid";
+  | "pack-target-invalid"
+  | "pack-transaction-conflict"
+  | "pack-transaction-corrupt"
+  | "pack-transaction-not-found";
 
 export class PackRuntimeError extends Error {
   readonly code: PackRuntimeErrorCode;

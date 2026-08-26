@@ -74,9 +74,9 @@ function manifest({ content, version = "1.0.0", overrides = {} }) {
   return value;
 }
 
-function validatedRegistry(pack) {
+function validatedRegistry(...packs) {
   const definition = createValidRegistryDefinition();
-  definition.packs.push(pack);
+  definition.packs.push(...packs);
   return registry.validateRegistry(definition);
 }
 
@@ -281,6 +281,41 @@ test("preflight rejects unvalidated authority and unsupported executable surface
   );
 });
 
+test("preflight reserves control-plane state and lock namespaces", async (t) => {
+  const f = await fixture(t);
+  for (const reservedTarget of [
+    ".ai-game-playbook/state/packs/installed.json",
+    ".ai-game-playbook/locks/project-mutation.lock",
+    ".AI-GAME-PLAYBOOK/STATE/packs/installed.json",
+  ]) {
+    const pack = manifest({
+      content: f.content,
+      overrides: {
+        artifacts: [
+          {
+            source: "dist/demo.txt",
+            target: reservedTarget,
+            digest: contracts.sha256Digest(f.content),
+            mode: "file",
+          },
+        ],
+        ownedPaths: [
+          {
+            path: reservedTarget,
+            kind: "file",
+            digest: contracts.sha256Digest(f.content),
+          },
+        ],
+      },
+    });
+
+    await assert.rejects(
+      packRuntime.preparePackOperation(request(f, pack)),
+      expectPackError("pack-surface-unsupported"),
+    );
+  }
+});
+
 test("same manifest and clean owned hashes prepare a write-free reinstall", async (t) => {
   const f = await fixture(t);
   const pack = manifest({ content: f.content });
@@ -328,6 +363,84 @@ test("exact version update plans a replacement and preserves its rollback preima
     },
   ]);
   assert.equal(await readFile(f.target, "utf8"), oldContent);
+});
+
+test("single-pack update refuses to invalidate an installed dependent", async (t) => {
+  const f = await fixture(t, "version one\n");
+  const installed = manifest({ content: f.content, version: "1.0.0" });
+  const nextContent = "version two\n";
+  const nextPack = manifest({ content: nextContent, version: "2.0.0" });
+  const dependentContent = "dependent payload\n";
+  const dependentTarget = ".ai-game-playbook/packs/dependent/demo.txt";
+  const dependent = manifest({
+    content: dependentContent,
+    overrides: {
+      id: "tool.dependent",
+      dependencies: [
+        {
+          id: nextPack.id,
+          minimum: "2.0.0",
+          maximumExclusive: "3.0.0",
+          optional: false,
+        },
+      ],
+      artifacts: [
+        {
+          source: "dist/dependent.txt",
+          target: dependentTarget,
+          digest: contracts.sha256Digest(dependentContent),
+          mode: "file",
+        },
+      ],
+      ownedPaths: [
+        {
+          path: dependentTarget,
+          kind: "file",
+          digest: contracts.sha256Digest(dependentContent),
+        },
+      ],
+    },
+  });
+  await writeFile(f.target, f.content, "utf8");
+  const dependentDirectory = join(
+    f.project,
+    ".ai-game-playbook",
+    "packs",
+    "dependent",
+  );
+  await mkdir(dependentDirectory, { recursive: true });
+  await writeFile(join(dependentDirectory, "demo.txt"), dependentContent, "utf8");
+  await writeFile(join(f.source, "dist", "demo.txt"), nextContent, "utf8");
+  await writeInstalledState(f, [
+    installedPack(dependent, dependentContent, {
+      dependencies: [
+        {
+          id: installed.id,
+          version: installed.version,
+          digest: installed.digest,
+        },
+      ],
+    }),
+    installedPack(installed, f.content),
+  ]);
+
+  const prepared = await packRuntime.preparePackOperation(
+    request(f, nextPack, {
+      operation: "update",
+      registry: validatedRegistry(nextPack, dependent),
+    }),
+  );
+
+  assert.equal(prepared.disposition, "conflicted");
+  assert.deepEqual(prepared.changes, []);
+  assert.deepEqual(prepared.conflicts, [
+    {
+      code: "dependency-in-use",
+      path: ".ai-game-playbook/state/packs/tool.dependent",
+      packId: "tool.dependent",
+    },
+  ]);
+  assert.equal(await readFile(f.target, "utf8"), f.content);
 });
 
 test("modified owned files and downgrade requests remain conflict-only", async (t) => {
@@ -406,6 +519,23 @@ test("malformed installed state fails closed before source promotion", async (t)
     expectPackError("pack-state-corrupt"),
   );
   await assert.rejects(readFile(f.target), (error) => error?.code === "ENOENT");
+});
+
+test("preflight rejects installed artifact byte-count drift", async (t) => {
+  const f = await fixture(t);
+  const pack = manifest({ content: f.content });
+  await writeFile(f.target, f.content, "utf8");
+  const installed = installedPack(pack, f.content);
+  installed.artifacts[0].bytes += 1;
+  await writeInstalledState(f, [installed]);
+
+  await assert.rejects(
+    packRuntime.preparePackOperation(
+      request(f, pack, { operation: "remove" }),
+    ),
+    expectPackError("pack-state-corrupt"),
+  );
+  assert.equal(await readFile(f.target, "utf8"), f.content);
 });
 
 test("request budgets and project identity are snapshotted before filesystem I/O", async (t) => {

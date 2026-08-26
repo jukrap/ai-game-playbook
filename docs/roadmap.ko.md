@@ -1,6 +1,6 @@
 ---
 source: docs/roadmap.md
-source_sha256: fb16d55ee44015d932ab40b71cf918561febbc0a800424c51c536558e57a72c9
+source_sha256: 164eeb622e5dfccbdf5abe854ed2ca42db3d116c2d1dd691d5804c539b00cccc
 translated_at: 2026-08-26
 ---
 
@@ -18,15 +18,15 @@ translated_at: 2026-08-26
 
 ## Stage 1: 공통 기반 — 진행 중
 
-- 완료: pnpm workspace, versioned contract schema, semantic validation, typed registry 검증 및 projection, pack dependency graph 검증, 결정적 resolved workflow-plan attestation, 추적 가능한 digest 결합 foundation plan, read-only managed-pack preflight.
+- 완료: pnpm workspace, versioned contract schema, semantic validation, typed registry 검증 및 projection, pack dependency graph 검증, 결정적 resolved workflow-plan attestation, 추적 가능한 digest 결합 foundation plan, private managed-pack preflight와 transaction executor.
 - 남음: core runtime, 실행 가능한 CLI, MCP server, Codex adapter, runtime parity generation.
-- 남음: approval 결합 pack staging, durable transaction journal, promotion, rollback, uninstall 실행. preflight digest, installed-state, dependency, downgrade, ownership, conflict 검사는 구현했습니다.
+- 남음: project-state bootstrap, 실행 가능한 pack CLI와 registry parity, 중단 transaction reconciliation과 doctor flow, 더 넓은 lifecycle evaluation, pack distribution. local approval/lane 결합 add, update, installed-state 소유권 기반 remove, journal, 명확한 실패의 rollback, conflict 검사는 private library primitive로 구현했습니다.
 - package는 private으로 유지하고 publish를 별도로 승인하기 전까지 `ai-game-playbook`과 `agpb`를 예약된 interface 이름으로만 사용합니다.
 
 ## Stage 2: 실행, 증거, 안전
 
-- 구현된 primitive: compare-and-swap write와 단일 파일 삭제, canonical project-root identity, bounded direct process 실행, 직렬화된 root/project 결합 mutating lease, exact signed grant와 effect settlement를 사용하는 in-memory registry 결합 permission admission, receipt chain·rollback·evidence·누적 budget을 강제하는 immutable resolved-plan checkpoint transition, 제한된 chain 검증과 restart-safe hydration을 포함한 append-only checkpoint 영속화, immutable write-free local pack plan.
-- 남음: durable approval/receipt/evidence storage, uncertainty reconciliation, dispatcher/lane integration, 완전한 project/Editor identity attestation, automatic lease heartbeat integration, parallel-read coordination.
+- 구현된 primitive: compare-and-swap write와 단일 파일 삭제, canonical project-root identity, bounded direct process 실행, 직렬화된 root/project 결합 mutating lease, exact signed grant와 effect settlement를 사용하는 in-memory registry 결합 permission admission, receipt chain·rollback·evidence·누적 budget을 강제하는 immutable resolved-plan checkpoint transition, 제한된 chain 검증과 restart-safe hydration을 포함한 append-only checkpoint 영속화, immutable local pack plan, append-only started/terminal record와 제한된 역순 rollback을 갖춘 authorization/lane 결합 transaction executor.
+- 남음: durable approval/receipt/evidence storage, uncertainty reconciliation, 일반 workflow dispatcher 통합, 완전한 project/Editor identity attestation, automatic lease heartbeat integration, parallel-read coordination.
 - 현재 bounded state machine을 중심으로 repair/retry와 cancellation transition, dispatcher 소유 checkpoint 영속화, receipt/evidence storage, 명시적 reconciliation을 완성합니다.
 - content-addressed receipt, evidence storage, redacted diagnostic, retention, explicit export를 추가합니다.
 - traversal, symlink escape, invalid token, output growth, timeout, stale process, ambiguous Editor, install lifecycle conflict를 테스트합니다.

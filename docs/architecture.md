@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture. The `contracts` and `registry` foundations, early `core` safety boundaries, and managed-pack preflight exist; the remaining runtime and bridge boundaries are planned.
+> Status: target architecture. The `contracts` and `registry` foundations, early `core` safety boundaries, and a private managed-pack transaction runtime exist; the remaining runtime and bridge boundaries are planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -33,13 +33,13 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 | `cli` | Planned | `agpb` argument parsing, local interaction, stable exit behavior, and help |
 | `mcp` | Planned | Schema-derived tools and resources behind the same permission broker |
 | `codex-adapter` | Planned | Skills, host routing metadata, and project instruction integration |
-| `pack-runtime` | Partial | Validated-registry and local-file preflight, artifact/state digest checks, installed dependency and ownership conflict planning exist; approval/lane admission, durable transaction journal, promotion, rollback, and uninstall execution remain planned |
+| `pack-runtime` | Partial | Write-free validated-registry preflight plus broker/lane-bound local add, update, installed-state-owned removal, CAS promotion, clear-failure rollback, effect settlement, and append-only transaction verification exist; directory bootstrap, CLI integration, interrupted-transaction reconciliation, and distributed pack acquisition remain planned |
 | `evidence` | Planned | Content-addressed artifacts, receipts, exports, retention, and redaction |
 | `engine-common` | Contract only | Common capability negotiation and engine operation contracts |
 | Engine adapters | Planned | Godot, Unity, and Unreal orchestration without broad host authority |
 | Project bridges | Planned | Minimum editor/runtime code needed to expose verified engine operations |
 
-Only `contracts`, `registry`, the partial private `core`, and the read-only private `pack-runtime` currently exist as workspace packages. A listed boundary is not a claim that its complete runtime capability already exists.
+Only `contracts`, `registry`, the partial private `core`, and the private `pack-runtime` currently exist as workspace packages. A listed boundary is not a claim that its complete runtime capability already exists.
 
 ## Execution flow
 
@@ -56,7 +56,7 @@ Only `contracts`, `registry`, the partial private `core`, and the read-only priv
 
 A consuming game project is planned to contain `.ai-game-playbook/`. Commit-worthy state includes the project profile, feature contracts, and policy. Cache, logs, screenshots, locks, receipts containing local details, local secrets, and machine-specific configuration remain ignored.
 
-Writes use owned-path rules and compare-and-swap preimages. The private core now advances a resolved workflow through pre-dispatch, dispatched, settled, rollback, blocked, terminal, and uncertain checkpoints. Each transition re-resolves the exact plan, accepts only same-process permission authority, binds a domain-separated receipt to command and authorization identity, preserves a receipt chain, and aggregates workflow budgets and complete evidence. Canonical checkpoint records are append-only under a fixed project-local directory, while a compare-and-swap head selects the current chain. Loading bounds record count and bytes, rechecks every parent transition and current registry/project identity, preserves corrupt state for diagnosis, and refuses competing heads. Restart recovery returns an undispatched admission to a reauthorization state and converts a dispatched but unsettled step to `uncertain`. Pack preflight now binds a same-process validated registry, target/source root identities, local artifact bytes, installed-state digest, intended file changes, conflicts, and limits into an immutable plan. It accepts only offline, hook-free regular-file packs and performs no mutation. The state machine and pack plan are not yet wired to lane acquisition or command dispatch; approval consumption, active leases, full receipts, and evidence payloads are not durable. The core also does not yet discover or control an editor. Pack promotion, rollback, uninstall execution, and parallel-read coordination remain planned.
+Writes use owned-path rules and compare-and-swap preimages. The private core now advances a resolved workflow through pre-dispatch, dispatched, settled, rollback, blocked, terminal, and uncertain checkpoints. Each transition re-resolves the exact plan, accepts only same-process permission authority, binds a domain-separated receipt to command and authorization identity, preserves a receipt chain, and aggregates workflow budgets and complete evidence. Canonical checkpoint records are append-only under a fixed project-local directory, while a compare-and-swap head selects the current chain. Loading bounds record count and bytes, rechecks every parent transition and current registry/project identity, preserves corrupt state for diagnosis, and refuses competing heads. Restart recovery returns an undispatched admission to a reauthorization state and converts a dispatched but unsettled step to `uncertain`. Pack preflight binds a same-process validated registry, target/source root identities, local artifact bytes, installed-state digest, intended file changes, conflicts, and limits into an immutable write-free plan. The private executor then requires an exact broker-issued install authorization and same-process `project-write` lease, writes an append-only started record before final-file effects, stages artifact and installed-state CAS operations, records a terminal outcome, and settles observed effects. A clear later-file failure triggers bounded reverse rollback; an uncertain effect is not retried. Removal can use canonical installed ownership even when the pack is no longer in the current registry. This path still requires pre-created state and transaction directories and has no restart reconciler, CLI, approval UI, or durable approval capability. The general workflow state machine is not yet wired to command dispatch, and full receipts and evidence payloads are not durable. The core also does not yet discover or control an editor. Parallel-read coordination remains planned.
 
 ## Host integration
 

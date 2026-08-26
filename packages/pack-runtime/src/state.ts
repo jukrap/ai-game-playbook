@@ -1,11 +1,14 @@
 import {
   canonicalizeJson,
   compareCanonicalText,
+  compareSemanticVersions,
   digestCanonicalJson,
   isSha256Digest,
   isStableId,
   isPortableProjectPath,
   parseSemanticVersion,
+  sha256Digest,
+  type PackManifest,
   type SemanticVersion,
   type Sha256Digest,
   type StableId,
@@ -17,6 +20,8 @@ import {
 } from "@ai-game-playbook/core";
 
 import { PackRuntimeError } from "./errors.js";
+import type { PreparedArtifactContent } from "./prepared-plan.js";
+import type { PackOperation } from "./types.js";
 
 export const PACK_INSTALLED_STATE_PATH: string =
   ".ai-game-playbook/state/packs/installed.json";
@@ -60,6 +65,19 @@ export interface InstalledPackState {
 export interface LoadedInstalledPackState {
   readonly state: InstalledPackState;
   readonly fileDigest?: Sha256Digest;
+}
+
+export interface CreateNextInstalledPackStateRequest {
+  readonly operation: PackOperation;
+  readonly pack: {
+    readonly id: StableId;
+    readonly version: SemanticVersion;
+    readonly digest: Sha256Digest;
+  };
+  readonly manifest?: PackManifest;
+  readonly installed: InstalledPackState;
+  readonly sourceArtifacts: readonly PreparedArtifactContent[];
+  readonly timestamp: string;
 }
 
 type MutableRecord = Record<string, unknown>;
@@ -249,6 +267,167 @@ export function createEmptyInstalledPackState(project: {
     ...body,
     stateDigest: computeInstalledPackStateDigest(body),
   });
+}
+
+function canonicalStateTimestamp(value: string): boolean {
+  const milliseconds = Date.parse(value);
+  return (
+    Number.isFinite(milliseconds) &&
+    new Date(milliseconds).toISOString() === value
+  );
+}
+
+function dependencyRecords(
+  manifest: PackManifest,
+  installed: InstalledPackState,
+): readonly InstalledPackDependency[] {
+  const records: InstalledPackDependency[] = [];
+  for (const dependency of manifest.dependencies) {
+    const active = installed.packs.find(({ id }) => id === dependency.id);
+    if (active === undefined) {
+      if (dependency.optional) continue;
+      throw new PackRuntimeError(
+        "pack-state-corrupt",
+        `$state.dependencies.${dependency.id}`,
+        "required dependency disappeared after pack preflight",
+      );
+    }
+    if (
+      compareSemanticVersions(active.version, dependency.minimum) < 0 ||
+      compareSemanticVersions(active.version, dependency.maximumExclusive) >= 0
+    ) {
+      throw new PackRuntimeError(
+        "pack-state-corrupt",
+        `$state.dependencies.${dependency.id}`,
+        "installed dependency moved outside the prepared version interval",
+      );
+    }
+    records.push(
+      Object.freeze({
+        id: active.id,
+        version: active.version,
+        digest: active.digest,
+      }),
+    );
+  }
+  return Object.freeze(
+    records.sort((left, right) => compareCanonicalText(left.id, right.id)),
+  );
+}
+
+function artifactRecords(
+  manifest: PackManifest,
+  sourceArtifacts: readonly PreparedArtifactContent[],
+): readonly InstalledPackArtifact[] {
+  const sourceByTarget = new Map(
+    sourceArtifacts.map((artifact) => [artifact.target, artifact.content]),
+  );
+  const records = manifest.artifacts.map((artifact) => {
+    const content = sourceByTarget.get(artifact.target);
+    if (
+      content === undefined ||
+      sha256Digest(content) !== artifact.digest
+    ) {
+      throw new PackRuntimeError(
+        "pack-artifact-digest-mismatch",
+        artifact.target,
+        "prepared artifact content no longer matches the manifest",
+      );
+    }
+    return Object.freeze({
+      path: artifact.target,
+      digest: artifact.digest,
+      bytes: content.byteLength,
+    });
+  });
+  return Object.freeze(
+    records.sort((left, right) => compareCanonicalText(left.path, right.path)),
+  );
+}
+
+export function createNextInstalledPackState(
+  request: CreateNextInstalledPackStateRequest,
+): InstalledPackState {
+  if (!canonicalStateTimestamp(request.timestamp)) {
+    throw new PackRuntimeError(
+      "pack-state-corrupt",
+      "$state.timestamp",
+      "pack state transition timestamp must be canonical",
+    );
+  }
+  if (
+    !Number.isSafeInteger(request.installed.revision) ||
+    request.installed.revision < 0 ||
+    request.installed.revision >= Number.MAX_SAFE_INTEGER
+  ) {
+    throw new PackRuntimeError(
+      "pack-state-corrupt",
+      "$state.revision",
+      "pack state revision cannot advance safely",
+    );
+  }
+  const active = request.installed.packs.find(
+    ({ id }) => id === request.pack.id,
+  );
+  let packs: readonly InstalledPackRecord[];
+  if (request.operation === "remove") {
+    if (active === undefined) {
+      throw new PackRuntimeError(
+        "pack-state-corrupt",
+        `$state.packs.${request.pack.id}`,
+        "removed pack disappeared after pack preflight",
+      );
+    }
+    packs = request.installed.packs.filter(
+      ({ id }) => id !== request.pack.id,
+    );
+  } else {
+    if (request.manifest === undefined) {
+      throw new PackRuntimeError(
+        "pack-state-corrupt",
+        `$state.packs.${request.pack.id}`,
+        "add and update state transitions require the prepared manifest",
+      );
+    }
+    const manifest = request.manifest;
+    const installedAt = active?.installedAt ?? request.timestamp;
+    const updatedMilliseconds = Math.max(
+      Date.parse(request.timestamp),
+      active === undefined ? 0 : Date.parse(active.updatedAt) + 1,
+    );
+    const record: InstalledPackRecord = Object.freeze({
+      id: manifest.id,
+      version: manifest.version,
+      digest: manifest.digest,
+      dependencies: dependencyRecords(manifest, request.installed),
+      artifacts: artifactRecords(manifest, request.sourceArtifacts),
+      installedAt,
+      updatedAt: new Date(updatedMilliseconds).toISOString(),
+    });
+    packs = [
+      ...request.installed.packs.filter(({ id }) => id !== manifest.id),
+      record,
+    ];
+  }
+  const sortedPacks = Object.freeze(
+    [...packs].sort((left, right) => compareCanonicalText(left.id, right.id)),
+  );
+  const body = {
+    schemaVersion: "1.0.0" as const,
+    project: Object.freeze({ ...request.installed.project }),
+    revision: request.installed.revision + 1,
+    packs: sortedPacks,
+  };
+  return Object.freeze({
+    ...body,
+    stateDigest: computeInstalledPackStateDigest(body),
+  });
+}
+
+export function serializeInstalledPackState(
+  state: InstalledPackState,
+): Uint8Array {
+  return Buffer.from(`${canonicalizeJson(state)}\n`, "utf8");
 }
 
 function parseState(

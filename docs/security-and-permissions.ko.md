@@ -1,12 +1,12 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: 604ea78300627b55041d9922c8c90bc97f6eea26c163275781693b8249b3fc59
+source_sha256: ddc427a5a5bf84cc4aa83255bd2c0192794f6bd3b13aea7476a18dc9169cfb1c
 translated_at: 2026-08-26
 ---
 
 # 보안과 권한
 
-> 상태: 초기 private admission, workflow-checkpoint, durable checkpoint-store, read-only pack-preflight primitive가 포함된 계획된 permission 정책입니다. command dispatch, Editor 또는 bridge enforcement는 아직 없습니다.
+> 상태: 초기 private admission, workflow-checkpoint, durable checkpoint-store, pack 전용 transaction executor가 포함된 계획된 permission 정책입니다. 일반 command dispatch, Editor 또는 bridge enforcement는 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
@@ -29,7 +29,7 @@ permission은 control plane이 평가하며 MCP annotation, skill, engine bridge
 
 현재 private broker는 같은 process에서 검증한 registry instance만 받습니다. 실제 command payload를 등록 input schema로 검증하고 그 digest를 project, command/handler, registry, feature, workflow step, Editor session, 정규화된 target, budget, deadline, run에 결합하며 설정된 public key로 domain-separated 단일 permission Ed25519 grant를 검증합니다. 민감한 grant는 한 번만 사용할 수 있고 authorization lease를 반환하기 전에 동기적으로 reserve합니다. 자동 admission은 범위가 제한된 project read, 승인된 feature source path와 change kind, approval checkpoint를 선언하지 않은 등록 test/build workflow step으로 제한합니다. test/build 권한은 project file 또는 Editor object mutation 권한을 암묵적으로 포함하지 않습니다. Editor object source mutation은 object operation type을 feature contract와 대조할 수 있을 때까지 거부합니다.
 
-authorization은 실행이 아닙니다. 이 primitive는 아직 process runner, filesystem CAS, project lane, CLI, MCP, engine bridge와 연결되지 않았습니다. grant use count와 active lease는 memory에만 있어 restart를 넘지 못하며 approval UI, durable approval 또는 revocation store, recovery action, secret-path classifier도 없습니다. registry는 exact validated authority에서 domain-separated workflow-plan digest를 파생하고 모호한 binding을 거부하며 immutable plan을 의미 검증합니다. workflow state machine은 broker 결정을 받기 전에 이 plan을 다시 해석하고 exact authorization과 실제 effect를 각 transition에 결합합니다. durable checkpoint store는 그 결과인 uncertainty barrier를 restart 뒤에도 보존하지만 stale authorization capability를 의도적으로 버리고 uncertainty를 reconcile하거나 해제하지는 못합니다. runtime enforcement와 accounting이 없는 동안 memory, CPU, GPU request budget은 거부합니다.
+authorization 자체가 실행은 아닙니다. 일반 broker는 command dispatcher, CLI, MCP, process workflow, engine bridge와 아직 연결되지 않았습니다. 좁은 예외로 private pack executor가 있습니다. 같은 process에서 준비한 plan, exact path와 보수적인 rollback budget에 결합된 broker-issued `install` 결정, attest된 `project-write` lease를 모두 받은 뒤에만 filesystem CAS를 호출합니다. grant use count와 active lease는 memory에만 있어 restart를 넘지 못하며 approval UI, durable approval 또는 revocation store, recovery action, secret-path classifier도 없습니다. registry는 exact validated authority에서 domain-separated workflow-plan digest를 파생하고 모호한 binding을 거부하며 immutable plan을 의미 검증합니다. workflow state machine은 broker 결정을 받기 전에 이 plan을 다시 해석하고 exact authorization과 실제 effect를 각 transition에 결합합니다. durable checkpoint store는 그 결과인 uncertainty barrier를 restart 뒤에도 보존하지만 stale authorization capability를 의도적으로 버리고 uncertainty를 reconcile하거나 해제하지는 못합니다. runtime enforcement와 accounting이 없는 동안 memory, CPU, GPU request budget은 거부합니다.
 
 ## Fail-closed 중단 조건
 
@@ -56,7 +56,7 @@ authorization은 실행이 아닙니다. 이 primitive는 아직 process runner,
 
 ## Filesystem과 pack 안전
 
-현재 core는 canonical project root를 결합하고 writable path link와 portable path ambiguity를 거부하며 제한된 staged SHA-256 compare-and-swap 쓰기와 exact-digest 단일 파일 삭제를 수행합니다. private pack preflight는 같은 process에서 검증한 registry와 offline·hook-free regular-file artifact만 받습니다. local content, canonical installed state, exact dependency, downgrade policy, owned hash, 비소유 충돌, resource limit를 확인한 뒤 immutable plan을 만듭니다. directory나 state를 만들거나 approval·mutation lane을 획득하고 content를 promote·rollback·uninstall하지 않습니다. 이러한 managed lifecycle 실행 단계는 아직 계획 단계입니다.
+현재 core는 canonical project root를 결합하고 writable path link와 portable path ambiguity를 거부하며 제한된 staged SHA-256 compare-and-swap 쓰기와 exact-digest 단일 파일 삭제를 수행합니다. private pack preflight는 같은 process에서 검증한 registry와 offline·hook-free regular-file artifact만 받습니다. local content, canonical installed state, exact dependency, downgrade policy, owned hash, 비소유 충돌, resource limit를 확인한 뒤 immutable write-free plan을 만듭니다. control-plane state와 lock namespace는 pack 소유 대상에서 제외합니다. pack executor는 directory를 만들거나 authority를 직접 얻지 않습니다. 필요한 state, transaction, lock, artifact parent directory가 미리 존재해야 하고 caller가 exact 승인 결정과 lane을 제공해야 합니다. transaction 시작 전과 각 forward staging·commit 경계 전후에 lease 만료를 다시 검사합니다. 승인 budget은 capture한 rollback preimage 크기를 사용하며, 단일 pack update가 설치된 dependent를 무효화하면 중단합니다. state만 바꾸는 update의 unchanged file을 포함한 최종 artifact digest를 installed-state commit 전에 write-free CAS guard로 확인합니다. final-file effect 전에 immutable started record를 쓰고 state와 artifact를 stage하며 canonical installed state를 마지막에 commit한 뒤 terminal record와 실제 path/byte settlement를 남깁니다. 뒤 operation의 명확한 실패는 앞 file commit을 exact digest로 역순 rollback하고 uncertain commit은 retry 없이 중단해 후속 reconciliation을 요구합니다. pack이 현재 registry에서 사라져도 installed-state 소유권을 기준으로 remove할 수 있습니다. CLI, 자동 directory bootstrap, transaction reconciler, pack 획득 경로는 아직 없습니다.
 
 path 검사는 최종 target을 resolve하고 traversal, absolute-path injection, symlink escape를 거부합니다. engine과 system tool은 탐지하지만 자동 설치하지 않습니다.
 

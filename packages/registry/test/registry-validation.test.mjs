@@ -486,6 +486,35 @@ test("pack validation binds artifacts to unique owned paths", () => {
     contracts.computePackManifestDigest(conflictingDigestPack);
   conflictingDigest.packs.push(conflictingDigestPack);
   expectDiagnostic(conflictingDigest, "pack-owned-path-invalid");
+
+  const crossPackCaseCollision = createValidRegistryDefinition();
+  const firstCasePack = createPack("pack.case-owner-a", "1.0.0");
+  const secondCasePack = createPack("pack.case-owner-b", "1.0.0");
+  secondCasePack.artifacts[0].target =
+    firstCasePack.artifacts[0].target.toUpperCase();
+  secondCasePack.ownedPaths[0].path = secondCasePack.artifacts[0].target;
+  secondCasePack.digest = contracts.computePackManifestDigest(secondCasePack);
+  crossPackCaseCollision.packs.push(firstCasePack, secondCasePack);
+  expectDiagnostic(crossPackCaseCollision, "pack-owned-path-invalid");
+
+  const crossPackTreeCollision = createValidRegistryDefinition();
+  const directoryPack = createPack("pack.tree-owner-a", "1.0.0");
+  directoryPack.artifacts[0].target =
+    ".ai-game-playbook/packs/shared-runtime";
+  directoryPack.artifacts[0].mode = "directory";
+  directoryPack.ownedPaths[0] = {
+    path: directoryPack.artifacts[0].target,
+    kind: "directory",
+    digest: directoryPack.artifacts[0].digest,
+  };
+  directoryPack.digest = contracts.computePackManifestDigest(directoryPack);
+  const descendantPack = createPack("pack.tree-owner-b", "1.0.0");
+  descendantPack.artifacts[0].target =
+    ".ai-game-playbook/packs/shared-runtime/worker.js";
+  descendantPack.ownedPaths[0].path = descendantPack.artifacts[0].target;
+  descendantPack.digest = contracts.computePackManifestDigest(descendantPack);
+  crossPackTreeCollision.packs.push(directoryPack, descendantPack);
+  expectDiagnostic(crossPackTreeCollision, "pack-owned-path-invalid");
 });
 
 test("registry validation rejects duplicate IDs and CLI path collisions", () => {

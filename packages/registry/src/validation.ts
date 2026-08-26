@@ -1660,6 +1660,90 @@ function validatePackArtifactOwnership(
   }
 }
 
+interface OwnedPathClaim {
+  readonly packIndex: number;
+  readonly pathIndex: number;
+}
+
+interface OwnedPathTrieNode {
+  readonly children: Map<string, OwnedPathTrieNode>;
+  claim?: OwnedPathClaim;
+  firstClaim?: OwnedPathClaim;
+}
+
+function createOwnedPathTrieNode(): OwnedPathTrieNode {
+  return { children: new Map() };
+}
+
+function ownedPathClaimLocator(claim: OwnedPathClaim): string {
+  return `$.packs[${claim.packIndex}].ownedPaths[${claim.pathIndex}].path`;
+}
+
+function validatePackOwnershipCollisions(
+  packs: readonly PackManifest[],
+  diagnostics: RegistryDiagnostic[],
+): void {
+  const root = createOwnedPathTrieNode();
+
+  for (let packIndex = 0; packIndex < packs.length; packIndex += 1) {
+    const pack = packs[packIndex];
+    if (pack === undefined) {
+      continue;
+    }
+    for (
+      let pathIndex = 0;
+      pathIndex < pack.ownedPaths.length;
+      pathIndex += 1
+    ) {
+      const ownedPath = pack.ownedPaths[pathIndex];
+      if (ownedPath === undefined) {
+        continue;
+      }
+      const claim = { packIndex, pathIndex };
+      const visited = [root];
+      let node = root;
+      let conflict: OwnedPathClaim | undefined;
+      const segments = ownedPath.path
+        .split("/")
+        .map((segment) => segment.toLowerCase());
+
+      for (const segment of segments) {
+        if (node.claim !== undefined) {
+          conflict = node.claim;
+          break;
+        }
+        let child = node.children.get(segment);
+        if (child === undefined) {
+          child = createOwnedPathTrieNode();
+          node.children.set(segment, child);
+        }
+        node = child;
+        visited.push(node);
+      }
+
+      if (conflict === undefined) {
+        conflict = node.claim ?? node.firstClaim;
+      }
+      if (conflict !== undefined) {
+        appendDiagnostic(
+          diagnostics,
+          diagnostic(
+            "pack-owned-path-invalid",
+            ownedPathClaimLocator(claim),
+            `owned path overlaps ${ownedPathClaimLocator(conflict)} under portable filesystem rules`,
+          ),
+        );
+        continue;
+      }
+
+      node.claim = claim;
+      for (const visitedNode of visited) {
+        visitedNode.firstClaim ??= claim;
+      }
+    }
+  }
+}
+
 function validatePackProvisions(
   definition: RegistryDefinition,
   diagnostics: RegistryDiagnostic[],
@@ -1784,6 +1868,7 @@ function validatePackProvisions(
     validatePackNetworkDeclaration(pack, basePath, diagnostics);
     validatePackArtifactOwnership(pack, basePath, diagnostics);
   }
+  validatePackOwnershipCollisions(definition.packs, diagnostics);
 }
 
 function validatePacks(

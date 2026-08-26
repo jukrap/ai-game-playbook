@@ -181,6 +181,42 @@ test("contract schemas reject unsafe identity, scope, support, and cost shapes",
       "pack-manifest",
       {
         ...validPublicContractFixtures["pack-manifest"],
+        artifacts: [
+          {
+            ...validPublicContractFixtures["pack-manifest"].artifacts[0],
+            target: ".ai-game-playbook/packs/CON/index.js",
+          },
+        ],
+      },
+    ],
+    [
+      "pack-manifest",
+      {
+        ...validPublicContractFixtures["pack-manifest"],
+        ownedPaths: [
+          {
+            ...validPublicContractFixtures["pack-manifest"].ownedPaths[0],
+            path: ".ai-game-playbook/packs/godot-core/index.js.",
+          },
+        ],
+      },
+    ],
+    [
+      "pack-manifest",
+      {
+        ...validPublicContractFixtures["pack-manifest"],
+        artifacts: [
+          {
+            ...validPublicContractFixtures["pack-manifest"].artifacts[0],
+            source: `${"a".repeat(256)}/index.js`,
+          },
+        ],
+      },
+    ],
+    [
+      "pack-manifest",
+      {
+        ...validPublicContractFixtures["pack-manifest"],
         license: { status: "declared" },
       },
     ],

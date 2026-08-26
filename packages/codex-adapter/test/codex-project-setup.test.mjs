@@ -157,6 +157,30 @@ test("setup plans are same-process capabilities and disclosure is explicit", asy
   );
 });
 
+test("setup accepts the generated read-only skill tools without materialization", async (t) => {
+  const { project } = await fixture(t);
+  const before = await readdir(project);
+
+  const plan = await createCodexProjectSetupPlan({
+    projectRoot: project,
+    enabledTools: ["agpb_skill__list", "agpb_skill__check"],
+    allowHostDisclosure: true,
+  });
+
+  assert.deepEqual(plan.host.enabledTools, [
+    "agpb_skill__check",
+    "agpb_skill__list",
+  ]);
+  assert.match(
+    plan.target.content,
+    /enabled_tools = \["agpb_skill__check", "agpb_skill__list"\]/u,
+  );
+  const inspected = await inspectCodexProjectSetup(plan);
+  assert.equal(inspected.skillTargets[0].action, "create");
+  assert.equal(inspected.mutationPerformed, false);
+  assert.deepEqual(await readdir(project), before);
+});
+
 test("inspection distinguishes create, retain, and conflict without mutation", async (t) => {
   const { project } = await fixture(t);
   const plan = await createPlan(project);

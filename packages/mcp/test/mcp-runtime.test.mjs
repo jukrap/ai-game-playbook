@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -175,6 +175,39 @@ test("direct invocation validates the exact bound project and emits canonical st
     } finally {
       await rm(foreign, { recursive: true, force: true });
     }
+  });
+});
+
+test("skill tools bind the generated registry handlers and remain write-free", async () => {
+  await withProject(async (root) => {
+    const before = await readdir(root);
+    const plan = await createMcpRuntimePlan({
+      projectRoot: root,
+      enabledTools: ["agpb_skill__list", "agpb_skill__check"],
+      allowHostDisclosure: true,
+    });
+    assert.deepEqual(
+      plan.enabledTools.map(({ name }) => name),
+      ["agpb_skill__list", "agpb_skill__check"],
+    );
+
+    const listed = await invokeMcpTool(plan, {
+      name: "agpb_skill__list",
+      arguments: { schemaVersion: "1.0.0", projectRoot: root },
+    });
+    assert.equal(listed.isError, undefined);
+    assert.equal(listed.structuredContent?.commandId, "skill.list");
+    assert.equal(listed.structuredContent?.materializationAvailable, false);
+
+    const checked = await invokeMcpTool(plan, {
+      name: "agpb_skill__check",
+      arguments: { schemaVersion: "1.0.0", projectRoot: root },
+    });
+    assert.equal(checked.isError, undefined);
+    assert.equal(checked.structuredContent?.commandId, "skill.check");
+    assert.equal(checked.structuredContent?.status, "attention");
+    assert.equal(checked.structuredContent?.mutationPerformed, false);
+    assert.deepEqual(await readdir(root), before);
   });
 });
 

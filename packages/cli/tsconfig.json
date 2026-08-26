@@ -9,7 +9,8 @@
     { "path": "../contracts" },
     { "path": "../registry" },
     { "path": "../core" },
-    { "path": "../pack-runtime" }
+    { "path": "../pack-runtime" },
+    { "path": "../skill-runtime" }
   ],
   "include": ["src/**/*.ts"]
 }

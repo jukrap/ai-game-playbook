@@ -10,6 +10,8 @@ test("runtime command handler metadata attests each exact compiled module", asyn
     ["doctor", "doctor.js"],
     ["init", "init.js"],
     ["project.inspect", "project-inspect.js"],
+    ["skill.check", "skill-check.js"],
+    ["skill.list", "skill-list.js"],
   ]) {
     const command = BUILTIN_REGISTRY.commands.find(({ id }) => id === commandId);
     assert.notEqual(command, undefined);

@@ -21,6 +21,8 @@ test("CLI help and version are derived from the implemented runtime surface", as
   assert.match(help.stdout, /init\s+Plan/);
   assert.match(help.stdout, /doctor\s+Inspect/);
   assert.match(help.stdout, /project inspect\s+Inspect/);
+  assert.match(help.stdout, /skill check\s+Inspect/);
+  assert.match(help.stdout, /skill list\s+List/);
   assert.doesNotMatch(help.stdout, /pack add/);
   assert.equal(help.stderr, "");
 
@@ -105,6 +107,7 @@ test("doctor JSON and human output agree with stable exit categories", async (t)
 test("CLI fails closed on unknown commands, flags, and missing option values", async () => {
   for (const args of [
     ["pack", "add"],
+    ["skill", "install"],
     ["doctor", "--repair"],
     ["init", "--apply"],
     ["doctor", "--project"],
@@ -119,6 +122,48 @@ test("CLI fails closed on unknown commands, flags, and missing option values", a
     assert.equal(result.stdout, "");
     assert.match(result.stderr, /Usage|Unknown|requires|repeated/);
   }
+});
+
+test("skill CLI commands expose read-only JSON and stable exit categories", async (t) => {
+  const { project } = await fixture(t);
+
+  const listed = await cli.runCli([
+    "skill",
+    "list",
+    "--project",
+    project,
+    "--json",
+  ]);
+  assert.equal(listed.exitCode, cli.CLI_EXIT_CODES.success);
+  assert.equal(JSON.parse(listed.stdout).commandId, "skill.list");
+
+  const missing = await cli.runCli([
+    "skill",
+    "check",
+    "--project",
+    project,
+    "--json",
+  ]);
+  assert.equal(missing.exitCode, cli.CLI_EXIT_CODES.success);
+  assert.equal(JSON.parse(missing.stdout).status, "attention");
+
+  await mkdir(
+    join(project, ".agents", "skills", "project-inspection"),
+    { recursive: true },
+  );
+  await writeFile(
+    join(project, ".agents", "skills", "project-inspection", "SKILL.md"),
+    "conflicting local skill\n",
+  );
+  const conflict = await cli.runCli([
+    "skill",
+    "check",
+    "--project",
+    project,
+    "--json",
+  ]);
+  assert.equal(conflict.exitCode, cli.CLI_EXIT_CODES.blocked);
+  assert.equal(JSON.parse(conflict.stdout).status, "blocked");
 });
 
 test("CLI bounds arguments, contains schema failures, and does not reflect terminal controls", async () => {

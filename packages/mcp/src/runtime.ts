@@ -12,6 +12,8 @@ import {
   runDoctor,
   runInit,
   runProjectInspect,
+  runSkillCheck,
+  runSkillList,
 } from "@ai-game-playbook/cli";
 import {
   assertValidatedRegistry,
@@ -74,7 +76,12 @@ type CommandHandler = (input: unknown) => Promise<unknown>;
 
 interface HandlerBinding {
   readonly packageName: "@ai-game-playbook/cli";
-  readonly exportName: "runDoctor" | "runInit" | "runProjectInspect";
+  readonly exportName:
+    | "runDoctor"
+    | "runInit"
+    | "runProjectInspect"
+    | "runSkillCheck"
+    | "runSkillList";
   readonly invoke: CommandHandler;
 }
 
@@ -119,6 +126,22 @@ const HANDLERS: ReadonlyMap<string, HandlerBinding> = new Map<
       packageName: "@ai-game-playbook/cli",
       exportName: "runProjectInspect",
       invoke: (input: unknown): Promise<unknown> => runProjectInspect(input),
+    }),
+  ],
+  [
+    "skill.check",
+    Object.freeze({
+      packageName: "@ai-game-playbook/cli",
+      exportName: "runSkillCheck",
+      invoke: (input: unknown): Promise<unknown> => runSkillCheck(input),
+    }),
+  ],
+  [
+    "skill.list",
+    Object.freeze({
+      packageName: "@ai-game-playbook/cli",
+      exportName: "runSkillList",
+      invoke: (input: unknown): Promise<unknown> => runSkillList(input),
     }),
   ],
 ]);

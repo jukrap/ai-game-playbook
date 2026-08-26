@@ -9,6 +9,8 @@ import { isAbsolute, resolve } from "node:path";
 import { runDoctor } from "./doctor.js";
 import { runInit } from "./init.js";
 import { runProjectInspect } from "./project-inspect.js";
+import { runSkillCheck } from "./skill-check.js";
+import { runSkillList } from "./skill-list.js";
 import { CliDeadlineError, runWithDeadline } from "./deadline.js";
 
 export interface CliExitCodes {
@@ -131,6 +133,38 @@ function projectInspectHelpText(): string {
     "  -h, --help        Show command help",
     "",
     "This command does not run Git, enumerate processes, connect to an Editor, or change files.",
+    "",
+  ].join("\n");
+}
+
+function skillListHelpText(): string {
+  return [
+    "Usage: agpb skill list [--project <path>] [--json]",
+    "",
+    "List the bounded registry skill catalog without materialization.",
+    "",
+    "Options:",
+    "  --project <path>  Select a project root; defaults to the current directory",
+    "  --json            Emit the registered skill catalog report as canonical JSON",
+    "  -h, --help        Show command help",
+    "",
+    "Skill installation is unavailable. This command never changes project files.",
+    "",
+  ].join("\n");
+}
+
+function skillCheckHelpText(): string {
+  return [
+    "Usage: agpb skill check [--project <path>] [--json]",
+    "",
+    "Inspect packaged skill targets in one project without mutation.",
+    "",
+    "Options:",
+    "  --project <path>  Select a project root; defaults to the current directory",
+    "  --json            Emit the registered skill check report as canonical JSON",
+    "  -h, --help        Show command help",
+    "",
+    "This command reports missing, current, conflicting, and unsafe targets without repair.",
     "",
   ].join("\n");
 }
@@ -309,6 +343,62 @@ function parseProjectInspectArguments(
   return Object.freeze({ json, projectRoot, help });
 }
 
+function parseSkillArguments(
+  args: readonly string[],
+  cwd: string,
+  command: "list" | "check",
+): ParsedDoctorArguments | CliRunResult {
+  let json = false;
+  let help = false;
+  let projectValue: string | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (value === "--json") {
+      if (json) {
+        return result(CLI_EXIT_CODES.usage, "", "Option --json was repeated.\n");
+      }
+      json = true;
+      continue;
+    }
+    if (value === "-h" || value === "--help") {
+      help = true;
+      continue;
+    }
+    if (value === "--project") {
+      const next = args[index + 1];
+      if (next === undefined || next.startsWith("-")) {
+        return result(
+          CLI_EXIT_CODES.usage,
+          "",
+          "Option --project requires one path.\n",
+        );
+      }
+      if (projectValue !== undefined) {
+        return result(
+          CLI_EXIT_CODES.usage,
+          "",
+          "Option --project was repeated.\n",
+        );
+      }
+      projectValue = next;
+      index += 1;
+      continue;
+    }
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Unknown skill ${command} option.\n${command === "list" ? skillListHelpText() : skillCheckHelpText()}`,
+    );
+  }
+  const projectRoot =
+    projectValue === undefined
+      ? cwd
+      : isAbsolute(projectValue)
+        ? projectValue
+        : resolve(cwd, projectValue);
+  return Object.freeze({ json, projectRoot, help });
+}
+
 function humanDoctorReport(report: Awaited<ReturnType<typeof runDoctor>>): string {
   const lines = [
     "AI Game Playbook doctor",
@@ -382,6 +472,64 @@ function humanProjectInspectReport(
   lines.push(
     "Static inspection only: no Git status, process inventory, Editor connection, or support-grade promotion.",
   );
+  return `${lines.join("\n")}\n`;
+}
+
+function humanSkillListReport(
+  report: Awaited<ReturnType<typeof runSkillList>>,
+): string {
+  const lines = [
+    "AI Game Playbook skill list",
+    `Status: ${report.status}`,
+    "Files changed: 0",
+    `Project: ${report.project.canonicalPath ?? report.project.requestedPath}`,
+    `Registered: ${report.summary.registered}`,
+  ];
+  for (const entry of report.entries) {
+    lines.push(
+      `  ${entry.id} ${entry.version} ${entry.invocation} -> ${entry.targetPath}`,
+    );
+  }
+  for (const issue of report.issues) {
+    lines.push(
+      "",
+      `${issue.severity.toUpperCase()} ${issue.code}  ${issue.message}`,
+      `        Next: ${issue.nextAction}`,
+    );
+  }
+  if (report.catalogDigest !== undefined) {
+    lines.push("", `Catalog digest: ${report.catalogDigest}`);
+  }
+  lines.push("Materialization support: unavailable; no project state was changed.");
+  return `${lines.join("\n")}\n`;
+}
+
+function humanSkillCheckReport(
+  report: Awaited<ReturnType<typeof runSkillCheck>>,
+): string {
+  const lines = [
+    "AI Game Playbook skill check",
+    `Status: ${report.status}`,
+    "Files changed: 0",
+    `Project: ${report.project.canonicalPath ?? report.project.requestedPath}`,
+    `Targets: missing ${report.summary.missing}, current ${report.summary.current}, conflict ${report.summary.conflict}, unsafe ${report.summary.unsafe}`,
+  ];
+  for (const check of report.checks) {
+    lines.push(
+      `  ${check.targetStatus.toUpperCase().padEnd(8)} ${check.id} -> ${check.targetPath}`,
+    );
+  }
+  for (const issue of report.issues) {
+    lines.push(
+      "",
+      `${issue.severity.toUpperCase()} ${issue.code}  ${issue.message}`,
+      `        Next: ${issue.nextAction}`,
+    );
+  }
+  if (report.checkDigest !== undefined) {
+    lines.push("", `Check digest: ${report.checkDigest}`);
+  }
+  lines.push("Inspection only: no skill was installed, replaced, or repaired.");
   return `${lines.join("\n")}\n`;
 }
 
@@ -577,6 +725,102 @@ async function dispatchProjectInspect(
   }
 }
 
+async function dispatchSkillList(
+  args: readonly string[],
+  options: CliRuntimeOptions,
+): Promise<CliRunResult> {
+  const parsed = parseSkillArguments(args, options.cwd ?? process.cwd(), "list");
+  if ("exitCode" in parsed) return parsed;
+  if (parsed.help) return result(CLI_EXIT_CODES.success, skillListHelpText());
+
+  const descriptor = BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "skill.list",
+  );
+  if (descriptor === undefined) {
+    return result(CLI_EXIT_CODES.failure, "", "The skill list command is unavailable.\n");
+  }
+  let input: ReturnType<typeof validateRegisteredContractValue>;
+  try {
+    input = validateRegisteredContractValue(
+      BUILTIN_REGISTRY,
+      descriptor.input,
+      { schemaVersion: "1.0.0", projectRoot: parsed.projectRoot },
+    );
+  } catch {
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      "Skill list input is outside the registered argument contract.\n",
+    );
+  }
+  try {
+    const report = await runWithDeadline(
+      () => runSkillList(input),
+      descriptor.timeoutMs,
+    );
+    return result(
+      report.status === "blocked" ? CLI_EXIT_CODES.blocked : CLI_EXIT_CODES.success,
+      parsed.json ? `${canonicalizeJson(report)}\n` : humanSkillListReport(report),
+    );
+  } catch (error) {
+    return result(
+      CLI_EXIT_CODES.failure,
+      "",
+      error instanceof CliDeadlineError
+        ? "Skill listing exceeded its registered deadline without producing a report.\n"
+        : "Skill listing failed before it could produce a validated report.\n",
+    );
+  }
+}
+
+async function dispatchSkillCheck(
+  args: readonly string[],
+  options: CliRuntimeOptions,
+): Promise<CliRunResult> {
+  const parsed = parseSkillArguments(args, options.cwd ?? process.cwd(), "check");
+  if ("exitCode" in parsed) return parsed;
+  if (parsed.help) return result(CLI_EXIT_CODES.success, skillCheckHelpText());
+
+  const descriptor = BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "skill.check",
+  );
+  if (descriptor === undefined) {
+    return result(CLI_EXIT_CODES.failure, "", "The skill check command is unavailable.\n");
+  }
+  let input: ReturnType<typeof validateRegisteredContractValue>;
+  try {
+    input = validateRegisteredContractValue(
+      BUILTIN_REGISTRY,
+      descriptor.input,
+      { schemaVersion: "1.0.0", projectRoot: parsed.projectRoot },
+    );
+  } catch {
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      "Skill check input is outside the registered argument contract.\n",
+    );
+  }
+  try {
+    const report = await runWithDeadline(
+      () => runSkillCheck(input),
+      descriptor.timeoutMs,
+    );
+    return result(
+      report.status === "blocked" ? CLI_EXIT_CODES.blocked : CLI_EXIT_CODES.success,
+      parsed.json ? `${canonicalizeJson(report)}\n` : humanSkillCheckReport(report),
+    );
+  } catch (error) {
+    return result(
+      CLI_EXIT_CODES.failure,
+      "",
+      error instanceof CliDeadlineError
+        ? "Skill checking exceeded its registered deadline without producing a report.\n"
+        : "Skill checking failed before it could produce a validated report.\n",
+    );
+  }
+}
+
 export async function runCli(
   args: readonly string[],
   options: CliRuntimeOptions = {},
@@ -618,6 +862,19 @@ export async function runCli(
       CLI_EXIT_CODES.usage,
       "",
       `Unknown project command.\n${projectInspectHelpText()}`,
+    );
+  }
+  if (args[0] === "skill") {
+    if (args[1] === "list") {
+      return dispatchSkillList(args.slice(2), options);
+    }
+    if (args[1] === "check") {
+      return dispatchSkillCheck(args.slice(2), options);
+    }
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Unknown skill command.\n${skillListHelpText()}${skillCheckHelpText()}`,
     );
   }
   return result(

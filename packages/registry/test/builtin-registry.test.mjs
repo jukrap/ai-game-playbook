@@ -11,7 +11,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.match(registry.BUILTIN_REGISTRY.digest, digestPattern);
   assert.deepEqual(
     registry.BUILTIN_REGISTRY.commands.map(({ id }) => id),
-    ["doctor", "init", "project.inspect"],
+    ["doctor", "init", "project.inspect", "skill.check", "skill.list"],
   );
 
   const doctor = registry.BUILTIN_REGISTRY.commands[0];
@@ -78,6 +78,35 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     ),
     true,
   );
+
+  for (const [id, inputSchema, outputSchema, exportName] of [
+    [
+      "skill.check",
+      contracts.skillCheckRequestSchema,
+      contracts.skillCheckReportSchema,
+      "runSkillCheck",
+    ],
+    [
+      "skill.list",
+      contracts.skillListRequestSchema,
+      contracts.skillListReportSchema,
+      "runSkillList",
+    ],
+  ]) {
+    const command = registry.BUILTIN_REGISTRY.commands.find(
+      ({ id: commandId }) => commandId === id,
+    );
+    assert.notEqual(command, undefined);
+    assert.deepEqual(command.cli, { path: id.split("."), aliases: [] });
+    assert.deepEqual(command.permissions, ["read-project"]);
+    assert.equal(command.sideEffects.every(({ kind }) => kind === "none"), true);
+    assert.equal(command.lane, "parallel-read");
+    assert.equal(command.input.schemaId, inputSchema.schemaId);
+    assert.equal(command.output.schemaId, outputSchema.schemaId);
+    assert.equal(command.handler.package, "@ai-game-playbook/cli");
+    assert.equal(command.handler.export, exportName);
+    assert.match(command.handler.digest, digestPattern);
+  }
 });
 
 test("builtin generated surfaces preserve implemented schema and command identity", () => {
@@ -87,20 +116,28 @@ test("builtin generated surfaces preserve implemented schema and command identit
     "doctor",
     "init",
     "project.inspect",
+    "skill.check",
+    "skill.list",
   ]);
   assert.deepEqual(surfaces.docs.data.commands.map(({ id }) => id), [
     "doctor",
     "init",
     "project.inspect",
+    "skill.check",
+    "skill.list",
   ]);
   assert.deepEqual(surfaces.mcp.data.tools.map(({ commandId }) => commandId), [
     "doctor",
     "init",
     "project.inspect",
+    "skill.check",
+    "skill.list",
   ]);
   assert.equal(surfaces.mcp.data.tools[0].enabledByDefault, false);
   assert.equal(surfaces.mcp.data.tools[1].enabledByDefault, false);
   assert.equal(surfaces.mcp.data.tools[2].enabledByDefault, false);
+  assert.equal(surfaces.mcp.data.tools[3].enabledByDefault, false);
+  assert.equal(surfaces.mcp.data.tools[4].enabledByDefault, false);
   assert.equal(
     surfaces.mcp.data.tools[0].outputSchemaId,
     contracts.doctorReportSchema.schemaId,

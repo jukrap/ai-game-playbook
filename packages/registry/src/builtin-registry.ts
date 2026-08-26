@@ -11,6 +11,10 @@ import {
   projectInspectReportSchema,
   projectInspectRequestSchema,
   runReceiptSchema,
+  skillCheckReportSchema,
+  skillCheckRequestSchema,
+  skillListReportSchema,
+  skillListRequestSchema,
   type CommandDescriptor,
   type PermissionClass,
   type ProjectStage,
@@ -182,6 +186,104 @@ const projectInspectCommand: CommandDescriptor = Object.freeze({
   }),
 });
 
+const skillCheckCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("skill.check"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "experimental",
+  summary: "Inspect project skill targets without mutation.",
+  cli: Object.freeze({
+    path: Object.freeze(["skill", "check"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: skillCheckRequestSchema.schemaId,
+    digest: skillCheckRequestSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: skillCheckReportSchema.schemaId,
+    digest: skillCheckReportSchema.digest,
+  }),
+  capabilities: Object.freeze([parseStableId("skill.check")]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "none",
+      scope: "project-skill-target-inspection",
+      boundary: "local",
+    }),
+  ]),
+  lane: "parallel-read",
+  timeoutMs: 10_000,
+  cancellation: Object.freeze({ mode: "not-applicable", graceMs: 0 }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: 10_000,
+    maxOutputBytes: 1_048_576,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([parseStableId("skill-check")]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/cli",
+    export: "runSkillCheck",
+    digest: parseSha256Digest(
+      "sha256:448ab2a9ab4667d2755399fecbb810cb434391b0980020b94e534ce0125caadb",
+    ),
+  }),
+});
+
+const skillListCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("skill.list"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "experimental",
+  summary: "List registered project skills without materialization.",
+  cli: Object.freeze({
+    path: Object.freeze(["skill", "list"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: skillListRequestSchema.schemaId,
+    digest: skillListRequestSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: skillListReportSchema.schemaId,
+    digest: skillListReportSchema.digest,
+  }),
+  capabilities: Object.freeze([parseStableId("skill.list")]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "none",
+      scope: "project-skill-catalog",
+      boundary: "local",
+    }),
+  ]),
+  lane: "parallel-read",
+  timeoutMs: 10_000,
+  cancellation: Object.freeze({ mode: "not-applicable", graceMs: 0 }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: 10_000,
+    maxOutputBytes: 1_048_576,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([parseStableId("skill-catalog")]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/cli",
+    export: "runSkillList",
+    digest: parseSha256Digest(
+      "sha256:e552074a0f66b46ebc363e8bc2406f3a47d4a6bb9e450769b72a12e2db8e779a",
+    ),
+  }),
+});
+
 const projectInspectionSkill: SkillDescriptor = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   id: parseStableId("project.inspection"),
@@ -231,8 +333,18 @@ const definition: RegistryDefinition = Object.freeze({
     projectInspectRequestSchema,
     projectInspectReportSchema,
     runReceiptSchema,
+    skillCheckRequestSchema,
+    skillCheckReportSchema,
+    skillListRequestSchema,
+    skillListReportSchema,
   ]),
-  commands: Object.freeze([doctorCommand, initCommand, projectInspectCommand]),
+  commands: Object.freeze([
+    doctorCommand,
+    initCommand,
+    projectInspectCommand,
+    skillCheckCommand,
+    skillListCommand,
+  ]),
   skills: Object.freeze([projectInspectionSkill]),
   roleLenses: Object.freeze([]),
   workflows: Object.freeze([]),

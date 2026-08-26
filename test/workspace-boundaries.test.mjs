@@ -82,6 +82,7 @@ test("workspace packages stay private and follow the foundation dependency direc
     "@ai-game-playbook/core": "workspace:*",
     "@ai-game-playbook/pack-runtime": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
+    "@ai-game-playbook/skill-runtime": "workspace:*",
   });
 });
 

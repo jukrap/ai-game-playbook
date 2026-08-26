@@ -38,6 +38,9 @@ importers:
       '@ai-game-playbook/registry':
         specifier: workspace:*
         version: link:../registry
+      '@ai-game-playbook/skill-runtime':
+        specifier: workspace:*
+        version: link:../skill-runtime
 
   packages/codex-adapter:
     dependencies:

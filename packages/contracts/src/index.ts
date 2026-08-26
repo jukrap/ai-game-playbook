@@ -10,6 +10,17 @@ export type {
   CanonicalJsonValue,
 } from "./canonical-json.js";
 export {
+  approvalGrantSchema,
+  computeApprovalGrantSigningDigest,
+  isCanonicalApprovalDestination,
+  isCanonicalApprovalScope,
+} from "./approval-contracts.js";
+export type {
+  ApprovalGrant,
+  ApprovalGrantScope,
+  ApprovalGrantSigningDigestInput,
+} from "./approval-contracts.js";
+export {
   CONTRACT_SCHEMA_DRAFT,
   CONTRACT_SCHEMA_MAX_BYTES,
   defineContractSchema,
@@ -171,6 +182,7 @@ export type {
   RunHandleStatus,
 } from "./run-engine-contracts.js";
 export {
+  checkApprovalGrantSemantics,
   checkAssetProvenanceSemantics,
   checkEngineCapabilityReportSemantics,
   checkFeatureContractSemantics,

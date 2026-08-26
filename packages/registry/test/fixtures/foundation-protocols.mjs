@@ -7,6 +7,43 @@ const requestId = "018f6f35-2c9e-7d1a-8a4b-123456789abe";
 const sessionId = "018f6f35-2c9e-7d1a-8a4b-123456789abf";
 
 export const validFoundationProtocolFixtures = {
+  "approval-grant": {
+    schemaVersion: "1.0.0",
+    grantId: "approval.network-once",
+    permission: "network",
+    projectId: "sample.graybox",
+    projectIdentityDigest: digest,
+    command: {
+      id: "evidence.export",
+      version: "1.0.0",
+      handlerDigest: secondDigest,
+    },
+    registryDigest: digest,
+    scope: {
+      paths: [],
+      objectIds: [],
+      destinations: ["https://api.example.com"],
+      dataClasses: [],
+      publishTargets: [],
+    },
+    budgets: {
+      expiresAt: "2026-08-26T01:07:03.000Z",
+      maxUses: 1,
+      execution: {
+        maxDurationMs: 60000,
+        maxOutputBytes: 1048576,
+        maxRepairCycles: 0,
+      },
+    },
+    requestDigest: secondDigest,
+    approvedBy: "user",
+    approvedAt: startedAt,
+    signature: {
+      algorithm: "ed25519",
+      keyId: "approval.local-key",
+      value: "A".repeat(86),
+    },
+  },
   "run-handle": {
     schemaVersion: "1.0.0",
     runId,

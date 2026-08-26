@@ -30,6 +30,7 @@ import {
   engineSessionIdentitySchema,
   runHandleSchema,
 } from "./run-engine-contracts.js";
+import { approvalGrantSchema } from "./approval-contracts.js";
 import { taskRoutingSelectionSchema } from "./routing-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
@@ -55,6 +56,7 @@ export const ORCHESTRATION_DESCRIPTOR_SCHEMAS: ContractSchemaCatalog =
 
 export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
   Object.freeze({
+    "approval-grant": approvalGrantSchema,
     "build-artifact-evidence": buildArtifactEvidenceSchema,
     "engine-diagnostic": engineDiagnosticSchema,
     "engine-operation-request": engineOperationRequestSchema,

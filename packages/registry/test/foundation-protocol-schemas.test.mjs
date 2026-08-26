@@ -8,6 +8,7 @@ import addFormats from "ajv-formats";
 import { validFoundationProtocolFixtures } from "./fixtures/foundation-protocols.mjs";
 
 const expectedIds = [
+  "approval-grant",
   "build-artifact-evidence",
   "engine-diagnostic",
   "engine-operation-request",
@@ -50,6 +51,27 @@ test("foundation protocol schemas are complete, versioned, and strictly valid", 
 test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", () => {
   const fixtures = validFoundationProtocolFixtures;
   const invalidCases = [
+    [
+      "approval-grant",
+      {
+        ...fixtures["approval-grant"],
+        budgets: { ...fixtures["approval-grant"].budgets, maxUses: 2 },
+      },
+    ],
+    [
+      "approval-grant",
+      {
+        ...fixtures["approval-grant"],
+        scope: { ...fixtures["approval-grant"].scope, destinations: [] },
+      },
+    ],
+    [
+      "approval-grant",
+      {
+        ...fixtures["approval-grant"],
+        permission: "editor-control",
+      },
+    ],
     ["run-handle", { ...fixtures["run-handle"], status: "done" }],
     [
       "run-handle",

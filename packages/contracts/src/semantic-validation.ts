@@ -5,11 +5,20 @@ import {
   type FeatureContract,
   type RunReceipt,
 } from "./feature-evidence-contracts.js";
+import {
+  isCanonicalApprovalDestination,
+  isCanonicalApprovalScope,
+  type ApprovalGrant,
+} from "./approval-contracts.js";
 import type { InputReplayTrace } from "./engine-evidence-contracts.js";
 import type { EngineCapabilityReport } from "./project-engine-contracts.js";
 import type { RunHandle } from "./run-engine-contracts.js";
 
 export type ContractSemanticIssueCode =
+  | "approval-grant-destination-noncanonical"
+  | "approval-grant-scope-noncanonical"
+  | "approval-grant-timestamp-invalid"
+  | "approval-grant-window-invalid"
   | "asset-provenance-approval-missing"
   | "asset-provenance-cost-overrun"
   | "asset-provenance-current-file-invalid"
@@ -81,6 +90,56 @@ function decimalMicros(value: string): bigint | undefined {
   }
   const fraction = (match[2] ?? "").padEnd(6, "0");
   return BigInt(match[1]) * 1_000_000n + BigInt(fraction || "0");
+}
+
+export function checkApprovalGrantSemantics(
+  grant: ApprovalGrant,
+): readonly ContractSemanticIssue[] {
+  const issues: ContractSemanticIssue[] = [];
+  const approvedAt = timestampMillis(grant.approvedAt);
+  const expiresAt = timestampMillis(grant.budgets.expiresAt);
+  if (approvedAt === undefined || expiresAt === undefined) {
+    issues.push(
+      issue(
+        "approval-grant-timestamp-invalid",
+        "/approvedAt",
+        "Approval grant timestamps must be valid date-time values.",
+      ),
+    );
+  } else if (approvedAt >= expiresAt) {
+    issues.push(
+      issue(
+        "approval-grant-window-invalid",
+        "/budgets/expiresAt",
+        "Approval grant expiry must occur after approval time.",
+      ),
+    );
+  }
+
+  if (!isCanonicalApprovalScope(grant.scope)) {
+    issues.push(
+      issue(
+        "approval-grant-scope-noncanonical",
+        "/scope",
+        "Approval grant scope arrays must be strictly sorted and unique.",
+      ),
+    );
+  }
+  if (
+    grant.scope.destinations.some(
+      (destination) => !isCanonicalApprovalDestination(destination),
+    )
+  ) {
+    issues.push(
+      issue(
+        "approval-grant-destination-noncanonical",
+        "/scope/destinations",
+        "Approval destinations must be canonical HTTP or HTTPS origins.",
+      ),
+    );
+  }
+
+  return freezeIssues(issues);
 }
 
 export function checkRunHandleSemantics(

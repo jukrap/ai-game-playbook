@@ -219,6 +219,7 @@ export interface PermissionSettlement {
     | "scope-violation";
   readonly mutationUncertain: boolean;
   readonly violations: readonly string[];
+  readonly actual: PermissionActualEffects;
   readonly settledAt: string;
 }
 
@@ -246,6 +247,11 @@ export type PermissionAuthorizationDecision =
       readonly lease: PermissionAuthorizationLease;
     };
 
+export type AuthorizedPermissionDecision = Extract<
+  PermissionAuthorizationDecision,
+  { readonly status: "authorized" }
+>;
+
 export interface PermissionBroker {
   prepare(
     request: PermissionAuthorizationRequest,
@@ -272,6 +278,8 @@ interface GrantUsage {
 }
 
 const preparedChallenges = new WeakSet<object>();
+const authorizationLeaseInstances = new WeakSet<object>();
+const permissionSettlementInstances = new WeakSet<object>();
 
 function boundaryError(
   code: ConstructorParameters<typeof CoreBoundaryError>[0],
@@ -280,6 +288,50 @@ function boundaryError(
   mutationUncertain = false,
 ): CoreBoundaryError {
   return new CoreBoundaryError(code, path, message, mutationUncertain);
+}
+
+export function assertAuthorizedPermissionDecision(
+  value: unknown,
+): asserts value is AuthorizedPermissionDecision {
+  const candidate =
+    value !== null && typeof value === "object"
+      ? (value as Partial<AuthorizedPermissionDecision>)
+      : undefined;
+  const challenge = candidate?.challenge;
+  const lease = candidate?.lease;
+  if (
+    candidate?.status !== "authorized" ||
+    challenge === undefined ||
+    lease === undefined ||
+    !preparedChallenges.has(challenge) ||
+    !authorizationLeaseInstances.has(lease) ||
+    lease.requestDigest !== challenge.requestDigest ||
+    lease.commandId !== challenge.command.id ||
+    lease.projectId !== challenge.project.id
+  ) {
+    throw boundaryError(
+      "permission-lease-state-invalid",
+      "$authorization",
+      "authorization decision must be produced by a permission broker in this process",
+    );
+  }
+}
+
+export function assertPermissionSettlement(
+  value: unknown,
+): asserts value is PermissionSettlement {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    !permissionSettlementInstances.has(value)
+  ) {
+    throw boundaryError(
+      "permission-lease-state-invalid",
+      "$settlement",
+      "permission settlement must be produced by a permission broker in this process",
+      true,
+    );
+  }
 }
 
 function readClock(now: () => number): number {
@@ -1013,7 +1065,13 @@ function normalizeWorkflow(
   });
   const workflow = registry.workflows.find(({ id }) => id === binding.id);
   const step = workflow?.steps.find(({ id }) => id === binding.stepId);
-  if (workflow === undefined || step?.commandId !== commandId) {
+  const matchesForwardCommand = step?.commandId === commandId;
+  const matchesRollbackCommand =
+    step?.onFailure === "rollback" && step.rollbackCommandId === commandId;
+  if (
+    workflow === undefined ||
+    (!matchesForwardCommand && !matchesRollbackCommand)
+  ) {
     throw boundaryError(
       "permission-workflow-invalid",
       "$request.workflow",
@@ -1274,6 +1332,7 @@ class PermissionAuthorizationLeaseImplementation
     this.#onUncertain = onUncertain;
     this.#onSettled = onSettled;
     Object.freeze(this);
+    authorizationLeaseInstances.add(this);
   }
 
   get state(): "active" | "settled" {
@@ -1349,14 +1408,17 @@ class PermissionAuthorizationLeaseImplementation
         : mutationUncertain
           ? "uncertain"
           : outcome;
-      return Object.freeze({
+      const settlement = Object.freeze({
         authorizationId: this.authorizationId,
         requestDigest: this.requestDigest,
         status,
         mutationUncertain: effectiveUncertain,
         violations: Object.freeze(violations),
+        actual,
         settledAt: new Date(settledNow).toISOString(),
       });
+      permissionSettlementInstances.add(settlement);
+      return settlement;
     } catch (error) {
       if (this.#mutationPotential) {
         this.#onUncertain(this.requestDigest);

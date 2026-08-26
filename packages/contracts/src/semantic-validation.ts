@@ -19,6 +19,10 @@ import {
   type ResolvedWorkflowCommand,
   type ResolvedWorkflowPlan,
 } from "./workflow-runtime-contracts.js";
+import {
+  isWorkflowCheckpointDigestValid,
+  type WorkflowCheckpointRecord,
+} from "./workflow-checkpoint-contracts.js";
 
 export type ContractSemanticIssueCode =
   | "approval-grant-destination-noncanonical"
@@ -51,8 +55,13 @@ export type ContractSemanticIssueCode =
   | "engine-capability-planned-without-reason"
   | "engine-capability-verified-without-receipt"
   | "engine-capability-verified-without-runtime-evidence"
+  | "run-receipt-authority-canonical-invalid"
   | "run-receipt-digest-mismatch"
   | "run-receipt-duration-mismatch"
+  | "run-receipt-effect-canonical-invalid"
+  | "run-receipt-effect-duration-mismatch"
+  | "run-receipt-effect-mutation-mismatch"
+  | "run-receipt-feature-identity-invalid"
   | "run-receipt-invalid-timestamp"
   | "run-receipt-self-parent"
   | "run-receipt-success-contradiction"
@@ -66,7 +75,14 @@ export type ContractSemanticIssueCode =
   | "resolved-workflow-plan-digest-mismatch"
   | "resolved-workflow-plan-order-invalid"
   | "run-receipt-uncertain-mutation-contradiction"
-  | "run-receipt-unexpected-dirty-success";
+  | "run-receipt-unexpected-dirty-success"
+  | "workflow-checkpoint-attempt-invalid"
+  | "workflow-checkpoint-canonical-invalid"
+  | "workflow-checkpoint-chain-invalid"
+  | "workflow-checkpoint-digest-mismatch"
+  | "workflow-checkpoint-identity-invalid"
+  | "workflow-checkpoint-state-invalid"
+  | "workflow-checkpoint-time-invalid";
 
 export interface ContractSemanticIssue {
   readonly code: ContractSemanticIssueCode;
@@ -121,6 +137,164 @@ function bindingKey(binding: {
   readonly source: string;
 }): string {
   return `${binding.target}\u0000${binding.source}`;
+}
+
+export function checkWorkflowCheckpointSemantics(
+  checkpoint: WorkflowCheckpointRecord,
+): readonly ContractSemanticIssue[] {
+  const issues: ContractSemanticIssue[] = [];
+  if (!isWorkflowCheckpointDigestValid(checkpoint)) {
+    issues.push(
+      issue(
+        "workflow-checkpoint-digest-mismatch",
+        "/checkpointDigest",
+        "Workflow checkpoint digest does not attest the immutable record body.",
+      ),
+    );
+  }
+
+  const createdAt = timestampMillis(checkpoint.createdAt);
+  const updatedAt = timestampMillis(checkpoint.updatedAt);
+  const expiresAt = timestampMillis(checkpoint.expiresAt);
+  const authorizationExpiresAt =
+    checkpoint.inFlight === undefined
+      ? undefined
+      : timestampMillis(checkpoint.inFlight.authorizationExpiresAt);
+  const resumable =
+    checkpoint.status === "prepared" ||
+    checkpoint.status === "running" ||
+    checkpoint.status === "waiting-approval" ||
+    checkpoint.status === "waiting-restart" ||
+    checkpoint.status === "waiting-rollback" ||
+    checkpoint.status === "rolling-back" ||
+    checkpoint.status === "uncertain";
+  if (
+    createdAt === undefined ||
+    updatedAt === undefined ||
+    expiresAt === undefined ||
+    createdAt > updatedAt ||
+    (resumable && updatedAt >= expiresAt) ||
+    (checkpoint.inFlight !== undefined &&
+      (authorizationExpiresAt === undefined ||
+        updatedAt === undefined ||
+        ((checkpoint.status === "running" ||
+          checkpoint.status === "rolling-back") &&
+          updatedAt >= authorizationExpiresAt)))
+  ) {
+    issues.push(
+      issue(
+        "workflow-checkpoint-time-invalid",
+        "/updatedAt",
+        "Checkpoint timestamps must be ordered and resumable state must remain before expiry.",
+      ),
+    );
+  }
+
+  const hasParent = checkpoint.parentCheckpointDigest !== undefined;
+  if (
+    (checkpoint.sequence === 0 && hasParent) ||
+    (checkpoint.sequence > 0 && !hasParent)
+  ) {
+    issues.push(
+      issue(
+        "workflow-checkpoint-chain-invalid",
+        "/parentCheckpointDigest",
+        "Only the initial checkpoint may omit its parent digest.",
+      ),
+    );
+  }
+
+  const hasFeatureId = checkpoint.identity.featureId !== undefined;
+  const hasFeatureDigest =
+    checkpoint.identity.featureContractDigest !== undefined;
+  if (hasFeatureId !== hasFeatureDigest) {
+    issues.push(
+      issue(
+        "workflow-checkpoint-identity-invalid",
+        "/identity",
+        "Feature identity and feature contract digest must be retained together.",
+      ),
+    );
+  }
+
+  let canonicalInvalid =
+    !isStrictlyCanonical(checkpoint.evidenceKinds) ||
+    !isStrictlyCanonical(checkpoint.artifactDigests);
+  if (
+    checkpoint.inFlight !== undefined &&
+    (!isStrictlyCanonical(checkpoint.inFlight.approvalIds) ||
+      !commandPermissionsAreCanonical(checkpoint.inFlight.command))
+  ) {
+    canonicalInvalid = true;
+  }
+  if (canonicalInvalid) {
+    issues.push(
+      issue(
+        "workflow-checkpoint-canonical-invalid",
+        "/evidenceKinds",
+        "Checkpoint evidence, artifact, approval, and permission arrays must be strictly canonical.",
+      ),
+    );
+  }
+
+  const requiresInFlight =
+    checkpoint.status === "running" ||
+    checkpoint.status === "rolling-back" ||
+    checkpoint.status === "uncertain";
+  const inFlight = checkpoint.inFlight;
+  const inFlightContradiction =
+    requiresInFlight !== (inFlight !== undefined) ||
+    (checkpoint.status === "running" &&
+      inFlight !== undefined &&
+      (inFlight.phase !== "command" ||
+        (inFlight.sideEffect !== "not-started" &&
+          inFlight.sideEffect !== "started"))) ||
+    (checkpoint.status === "rolling-back" &&
+      inFlight !== undefined &&
+      (inFlight.phase !== "rollback" ||
+        (inFlight.sideEffect !== "not-started" &&
+          inFlight.sideEffect !== "started"))) ||
+    (checkpoint.status === "uncertain" &&
+      inFlight !== undefined &&
+      inFlight.sideEffect !== "uncertain") ||
+    (inFlight !== undefined && inFlight.ordinal !== checkpoint.nextOrdinal);
+  if (inFlightContradiction) {
+    issues.push(
+      issue(
+        "workflow-checkpoint-state-invalid",
+        "/status",
+        "Checkpoint status, cursor, phase, and in-flight side-effect state are inconsistent.",
+      ),
+    );
+  }
+
+  const attemptKeys = new Set<string>();
+  let attemptInvalid = false;
+  for (const attempt of checkpoint.attempts) {
+    const key = `${attempt.ordinal}\u0000${attempt.attempt}\u0000${attempt.phase}`;
+    if (attemptKeys.has(key) || attempt.ordinal > checkpoint.nextOrdinal) {
+      attemptInvalid = true;
+    }
+    attemptKeys.add(key);
+  }
+  const lastAttempt = checkpoint.attempts.at(-1);
+  if (
+    attemptInvalid ||
+    (lastAttempt === undefined) !==
+      (checkpoint.receiptChainHead === undefined) ||
+    (lastAttempt !== undefined &&
+      checkpoint.receiptChainHead !== lastAttempt.receiptDigest)
+  ) {
+    issues.push(
+      issue(
+        "workflow-checkpoint-attempt-invalid",
+        "/attempts",
+        "Checkpoint attempts must be unique, cursor-bounded, and agree with the receipt chain head.",
+      ),
+    );
+  }
+
+  return freezeIssues(issues);
 }
 
 export function checkResolvedWorkflowPlanSemantics(
@@ -740,6 +914,74 @@ export function checkRunReceiptSemantics(
         "run-receipt-self-parent",
         "/previousReceiptDigest",
         "A receipt cannot name itself as its previous receipt.",
+      ),
+    );
+  }
+  if (
+    (receipt.identity.featureId === undefined) !==
+    (receipt.identity.featureContractDigest === undefined)
+  ) {
+    issues.push(
+      issue(
+        "run-receipt-feature-identity-invalid",
+        "/identity",
+        "Feature identity and feature contract digest must be retained together.",
+      ),
+    );
+  }
+  if (
+    !isStrictlyCanonical(receipt.authority.packDigests) ||
+    !isStrictlyCanonical(receipt.authority.approvalIds)
+  ) {
+    issues.push(
+      issue(
+        "run-receipt-authority-canonical-invalid",
+        "/authority",
+        "Pack and approval authority arrays must be strictly canonical.",
+      ),
+    );
+  }
+  if (
+    !isStrictlyCanonical(receipt.effects.changedPaths) ||
+    !isStrictlyCanonical(receipt.effects.objectIds) ||
+    !isStrictlyCanonical(receipt.effects.destinations) ||
+    !isStrictlyCanonical(receipt.effects.dataClasses) ||
+    !isStrictlyCanonical(receipt.effects.changeKinds) ||
+    !isStrictlyCanonical(receipt.effects.publishTargets)
+  ) {
+    issues.push(
+      issue(
+        "run-receipt-effect-canonical-invalid",
+        "/effects",
+        "Actual effect arrays must be strictly canonical.",
+      ),
+    );
+  }
+  if (receipt.effects.durationMs !== receipt.timing.durationMs) {
+    issues.push(
+      issue(
+        "run-receipt-effect-duration-mismatch",
+        "/effects/durationMs",
+        "Actual effect duration must equal the attested run duration.",
+      ),
+    );
+  }
+  const mutationPaths = [
+    ...receipt.mutation.changedFiles.map(({ path }) => path),
+    ...receipt.mutation.unexpectedDirtyFiles,
+  ].sort(compareCanonicalText);
+  if (
+    new Set(mutationPaths).size !== mutationPaths.length ||
+    mutationPaths.length !== receipt.effects.changedPaths.length ||
+    mutationPaths.some(
+      (path, index) => path !== receipt.effects.changedPaths[index],
+    )
+  ) {
+    issues.push(
+      issue(
+        "run-receipt-effect-mutation-mismatch",
+        "/effects/changedPaths",
+        "Actual changed paths must exactly reconcile declared file mutations.",
       ),
     );
   }

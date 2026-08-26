@@ -1,12 +1,12 @@
 ---
 source: README.md
-source_sha256: 119ee923d9355da1cdb85827f0863e4cfa751d9594da05e65ecc1a94d72c441c
+source_sha256: 07c80e9a95cdd567c423ed67e3445eb0744ea75761f77f352977d5cc4c9e20b7
 translated_at: 2026-08-26
 ---
 
 # AI Game Playbook
 
-> 상태: control plane 계약, registry, 초기 core filesystem/process/project-lane/permission-admission 경계를 구현하는 단계입니다. 설치 가능한 패키지, `agpb` 실행 파일, MCP 서버, 엔진 어댑터는 아직 없습니다.
+> 상태: control plane 계약, registry, 초기 core filesystem/process/project-lane/permission/workflow-checkpoint 경계를 구현하는 단계입니다. 설치 가능한 패키지, `agpb` 실행 파일, MCP 서버, 엔진 어댑터는 아직 없습니다.
 
 [English](README.md)
 
@@ -16,12 +16,12 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine으로 게임을 만드는 
 
 - versioned 공개 schema와 semantic validation을 포함한 pnpm/TypeScript workspace.
 - command, skill, workflow, role lens, schema, pack descriptor를 검증하고 범위가 제한된 설계 projection을 생성하며 exact command authority에 결합된 결정적 workflow plan을 해석하는 typed registry.
-- canonical project root 결합, portable path 해석, staged SHA-256 compare-and-swap 쓰기, digest 결합 direct process 실행, 초기화된 project마다 root/project에 결합된 mutating lease 하나, registry 결합 permission admission과 서명된 scoped grant를 제공하는 초기 private core package.
+- canonical project root 결합, portable path 해석, staged SHA-256 compare-and-swap 쓰기, digest 결합 direct process 실행, 초기화된 project마다 root/project에 결합된 mutating lease 하나, registry 결합 permission admission과 서명된 scoped grant, in-memory resolved-plan state machine을 제공하는 초기 private core package.
 - 의도한 command 및 skill surface를 담은 digest 결합 추적 계획.
 - 영어 문서와 한국어 미러.
 - contract, 생성 계획 drift, 문서 정합성을 검사하는 cross-platform static check.
 
-이 기반은 개발용 library와 검사이며 사용 가능한 제품이 아닙니다. registry는 유한한 workflow plan을 attest할 수 있지만 이를 실행하는 workflow state machine은 없습니다. lane primitive는 미리 생성된 local project state와 명시적 갱신이 필요하고 아직 parallel reader를 조정하거나 Editor를 제어하지 않습니다. permission primitive는 실제 등록 command input, project/feature/workflow/session scope, 실행 budget, Ed25519 grant, use count, 보고된 effect를 검증하지만 in-memory이고 dispatcher, approval UI, durable checkpoint, recovery flow에 연결되지 않았습니다. CPU와 memory sandbox도 아직 없습니다. 현재 저장소는 설치 가능한 npm 패키지나 동작하는 게임 엔진 자동화를 제공하지 않습니다. 문서의 명령은 인터페이스 계획이며 지금 실행할 수 있는 명령이 아닙니다.
+이 기반은 개발용 library와 검사이며 사용 가능한 제품이 아닙니다. private state machine은 immutable hash-linked checkpoint를 만들고 authorization과 dispatch를 분리하며 exact run receipt와 보고된 effect를 정산하고 선언된 failure 또는 rollback transition을 진행하며 uncertainty나 누적 budget 초과에서 중단합니다. 아직 in-memory이므로 checkpoint, approval use, uncertainty barrier가 restart 뒤에는 유지되지 않고 이 primitive를 호출하는 dispatcher나 approval UI도 없습니다. lane primitive도 미리 생성된 local project state와 명시적 갱신이 필요하며 parallel reader를 조정하거나 Editor를 제어하지 않습니다. CPU와 memory sandbox도 아직 없습니다. 현재 저장소는 설치 가능한 npm 패키지나 동작하는 게임 엔진 자동화를 제공하지 않습니다. 문서의 명령은 인터페이스 계획이며 지금 실행할 수 있는 명령이 아닙니다.
 
 ## 제품 방향
 

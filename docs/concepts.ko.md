@@ -1,12 +1,12 @@
 ---
 source: docs/concepts.md
-source_sha256: a3c93edfb0451dc1ee8f7c68f76a5bb886053c7dc8c32655030c1011f8cb8c21
+source_sha256: de3afa8ef2acdc723d9aee583340b34045968925a7ad037745113158b5c97296
 translated_at: 2026-08-26
 ---
 
 # 핵심 개념과 공개 타입
 
-> 상태: versioned schema, semantic validator, 결정적 workflow-plan 해석, 초기 private permission consumer를 구현했습니다. 실행 가능한 runtime surface와 engine capability는 아직 계획 단계입니다.
+> 상태: versioned schema, semantic validator, 결정적 workflow-plan 해석, 초기 private permission 및 workflow-state consumer를 구현했습니다. 실행 가능한 제품 surface와 engine capability는 아직 계획 단계입니다.
 
 [English](concepts.md) · [문서](README.ko.md)
 
@@ -33,7 +33,8 @@ adapter는 지원하지 않는 단계를 보고할 수 있습니다. 필수 단�
 | `FeatureContract` | 플레이어가 볼 결과, 허용 변경 범위, 완료 조건, 위험, budget, rollback plan |
 | `ApprovalGrant` | exact project, command, request, scope, budget, expiration, 필요한 경우 feature/workflow/Editor session identity에 결합된 단일 signed permission |
 | `ResolvedWorkflowPlan` | 실행 전 exact registry, workflow, stage, command와 handler authority, lane, permission, budget, transition, evidence duty에 결합된 하나의 유한 DAG |
-| `RunReceipt` | run identity, tool/command, 시간, exit/inner result, log, test, capture, artifact hash, changed file, recovery result |
+| `WorkflowCheckpointRecord` | immutable sequence, exact resolved-plan 및 project authority, in-flight authorization, attempt, 누적 budget, evidence, receipt-chain head, TTL, parent digest |
+| `RunReceipt` | run, feature, plan, command descriptor, handler, input, authorization identity와 timing, outer/inner result, artifact, changed file, recovery result |
 | `AssetProvenance` | asset source와 lineage, 권리, transform, 필요 시 provider/model/checkpoint/seed, cost/approval, file hash, QA state |
 
 schema identifier와 command identifier는 안정적인 machine name입니다. 사람이 읽는 help와 translation은 대체 command identity를 만들지 않습니다.
@@ -50,7 +51,7 @@ mutation 전, Editor reload/restart 후, evidence 승격 전에 identity를 검�
 - **role lens**는 판단 질문과 evidence 책임을 가진 검토 관점이며 가상 직원이나 독립 executor가 아닙니다.
 - **workflow**는 checkpoint, budget, stop condition을 갖춘 등록 command의 제한된 순서입니다. 실행 전에 descriptor를 결정적인 위상 순서와 exact implementation authority를 가진 domain-separated plan으로 해석합니다.
 
-기본 계획은 작업마다 skill 1~5개와 role lens 최대 3개를 선택합니다. 하나의 executor가 mutation을 소유하고 병렬 작업은 안전한 read와 독립 분석으로 제한합니다. resolved plan을 소비할 workflow state machine과 checkpoint runtime은 아직 구현하지 않았습니다.
+기본 계획은 작업마다 skill 1~5개와 role lens 최대 3개를 선택합니다. 하나의 executor가 mutation을 소유하고 병렬 작업은 안전한 read와 독립 분석으로 제한합니다. private in-memory state machine은 이제 resolved plan을 소비하고 authorization과 dispatch 경계를 분리하며 exact permission settlement와 receipt를 검증하고 선언된 failure/rollback transition을 진행하며 uncertainty나 누적 budget 초과를 차단합니다. durable storage, restart hydration, command dispatch, engine 실행은 아직 구현하지 않았습니다.
 
 ## 실행 결과
 

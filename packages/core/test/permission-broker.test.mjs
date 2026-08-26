@@ -27,6 +27,7 @@ function featureContract() {
 function brokerRegistry({
   approvalCheckpoint = false,
   inspectBudgetOverrides = {},
+  workflowBudgetOverrides = {},
 } = {}) {
   const definition = createValidRegistryDefinition();
   definition.schemas.push(contracts.approvalGrantSchema);
@@ -81,6 +82,10 @@ function brokerRegistry({
     ({ id }) => id === "step.verify",
   );
   verifyStep.approvalCheckpoint = approvalCheckpoint;
+  definition.workflows[0].budgets = {
+    ...definition.workflows[0].budgets,
+    ...workflowBudgetOverrides,
+  };
   return registry.validateRegistry(definition);
 }
 
@@ -267,6 +272,48 @@ test("source and test authority require a current feature and registered workflo
   );
 });
 
+test("workflow authority accepts only the rollback command declared by the bound step", () => {
+  const rollbackRegistry = brokerRegistry({
+    workflowBudgetOverrides: {
+      maxChangedFiles: 1,
+      maxChangedBytes: 1024,
+    },
+  });
+  const broker = createBroker({ registry: rollbackRegistry });
+  const feature = featureContract();
+  const rollbackRequest = request("engine.rollback", {
+    featureContract: feature,
+    input: feature,
+    workflow: {
+      id: "workflow.verify-feature",
+      stepId: "step.verify",
+      resolvedPlanDigest: planDigest,
+    },
+    editorSessionIdentityDigest,
+    scope: scope({ changeKinds: ["source"] }),
+    budgets: budgets({ maxChangedFiles: 1, maxChangedBytes: 1024 }),
+  });
+  const pending = broker.authorize(rollbackRequest, []);
+  assert.equal(pending.status, "approval-required");
+  const grant = signedGrant(pending.challenge, "editor-control");
+  assert.equal(broker.authorize(rollbackRequest, [grant]).status, "authorized");
+
+  assert.throws(
+    () =>
+      createBroker({ registry: rollbackRegistry }).authorize(
+        {
+          ...rollbackRequest,
+          workflow: {
+            ...rollbackRequest.workflow,
+            stepId: "step.inspect",
+          },
+        },
+        [],
+      ),
+    expectCoreError("permission-workflow-invalid"),
+  );
+});
+
 test("filesystem installation requires at least one explicit target path", () => {
   const broker = createBroker();
   assert.throws(
@@ -433,6 +480,10 @@ test("explicit approvals are exact, signed, single-use, and consumed atomically"
     },
   });
   assert.equal(completed.status, "succeeded");
+  assert.deepEqual(completed.actual.destinations, ["https://api.example.com"]);
+  assert.equal(completed.actual.durationMs, 10);
+  assert.equal(Object.isFrozen(completed.actual), true);
+  assert.equal(Object.isFrozen(completed.actual.destinations), true);
 
   assert.throws(
     () => broker.authorize(networkRequest, [grant]),

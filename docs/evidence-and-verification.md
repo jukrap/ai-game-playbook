@@ -1,6 +1,6 @@
 # Evidence and Verification
 
-> Status: planned verification contract. No product receipts or engine evidence exist yet.
+> Status: the receipt and checkpoint contracts and their in-memory settlement boundary are implemented. Durable product receipts and engine evidence do not exist yet.
 
 [한국어](evidence-and-verification.ko.md) · [Documentation](README.md)
 
@@ -18,16 +18,16 @@ Grades are ordinal but not interchangeable. A document, code path, fixture, scre
 
 ## `RunReceipt`
 
-A planned receipt binds the following to one run identity:
+The implemented receipt contract binds the following to one run identity:
 
-- Project, feature, workflow, step, process, editor session, engine, version, renderer, scene/world, and camera identity.
-- Registry, command, handler, tool, input, configuration, and environment digests.
+- Project, exact feature contract, resolved workflow plan, step/phase/attempt, editor session, optional engine, and environment identity.
+- Registry, command descriptor, handler, input, authorization request, approval, and optional pack digests.
 - Start/end times, timeout/cancellation state, outer exit, inner operation result, and component outcomes.
 - Logs, complete test reports, gameplay assertions, input traces, state snapshots, captures, profiles, builds, exports, and artifact hashes.
 - Changed files, before/after hashes, dirty-state reconciliation, rollback attempt, and recovery result.
 - Approvals, network destinations, transmitted data classes, provider/model information, and cost when applicable.
 
-Receipts form a hash-linked chain across checkpoints and handoffs. Resume requires matching project and workflow identity, valid TTL, unchanged approved scope, and renewed approval when a session or external action changes.
+The private state machine currently forms a domain-separated, hash-linked receipt chain across immutable checkpoints and accepts only complete artifacts from successful settlements. Restart persistence and hydration remain unimplemented. The planned resume boundary requires matching project and workflow identity, a valid TTL, unchanged approved scope and dirty state, and renewed approval when a session or external action changes.
 
 ## Test authority
 

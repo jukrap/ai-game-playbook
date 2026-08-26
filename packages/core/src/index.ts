@@ -33,11 +33,14 @@ export {
   runBoundedProcess,
 } from "./process-runner.js";
 export {
+  assertAuthorizedPermissionDecision,
+  assertPermissionSettlement,
   createApprovalGrantSubject,
   createPermissionBroker,
 } from "./permission-broker.js";
 export type {
   CreateApprovalGrantSubjectOptions,
+  AuthorizedPermissionDecision,
   PermissionActualEffects,
   PermissionAuthorizationChallenge,
   PermissionAuthorizationDecision,
@@ -97,3 +100,19 @@ export type {
   ProjectLaneOwnerStatus,
   ProjectMutationLane,
 } from "./project-lane.js";
+export {
+  beginWorkflowStep,
+  createWorkflowCheckpoint,
+  markWorkflowStepStarted,
+  settleWorkflowStep,
+  WORKFLOW_CHECKPOINT_MAX_TTL_MS,
+  WORKFLOW_CHECKPOINT_MIN_TTL_MS,
+} from "./workflow-state.js";
+export type {
+  BeginWorkflowStepRequest,
+  CreateWorkflowCheckpointRequest,
+  MarkWorkflowStepStartedRequest,
+  SettleWorkflowStepRequest,
+  WorkflowCheckpointFeature,
+  WorkflowCheckpointProject,
+} from "./workflow-state.js";

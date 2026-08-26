@@ -341,6 +341,32 @@ export type RunStatus =
   | "cancelled"
   | "uncertain";
 
+export interface RunReceiptEffects {
+  readonly changedPaths: readonly string[];
+  readonly changedBytes: number;
+  readonly objectIds: readonly string[];
+  readonly destinations: readonly string[];
+  readonly dataClasses: readonly StableId[];
+  readonly changeKinds: readonly (
+    | "metadata"
+    | "source"
+    | "config"
+    | "scene"
+    | "asset"
+    | "test"
+  )[];
+  readonly provider?: string;
+  readonly model?: string;
+  readonly publishTargets: readonly string[];
+  readonly durationMs: number;
+  readonly outputBytes: number;
+  readonly repairCycles: number;
+  readonly cost?: {
+    readonly currency: string;
+    readonly amount: DecimalAmount;
+  };
+}
+
 export interface RunReceipt {
   readonly schemaVersion: SemanticVersion;
   readonly receiptId: string;
@@ -351,13 +377,23 @@ export interface RunReceipt {
     readonly workflowId: StableId;
     readonly stepId: StableId;
     readonly attempt: number;
+    readonly phase: "command" | "rollback";
     readonly projectId: StableId;
     readonly featureId?: StableId;
+    readonly featureContractDigest?: Sha256Digest;
+    readonly resolvedPlanDigest: Sha256Digest;
   };
   readonly authority: {
-    readonly command: { readonly id: StableId; readonly version: SemanticVersion };
+    readonly command: {
+      readonly id: StableId;
+      readonly version: SemanticVersion;
+      readonly descriptorDigest: Sha256Digest;
+    };
     readonly registryDigest: Sha256Digest;
     readonly handlerDigest: Sha256Digest;
+    readonly inputDigest: Sha256Digest;
+    readonly authorizationId: string;
+    readonly authorizationRequestDigest: Sha256Digest;
     readonly packDigests: readonly Sha256Digest[];
     readonly approvalIds: readonly StableId[];
   };
@@ -374,6 +410,7 @@ export interface RunReceipt {
     readonly endedAt: string;
     readonly durationMs: number;
   };
+  readonly effects: RunReceiptEffects;
   readonly outcomes: {
     readonly outer: {
       readonly status: ComponentOutcome;
@@ -434,7 +471,11 @@ export function computeRunReceiptDigest(
   receipt: RunReceiptDigestInput,
 ): Sha256Digest {
   const { receiptDigest: _receiptDigest, ...payload } = receipt;
-  return digestCanonicalJson(payload);
+  return digestCanonicalJson({
+    domain: "ai-game-playbook.run-receipt",
+    version: "1",
+    subject: payload,
+  });
 }
 
 export function isRunReceiptDigestValid(receipt: RunReceipt): boolean {
@@ -445,21 +486,44 @@ export function isRunReceiptDigestValid(receipt: RunReceipt): boolean {
   }
 }
 
-const runIdentity = closedObject(
+const runIdentityBase = closedObject(
   {
     runId: reference("uuid"),
     workflowId: reference("stableId"),
     stepId: reference("stableId"),
     attempt: { type: "integer", minimum: 1, maximum: 100 },
+    phase: enumSchema(["command", "rollback"]),
     projectId: reference("stableId"),
     featureId: reference("stableId"),
+    featureContractDigest: reference("sha256Digest"),
+    resolvedPlanDigest: reference("sha256Digest"),
   },
-  ["runId", "workflowId", "stepId", "attempt", "projectId"],
+  [
+    "runId",
+    "workflowId",
+    "stepId",
+    "attempt",
+    "phase",
+    "projectId",
+    "resolvedPlanDigest",
+  ],
 );
 
+const runIdentity = {
+  ...runIdentityBase,
+  dependentRequired: {
+    featureId: ["featureContractDigest"],
+    featureContractDigest: ["featureId"],
+  },
+};
+
 const commandAuthority = closedObject(
-  { id: reference("stableId"), version: reference("semanticVersion") },
-  ["id", "version"],
+  {
+    id: reference("stableId"),
+    version: reference("semanticVersion"),
+    descriptorDigest: reference("sha256Digest"),
+  },
+  ["id", "version", "descriptorDigest"],
 );
 
 const runAuthority = closedObject(
@@ -467,6 +531,9 @@ const runAuthority = closedObject(
     command: commandAuthority,
     registryDigest: reference("sha256Digest"),
     handlerDigest: reference("sha256Digest"),
+    inputDigest: reference("sha256Digest"),
+    authorizationId: reference("uuid"),
+    authorizationRequestDigest: reference("sha256Digest"),
     packDigests: boundedArray(reference("sha256Digest"), {
       maximum: 128,
       unique: true,
@@ -480,6 +547,9 @@ const runAuthority = closedObject(
     "command",
     "registryDigest",
     "handlerDigest",
+    "inputDigest",
+    "authorizationId",
+    "authorizationRequestDigest",
     "packDigests",
     "approvalIds",
   ],
@@ -509,6 +579,58 @@ const runTiming = closedObject(
     durationMs: { type: "integer", minimum: 0, maximum: 604800000 },
   },
   ["startedAt", "endedAt", "durationMs"],
+);
+
+const runEffects = closedObject(
+  {
+    changedPaths: boundedArray(reference("portablePath"), {
+      maximum: 100000,
+      unique: true,
+    }),
+    changedBytes: {
+      type: "integer",
+      minimum: 0,
+      maximum: 1099511627776,
+    },
+    objectIds: boundedArray(textSchema(500), {
+      maximum: 256,
+      unique: true,
+    }),
+    destinations: boundedArray(textSchema(2048), {
+      maximum: 32,
+      unique: true,
+    }),
+    dataClasses: boundedArray(reference("stableId"), {
+      maximum: 64,
+      unique: true,
+    }),
+    changeKinds: boundedArray(
+      enumSchema(["metadata", "source", "config", "scene", "asset", "test"]),
+      { maximum: 6, unique: true },
+    ),
+    provider: textSchema(200),
+    model: textSchema(200),
+    publishTargets: boundedArray(textSchema(500), {
+      maximum: 256,
+      unique: true,
+    }),
+    durationMs: { type: "integer", minimum: 0, maximum: 604800000 },
+    outputBytes: { type: "integer", minimum: 0, maximum: 1073741824 },
+    repairCycles: { type: "integer", minimum: 0, maximum: 3 },
+    cost: reference("money"),
+  },
+  [
+    "changedPaths",
+    "changedBytes",
+    "objectIds",
+    "destinations",
+    "dataClasses",
+    "changeKinds",
+    "publishTargets",
+    "durationMs",
+    "outputBytes",
+    "repairCycles",
+  ],
 );
 
 const outerOutcome = closedObject(
@@ -629,6 +751,7 @@ const runReceiptRoot = contractRoot(
       authority: runAuthority,
       environment: runEnvironment,
       timing: runTiming,
+      effects: runEffects,
       outcomes: runOutcomes,
       mutation,
       artifacts: boundedArray(receiptArtifact, { maximum: 10000 }),
@@ -644,6 +767,7 @@ const runReceiptRoot = contractRoot(
       "authority",
       "environment",
       "timing",
+      "effects",
       "outcomes",
       "mutation",
       "artifacts",

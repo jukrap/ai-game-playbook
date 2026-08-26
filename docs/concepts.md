@@ -1,6 +1,6 @@
 # Core Concepts and Public Types
 
-> Status: versioned schemas, semantic validators, deterministic workflow-plan resolution, and an early private permission consumer are implemented. Executable runtime surfaces and engine capability remain planned.
+> Status: versioned schemas, semantic validators, deterministic workflow-plan resolution, and early private permission and workflow-state consumers are implemented. Executable product surfaces and engine capability remain planned.
 
 [한국어](concepts.ko.md) · [Documentation](README.md)
 
@@ -27,7 +27,8 @@ The current foundation implements these contracts as versioned JSON schemas and 
 | `FeatureContract` | Player-visible outcome, allowed change scope, completion conditions, risks, budgets, and rollback plan |
 | `ApprovalGrant` | One signed permission bound to exact project, command, request, scope, budget, expiration, and optional feature, workflow, or editor session identity |
 | `ResolvedWorkflowPlan` | One finite DAG bound to exact registry, workflow, stage, command and handler authority, lanes, permissions, budgets, transitions, and evidence duties before execution |
-| `RunReceipt` | Run identity, tools and commands, timing, exit and inner results, logs, tests, captures, artifact hashes, changed files, and recovery result |
+| `WorkflowCheckpointRecord` | Immutable sequence, exact resolved-plan and project authority, in-flight authorization, attempts, cumulative budgets, evidence, receipt-chain head, TTL, and parent digest |
+| `RunReceipt` | Run, feature, plan, command descriptor, handler, input, and authorization identity; timing, outer and inner results, artifacts, changed files, and recovery result |
 | `AssetProvenance` | Asset source and lineage, rights, transformations, provider/model/checkpoint/seed when applicable, cost and approvals, file hashes, and QA state |
 
 Schema identifiers and command identifiers are stable machine names. Human-readable help and translations do not create alternate command identities.
@@ -44,7 +45,7 @@ Identity is checked before mutation, after editor reload or restart, and before 
 - A **role lens** is a review perspective with decision questions and evidence duties, not a virtual employee or an independent executor.
 - A **workflow** is a bounded sequence of registered commands with checkpoints, budgets, and stop conditions. Before execution, its descriptor is resolved into a domain-separated plan with deterministic topological order and exact implementation authority.
 
-The default plan selects one to five skills and no more than three role lenses for a task. One executor owns mutations; parallel work is limited to safe reads and independent analysis. The workflow state machine and checkpoint runtime that will consume a resolved plan are not implemented yet.
+The default plan selects one to five skills and no more than three role lenses for a task. One executor owns mutations; parallel work is limited to safe reads and independent analysis. The private in-memory state machine now consumes a resolved plan, separates authorization from the dispatch boundary, verifies exact permission settlement and receipts, advances declared failure and rollback transitions, and blocks uncertainty or cumulative budget overrun. Durable storage, restart hydration, command dispatch, and engine execution are not implemented yet.
 
 ## Run outcomes
 

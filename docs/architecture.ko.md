@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: c10da07498302b318a67afbb71fa77fce441a60256e65495e925572b7d5a8a31
+source_sha256: f9d2dbfdceaa21ab386c28bd47cfc74ad3878b286d8103f72293f75b5c0760e2
 translated_at: 2026-08-26
 ---
 
 # 목표 아키텍처
 
-> 상태: 목표 아키텍처입니다. `contracts`, `registry` 기반과 초기 `core` filesystem/process/mutating-lane/permission-admission 경계가 존재하며 나머지 runtime과 bridge 경계는 계획 단계입니다.
+> 상태: 목표 아키텍처입니다. `contracts`, `registry` 기반과 초기 `core` filesystem/process/mutating-lane/permission/in-memory workflow-checkpoint 경계가 존재하며 나머지 runtime과 bridge 경계는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -27,7 +27,7 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 작성 원본입니다. 현재 generator는 CLI, MCP, help, 문서 metadata, host routing용으로 검증된 설계 projection을 생성합니다. 또한 지원되는 workflow stage를 exact registry, workflow, schema, command, handler, lane, permission, budget, failure transition, evidence duty에 결합된 유한하고 domain-separated된 plan으로 해석합니다. private permission primitive는 검증된 command와 schema authority를 소비하지만 생성된 CLI/MCP/host 실행 consumer와 workflow state machine은 아직 계획 단계입니다. 생성 표면은 권한을 부여하거나 capability를 지어낼 수 없습니다.
+typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 작성 원본입니다. 현재 generator는 CLI, MCP, help, 문서 metadata, host routing용으로 검증된 설계 projection을 생성합니다. 또한 지원되는 workflow stage를 exact registry, workflow, schema, command, handler, lane, permission, budget, failure transition, evidence duty에 결합된 유한하고 domain-separated된 plan으로 해석합니다. private permission과 workflow-state primitive는 검증된 authority를 소비하지만 생성된 CLI/MCP/host 실행 consumer와 durable workflow storage는 아직 계획 단계입니다. 생성 표면은 권한을 부여하거나 capability를 지어낼 수 없습니다.
 
 ## Workspace 경계
 
@@ -35,7 +35,7 @@ typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 | --- | --- | --- |
 | `contracts` | 기반 구현 | engine runtime dependency가 없는 versioned schema와 shared identifier |
 | `registry` | 기반 구현 | descriptor validation, generation, digest, routing, parity check, 결정적 workflow-plan 해석 |
-| `core` | 일부 구현 | canonical project identity, portable path 해석, staged filesystem compare-and-swap, digest 결합 direct process 실행, root/project 결합 mutating lease, in-memory signed permission admission/settlement가 존재하며 dispatcher integration, durable approval, CPU/memory enforcement, parallel-read coordination, checkpoint, workflow state는 계획 단계 |
+| `core` | 일부 구현 | canonical project identity, portable path 해석, staged filesystem compare-and-swap, digest 결합 direct process 실행, root/project 결합 mutating lease, in-memory signed permission admission/settlement, immutable workflow checkpoint transition이 존재하며 dispatcher integration, durable approval/checkpoint, resume recovery, CPU/memory enforcement, parallel-read coordination은 계획 단계 |
 | `cli` | 계획 | `agpb` argument parsing, local interaction, stable exit behavior, help |
 | `mcp` | 계획 | 동일 permission broker 뒤의 schema-derived tool과 resource |
 | `codex-adapter` | 계획 | skill, host routing metadata, project instruction integration |
@@ -62,7 +62,7 @@ typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 
 게임 project에는 `.ai-game-playbook/`을 둘 계획입니다. project profile, feature contract, policy는 commit 대상입니다. cache, log, screenshot, lock, local detail을 포함한 receipt, local secret, machine-specific configuration은 ignore합니다.
 
-write는 owned-path rule과 compare-and-swap preimage를 사용합니다. registry는 실행 전에 immutable workflow plan을 파생하고 의미 검증할 수 있지만 현재 이를 진행하거나 checkpoint에 결합하는 runtime은 없습니다. 현재 private core는 고정된 project-local lease 하나로 `project-write`, `editor-bound`, `build-bound` admission을 직렬화하지만 아직 Editor를 탐지하거나 제어하지는 않습니다. permission primitive는 검증된 registry에서 command를 resolve하고 실제 input schema를 검증하며 feature/workflow/session scope와 budget을 좁히고 exact signed grant를 memory에서 소비하며 보고된 undeclared effect를 거부합니다. 아직 lane 획득이나 command dispatch와 연결되지 않았고 approval consumption과 uncertainty barrier는 process restart를 넘어 보존되지 않습니다. pack lifecycle operation과 parallel read coordination도 계획 단계입니다.
+write는 owned-path rule과 compare-and-swap preimage를 사용합니다. private core는 이제 resolved workflow를 pre-dispatch, dispatched, settled, rollback, blocked, terminal, uncertain checkpoint로 진행합니다. 각 transition은 exact plan을 다시 해석하고 같은 process에서 발급된 permission authority만 받으며 domain-separated receipt를 command와 authorization identity에 결합하고 receipt chain, 누적 workflow budget, complete evidence를 보존합니다. 이 state machine은 아직 lane 획득이나 command dispatch에 연결되지 않았고 checkpoint record, approval consumption, uncertainty barrier는 process restart 뒤에 유지되지 않습니다. core는 아직 Editor도 탐지하거나 제어하지 않습니다. pack lifecycle operation과 parallel read coordination도 계획 단계입니다.
 
 ## Host integration
 
@@ -70,4 +70,4 @@ Codex가 첫 지원 host지만 계약은 하나의 chat surface에 의존하지 
 
 ## 실패와 복구
 
-모든 mutation은 precondition, changed path, engine identity, recovery status를 기록하도록 계획합니다. 구현된 lease는 root/project mismatch, lock directory identity 변경, malformed record, live 또는 확인 불가능한 owner에서 중단합니다. 만료된 lease는 owner PID가 더는 실행 중이지 않을 때만 quarantine합니다. durable recovery receipt와 전체 workflow reconciliation은 아직 계획 단계입니다. rollback은 실패한 command가 아무것도 바꾸지 않았다고 가정하는 대신 자체 receipt를 갖는 등록 operation입니다.
+모든 mutation은 precondition, changed path, engine identity, recovery status를 기록하도록 계획합니다. 구현된 lease는 root/project mismatch, lock directory identity 변경, malformed record, live 또는 확인 불가능한 owner에서 중단합니다. 만료된 lease는 owner PID가 더는 실행 중이지 않을 때만 quarantine합니다. in-memory workflow 경계는 uncertain mutation이나 누적 budget 위반 뒤에 중단하고 선언된 rollback을 별도 command와 receipt로 승인합니다. durable checkpoint recovery와 전체 project/Editor reconciliation은 아직 계획 단계이며 rollback은 실패한 command가 아무것도 바꾸지 않았음을 뜻하지 않습니다.

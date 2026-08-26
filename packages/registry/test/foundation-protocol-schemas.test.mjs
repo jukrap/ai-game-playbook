@@ -20,6 +20,7 @@ const expectedIds = [
   "run-handle",
   "runtime-frame-evidence",
   "task-routing-selection",
+  "workflow-checkpoint",
 ];
 
 function validator() {
@@ -81,6 +82,13 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
         delete invalid.steps[1].rollbackCommand;
         return invalid;
       })(),
+    ],
+    [
+      "workflow-checkpoint",
+      {
+        ...fixtures["workflow-checkpoint"],
+        status: "running",
+      },
     ],
     [
       "run-handle",

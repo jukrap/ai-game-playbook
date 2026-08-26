@@ -1,12 +1,12 @@
 ---
 source: docs/evidence-and-verification.md
-source_sha256: 8552f1627598a3289538ec78d588610978bda0eb0db69e7ecd88efc642a61ab2
+source_sha256: afd64b8361714cfcd45a76f926303f3faad2d716c8383764299d60888ce5ffa3
 translated_at: 2026-08-26
 ---
 
 # 증거와 검증
 
-> 상태: 계획된 검증 계약입니다. 제품 receipt나 engine evidence는 아직 없습니다.
+> 상태: receipt/checkpoint 계약과 in-memory settlement 경계를 구현했습니다. durable 제품 receipt와 engine evidence는 아직 없습니다.
 
 [English](evidence-and-verification.md) · [문서](README.ko.md)
 
@@ -24,16 +24,16 @@ translated_at: 2026-08-26
 
 ## `RunReceipt`
 
-계획된 receipt는 다음을 하나의 run identity에 결합합니다.
+구현된 receipt 계약은 다음을 하나의 run identity에 결합합니다.
 
-- project, feature, workflow, step, process, Editor session, engine, version, renderer, scene/world, camera identity.
-- registry, command, handler, tool, input, configuration, environment digest.
+- project, exact feature contract, resolved workflow plan, step/phase/attempt, Editor session, 선택적 engine, environment identity.
+- registry, command descriptor, handler, input, authorization request, approval, 선택적 pack digest.
 - start/end time, timeout/cancellation state, outer exit, inner operation result, component outcome.
 - log, complete test report, gameplay assertion, input trace, state snapshot, capture, profile, build, export, artifact hash.
 - changed file, before/after hash, dirty-state reconciliation, rollback attempt, recovery result.
 - 필요 시 approval, network destination, transmitted data class, provider/model information, cost.
 
-receipt는 checkpoint와 handoff를 가로질러 hash-linked chain을 이룹니다. resume에는 project/workflow identity 일치, 유효한 TTL, 변경되지 않은 approved scope가 필요하며 session 또는 external action이 바뀌면 approval을 갱신해야 합니다.
+private state machine은 현재 immutable checkpoint를 가로질러 domain-separated hash-linked receipt chain을 만들고 성공적으로 정산된 complete artifact만 수용합니다. restart persistence와 hydration은 아직 구현하지 않았습니다. 계획된 resume 경계에는 project/workflow identity 일치, 유효한 TTL, 변경되지 않은 approved scope와 dirty state가 필요하며 session 또는 external action이 바뀌면 approval을 갱신해야 합니다.
 
 ## Test 판정 기준
 

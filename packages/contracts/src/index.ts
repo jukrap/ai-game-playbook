@@ -123,6 +123,7 @@ export type {
   FeatureContractApprovalDigestInput,
   RunReceipt,
   RunReceiptDigestInput,
+  RunReceiptEffects,
   RunStatus,
 } from "./feature-evidence-contracts.js";
 export {
@@ -149,6 +150,22 @@ export type {
   ResolvedWorkflowPlanDigestInput,
   ResolvedWorkflowStep,
 } from "./workflow-runtime-contracts.js";
+export {
+  computeWorkflowCheckpointDigest,
+  isWorkflowCheckpointDigestValid,
+  workflowCheckpointSchema,
+} from "./workflow-checkpoint-contracts.js";
+export type {
+  WorkflowCheckpointAttempt,
+  WorkflowCheckpointAttemptOutcome,
+  WorkflowCheckpointAttemptPhase,
+  WorkflowCheckpointBudgetUsage,
+  WorkflowCheckpointDigestInput,
+  WorkflowCheckpointInFlight,
+  WorkflowCheckpointRecord,
+  WorkflowCheckpointSideEffect,
+  WorkflowCheckpointStatus,
+} from "./workflow-checkpoint-contracts.js";
 export {
   engineCapabilityReportSchema,
   gameProjectProfileSchema,
@@ -201,6 +218,7 @@ export {
   checkResolvedWorkflowPlanSemantics,
   checkRunHandleSemantics,
   checkRunReceiptSemantics,
+  checkWorkflowCheckpointSemantics,
 } from "./semantic-validation.js";
 export type {
   ContractSemanticIssue,

@@ -14,6 +14,7 @@ export type CoreBoundaryErrorCode =
   | "invalid-permission-request"
   | "invalid-project-root"
   | "invalid-project-path-options"
+  | "invalid-workflow-checkpoint-request"
   | "project-path-budget-exceeded"
   | "project-path-case-conflict"
   | "project-path-escape"
@@ -60,6 +61,11 @@ export type CoreBoundaryErrorCode =
   | "project-lane-recovery-failed"
   | "project-lane-release-failed"
   | "project-lane-state-invalid"
+  | "workflow-checkpoint-budget-exceeded"
+  | "workflow-checkpoint-plan-mismatch"
+  | "workflow-checkpoint-receipt-invalid"
+  | "workflow-checkpoint-state-invalid"
+  | "workflow-checkpoint-transition-invalid"
   | "unsafe-project-root";
 
 export class CoreBoundaryError extends Error {

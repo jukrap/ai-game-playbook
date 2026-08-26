@@ -193,13 +193,23 @@ const runReceipt = {
     workflowId: "workflow.verify-feature",
     stepId: "step.run-tests",
     attempt: 1,
+    phase: "command",
     projectId: "sample.graybox",
     featureId: "feature.collectible-loop",
+    featureContractDigest: secondDigest,
+    resolvedPlanDigest: digest,
   },
   authority: {
-    command: { id: "verify", version: "1.0.0" },
+    command: {
+      id: "verify",
+      version: "1.0.0",
+      descriptorDigest: digest,
+    },
     registryDigest: digest,
     handlerDigest: secondDigest,
+    inputDigest: digest,
+    authorizationId: "118f6f35-2c9e-7d1a-8a4b-123456789abc",
+    authorizationRequestDigest: secondDigest,
     packDigests: [],
     approvalIds: ["approval.collectible-loop"],
   },
@@ -211,6 +221,18 @@ const runReceipt = {
     engine: { id: "godot", version: "4.7.2" },
   },
   timing: { startedAt, endedAt, durationMs: 1000 },
+  effects: {
+    changedPaths: [],
+    changedBytes: 0,
+    objectIds: [],
+    destinations: [],
+    dataClasses: [],
+    changeKinds: [],
+    publishTargets: [],
+    durationMs: 1000,
+    outputBytes: 0,
+    repairCycles: 0,
+  },
   outcomes: {
     outer: { status: "passed", exitCode: 0, timedOut: false },
     inner: { status: "passed", code: "verified", message: "Verified." },
@@ -351,7 +373,11 @@ test("run receipt semantic checks reject count and duration contradictions", () 
   const issues = contracts.checkRunReceiptSemantics(receipt);
   assert.deepEqual(
     issues.map(({ code }) => code),
-    ["run-receipt-duration-mismatch", "run-receipt-test-count-mismatch"],
+    [
+      "run-receipt-effect-duration-mismatch",
+      "run-receipt-duration-mismatch",
+      "run-receipt-test-count-mismatch",
+    ],
   );
   assert.equal(Object.isFrozen(issues), true);
   assert.equal(issues.every(Object.isFrozen), true);
@@ -365,6 +391,11 @@ test("run receipt digests attest the canonical body and cannot self-parent", () 
   valid.receiptDigest = contracts.computeRunReceiptDigest(valid);
   assert.equal(contracts.isRunReceiptDigestValid(valid), true);
   assert.deepEqual(contracts.checkRunReceiptSemantics(valid), []);
+  const { receiptDigest: _receiptDigest, ...plainBody } = valid;
+  assert.notEqual(
+    valid.receiptDigest,
+    contracts.digestCanonicalJson(plainBody),
+  );
 
   const tampered = structuredClone(valid);
   tampered.outcomes.inner.message = "Changed after attestation.";
@@ -385,6 +416,33 @@ test("run receipt digests attest the canonical body and cannot self-parent", () 
     issues.some(({ code }) => code === "run-receipt-self-parent"),
     true,
   );
+});
+
+test("run receipt identity retains feature contract and resolved execution authority", () => {
+  const missingFeatureDigest = structuredClone(runReceipt);
+  delete missingFeatureDigest.identity.featureContractDigest;
+  missingFeatureDigest.receiptDigest =
+    contracts.computeRunReceiptDigest(missingFeatureDigest);
+
+  assert.equal(
+    contracts
+      .checkRunReceiptSemantics(missingFeatureDigest)
+      .some(({ code }) => code === "run-receipt-feature-identity-invalid"),
+    true,
+  );
+});
+
+test("run receipt effects reconcile timing and changed paths", () => {
+  const receipt = structuredClone(runReceipt);
+  receipt.effects.durationMs = 999;
+  receipt.effects.changedPaths = ["unexpected/file.txt"];
+  receipt.receiptDigest = contracts.computeRunReceiptDigest(receipt);
+
+  const codes = new Set(
+    contracts.checkRunReceiptSemantics(receipt).map(({ code }) => code),
+  );
+  assert.equal(codes.has("run-receipt-effect-duration-mismatch"), true);
+  assert.equal(codes.has("run-receipt-effect-mutation-mismatch"), true);
 });
 
 test("capability semantic checks reject duplicate and future observations", () => {

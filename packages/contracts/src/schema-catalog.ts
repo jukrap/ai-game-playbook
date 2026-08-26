@@ -33,6 +33,7 @@ import {
 import { approvalGrantSchema } from "./approval-contracts.js";
 import { taskRoutingSelectionSchema } from "./routing-contracts.js";
 import { resolvedWorkflowPlanSchema } from "./workflow-runtime-contracts.js";
+import { workflowCheckpointSchema } from "./workflow-checkpoint-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -65,7 +66,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "engine-project-identity": engineProjectIdentitySchema,
     "engine-session-identity": engineSessionIdentitySchema,
     "input-replay-trace": inputReplayTraceSchema,
-    "resolved-workflow-plan": resolvedWorkflowPlanSchema,
+  "resolved-workflow-plan": resolvedWorkflowPlanSchema,
+  "workflow-checkpoint": workflowCheckpointSchema,
     "run-handle": runHandleSchema,
     "runtime-frame-evidence": runtimeFrameEvidenceSchema,
     "task-routing-selection": taskRoutingSelectionSchema,

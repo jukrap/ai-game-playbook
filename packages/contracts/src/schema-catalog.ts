@@ -53,6 +53,10 @@ import {
   engineStatusReportSchema,
   engineStatusRequestSchema,
 } from "./engine-status-contracts.js";
+import {
+  godotVersionProbeReportSchema,
+  godotVersionProbeRequestSchema,
+} from "./godot-version-probe-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -83,6 +87,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "doctor-request": doctorRequestSchema,
     "engine-status-report": engineStatusReportSchema,
     "engine-status-request": engineStatusRequestSchema,
+    "godot-version-probe-report": godotVersionProbeReportSchema,
+    "godot-version-probe-request": godotVersionProbeRequestSchema,
     "init-report": initReportSchema,
     "init-request": initRequestSchema,
     "project-inspect-report": projectInspectReportSchema,

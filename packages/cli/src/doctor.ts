@@ -83,7 +83,9 @@ function skipped(id: string, code: string, message: string): DoctorCheck {
 
 function inspectRegistry(): DoctorCheck {
   const commands = BUILTIN_REGISTRY_SURFACES.cli.data.commands;
-  const runtimeCommands = BUILTIN_REGISTRY.commands;
+  const runtimeCommands = BUILTIN_REGISTRY.commands.filter(
+    ({ lifecycle }) => lifecycle !== "internal" && lifecycle !== "deprecated",
+  );
   const surfaceMatchesRuntime =
     commands.length === runtimeCommands.length &&
     runtimeCommands.every((runtimeCommand) => {

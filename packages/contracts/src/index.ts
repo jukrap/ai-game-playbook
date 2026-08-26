@@ -90,6 +90,31 @@ export type {
   EngineStatusVersionObservation,
   EngineStatusVersionPrecision,
 } from "./engine-status-contracts.js";
+export {
+  GODOT_VERSION_PROCESS_CODES,
+  GODOT_VERSION_PROBE_CODES,
+  GODOT_VERSION_PROBE_MAX_OUTPUT_BYTES,
+  GODOT_VERSION_PROBE_STATUSES,
+  GODOT_VERSION_PROBE_TARGET_RELEASE_STATUS,
+  GODOT_VERSION_PROBE_TARGET_VERSION,
+  assertGodotVersionProbeReportSemantics,
+  computeGodotVersionProbeDigest,
+  godotVersionProbeReportSchema,
+  godotVersionProbeRequestSchema,
+} from "./godot-version-probe-contracts.js";
+export type {
+  GodotVersionProbeAuthorization,
+  GodotVersionProbeCode,
+  GodotVersionProbeCommandInput,
+  GodotVersionProbeDigestInput,
+  GodotVersionProbeExecution,
+  GodotVersionProbeOutputAttestation,
+  GodotVersionProbeProcessResult,
+  GodotVersionProbeReport,
+  GodotVersionProbeStatus,
+  GodotVersionProcessCode,
+  ParsedGodotVersionProbeOutput,
+} from "./godot-version-probe-contracts.js";
 export type {
   SkillCatalogDigestInput,
   SkillCatalogEntry,

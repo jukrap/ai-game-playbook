@@ -20,3 +20,19 @@ export type {
   InvalidGodotVersionOutput,
   ParsedGodotVersionOutput,
 } from "./version-probe-result.js";
+export {
+  GODOT_VERSION_PROBE_COMMAND_ID,
+  GODOT_VERSION_PROBE_COMMAND_TIMEOUT_MS,
+  GODOT_VERSION_PROBE_IDLE_TIMEOUT_MS,
+  GODOT_VERSION_PROBE_PROCESS_TIMEOUT_MS,
+  GODOT_VERSION_PROBE_TERMINATION_GRACE_MS,
+  createGodotVersionProbeAuthorizationRequest,
+  prepareGodotVersionProbe,
+  runGodotVersionProbe,
+} from "./version-probe.js";
+export type {
+  CreateGodotVersionProbeAuthorizationRequest,
+  PrepareGodotVersionProbeRequest,
+  PreparedGodotVersionProbe,
+  RunGodotVersionProbeRequest,
+} from "./version-probe.js";

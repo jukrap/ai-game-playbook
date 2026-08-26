@@ -14,6 +14,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     [
       "doctor",
       "engine.status",
+      "engine.version-probe",
       "init",
       "project.inspect",
       "skill.check",
@@ -61,6 +62,44 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.equal(engineStatus.handler.package, "@ai-game-playbook/godot-adapter");
   assert.equal(engineStatus.handler.export, "runGodotEngineStatus");
   assert.match(engineStatus.handler.digest, digestPattern);
+
+  const versionProbe = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "engine.version-probe",
+  );
+  assert.notEqual(versionProbe, undefined);
+  assert.equal(versionProbe.lifecycle, "internal");
+  assert.deepEqual(versionProbe.cli, {
+    path: ["internal", "engine", "version-probe"],
+    aliases: [],
+  });
+  assert.deepEqual(versionProbe.capabilities, ["engine.version-probe"]);
+  assert.deepEqual(versionProbe.permissions, ["read-project"]);
+  assert.deepEqual(versionProbe.sideEffects, [
+    { kind: "process", scope: "godot-version-probe", boundary: "local" },
+  ]);
+  assert.equal(versionProbe.lane, "parallel-read");
+  assert.equal(versionProbe.timeoutMs, 10_000);
+  assert.deepEqual(versionProbe.cancellation, {
+    mode: "process-tree",
+    graceMs: 1_000,
+  });
+  assert.deepEqual(versionProbe.retry, { mode: "never", maxAttempts: 1 });
+  assert.equal(versionProbe.budgets.maxChangedFiles, 0);
+  assert.equal(versionProbe.budgets.maxChangedBytes, 0);
+  assert.equal(versionProbe.budgets.maxDurationMs, 10_000);
+  assert.equal(versionProbe.budgets.maxOutputBytes, 16_384);
+  assert.equal(versionProbe.budgets.maxRepairCycles, 0);
+  assert.equal(
+    versionProbe.input.schemaId,
+    contracts.godotVersionProbeRequestSchema.schemaId,
+  );
+  assert.equal(
+    versionProbe.output.schemaId,
+    contracts.godotVersionProbeReportSchema.schemaId,
+  );
+  assert.equal(versionProbe.handler.package, "@ai-game-playbook/godot-adapter");
+  assert.equal(versionProbe.handler.export, "runGodotVersionProbe");
+  assert.match(versionProbe.handler.digest, digestPattern);
 
   const init = registry.BUILTIN_REGISTRY.commands.find(({ id }) => id === "init");
   assert.notEqual(init, undefined);

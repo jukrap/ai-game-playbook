@@ -45,7 +45,9 @@ test("foundation plan separates available and planned command surfaces", () => {
       .filter(({ availability }) => availability === "available")
       .map(({ id }) => id)
       .sort(),
-    registry.BUILTIN_REGISTRY.commands.map(({ id }) => id).sort(),
+    registry.BUILTIN_REGISTRY_SURFACES.cli.data.commands
+      .map(({ id }) => id)
+      .sort(),
   );
   for (const skill of artifact.data.skills) {
     assert.equal(contracts.isStableId(skill.id), true);

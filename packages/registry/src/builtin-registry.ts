@@ -1,10 +1,14 @@
 import {
+  approvalGrantSchema,
   assetProvenanceSchema,
   doctorReportSchema,
   doctorRequestSchema,
   engineStatusReportSchema,
   engineStatusRequestSchema,
+  GODOT_VERSION_PROBE_MAX_OUTPUT_BYTES,
   gameProjectProfileSchema,
+  godotVersionProbeReportSchema,
+  godotVersionProbeRequestSchema,
   initReportSchema,
   initRequestSchema,
   parseSemanticVersion,
@@ -134,7 +138,7 @@ const doctorCommand: CommandDescriptor = Object.freeze({
     package: "@ai-game-playbook/cli",
     export: "runDoctor",
     digest: parseSha256Digest(
-      "sha256:d8996ca370062478f2ad393cdccb622ad36b094a6add613bc7674724bcba87a9",
+      "sha256:5f20c0ba5af33d5c7ac4048fde16550f621fbdd1407d56df24c83a30162111d4",
     ),
   }),
 });
@@ -184,6 +188,55 @@ const engineStatusCommand: CommandDescriptor = Object.freeze({
     export: "runGodotEngineStatus",
     digest: parseSha256Digest(
       "sha256:196803e948c170e1e86a8b50642e22277755118dcdc860894ea661273fa11500",
+    ),
+  }),
+});
+
+const engineVersionProbeCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("engine.version-probe"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary: "Run one identity-bound Godot version probe with bounded output.",
+  cli: Object.freeze({
+    path: Object.freeze(["internal", "engine", "version-probe"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: godotVersionProbeRequestSchema.schemaId,
+    digest: godotVersionProbeRequestSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: godotVersionProbeReportSchema.schemaId,
+    digest: godotVersionProbeReportSchema.digest,
+  }),
+  capabilities: Object.freeze([parseStableId("engine.version-probe")]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "process",
+      scope: "godot-version-probe",
+      boundary: "local",
+    }),
+  ]),
+  lane: "parallel-read",
+  timeoutMs: 10_000,
+  cancellation: Object.freeze({ mode: "process-tree", graceMs: 1_000 }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: 10_000,
+    maxOutputBytes: GODOT_VERSION_PROBE_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([parseStableId("godot-version-probe")]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/godot-adapter",
+    export: "runGodotVersionProbe",
+    digest: parseSha256Digest(
+      "sha256:78dca1711999053ba63098dedbd67fe26d688511ac4696d627123dc14108ddeb",
     ),
   }),
 });
@@ -375,11 +428,14 @@ const definition: RegistryDefinition = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   controlPlaneVersion: parseSemanticVersion("0.0.0").value,
   schemas: Object.freeze([
+    approvalGrantSchema,
     assetProvenanceSchema,
     doctorRequestSchema,
     doctorReportSchema,
     engineStatusRequestSchema,
     engineStatusReportSchema,
+    godotVersionProbeRequestSchema,
+    godotVersionProbeReportSchema,
     gameProjectProfileSchema,
     initRequestSchema,
     initReportSchema,
@@ -394,6 +450,7 @@ const definition: RegistryDefinition = Object.freeze({
   commands: Object.freeze([
     doctorCommand,
     engineStatusCommand,
+    engineVersionProbeCommand,
     initCommand,
     projectInspectCommand,
     skillCheckCommand,

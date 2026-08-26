@@ -19,6 +19,8 @@ const expectedIds = [
   "engine-session-identity",
   "engine-status-report",
   "engine-status-request",
+  "godot-version-probe-report",
+  "godot-version-probe-request",
   "init-report",
   "init-request",
   "input-replay-trace",

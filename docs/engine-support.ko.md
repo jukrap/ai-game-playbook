@@ -1,6 +1,6 @@
 ---
 source: docs/engine-support.md
-source_sha256: 12514df3d727fcef89b5d1e4fe1170e45bdc82e79ad1e9e4ce1471997590987d
+source_sha256: 7f29bf51fcf724ae61510758d79386895edfbddc911f472c684a77cd80830bf2
 translated_at: 2026-08-27
 ---
 
@@ -32,6 +32,8 @@ translated_at: 2026-08-27
 등급은 environment와 capability별로 평가합니다. 설치된 Editor 탐지만으로 adapter 지원을 확립하지 않습니다.
 
 Source-built `agpb engine status --engine godot` command는 support grade가 아니라 control-plane observation입니다. Static Godot project candidate 하나를 검증하고 major/minor hint를 pin된 `4.7.2` target과 비교합니다. Executable path를 받지 않고 host-tool discovery/version probe나 process start를 수행하지 않으며 matrix의 모든 cell을 `planned`로 유지합니다.
+
+Internal-only 후속 component는 explicit executable candidate 하나와 static status digest 하나를 same-process plan에 결합하고 project-scoped broker authority를 얻은 뒤 bounded process runner를 통해 `--version`만 호출할 수 있습니다. Dispatch 전 identity drift를 거부하고 실행 뒤 identity를 다시 확인하며 authorization을 정산하고 raw path/output 없이 normalized process와 output digest를 출력합니다. Filesystem/network isolation은 명시적으로 `not-enforced`로 유지합니다. 이 component에는 automated local witness가 있지만 실제 Godot binary의 retained execution이 없고 CLI/MCP에 노출되지 않으므로 matrix를 변경하지 않습니다.
 
 ## Godot 방향
 

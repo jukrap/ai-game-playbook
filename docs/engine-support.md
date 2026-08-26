@@ -27,6 +27,8 @@ Grades are evaluated per environment and capability. Detecting an installed edit
 
 The source-built `agpb engine status --engine godot` command is a control-plane observation, not a support grade. It validates one static Godot project candidate and compares its major/minor hint with the pinned `4.7.2` target. It accepts no executable path, performs no host-tool discovery or version probe, starts no process, and leaves every matrix cell `planned`.
 
+An internal-only follow-up can bind one explicit executable candidate and one static status digest to a same-process plan, obtain project-scoped broker authority, and invoke only `--version` through the bounded process runner. It rejects identity drift before dispatch, rechecks identity after execution, settles the authorization, and emits normalized process and output digests without raw paths or output. Filesystem and network isolation remain explicitly `not-enforced`. This component has automated local witnesses but no retained execution from an actual Godot binary, is not exposed through CLI or MCP, and does not change the matrix.
+
 ## Godot direction
 
 Godot has the first static adapter boundary and remains the first planned live adapter. Static scene inspection stays separate from engine-backed preflight and runtime play. Script and batch validation, exact project/editor identity, deterministic input through real input mappings, gameplay state assertions, actual runtime frames, logs, and Windows export startup are required for the first alpha.

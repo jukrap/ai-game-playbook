@@ -9,6 +9,7 @@ test("runtime command handler metadata attests each exact compiled module", asyn
   for (const [commandId, packageDirectory, moduleName] of [
     ["doctor", "cli", "doctor.js"],
     ["engine.status", "godot-adapter", "status.js"],
+    ["engine.version-probe", "godot-adapter", "version-probe.js"],
     ["init", "cli", "init.js"],
     ["project.inspect", "project-runtime", "project-inspect.js"],
     ["skill.check", "cli", "skill-check.js"],

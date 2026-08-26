@@ -1,4 +1,7 @@
-import type { RunReceipt } from "./feature-evidence-contracts.js";
+import {
+  computeRunReceiptDigest,
+  type RunReceipt,
+} from "./feature-evidence-contracts.js";
 import type { EngineCapabilityReport } from "./project-engine-contracts.js";
 
 export type ContractSemanticIssueCode =
@@ -8,8 +11,10 @@ export type ContractSemanticIssueCode =
   | "engine-capability-planned-without-reason"
   | "engine-capability-verified-without-receipt"
   | "engine-capability-verified-without-runtime-evidence"
+  | "run-receipt-digest-mismatch"
   | "run-receipt-duration-mismatch"
   | "run-receipt-invalid-timestamp"
+  | "run-receipt-self-parent"
   | "run-receipt-success-contradiction"
   | "run-receipt-test-count-mismatch"
   | "run-receipt-test-pass-contradiction"
@@ -45,6 +50,24 @@ export function checkRunReceiptSemantics(
   receipt: RunReceipt,
 ): readonly ContractSemanticIssue[] {
   const issues: ContractSemanticIssue[] = [];
+  if (computeRunReceiptDigest(receipt) !== receipt.receiptDigest) {
+    issues.push(
+      issue(
+        "run-receipt-digest-mismatch",
+        "/receiptDigest",
+        "Receipt digest must attest the canonical receipt body without the digest field.",
+      ),
+    );
+  }
+  if (receipt.previousReceiptDigest === receipt.receiptDigest) {
+    issues.push(
+      issue(
+        "run-receipt-self-parent",
+        "/previousReceiptDigest",
+        "A receipt cannot name itself as its previous receipt.",
+      ),
+    );
+  }
   const startedAt = timestampMillis(receipt.timing.startedAt);
   const endedAt = timestampMillis(receipt.timing.endedAt);
   if (startedAt === undefined || endedAt === undefined || endedAt < startedAt) {

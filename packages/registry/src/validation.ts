@@ -6,6 +6,7 @@ import {
   commandDescriptorSchema,
   compareCanonicalText,
   compareSemanticVersions,
+  computePackManifestDigest,
   digestCanonicalJson,
   isSha256Digest,
   isStableId,
@@ -1537,6 +1538,22 @@ function validatePacks(
   definition: RegistryDefinition,
   diagnostics: RegistryDiagnostic[],
 ): void {
+  for (let index = 0; index < definition.packs.length; index += 1) {
+    const pack = definition.packs[index];
+    if (
+      pack !== undefined &&
+      computePackManifestDigest(pack) !== pack.digest
+    ) {
+      appendDiagnostic(
+        diagnostics,
+        diagnostic(
+          "pack-digest-mismatch",
+          `$.packs[${index}].digest`,
+          "pack digest does not attest the canonical manifest body",
+        ),
+      );
+    }
+  }
   validatePackIntervals(definition, diagnostics);
   validatePackDependencies(definition, diagnostics);
   validatePackProvisions(definition, diagnostics);

@@ -18,7 +18,7 @@ import {
   reference,
   textSchema,
 } from "./schema-fragments.js";
-import type { Sha256Digest } from "./digest.js";
+import { digestCanonicalJson, type Sha256Digest } from "./digest.js";
 import type { StableId } from "./stable-id.js";
 
 export interface CommandDescriptor {
@@ -279,6 +279,27 @@ export interface PackManifest {
 export interface VersionInterval {
   readonly minimum: SemanticVersion;
   readonly maximumExclusive: SemanticVersion;
+}
+
+export type PackManifestDigestInput = Omit<
+  PackManifest,
+  "digest" | "signature"
+> &
+  Partial<Pick<PackManifest, "digest" | "signature">>;
+
+export function computePackManifestDigest(
+  manifest: PackManifestDigestInput,
+): Sha256Digest {
+  const { digest: _digest, signature: _signature, ...payload } = manifest;
+  return digestCanonicalJson(payload);
+}
+
+export function isPackManifestDigestValid(manifest: PackManifest): boolean {
+  try {
+    return computePackManifestDigest(manifest) === manifest.digest;
+  } catch {
+    return false;
+  }
 }
 
 const versionInterval = closedObject(

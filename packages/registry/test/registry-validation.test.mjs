@@ -38,6 +38,7 @@ function createPack(id, version, dependencies = []) {
   pack.artifacts[0].target =
     `.ai-game-playbook/packs/${directory}/index.js`;
   pack.ownedPaths[0].path = pack.artifacts[0].target;
+  pack.digest = contracts.computePackManifestDigest(pack);
   return pack;
 }
 
@@ -194,6 +195,34 @@ test("pack dependency graphs are versioned, sorted, and deterministically attest
     ["feature.gameplay", "foundation.core"],
   );
   assert.equal(first.digest, second.digest);
+});
+
+test("pack manifests bind their canonical body to the declared digest", () => {
+  assert.equal(typeof contracts.computePackManifestDigest, "function");
+  assert.equal(typeof contracts.isPackManifestDigestValid, "function");
+
+  const definition = createValidRegistryDefinition();
+  const pack = createPack("pack.attested", "1.0.0");
+  pack.digest = contracts.computePackManifestDigest(pack);
+  assert.equal(contracts.isPackManifestDigestValid(pack), true);
+  const signed = {
+    ...structuredClone(pack),
+    signature: {
+      algorithm: "ed25519",
+      keyId: "key.release",
+      value: "detached-signature",
+    },
+  };
+  assert.equal(contracts.computePackManifestDigest(signed), pack.digest);
+  definition.packs.push(pack);
+  assert.equal(registry.validateRegistry(definition).packs.length, 1);
+
+  const tampered = createValidRegistryDefinition();
+  const tamperedPack = structuredClone(pack);
+  tamperedPack.license = { status: "declared", expression: "MIT" };
+  assert.equal(contracts.isPackManifestDigestValid(tamperedPack), false);
+  tampered.packs.push(tamperedPack);
+  expectDiagnostic(tampered, "pack-digest-mismatch");
 });
 
 test("pack validation rejects empty intervals and control-plane incompatibility", () => {

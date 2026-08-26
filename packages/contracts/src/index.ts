@@ -23,12 +23,15 @@ export type {
 } from "./contract-schema.js";
 export {
   commandDescriptorSchema,
+  computePackManifestDigest,
+  isPackManifestDigestValid,
   packManifestSchema,
 } from "./command-pack-contracts.js";
 export type {
   CommandDescriptor,
   PackKind,
   PackManifest,
+  PackManifestDigestInput,
   VersionInterval,
 } from "./command-pack-contracts.js";
 export {
@@ -83,7 +86,9 @@ export type {
 } from "./engine-evidence-contracts.js";
 export {
   assetProvenanceSchema,
+  computeRunReceiptDigest,
   featureContractSchema,
+  isRunReceiptDigestValid,
   runReceiptSchema,
 } from "./feature-evidence-contracts.js";
 export type {
@@ -93,6 +98,7 @@ export type {
   AssetQaResult,
   FeatureContract,
   RunReceipt,
+  RunReceiptDigestInput,
   RunStatus,
 } from "./feature-evidence-contracts.js";
 export {

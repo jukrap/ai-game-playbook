@@ -16,7 +16,7 @@ import {
   reference,
   textSchema,
 } from "./schema-fragments.js";
-import type { Sha256Digest } from "./digest.js";
+import { digestCanonicalJson, type Sha256Digest } from "./digest.js";
 import type { StableId } from "./stable-id.js";
 
 export interface FeatureContract {
@@ -367,6 +367,24 @@ export interface RunReceipt {
     readonly actions: readonly string[];
   };
   readonly receiptDigest: Sha256Digest;
+}
+
+export type RunReceiptDigestInput = Omit<RunReceipt, "receiptDigest"> &
+  Partial<Pick<RunReceipt, "receiptDigest">>;
+
+export function computeRunReceiptDigest(
+  receipt: RunReceiptDigestInput,
+): Sha256Digest {
+  const { receiptDigest: _receiptDigest, ...payload } = receipt;
+  return digestCanonicalJson(payload);
+}
+
+export function isRunReceiptDigestValid(receipt: RunReceipt): boolean {
+  try {
+    return computeRunReceiptDigest(receipt) === receipt.receiptDigest;
+  } catch {
+    return false;
+  }
 }
 
 const runIdentity = closedObject(

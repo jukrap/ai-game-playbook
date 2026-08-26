@@ -86,6 +86,7 @@ const runReceipt = {
   recovery: { attempted: false, outcome: "not-run", actions: [] },
   receiptDigest: digest,
 };
+runReceipt.receiptDigest = contracts.computeRunReceiptDigest(runReceipt);
 
 test("semantic checks accept internally consistent capability and receipt fixtures", () => {
   assert.deepEqual(
@@ -106,6 +107,7 @@ test("run receipt semantic checks reject count and duration contradictions", () 
   const receipt = structuredClone(runReceipt);
   receipt.outcomes.tests.discovered = 4;
   receipt.timing.durationMs = 999;
+  receipt.receiptDigest = contracts.computeRunReceiptDigest(receipt);
 
   const issues = contracts.checkRunReceiptSemantics(receipt);
   assert.deepEqual(
@@ -114,6 +116,36 @@ test("run receipt semantic checks reject count and duration contradictions", () 
   );
   assert.equal(Object.isFrozen(issues), true);
   assert.equal(issues.every(Object.isFrozen), true);
+});
+
+test("run receipt digests attest the canonical body and cannot self-parent", () => {
+  assert.equal(typeof contracts.computeRunReceiptDigest, "function");
+  assert.equal(typeof contracts.isRunReceiptDigestValid, "function");
+
+  const valid = structuredClone(runReceipt);
+  valid.receiptDigest = contracts.computeRunReceiptDigest(valid);
+  assert.equal(contracts.isRunReceiptDigestValid(valid), true);
+  assert.deepEqual(contracts.checkRunReceiptSemantics(valid), []);
+
+  const tampered = structuredClone(valid);
+  tampered.outcomes.inner.message = "Changed after attestation.";
+  assert.equal(contracts.isRunReceiptDigestValid(tampered), false);
+  assert.equal(
+    contracts
+      .checkRunReceiptSemantics(tampered)
+      .some(({ code }) => code === "run-receipt-digest-mismatch"),
+    true,
+  );
+
+  const selfParent = structuredClone(valid);
+  selfParent.previousReceiptDigest = selfParent.receiptDigest;
+  selfParent.receiptDigest = contracts.computeRunReceiptDigest(selfParent);
+  selfParent.previousReceiptDigest = selfParent.receiptDigest;
+  const issues = contracts.checkRunReceiptSemantics(selfParent);
+  assert.equal(
+    issues.some(({ code }) => code === "run-receipt-self-parent"),
+    true,
+  );
 });
 
 test("capability semantic checks reject duplicate and future observations", () => {

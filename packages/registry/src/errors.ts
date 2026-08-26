@@ -11,6 +11,7 @@ export type RegistryDiagnosticCode =
   | "invalid-control-plane-version"
   | "pack-compatibility-duplicate"
   | "pack-control-plane-incompatible"
+  | "pack-digest-mismatch"
   | "pack-dependency-cycle"
   | "pack-dependency-duplicate"
   | "pack-dependency-missing"

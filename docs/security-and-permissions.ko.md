@@ -1,12 +1,12 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: 34f854c124086acefeff4334e799bade9a008bc0a75b0b06d9dead15b2356a9b
+source_sha256: ec55258097e44bad1fc025ba0f975a50dd7234636b6e7295d4b3c622f81ef459
 translated_at: 2026-08-27
 ---
 
 # 보안과 권한
 
-> 상태: private admission, workflow checkpoint, durable receipt/artifact record, bounded private receipt-head query, managed-pack transaction, read-only CLI diagnostic, read-only STDIO MCP 경계, write-free Codex setup planning이 구현된 계획 permission policy입니다. General mutation dispatch와 engine enforcement는 아직 없습니다.
+> 상태: private admission, workflow checkpoint, durable receipt/artifact record, bounded private receipt-head query, managed-pack transaction, read-only CLI diagnostic, read-only STDIO MCP 경계, write-free Codex configuration/skill-target planning이 구현된 계획 permission policy입니다. General mutation dispatch와 engine enforcement는 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
@@ -20,7 +20,7 @@ Authorization 자체는 execution이 아닙니다. Broker는 general mutation di
 
 MCP startup에는 bounded project root 하나, explicit generated tool name 하나 이상, 선택한 project diagnostic이 active host에 disclose될 수 있다는 acknowledgement가 필요합니다. Runtime은 canonical path와 filesystem identity를 bind하고 모든 command input을 그 exact project에 다시 bind하며 duplicated, unknown, write-capable, destructive, open-world tool을 거부합니다. 최대 1 MiB인 modern STDIO message만 받고 registered input/output schema와 command deadline을 강제하며 bounded canonical result를 출력하고 HTTP/network access를 노출하지 않습니다. Host approval UI는 host 책임이며 이 acknowledgement는 evidence export나 telemetry consent가 아닙니다.
 
-Codex setup planner는 caller가 선택한 executable이나 script를 받지 않습니다. 현재 지원 Node.js executable과 이 installation의 MCP entry point를 bind하고 explicit tool allowlist와 prompt approval mode가 있는 machine-specific local-only project configuration 하나를 render합니다. Inspection은 해당 runtime identity를 다시 확인하고 linked, case-aliased, type-conflicted, oversized target을 거부합니다. Directory 생성, file write, merge, trust 변경, skill materialization을 수행하지 않습니다.
+Codex setup planner는 caller가 선택한 executable, script, skill path를 받지 않습니다. 현재 지원 Node.js executable, 이 installation의 MCP entry point, generated registry의 유일한 stable model-invoked skill route를 bind합니다. Deterministic project-skill byte를 반환하기 전에 packaged source가 64 KiB 상한 안의 canonical regular file이며 선언한 name, UTF-8/LF 형식, frontmatter, SHA-256 digest와 일치하는지 확인합니다. Inspection은 해당 runtime identity를 다시 확인하고 configuration/skill target을 분류하면서 linked, case-aliased, type-conflicted, oversized path를 거부합니다. Directory 생성, file write, merge, trust 변경, skill materialization을 수행하지 않습니다.
 
 Static project inspection은 local root 하나를 bind하고 directory observation과 file byte를 제한하며 unsafe link와 case ambiguity를 거부하고 read 전후 identity를 다시 확인합니다. `.git` marker는 Git 실행 permission을 부여하지 않으며 Editor lock은 process, session, liveness, connection, mutation authority를 부여하지 않습니다. Report는 mutation, process launch, network access가 없음을 명시합니다. Invalid profile과 ambiguous engine candidate는 그럴듯한 target을 선택하지 않고 이후 authority를 차단합니다.
 

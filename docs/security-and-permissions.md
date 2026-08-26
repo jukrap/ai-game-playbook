@@ -1,6 +1,6 @@
 # Security and Permissions
 
-> Status: planned permission policy with implemented private admission, workflow checkpoints, durable receipt and artifact records, bounded private receipt-head queries, managed-pack transactions, read-only CLI diagnostics, a read-only STDIO MCP boundary, and write-free Codex setup planning. General mutation dispatch and engine enforcement do not exist.
+> Status: planned permission policy with implemented private admission, workflow checkpoints, durable receipt and artifact records, bounded private receipt-head queries, managed-pack transactions, read-only CLI diagnostics, a read-only STDIO MCP boundary, and write-free Codex configuration and skill-target planning. General mutation dispatch and engine enforcement do not exist.
 
 [한국어](security-and-permissions.ko.md) · [Documentation](README.md)
 
@@ -14,7 +14,7 @@ The current CLI dispatches plan-only `init`, read-only `doctor`, and static read
 
 MCP startup requires one bounded project root, at least one explicit generated tool name, and acknowledgement that selected project diagnostics can be disclosed to the active host. The runtime binds the canonical path and filesystem identity, rebinds every command input to that exact project, and refuses duplicated, unknown, write-capable, destructive, or open-world tools. It accepts only modern STDIO messages up to 1 MiB, validates registered input and output schemas, enforces command deadlines, emits bounded canonical results, and exposes neither HTTP nor network access. Host approval UI remains host-owned; this acknowledgement is not evidence export or telemetry consent.
 
-The Codex setup planner accepts no caller-selected executable or script. It binds the current supported Node.js executable and this installation's MCP entry point, then renders one machine-specific local-only project configuration with an explicit tool allowlist and prompt approval mode. Inspection rechecks those runtime identities and refuses linked, case-aliased, type-conflicted, or oversized targets. It performs no directory creation, file write, merge, trust change, or skill materialization.
+The Codex setup planner accepts no caller-selected executable, script, or skill path. It binds the current supported Node.js executable, this installation's MCP entry point, and the generated registry's only stable model-invoked skill route. Before returning deterministic project-skill bytes, it requires the packaged source to remain a canonical regular file within a 64 KiB cap and to match its declared name, UTF-8/LF form, frontmatter, and SHA-256 digest. Inspection rechecks those runtime identities and classifies both configuration and skill targets while refusing linked, case-aliased, type-conflicted, or oversized paths. It performs no directory creation, file write, merge, trust change, or skill materialization.
 
 Static project inspection binds one local root, limits directory observations and file bytes, rejects unsafe links and case ambiguity, and rechecks identities around reads. A `.git` marker never grants permission to execute Git, and an Editor lock never grants process, session, liveness, connection, or mutation authority. The report explicitly records no mutation, process launch, or network access. Invalid profiles and ambiguous engine candidates block later authority instead of selecting a likely target.
 

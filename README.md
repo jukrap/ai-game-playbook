@@ -1,6 +1,6 @@
 # AI Game Playbook
 
-> Status: control-plane contracts, registry, core safety boundaries, managed-pack transactions, durable private receipts and artifact bytes, bounded private receipt-head queries, limited private artifact assessment, three experimental source-built read-only commands, a project-bound modern STDIO MCP runtime, and a write-free Codex setup planner are in progress. No installable package or engine adapter exists yet.
+> Status: control-plane contracts, registry, core safety boundaries, managed-pack transactions, durable private receipts and artifact bytes, bounded private receipt-head queries, limited private artifact assessment, three experimental source-built read-only commands, a project-bound modern STDIO MCP runtime, one registry-derived project-inspection skill artifact, and a write-free Codex setup planner are in progress. No installable package or engine adapter exists yet.
 
 [한국어](README.ko.md)
 
@@ -15,7 +15,7 @@ AI Game Playbook is an AI-assisted game-development control plane for individual
 - A private managed-pack runtime with write-free preflight, exact ownership, add/update/remove transactions, append-only journals, active-transaction barriers, rollback after clear failures, marker-bound directory ownership, and separately approved recovery finalization.
 - An experimental private CLI package and repository-local `agpb` entry point. The implemented commands are plan-only `agpb init`, read-only `agpb doctor`, and static read-only `agpb project inspect`.
 - An experimental private MCP package that exposes only explicitly enabled, registry-generated read-only tools over modern STDIO. It binds one project identity, validates exact input and output schemas, bounds transport and result bytes, and performs no network or project mutation.
-- A private Codex adapter that renders and inspects one machine-specific, local-only project MCP configuration. It derives the current Node.js executable and MCP entry point, never writes or merges the target, and does not materialize project skills.
+- A private Codex adapter that renders and inspects one machine-specific, local-only project MCP configuration and one deterministic project-inspection skill target. It binds the packaged skill bytes to the generated registry digest, never writes or merges either target, and does not materialize project skills.
 - A digest-bound public surface that marks `init`, `doctor`, and `project inspect` available while keeping every other command and all engine capabilities planned.
 - English public documentation with Korean mirrors and Windows/Linux conformance checks.
 

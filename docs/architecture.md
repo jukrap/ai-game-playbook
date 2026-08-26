@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, durable private receipt records and artifact objects, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions, plan-only `agpb init`, read-only `agpb doctor`, static read-only `agpb project inspect`, a project-bound read-only STDIO MCP runtime, and a write-free Codex setup planner exist. General mutation dispatch, evidence export, applied host installation, engines, and bridges remain planned.
+> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, durable private receipt records and artifact objects, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions, plan-only `agpb init`, read-only `agpb doctor`, static read-only `agpb project inspect`, a project-bound read-only STDIO MCP runtime, a registry-derived project-inspection skill artifact, and a write-free Codex setup planner exist. General mutation dispatch, evidence export, applied host installation, engines, and bridges remain planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -34,7 +34,7 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 | `cli` | Experimental partial | Registry-derived help/version, fail-closed parsing, stable exit categories, human/JSON output, plan-only `init`, read-only `doctor`, and static `project inspect` |
 | `evidence` | Partial private foundation | Pure bounded-process and structured-test normalization plus limited retained-artifact format/provenance assessment exist alongside canonical receipt records, content-addressed bytes, and producer-bound manifests; engine report parsing, assessment persistence, retention, migration, CLI/MCP listing, and explicit export remain planned |
 | `mcp` | Experimental private runtime | Modern STDIO transport for an explicit generated read-only tool allowlist, exact project binding, schema parity, bounded messages, and canonical results; mutation and network tools are unavailable |
-| `codex-adapter` | Partial private planner | Deterministic local-only project MCP configuration planning and create/retain/conflict inspection without writes, merge, trust changes, or skill materialization |
+| `codex-adapter` | Partial private planner | Deterministic local-only project MCP configuration and project-inspection skill target planning plus create/retain/conflict inspection without writes, merge, trust changes, or skill materialization |
 | `engine-common` | Contract only | Common capability negotiation and engine-operation contracts |
 | Engine adapters | Planned | Godot, Unity, and Unreal orchestration without broad host authority |
 | Project bridges | Planned | Minimum editor/runtime code needed to expose verified operations |
@@ -57,7 +57,7 @@ Handler digests attest the compiled init, doctor, and project-inspection modules
 
 The current MCP path is also write-free. Startup requires one project root, one or more explicit generated tool names, and acknowledgement that selected project diagnostics may enter the active host context. The runtime binds the canonical project identity, registers only read-only closed-world tools, limits each STDIO message to 1 MiB, validates exact registered input and output schemas, and returns canonical bounded results. It has no HTTP transport, network access, editor control, or mutation route.
 
-The Codex adapter derives the current supported Node.js executable and this installation's MCP entry point rather than accepting caller-selected runtime code. It produces immutable bytes for one project-local `.codex/config.toml` and can classify the target as create, retain, or conflict while rechecking project and runtime identities. It never creates the parent directory, writes or merges configuration, changes project trust, or installs skills. Registry-derived skill targets remain explicitly unmaterialized.
+The Codex adapter derives the current supported Node.js executable and this installation's MCP entry point rather than accepting caller-selected runtime code. It produces immutable bytes for one project-local `.codex/config.toml` and one `.agents/skills/project-inspection/SKILL.md` target, then classifies each target as create, retain, or conflict while rechecking project and runtime identities. The packaged skill source must be a bounded canonical regular file whose UTF-8, LF-only frontmatter, name, and SHA-256 digest match the generated registry route. The adapter never creates a parent directory, writes or merges a target, changes project trust, or installs a skill.
 
 ## Planned mutating execution flow
 

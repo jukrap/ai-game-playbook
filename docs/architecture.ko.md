@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: 0a49785c1dc6133d5f2b3c9b45f57f8f46f25ceab3b4f8b311f9fb5671be7c2b
+source_sha256: 47938fac56ccd7b74cd68f444421a383a064e00e8efde4ec6c46ab75f7dcd202
 translated_at: 2026-08-27
 ---
 
 # 목표 아키텍처
 
-> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, core 안전 primitive, durable private receipt record와 artifact object, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, managed-pack transaction, plan-only `agpb init`, read-only `agpb doctor`, static read-only `agpb project inspect`, project-bound read-only STDIO MCP runtime, write-free Codex setup planner가 존재합니다. General mutation dispatch, evidence export, 실제 host installation, engine, bridge는 계획 단계입니다.
+> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, core 안전 primitive, durable private receipt record와 artifact object, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, managed-pack transaction, plan-only `agpb init`, read-only `agpb doctor`, static read-only `agpb project inspect`, project-bound read-only STDIO MCP runtime, registry-derived project-inspection skill artifact, write-free Codex setup planner가 존재합니다. General mutation dispatch, evidence export, 실제 host installation, engine, bridge는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -40,7 +40,7 @@ Typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 | `cli` | 실험적 일부 구현 | Registry-derived help/version, fail-closed parsing, stable exit category, human/JSON output, plan-only `init`, read-only `doctor`, static `project inspect` |
 | `evidence` | Private 기반 일부 구현 | Pure bounded-process/structured-test normalization, 제한된 retained-artifact format/provenance assessment, canonical receipt record, content-addressed byte, producer-bound manifest가 존재하며 engine report parsing, assessment persistence, retention, migration, CLI/MCP listing, explicit export는 계획 단계 |
 | `mcp` | 실험적 private runtime | Explicit generated read-only tool allowlist, exact project binding, schema parity, bounded message, canonical result를 제공하는 modern STDIO transport. Mutation/network tool은 사용할 수 없음 |
-| `codex-adapter` | Private planner 일부 구현 | Write, merge, trust 변경, skill materialization 없이 deterministic local-only project MCP configuration 계획과 create/retain/conflict 검사 |
+| `codex-adapter` | Private planner 일부 구현 | Write, merge, trust 변경, skill materialization 없이 deterministic local-only project MCP configuration과 project-inspection skill target 계획 및 create/retain/conflict 검사 |
 | `engine-common` | Contract만 존재 | 공통 capability negotiation과 engine-operation contract |
 | Engine adapter | 계획 | Broad host authority 없는 Godot, Unity, Unreal orchestration |
 | Project bridge | 계획 | Verified operation 노출에 필요한 최소 Editor/runtime code |
@@ -63,7 +63,7 @@ Handler digest는 compiled init, doctor, project-inspection module을 각각 att
 
 현재 MCP 경로도 write-free입니다. Startup에는 project root 하나, 명시적인 generated tool name 하나 이상, 선택한 project diagnostic이 active host context에 들어갈 수 있다는 acknowledgement가 필요합니다. Runtime은 canonical project identity를 bind하고 read-only closed-world tool만 등록하며 STDIO message 하나를 1 MiB로 제한하고 exact registered input/output schema를 검증한 뒤 canonical bounded result를 반환합니다. HTTP transport, network access, Editor control, mutation route는 없습니다.
 
-Codex adapter는 caller가 선택한 runtime code를 받지 않고 현재 지원 Node.js executable과 이 installation의 MCP entry point를 자체 결정합니다. Project-local `.codex/config.toml` 하나의 immutable byte를 만들고 project/runtime identity를 다시 확인하면서 target을 create, retain, conflict로 분류할 수 있습니다. Parent directory 생성, configuration write/merge, project trust 변경, skill 설치를 수행하지 않습니다. Registry-derived skill target은 명시적으로 materialize되지 않은 상태입니다.
+Codex adapter는 caller가 선택한 runtime code를 받지 않고 현재 지원 Node.js executable과 이 installation의 MCP entry point를 자체 결정합니다. Project-local `.codex/config.toml` 하나와 `.agents/skills/project-inspection/SKILL.md` target 하나의 immutable byte를 만들고 project/runtime identity를 다시 확인하면서 각 target을 create, retain, conflict로 분류합니다. Packaged skill source는 bounded canonical regular file이어야 하며 UTF-8, LF-only frontmatter, name, SHA-256 digest가 generated registry route와 일치해야 합니다. Adapter는 parent directory를 만들거나 target을 write/merge하거나 project trust를 변경하거나 skill을 설치하지 않습니다.
 
 ## 계획된 mutation 실행 흐름
 

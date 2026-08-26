@@ -1,6 +1,6 @@
 ---
 source: docs/roadmap.md
-source_sha256: 8b5d7b9584143c5b25656e1a4fc05b6bd59bf6f00b510c452dfe7253e25287bc
+source_sha256: 344372beb589fa3fd66a1825c719eea8d3ec88b7f756fedac548c0663e9fe1b8
 translated_at: 2026-08-27
 ---
 
@@ -12,7 +12,7 @@ translated_at: 2026-08-27
 
 ## 현재 체크포인트
 
-완료된 기반에는 versioned contract, strict registry validation, generated surface, deterministic workflow plan, canonical project/path handling, compare-and-swap filesystem operation, bounded process, project mutation lease, signed scoped permission admission, workflow checkpoint, durable private receipt record, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, recovery boundary가 있는 managed-pack transaction, project-bound read-only STDIO MCP runtime, write-free Codex project-configuration planning이 포함됩니다.
+완료된 기반에는 versioned contract, strict registry validation, generated surface, deterministic workflow plan, canonical project/path handling, compare-and-swap filesystem operation, bounded process, project mutation lease, signed scoped permission admission, workflow checkpoint, durable private receipt record, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, recovery boundary가 있는 managed-pack transaction, project-bound read-only STDIO MCP runtime, registry-derived project-inspection skill artifact 하나, write-free Codex project-configuration/skill-target planning이 포함됩니다.
 
 현재 Stage 2 product slice에는 다음이 추가됐습니다.
 
@@ -28,7 +28,7 @@ translated_at: 2026-08-27
 - bounded process와 structured test-report observation을 immutable component outcome으로 바꾸는 private fail-closed normalization;
 - 보존된 UTF-8, canonical JSON, non-interlaced PNG와 선택적 current-registry asset-provenance evidence를 평가하는 private fail-closed assessment;
 - exact project/schema binding 아래 explicit enabled generated read-only tool을 노출하는 private modern STDIO runtime;
-- apply나 skill materialization 없이 deterministic Codex project configuration을 계획하고 create/retain/conflict를 검사하는 private 경계;
+- apply나 skill materialization 없이 deterministic Codex project configuration과 project-inspection skill target을 계획하고 create/retain/conflict를 검사하는 private 경계;
 - compiled-handler digest attestation;
 - generated/public availability parity.
 
@@ -48,7 +48,7 @@ Private library function이 있다는 이유만으로 command를 available로 �
 
 ## Stage 3 — evidence, MCP, Codex integration
 
-Process/test normalization, 제한된 artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, plan-only Codex project-configuration 기반은 구현했습니다. Engine report parser, required-test selection, gameplay/capture/performance/build normalizer, 더 넓은 artifact format, runtime-frame provenance, assessment persistence, runtime-to-receipt integration은 계획 단계입니다. 그 밖에 filtered/persistent evidence indexing, receipt-history migration/forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export command, 승인된 Codex configuration apply, registry-derived project skill materialization/check를 계획합니다.
+Process/test normalization, 제한된 artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, registry-derived project-inspection skill artifact 하나, plan-only Codex project-configuration/skill-target 기반은 구현했습니다. Engine report parser, required-test selection, gameplay/capture/performance/build normalizer, 더 넓은 artifact format, runtime-frame provenance, assessment persistence, runtime-to-receipt integration은 계획 단계입니다. 그 밖에 filtered/persistent evidence indexing, receipt-history migration/forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export command, 승인된 Codex configuration/skill materialization, public skill lifecycle command를 계획합니다.
 
 CLI, MCP, 문서, skill routing은 동일한 command ID, schema digest, permission, handler identity를 유지해야 합니다. MCP annotation은 hint이며 permission broker를 override할 수 없습니다. Background upload나 telemetry path는 계획하지 않습니다.
 

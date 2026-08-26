@@ -1,12 +1,12 @@
 ---
 source: README.md
-source_sha256: 304d4a676c61faff1d5d0e4ed5ca704e43ee7aa746f53ad7856bb7bcb395796f
+source_sha256: c81a4e0a6204ec05eabe1a7982afd81c6500b539e91f3fee59118b01abc03db1
 translated_at: 2026-08-27
 ---
 
 # AI Game Playbook
 
-> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction, durable private receipt와 artifact byte, bounded private receipt-head query, 제한된 private artifact assessment, 소스 빌드 방식의 실험적 read-only command 세 개, project-bound modern STDIO MCP runtime, write-free Codex setup planner를 구현하고 있습니다. 설치 가능한 package와 engine adapter는 아직 없습니다.
+> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction, durable private receipt와 artifact byte, bounded private receipt-head query, 제한된 private artifact assessment, 소스 빌드 방식의 실험적 read-only command 세 개, project-bound modern STDIO MCP runtime, registry-derived project-inspection skill artifact 하나, write-free Codex setup planner를 구현하고 있습니다. 설치 가능한 package와 engine adapter는 아직 없습니다.
 
 [English](README.md)
 
@@ -21,7 +21,7 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine을 사용하는 개인과 
 - write-free preflight, exact ownership, add/update/remove transaction, append-only journal, active-transaction barrier, 명확한 실패 뒤 rollback, marker 결합 directory ownership, 별도 승인 recovery finalization을 제공하는 private managed-pack runtime.
 - 실험적 private CLI package와 repository-local `agpb` entry point. 구현된 명령은 plan-only `agpb init`, read-only `agpb doctor`, static read-only `agpb project inspect`입니다.
 - 명시적으로 enable한 registry-generated read-only tool만 modern STDIO로 노출하는 실험적 private MCP package. Project identity 하나를 bind하고 exact input/output schema와 transport/result byte limit을 강제하며 network access나 project mutation을 수행하지 않습니다.
-- Machine-specific local-only project MCP configuration 하나를 render하고 inspect하는 private Codex adapter. 현재 Node.js executable과 MCP entry point를 자체 결정하고 target을 write 또는 merge하지 않으며 project skill을 materialize하지 않습니다.
+- Machine-specific local-only project MCP configuration 하나와 deterministic project-inspection skill target 하나를 render하고 inspect하는 private Codex adapter. Packaged skill byte를 generated registry digest에 bind하며 어느 target도 write하거나 merge하지 않고 project skill을 materialize하지 않습니다.
 - `init`, `doctor`, `project inspect`를 available로 표시하고 나머지 모든 명령과 엔진 capability를 planned로 유지하는 digest 결합 공개 surface.
 - 영어 공개 문서와 한국어 mirror, Windows/Linux conformance check.
 

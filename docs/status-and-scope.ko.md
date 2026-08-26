@@ -1,6 +1,6 @@
 ---
 source: docs/status-and-scope.md
-source_sha256: f513abe86c79f81e409819a02cd6c02b5b043d7c0f2896956daf92a052c6e177
+source_sha256: a3435f2ba3ea68c537e9a8c9eac18b7d5244dce566d370eedc2612c93606653c
 translated_at: 2026-08-27
 ---
 
@@ -30,13 +30,13 @@ translated_at: 2026-08-27
 - raw process output을 복사하지 않고 bounded process와 structured test-report observation을 fail-closed로 정규화하는 경계;
 - raw content를 출력하지 않으면서 보존된 UTF-8, canonical JSON 또는 non-interlaced PNG artifact 하나와 선택적 current-registry `AssetProvenance` 일치를 fail-closed로 평가하는 경계;
 - exact project binding, host-disclosure acknowledgement, schema validation, bounded message, canonical result를 포함해 explicit generated read-only tool subset을 modern STDIO로 등록하는 경계;
-- filesystem mutation 없이 machine-specific local-only Codex project MCP configuration 하나를 deterministic하게 계획하고 검사하는 경계.
+- filesystem mutation 없이 machine-specific local-only Codex project MCP configuration 하나와 registry-derived project-inspection skill target 하나를 deterministic하게 계획하고 검사하는 경계.
 
 Private pack runtime은 write-free preflight, canonical installed state, exact dependency/ownership, local add/update/remove transaction, active marker, append-only journal, compare-and-swap promotion, clear-failure rollback, marker-bound direct-parent directory ownership, reversible tombstone, bounded recovery inspection, 별도 승인 stable-state finalization을 구현합니다.
 
 Source-built `agpb` executable은 현재 plan-only `init`, read-only `doctor`, static read-only `project inspect`를 노출합니다. `init`은 고정된 project-local target 16개를 분류해 identity-bound `InitReport`를 출력하지만 plan을 apply할 수 없습니다. `doctor`는 runtime-registry parity, 지원 Node.js 범위, canonical project root 하나, fixed runtime layout, installed-pack-state validity, active transaction marker를 검사합니다. `project inspect`는 bounded Godot/Unity/Unreal marker candidate, canonical profile validity/compatibility, marker-only dirty-state knowledge, unbound static Editor signal을 보고합니다. 세 명령 모두 registered report에서 human 또는 canonical JSON output을 만들며 write를 수행하지 않습니다.
 
-Source-built MCP runtime은 startup에서 generated registry surface로부터 명시적으로 선택한 tool name만 노출합니다. 현재 tool은 같은 write-free command 세 개이며 mutation, network, engine, evidence export, arbitrary handler execution을 노출하지 않습니다. Codex adapter는 현재 Node.js와 MCP entry identity를 자체 결정하고 prompt-mode project configuration을 render하며 absent, exact, conflicting, oversized, linked, case-aliased target을 분류합니다. 해당 configuration을 write하거나 기존 file을 merge하거나 project를 trusted로 바꾸거나 skill을 설치하지 않습니다.
+Source-built MCP runtime은 startup에서 generated registry surface로부터 명시적으로 선택한 tool name만 노출합니다. 현재 tool은 같은 write-free command 세 개이며 mutation, network, engine, evidence export, arbitrary handler execution을 노출하지 않습니다. Runtime registry는 bounded `project.inspection` skill 하나도 구현된 static inspection command로 route합니다. Codex adapter는 packaged skill artifact를 검증하고 현재 Node.js와 MCP entry identity를 자체 결정하며 prompt-mode project configuration과 deterministic project-skill byte를 render한 뒤 각 target을 absent, exact, conflicting, oversized, linked, case-aliased로 분류합니다. 어느 target도 write하지 않고 기존 file을 merge하거나 project를 trusted로 바꾸거나 skill을 설치하지 않습니다.
 
 ## 사용할 수 없는 것
 

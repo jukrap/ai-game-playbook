@@ -1,12 +1,12 @@
 ---
 source: docs/evidence-and-verification.md
-source_sha256: 8022111bed2bd5aeaa9bc0c0e73cc4ac065d22c291e9b6ab2648d17b7359e51f
+source_sha256: 16b6cd4ab364d01af1c7deb551cd3224e62830d40b7a38d99ac1a2f84d244a86
 translated_at: 2026-08-27
 ---
 
 # 증거와 검증
 
-> 상태: receipt/checkpoint 계약, settlement 경계, durable checkpoint chain, private durable receipt record와 private content-addressed artifact payload를 구현했습니다. Evidence command, export, format QA, engine evidence는 아직 없습니다.
+> 상태: receipt/checkpoint 계약, settlement 경계, durable checkpoint chain, private durable receipt record, private content-addressed artifact payload, pure process/test result normalizer를 구현했습니다. Evidence command, report parser, export, format QA, engine evidence는 아직 없습니다.
 
 [English](evidence-and-verification.md) · [문서](README.ko.md)
 
@@ -43,7 +43,11 @@ Private receipt store는 promoted `RunReceipt` body를 run별 compare-and-swap h
 
 ## Test 판정 기준
 
-test outcome은 process failure, incomplete report, assertion failure, all-skipped, zero test, post-result crash, success를 구분합니다. success에는 complete report, 0보다 큰 test count, 모든 required test ID, passing assertion이 필요합니다. retry는 첫 failure를 보존하며 deterministic divergence를 숨길 수 없습니다.
+구현된 private normalizer는 bounded process result와, test의 경우 이미 구조화된 report observation을 받습니다. Process result를 다시 검증하고 zero/nonzero exit, spawn failure, timeout, idle timeout, output limit, cancellation, unconfirmed termination을 고정 outcome으로 매핑합니다. Normalized output은 bounded digest와 counter를 유지하지만 raw stdout/stderr는 포함하지 않습니다.
+
+Test outcome은 report 이전 process failure, missing/incomplete/unparseable report, 일치하지 않는 count, assertion failure, all-skipped execution, zero discovered test, missing required test ID, post-result process failure/cancellation/uncertainty, success를 구분합니다. Success에는 complete report, 0보다 큰 executed test count, 모든 required test ID, passing assertion, clean process result가 필요합니다. Count가 일치하지 않는 report는 receipt-compatible test summary로 투영하지 않습니다. Retry는 첫 failure를 보존하며 deterministic divergence를 숨길 수 없습니다.
+
+이 계층은 XML/JSON report를 parse하거나 engine/test process를 실행하거나 required test ID를 선택하거나 receipt를 기록하거나 command를 노출하지 않습니다. Engine adapter가 bounded report parser를 제공하고 normalized outcome을 같은 run authority에 결합해야 verification에서 사용할 수 있습니다.
 
 gameplay outcome, capture outcome, performance outcome, build outcome은 test outcome과 분리합니다. unit suite 통과만으로 collectible, HUD binding, save/load, packaged startup의 동작을 증명할 수 없습니다.
 

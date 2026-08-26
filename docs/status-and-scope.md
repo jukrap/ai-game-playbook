@@ -6,7 +6,7 @@
 
 ## Current repository state
 
-The repository contains a private pnpm/TypeScript workspace, versioned schemas, semantic validators, typed registry validation and generation, deterministic workflow-plan attestation, a runtime registry for implemented commands, a digest-bound public surface, tests, Windows/Linux CI, an early core package, a managed-pack runtime, and an experimental CLI package.
+The repository contains a private pnpm/TypeScript workspace, versioned schemas, semantic validators, typed registry validation and generation, deterministic workflow-plan attestation, a runtime registry for implemented commands, a digest-bound public surface, tests, Windows/Linux CI, an early core package, a private evidence-normalization package, a managed-pack runtime, and an experimental CLI package.
 
 Implemented core boundaries include:
 
@@ -17,9 +17,10 @@ Implemented core boundaries include:
 - one root/project-bound mutation lease with bounded waiting and dead-owner-only recovery;
 - schema-bound permission admission, exact scoped signed grants, and effect settlement;
 - deterministic workflow-plan resolution and immutable state transitions;
-- canonical append-only checkpoint chains with restart classification; and
-- canonical append-only run-receipt records with compare-and-swap heads, exact authority binding, and redaction checks; and
-- private promotion of complete project-local artifact snapshots into immutable SHA-256 objects with receipt-attested manifests.
+- canonical append-only checkpoint chains with restart classification;
+- canonical append-only run-receipt records with compare-and-swap heads, exact authority binding, and redaction checks;
+- private promotion of complete project-local artifact snapshots into immutable SHA-256 objects with receipt-attested manifests; and
+- fail-closed normalization of bounded process and structured test-report observations without copying raw process output.
 
 The private pack runtime implements write-free preflight, canonical installed state, exact dependencies and ownership, local add/update/remove transactions, active markers, append-only journals, compare-and-swap promotion, clear-failure rollback, marker-bound direct-parent directory ownership, reversible tombstones, bounded recovery inspection, and separately approved stable-state finalization.
 
@@ -27,11 +28,11 @@ The source-built `agpb` executable currently exposes plan-only `init`, read-only
 
 ## What is not available
 
-There is no installable or published package, MCP server, Codex integration package, general command dispatcher, approval UI, durable approval store, evidence CLI or export path, mutating pack CLI, recovery-finalization command, CPU or memory sandbox, engine bridge, engine pack, live-engine automation, or playable golden project.
+There is no installable or published package, MCP server, Codex integration package, general command dispatcher, approval UI, durable approval store, evidence CLI or export path, engine report parser, mutating pack CLI, recovery-finalization command, CPU or memory sandbox, engine bridge, engine pack, live-engine automation, or playable golden project.
 
 Mutating initialization, pack and skill commands, engine commands, workflow execution, verification, evidence commands, and documentation command integration remain planned. Private library functions are not public commands. The runtime registry exposes none of those planned operations.
 
-Project-state bootstrap, artifact promotion, receipt persistence, pack mutation, recovery inspection, and recovery finalization remain private APIs. The current `init` can report layout intent and conflicts but cannot create profile, policy, ignore, or runtime-state bytes. The current doctor can identify unsafe state but cannot initialize, repair, clear, classify recovery, or finalize it. Project inspection does not run Git, enumerate processes, establish Editor liveness or session identity, validate stage evidence content, connect to an engine, or raise an engine support grade. The workflow runtime is not connected to general dispatch. Durable receipt JSON and bounded content-addressed artifact bytes exist, but format/decode QA, retention, historical migration, evidence commands, and export do not.
+Project-state bootstrap, artifact promotion, receipt persistence, component result normalization, pack mutation, recovery inspection, and recovery finalization remain private APIs. The current `init` can report layout intent and conflicts but cannot create profile, policy, ignore, or runtime-state bytes. The current doctor can identify unsafe state but cannot initialize, repair, clear, classify recovery, or finalize it. Project inspection does not run Git, enumerate processes, establish Editor liveness or session identity, validate stage evidence content, connect to an engine, or raise an engine support grade. The workflow runtime is not connected to general dispatch. Durable receipt JSON, bounded content-addressed artifact bytes, and pure process/test outcome normalization exist, but report parsing, format/decode QA, retention, historical migration, evidence commands, and export do not.
 
 All Godot, Unity, and Unreal capabilities remain `planned`. Availability of `init`, `doctor`, and `project inspect` is a control-plane command status, not engine evidence.
 

@@ -1,6 +1,6 @@
 # Evidence and Verification
 
-> Status: the receipt and checkpoint contracts, settlement boundary, durable checkpoint chain, private durable receipt records, and private content-addressed artifact payloads are implemented. Evidence commands, export, format QA, and engine evidence do not exist yet.
+> Status: the receipt and checkpoint contracts, settlement boundary, durable checkpoint chain, private durable receipt records, private content-addressed artifact payloads, and pure process/test result normalizers are implemented. Evidence commands, report parsers, export, format QA, and engine evidence do not exist yet.
 
 [한국어](evidence-and-verification.ko.md) · [Documentation](README.md)
 
@@ -37,7 +37,11 @@ The current artifact slice is bounded to 256 complete artifacts and 64 MiB acros
 
 ## Test authority
 
-Test outcomes distinguish process failure, incomplete report, assertion failure, all-skipped, zero tests, post-result crash, and success. Success requires a complete report, a nonzero test count, all required test IDs, and passing assertions. Retries preserve the first failure and cannot hide deterministic divergence.
+The implemented private normalizers accept a bounded process result and, for tests, an already-structured report observation. Process results are revalidated and mapped to fixed outcomes for zero or nonzero exit, spawn failure, timeout, idle timeout, output limit, cancellation, and unconfirmed termination. Normalized output retains bounded digests and counters but never raw stdout or stderr.
+
+Test outcomes distinguish a process failure before a report, missing/incomplete/unparseable reports, inconsistent counts, assertion failure, all-skipped execution, zero discovered tests, missing required test IDs, post-result process failure/cancellation/uncertainty, and success. Success requires a complete report, a nonzero executed test count, all required test IDs, passing assertions, and a clean process result. A count-mismatched report is not projected into a receipt-compatible test summary. Retries preserve the first failure and cannot hide deterministic divergence.
+
+This layer does not parse XML or JSON reports, run an engine or test process, select required test IDs, write receipts, or expose a command. Engine adapters must provide bounded report parsers and bind the normalized outcome to the same run authority before verification can use it.
 
 Gameplay outcome, capture outcome, performance outcome, and build outcome remain separate from test outcome. A passing unit suite cannot prove a collectible, HUD binding, save/load, or packaged startup works.
 

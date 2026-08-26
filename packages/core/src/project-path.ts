@@ -321,7 +321,7 @@ async function findDirectoryMatches(
   maxDirectoryEntries: number,
   path: PortableProjectPath,
 ): Promise<Dirent[]> {
-  const matches: Dirent[] = [];
+  const matches = new Map<string, Dirent>();
   const folded = segment.toLowerCase();
   let count = 0;
   try {
@@ -336,7 +336,9 @@ async function findDirectoryMatches(
         );
       }
       if (entry.name.toLowerCase() === folded) {
-        matches.push(entry);
+        // A directory stream may observe the same exact name before and after
+        // a concurrent rename/recreate. Distinct case variants stay separate.
+        matches.set(entry.name, entry);
       }
     }
   } catch (error) {
@@ -345,7 +347,7 @@ async function findDirectoryMatches(
     }
     pathError(error, path);
   }
-  return matches;
+  return [...matches.values()];
 }
 
 function kindOf(stats: BigIntStats): ResolvedProjectPathKind {

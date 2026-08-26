@@ -41,6 +41,7 @@ export const PROJECT_LANE_MAX_POLL_MS: number = 1_000;
 
 const PROJECT_LANE_LOCK_DIRECTORY = ".ai-game-playbook/locks";
 const PROJECT_LANE_MAX_LOCK_BYTES = 16 * 1_024;
+const PROJECT_LANE_RELEASE_WITNESS_ATTEMPTS = 4;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const CURRENT_PROCESS_STARTED_AT: string = new Date(
@@ -1038,7 +1039,7 @@ async function moveLockToTombstone(
         throw error;
       }
     }
-    await assertReleasedIdentityIsNotCurrent(root, directory, current);
+    await assertReleasedSnapshotIsNotCurrent(root, directory, current);
     await syncDirectory(directory.absolutePath);
   } catch {
     throw new CoreBoundaryError(
@@ -1082,6 +1083,71 @@ async function assertReleasedIdentityIsNotCurrent(
   ) {
     throw new Error("released project lane identity returned to the lock path");
   }
+}
+
+async function assertReleasedSnapshotIsNotCurrent(
+  root: CanonicalProjectRoot,
+  directory: BoundLaneDirectory,
+  released: LaneFileSnapshot,
+): Promise<void> {
+  for (
+    let attempt = 0;
+    attempt < PROJECT_LANE_RELEASE_WITNESS_ATTEMPTS;
+    attempt += 1
+  ) {
+    await assertLaneDirectory(root, directory);
+    let target: ResolvedProjectPath;
+    try {
+      target = await resolveProjectPath(root, PROJECT_LANE_LOCK_PATH, {
+        expectedType: "file",
+        existence: "optional",
+      });
+    } catch (error) {
+      if (
+        error instanceof CoreBoundaryError &&
+        error.code === "project-path-not-found"
+      ) {
+        await assertLaneDirectory(root, directory);
+        return;
+      }
+      throw error;
+    }
+    if (!sameIdentity(target.parentIdentity, directory)) {
+      throw new Error("project lane lock parent changed during release cleanup");
+    }
+    if (target.kind === "absent") {
+      return;
+    }
+    if (target.targetIdentity === undefined) {
+      throw new Error("project lane lock has no release witness identity");
+    }
+    if (!sameIdentity(target.targetIdentity, released)) {
+      return;
+    }
+
+    try {
+      const current = await readLockSnapshot(root, directory);
+      if (current === undefined) {
+        await assertLaneDirectory(root, directory);
+        return;
+      }
+      // A filesystem may reuse the released inode immediately after unlink.
+      // The old lock returned only when both its identity and content witness match.
+      if (!sameIdentity(current, released) || current.digest !== released.digest) {
+        return;
+      }
+      throw new Error("released project lane snapshot returned to the lock path");
+    } catch (error) {
+      if (
+        error instanceof LaneSnapshotChangedError &&
+        attempt + 1 < PROJECT_LANE_RELEASE_WITNESS_ATTEMPTS
+      ) {
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error("project lane release witness did not stabilize");
 }
 
 async function waitForRetry(

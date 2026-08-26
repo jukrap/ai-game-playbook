@@ -788,10 +788,8 @@ function createStagedWrite(
 export async function stageProjectFileCas(
   value: ProjectFileCasRequest,
 ): Promise<StagedProjectFileCasWrite> {
-  if (typeof value === "object" && value !== null) {
-    await assertProjectRootIdentity(value.root);
-  }
   const request = validateCasRequest(value);
+  await assertProjectRootIdentity(request.root);
   const target = await resolveCasTarget(request);
   const parentPath = dirname(target.absolutePath);
   const parentIdentity = target.parentIdentity;

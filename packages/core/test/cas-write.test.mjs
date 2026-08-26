@@ -183,6 +183,23 @@ test("CAS detaches mutable input and rejects undeclared request authority", asyn
   );
 });
 
+test("CAS snapshots mutable content before its first asynchronous boundary", async (t) => {
+  const { root, target } = await fixture(t);
+  const mutable = Buffer.from("call-time\n", "utf8");
+  const pending = core.stageProjectFileCas({
+    root,
+    path: "Config/settings.json",
+    content: mutable,
+    expected: { mode: "absent" },
+    maxBytes: 1024,
+  });
+  mutable.fill(0x78);
+
+  const staged = await pending;
+  await staged.commit();
+  assert.equal(await readFile(target, "utf8"), "call-time\n");
+});
+
 test("staged CAS detects target races and preserves the competing write", async (t) => {
   const initial = "before\n";
   const raced = "editor-write\n";

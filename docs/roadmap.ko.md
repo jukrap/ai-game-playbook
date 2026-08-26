@@ -1,6 +1,6 @@
 ---
 source: docs/roadmap.md
-source_sha256: bf9206efb61b2c2a36ea223fc1f7fdb1ee93f1515ffdde811aea9260faff9798
+source_sha256: 93c157e61ff8fe150c14b5ee8e61471ff211912013e927b95339080f9e11b3dc
 translated_at: 2026-08-27
 ---
 
@@ -12,7 +12,7 @@ translated_at: 2026-08-27
 
 ## 현재 체크포인트
 
-완료된 기반에는 versioned contract, strict registry validation, generated surface, deterministic workflow plan, canonical project/path handling, compare-and-swap filesystem operation, bounded process, project mutation lease, signed scoped permission admission, workflow checkpoint, durable private receipt record, pure process/test result normalization, recovery boundary가 있는 managed-pack transaction이 포함됩니다.
+완료된 기반에는 versioned contract, strict registry validation, generated surface, deterministic workflow plan, canonical project/path handling, compare-and-swap filesystem operation, bounded process, project mutation lease, signed scoped permission admission, workflow checkpoint, durable private receipt record, pure process/test result normalization, 제한된 retained-artifact assessment, recovery boundary가 있는 managed-pack transaction이 포함됩니다.
 
 현재 Stage 2 product slice에는 다음이 추가됐습니다.
 
@@ -25,6 +25,7 @@ translated_at: 2026-08-27
 - exact runtime/registry authority, compare-and-swap head, redaction check, complete project-local artifact-locator 검증을 포함한 canonical append-only run-receipt persistence;
 - complete artifact snapshot을 receipt가 증명하는 canonical manifest와 함께 immutable SHA-256 object로 승격하는 private promotion;
 - bounded process와 structured test-report observation을 immutable component outcome으로 바꾸는 private fail-closed normalization;
+- 보존된 UTF-8, canonical JSON, non-interlaced PNG와 선택적 current-registry asset-provenance evidence를 평가하는 private fail-closed assessment;
 - compiled-handler digest attestation;
 - generated/public availability parity.
 
@@ -44,7 +45,7 @@ Private library function이 있다는 이유만으로 command를 available로 �
 
 ## Stage 3 — evidence, MCP, Codex integration
 
-Process/test normalization 기반은 구현했지만 engine report parser, required-test selection, gameplay/capture/performance/build normalizer, runtime-to-receipt integration은 계획 단계입니다. 그 밖에 artifact format/provenance QA, evidence query, receipt-history migration/forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export command, registry-generated STDIO MCP tool, project-scoped Codex skill과 instruction을 계획합니다.
+Process/test normalization과 제한된 artifact-assessment 기반은 구현했지만 engine report parser, required-test selection, gameplay/capture/performance/build normalizer, 더 넓은 artifact format, runtime-frame provenance, assessment persistence, runtime-to-receipt integration은 계획 단계입니다. 그 밖에 evidence query, receipt-history migration/forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export command, registry-generated STDIO MCP tool, project-scoped Codex skill과 instruction을 계획합니다.
 
 CLI, MCP, 문서, skill routing은 동일한 command ID, schema digest, permission, handler identity를 유지해야 합니다. MCP annotation은 hint이며 permission broker를 override할 수 없습니다. Background upload나 telemetry path는 계획하지 않습니다.
 

@@ -6,7 +6,7 @@
 
 ## Current checkpoint
 
-Completed foundations include versioned contracts, strict registry validation, generated surfaces, deterministic workflow plans, canonical project/path handling, compare-and-swap filesystem operations, bounded processes, project mutation leases, signed scoped permission admission, workflow checkpoints, durable private receipt records, pure process/test result normalization, and managed-pack transactions with recovery boundaries.
+Completed foundations include versioned contracts, strict registry validation, generated surfaces, deterministic workflow plans, canonical project/path handling, compare-and-swap filesystem operations, bounded processes, project mutation leases, signed scoped permission admission, workflow checkpoints, durable private receipt records, pure process/test result normalization, limited retained-artifact assessment, and managed-pack transactions with recovery boundaries.
 
 The current Stage 2 product slice adds:
 
@@ -19,6 +19,7 @@ The current Stage 2 product slice adds:
 - canonical append-only run-receipt persistence with exact runtime and registry authority, compare-and-swap heads, redaction checks, and complete project-local artifact-locator verification;
 - private promotion of complete artifact snapshots into immutable SHA-256 objects with receipt-attested canonical manifests;
 - private fail-closed normalization of bounded process and structured test-report observations into immutable component outcomes;
+- private fail-closed assessment of retained UTF-8, canonical JSON, non-interlaced PNG, and optional current-registry asset-provenance evidence;
 - compiled-handler digest attestation; and
 - generated/public availability parity.
 
@@ -38,7 +39,7 @@ No command may be marked available merely because a private library function exi
 
 ## Stage 3 — evidence, MCP, and Codex integration
 
-The process/test normalization foundation is implemented, but engine report parsers, required-test selection, gameplay/capture/performance/build normalizers, and runtime-to-receipt integration remain planned. Other planned work includes artifact format and provenance QA, evidence queries, receipt-history migration and forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export commands, registry-generated STDIO MCP tools, and project-scoped Codex skills and instructions.
+The process/test normalization and limited artifact-assessment foundations are implemented, but engine report parsers, required-test selection, gameplay/capture/performance/build normalizers, broader artifact formats, runtime-frame provenance, assessment persistence, and runtime-to-receipt integration remain planned. Other planned work includes evidence queries, receipt-history migration and forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export commands, registry-generated STDIO MCP tools, and project-scoped Codex skills and instructions.
 
 CLI, MCP, documentation, and skill routing must preserve identical command IDs, schema digests, permissions, and handler identities. MCP annotations remain hints and can never override the permission broker. No background upload or telemetry path is planned.
 

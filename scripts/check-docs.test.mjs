@@ -106,14 +106,14 @@ const scenarios = [
     diagnostic: "missing Status banner",
     mutate: (root) => {
       updateFile(root, "docs/assets-and-provenance.md", (text) =>
-        text.replace("> Status: planned asset policy. No asset pipeline or provider integration exists yet.\n\n", "")
+        text.replace(/^> Status:[^\r\n]*(?:\r?\n){2}/m, "")
       );
       const englishDigest = createHash("sha256")
         .update(readFileSync(join(root, "docs", "assets-and-provenance.md")))
         .digest("hex");
       updateFile(root, "docs/assets-and-provenance.ko.md", (text) =>
         text
-          .replace("> 상태: 계획된 자산 정책입니다. asset pipeline이나 provider integration은 아직 없습니다.\n\n", "")
+          .replace(/^> 상태:[^\r\n]*(?:\r?\n){2}/m, "")
           .replace(/^source_sha256: [0-9a-f]{64}$/m, `source_sha256: ${englishDigest}`)
       );
     }

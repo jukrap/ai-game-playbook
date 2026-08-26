@@ -1,6 +1,6 @@
 # Evidence and Verification
 
-> Status: the receipt and checkpoint contracts, settlement boundary, durable checkpoint chain, private durable receipt records, private content-addressed artifact payloads, and pure process/test result normalizers are implemented. Evidence commands, report parsers, export, format QA, and engine evidence do not exist yet.
+> Status: the receipt and checkpoint contracts, settlement boundary, durable checkpoint chain, private durable receipt records, private content-addressed artifact payloads, pure process/test result normalizers, and limited private artifact format/provenance assessment are implemented. Evidence commands, engine report parsers, export, persisted artifact QA, and engine evidence do not exist yet.
 
 [한국어](evidence-and-verification.ko.md) · [Documentation](README.md)
 
@@ -33,7 +33,7 @@ A private promotion API validates a complete artifact source as a stable project
 
 The private receipt store persists the promoted `RunReceipt` body as a canonical immutable record behind one compare-and-swap head per run. Persistence binds the same canonical project root, runtime, registry, command, workflow plan, and optional feature contract. Diagnostics require an explicit redaction marker, obvious credential-shaped and absolute private-machine text patterns are rejected, and fixed record, chain, artifact-count, and artifact-byte budgets apply. Every complete artifact must use its exact CAS object path and matching manifest; load reopens both twice. The source file is no longer evidence authority after promotion. Missing, malformed, noncanonical, tampered, relocated, rebound, stale, and competing state is preserved and rejected rather than repaired or silently replaced.
 
-The current artifact slice is bounded to 256 complete artifacts and 64 MiB across one verified receipt chain, with a 128 KiB manifest limit. It does not parse or decode engine artifacts, validate image dimensions or runtime-frame provenance beyond the receipt fields, provide retention cleanup or reachable-head garbage collection, list/show/export commands, encrypt records, or load old chains under a different registry authority. Approval reservations and an action that can clear uncertainty are also not durable yet.
+The current receipt/object slice is bounded to 256 complete artifacts and 64 MiB across one verified receipt chain, with a 128 KiB manifest limit. A separate private assessment accepts one promoted complete artifact up to 16 MiB, revalidates the receipt, object, and manifest before and after reading the retained bytes, and returns bounded metadata without raw content. It can decode BOM-free UTF-8, parse exact canonical JSON under depth and node limits, or validate PNG chunks, CRCs, dimensions, bounded inflate output, and non-interlaced scanlines. Interlaced PNG is structurally checked but remains `unverified`. Optional `AssetProvenance` validation uses the exact current registry and requires the declared current-file path, digest, and byte count to match the assessed artifact. The assessment is not persisted and does not prove runtime-frame origin, engine import state, broader image semantics, or production readiness. Other formats, engine report parsing, retention cleanup or reachable-head garbage collection, list/show/export commands, record encryption, and loading old chains under a different registry authority remain unavailable. Approval reservations and an action that can clear uncertainty are also not durable yet.
 
 ## Test authority
 
@@ -53,7 +53,7 @@ Determinism means the declared gameplay observations repeat within the stated en
 
 ## Runtime capture
 
-Only a frame captured from actual play can serve as runtime visual evidence. Editor previews, scene thumbnails, and imported images receive different evidence classes. A capture is accepted only after file completion, decode, dimensions, provenance fields, and hash are verified.
+Only a frame captured from actual play can serve as runtime visual evidence. Editor previews, scene thumbnails, and imported images receive different evidence classes. Successful PNG decoding by the private assessor proves only the retained file's bounded structure; it does not prove that an engine produced the frame during play. Future runtime-capture acceptance also requires file completion, dimensions, capture provenance, engine/session/state identity, and hash verification.
 
 Visual scores are advisory. They cannot override gameplay-state failures, missing interaction, critical visual findings, or mismatched baseline identity.
 

@@ -1,12 +1,12 @@
 ---
 source: docs/assets-and-provenance.md
-source_sha256: 7ab5f4e698a80b6a5f3a87f48fed267be65c000dc2b2ae48fb2ec3c2de92e823
+source_sha256: 86e0a5cbd41579ab8b379094e98730a837eb9b7ed35e0cf83f25cf9674484f10
 translated_at: 2026-08-26
 ---
 
 # 자산과 Provenance
 
-> 상태: 계획된 자산 정책입니다. asset pipeline이나 provider integration은 아직 없습니다.
+> 상태: 등록된 provenance contract와 제한된 private assessment가 있는 계획된 자산 정책입니다. Asset pipeline이나 provider integration은 아직 없습니다.
 
 [English](assets-and-provenance.md) · [문서](README.ko.md)
 
@@ -22,7 +22,7 @@ download, conversion, generation이 성공했다는 이유만으로 file이 prod
 
 ## `AssetProvenance`
 
-각 candidate는 다음 정보를 가질 계획입니다.
+등록된 contract는 다음 candidate metadata를 담을 수 있으며 production-pipeline integration은 계획 단계입니다.
 
 - 안정적인 asset과 slot identity.
 - original source category, lineage, source file hash.
@@ -33,6 +33,8 @@ download, conversion, generation이 성공했다는 이유만으로 file이 prod
 - engine import setting, dependency, QA result, promotion state, rollback target.
 
 권리를 알 수 없거나 lineage가 없으면 production 승격을 차단합니다. 시스템은 file을 사용할 수 있다는 사실로 ownership을 추론하지 않습니다.
+
+현재 private assessor는 `AssetProvenance` 값을 exact in-process registry에 대해 검증하고 semantic invariant를 확인하며 선언된 current-file path, SHA-256 digest, byte count 하나가 평가한 artifact와 일치하도록 요구합니다. Bounded identity, lifecycle, QA count, rights summary, issue-code metadata를 반환합니다. 이 검사를 통과해도 권리를 승인하거나 asset을 import하거나 lifecycle을 진행하거나 engine-backed QA를 확립하거나 production-ready로 만들지 않으며 결과도 아직 영속화하지 않습니다.
 
 ## 첫 버전 지원 입력
 

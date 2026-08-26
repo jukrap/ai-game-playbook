@@ -1,6 +1,6 @@
 # Assets and Provenance
 
-> Status: planned asset policy. No asset pipeline or provider integration exists yet.
+> Status: planned asset policy with a registered provenance contract and limited private assessment. No asset pipeline or provider integration exists yet.
 
 [한국어](assets-and-provenance.ko.md) · [Documentation](README.md)
 
@@ -16,7 +16,7 @@ No downloaded, converted, or generated file is production-ready merely because c
 
 ## `AssetProvenance`
 
-Each candidate is planned to carry:
+The registered contract can carry the following candidate metadata; production-pipeline integration remains planned:
 
 - Stable asset and slot identities.
 - Original source category, lineage, and source file hash.
@@ -27,6 +27,8 @@ Each candidate is planned to carry:
 - Engine import settings, dependencies, QA results, promotion state, and rollback target.
 
 Unknown rights or missing lineage blocks promotion to production. The system does not infer ownership from file availability.
+
+The current private assessor validates an `AssetProvenance` value against the exact in-process registry, checks semantic invariants, and requires one declared current-file path, SHA-256 digest, and byte count to match the assessed artifact. It returns bounded identity, lifecycle, QA-count, rights-summary, and issue-code metadata. Passing this check does not approve rights, import an asset, advance its lifecycle, establish engine-backed QA, or make it production-ready, and the result is not yet persisted.
 
 ## Supported first-version inputs
 

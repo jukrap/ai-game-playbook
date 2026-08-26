@@ -1,12 +1,12 @@
 ---
 source: docs/evidence-and-verification.md
-source_sha256: 16b6cd4ab364d01af1c7deb551cd3224e62830d40b7a38d99ac1a2f84d244a86
+source_sha256: 14aebd1cfcbd7079bbef39ff8923924cc0f165672676f1973ad3de89a3ee4a6e
 translated_at: 2026-08-27
 ---
 
 # 증거와 검증
 
-> 상태: receipt/checkpoint 계약, settlement 경계, durable checkpoint chain, private durable receipt record, private content-addressed artifact payload, pure process/test result normalizer를 구현했습니다. Evidence command, report parser, export, format QA, engine evidence는 아직 없습니다.
+> 상태: receipt/checkpoint 계약, settlement 경계, durable checkpoint chain, private durable receipt record, private content-addressed artifact payload, pure process/test result normalizer, 제한된 private artifact format/provenance assessment를 구현했습니다. Evidence command, engine report parser, export, 영속화된 artifact QA, engine evidence는 아직 없습니다.
 
 [English](evidence-and-verification.md) · [문서](README.ko.md)
 
@@ -39,7 +39,7 @@ Private promotion API는 complete artifact source를 stable project-local regula
 
 Private receipt store는 promoted `RunReceipt` body를 run별 compare-and-swap head 뒤의 canonical immutable record로 영속화합니다. Persistence는 같은 canonical project root, runtime, registry, command, workflow plan, 선택적 feature contract를 결합합니다. Diagnostic에는 explicit redaction marker가 필요하고 명백한 credential-shaped text와 absolute private-machine path pattern을 거부하며 record, chain, artifact count, artifact byte에 고정 budget을 적용합니다. 모든 complete artifact는 exact CAS object path와 일치하는 manifest를 사용해야 하며 load는 둘을 두 번 다시 엽니다. Promotion 뒤 source file은 evidence authority가 아닙니다. Missing, malformed, noncanonical, tampered, relocated, rebound, stale, competing state는 repair하거나 조용히 교체하지 않고 그대로 보존한 채 거부합니다.
 
-현재 artifact slice는 검증하는 receipt chain 하나에서 complete artifact 최대 256개, 총 64 MiB, manifest 128 KiB로 제한됩니다. Engine artifact parse/decode, image dimension 또는 receipt field를 넘어선 runtime-frame provenance 검증, retention cleanup/reachable-head GC, list/show/export command, record encryption, 다른 registry authority 아래의 과거 chain load는 제공하지 않습니다. Approval reservation과 uncertainty를 해제하는 action도 아직 durable하지 않습니다.
+현재 receipt/object slice는 검증하는 receipt chain 하나에서 complete artifact 최대 256개, 총 64 MiB, manifest 128 KiB로 제한됩니다. 별도 private assessment는 최대 16 MiB의 promoted complete artifact 하나를 받아 보존 byte를 읽기 전후에 receipt, object, manifest를 다시 검증하고 raw content 없는 bounded metadata를 반환합니다. BOM 없는 UTF-8 decode, depth/node limit을 적용한 exact canonical JSON parse, PNG chunk·CRC·dimension·bounded inflate output·non-interlaced scanline 검증을 수행할 수 있습니다. Interlaced PNG는 구조를 검사하지만 `unverified`로 남습니다. 선택적 `AssetProvenance` validation은 exact current registry를 사용하며 선언된 current-file path, digest, byte count가 평가한 artifact와 일치해야 합니다. Assessment는 영속화하지 않으며 runtime-frame origin, engine import state, 더 넓은 image semantics, production readiness를 증명하지 않습니다. 다른 format, engine report parsing, retention cleanup/reachable-head GC, list/show/export command, record encryption, 다른 registry authority 아래의 과거 chain load는 제공하지 않습니다. Approval reservation과 uncertainty를 해제하는 action도 아직 durable하지 않습니다.
 
 ## Test 판정 기준
 
@@ -59,7 +59,7 @@ determinism은 선언한 gameplay observation이 명시한 environment와 tolera
 
 ## Runtime capture
 
-실제 play에서 capture한 frame만 runtime visual evidence가 될 수 있습니다. Editor preview, scene thumbnail, imported image는 다른 evidence class입니다. file completion, decode, dimension, provenance field, hash를 확인한 뒤에만 capture를 수용합니다.
+실제 play에서 capture한 frame만 runtime visual evidence가 될 수 있습니다. Editor preview, scene thumbnail, imported image는 다른 evidence class입니다. Private assessor가 PNG decode에 성공해도 보존 file의 bounded structure만 증명하며 engine이 play 중 frame을 만들었다는 뜻은 아닙니다. 향후 runtime capture 수용에는 file completion, dimension, capture provenance, engine/session/state identity, hash 검증도 필요합니다.
 
 visual score는 advisory입니다. gameplay-state failure, missing interaction, critical visual finding, mismatched baseline identity를 덮을 수 없습니다.
 

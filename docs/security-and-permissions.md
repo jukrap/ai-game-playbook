@@ -16,6 +16,8 @@ Static project inspection binds one local root, limits directory observations an
 
 The private artifact promotion and receipt stores accept only the current same-process validated registry and a receipt bound to the exact project, runtime, command descriptor, handler, workflow plan, and optional feature contract. They require pre-existing ignored local directories, stable project-local source snapshots, digest-addressed create-only objects, canonical producer manifests, canonical receipt JSON, compare-and-swap heads, explicit diagnostic redaction markers, and bounded text and artifacts. Complete artifact objects and manifests are reopened twice during verification. These stores do not grant execution authority, repair corruption, retry a mutation, perform format QA, remove unreachable objects, or export data.
 
+A separate private artifact assessor inherits no additional authority. It snapshots the request before I/O, requires one exact promoted complete artifact, verifies the receipt/object/manifest before and after reading retained bytes, and applies fixed byte, JSON-tree, PNG-dimension, pixel, inflate, and chunk limits. Optional provenance validation requires the exact current registry and current-file identity. The assessor returns bounded codes and metadata rather than raw content; it performs no write, process launch, network access, engine control, export, retry, repair, or support-grade promotion. Unsupported interlaced PNG remains `unverified`.
+
 ## Default permission model
 
 | Action | Default |

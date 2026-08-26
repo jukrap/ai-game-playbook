@@ -1,6 +1,6 @@
 ---
 source: docs/status-and-scope.md
-source_sha256: a4e9e5b4d0bcb2bf5e5695f41a6aff3c83a5f885868696f28e825e2568f01837
+source_sha256: d0517a4d2079588e9da8e22d41cdf1ebd56c31ad5da0ec5c9ff2c64fa9a94650
 translated_at: 2026-08-27
 ---
 
@@ -12,7 +12,7 @@ translated_at: 2026-08-27
 
 ## 현재 저장소 상태
 
-저장소에는 private pnpm/TypeScript workspace, versioned schema, semantic validator, typed registry validation/generation, deterministic workflow-plan attestation, implemented command용 runtime registry, digest 결합 공개 surface, test, Windows/Linux CI, 초기 core package, private evidence-normalization package, managed-pack runtime, experimental CLI package가 있습니다.
+저장소에는 private pnpm/TypeScript workspace, versioned schema, semantic validator, typed registry validation/generation, deterministic workflow-plan attestation, implemented command용 runtime registry, digest 결합 공개 surface, test, Windows/Linux CI, 초기 core package, private evidence package, managed-pack runtime, experimental CLI package가 있습니다.
 
 구현된 core 경계는 다음을 포함합니다.
 
@@ -26,7 +26,8 @@ translated_at: 2026-08-27
 - restart classification을 포함한 canonical append-only checkpoint chain;
 - compare-and-swap head, exact authority binding, redaction check를 포함한 canonical append-only run-receipt record;
 - complete project-local artifact snapshot을 receipt가 증명하는 manifest와 함께 immutable SHA-256 object로 승격하는 private promotion;
-- raw process output을 복사하지 않고 bounded process와 structured test-report observation을 fail-closed로 정규화하는 경계.
+- raw process output을 복사하지 않고 bounded process와 structured test-report observation을 fail-closed로 정규화하는 경계;
+- raw content를 출력하지 않으면서 보존된 UTF-8, canonical JSON 또는 non-interlaced PNG artifact 하나와 선택적 current-registry `AssetProvenance` 일치를 fail-closed로 평가하는 경계.
 
 Private pack runtime은 write-free preflight, canonical installed state, exact dependency/ownership, local add/update/remove transaction, active marker, append-only journal, compare-and-swap promotion, clear-failure rollback, marker-bound direct-parent directory ownership, reversible tombstone, bounded recovery inspection, 별도 승인 stable-state finalization을 구현합니다.
 
@@ -38,7 +39,7 @@ Installable/published package, MCP server, Codex integration package, general co
 
 Mutating initialization, pack/skill command, engine command, workflow execution, verification, evidence command, documentation command integration은 planned입니다. Private library function은 public command가 아니며 runtime registry도 이러한 planned operation을 노출하지 않습니다.
 
-Project-state bootstrap, artifact promotion, receipt persistence, component result normalization, pack mutation, recovery inspection, recovery finalization은 private API입니다. 현재 `init`은 layout intent와 conflict를 보고할 수 있지만 profile, policy, ignore, runtime-state byte를 만들 수 없습니다. 현재 doctor는 unsafe state를 식별할 수 있지만 initialize, repair, clear, recovery classify, finalize할 수 없습니다. Project inspection은 Git 실행, process 열거, Editor liveness/session identity 확립, stage evidence content 검증, engine 연결, engine support grade 승격을 수행하지 않습니다. Workflow runtime은 general dispatch와 연결되지 않았습니다. Durable receipt JSON, bounded content-addressed artifact byte, pure process/test outcome normalization은 존재하지만 report parsing, format/decode QA, retention, historical migration, evidence command, export는 없습니다.
+Project-state bootstrap, artifact promotion, receipt persistence, component result normalization, retained-artifact assessment, pack mutation, recovery inspection, recovery finalization은 private API입니다. 현재 `init`은 layout intent와 conflict를 보고할 수 있지만 profile, policy, ignore, runtime-state byte를 만들 수 없습니다. 현재 doctor는 unsafe state를 식별할 수 있지만 initialize, repair, clear, recovery classify, finalize할 수 없습니다. Project inspection은 Git 실행, process 열거, Editor liveness/session identity 확립, stage evidence content 검증, engine 연결, engine support grade 승격을 수행하지 않습니다. Workflow runtime은 general dispatch와 연결되지 않았습니다. Durable receipt JSON, bounded content-addressed artifact byte, pure process/test outcome normalization, 제한된 UTF-8/canonical-JSON/non-interlaced-PNG 및 provenance assessment는 존재합니다. Engine report parsing, 더 넓은 format/decode QA, assessment persistence, runtime-frame provenance, retention, historical migration, evidence command, export는 없습니다.
 
 Godot, Unity, Unreal capability는 모두 `planned`입니다. `init`, `doctor`, `project inspect` availability는 control-plane command 상태이며 engine evidence가 아닙니다.
 

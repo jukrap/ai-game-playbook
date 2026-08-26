@@ -1,6 +1,6 @@
 ---
 source: docs/concepts.md
-source_sha256: 0851c31209395f5fcd6503a7f68f131c76d103e77482633b4ace2863dbcb7202
+source_sha256: 4cf4d7cd7d3edae2be13d9ce6f2c793fff281dade96155d434c731782f3b9d67
 translated_at: 2026-08-27
 ---
 
@@ -51,7 +51,7 @@ mutation 전, Editor reload/restart 후, evidence 승격 전에 identity를 검�
 - **role lens**는 판단 질문과 evidence 책임을 가진 검토 관점이며 가상 직원이나 독립 executor가 아닙니다.
 - **workflow**는 checkpoint, budget, stop condition을 갖춘 등록 command의 제한된 순서입니다. 실행 전에 descriptor를 결정적인 위상 순서와 exact implementation authority를 가진 domain-separated plan으로 해석합니다.
 
-기본 계획은 작업마다 skill 1~5개와 role lens 최대 3개를 선택합니다. 하나의 executor가 mutation을 소유하고 병렬 작업은 안전한 read와 독립 분석으로 제한합니다. private state machine은 이제 resolved plan을 소비하고 authorization과 dispatch 경계를 분리하며 exact permission settlement와 receipt를 검증하고 선언된 failure/rollback transition을 진행하며 uncertainty나 누적 budget 초과를 차단합니다. append-only checkpoint store는 제한된 parent chain을 검증하고 stale authorization을 복원하지 않는 restart hydration을 지원합니다. dispatch하지 않은 admission은 재승인이 필요하고 dispatch 후 정산하지 못한 step은 reconciliation이 필요합니다. 별도 private store는 canonical receipt body를 compare-and-swap head 뒤에 영속화하고 complete artifact snapshot을 producer-bound manifest가 있는 immutable SHA-256 object로 승격합니다. command dispatch, durable approval, artifact format QA, retention/export, uncertainty 해제, engine 실행은 아직 구현하지 않았습니다.
+기본 계획은 작업마다 skill 1~5개와 role lens 최대 3개를 선택합니다. 하나의 executor가 mutation을 소유하고 병렬 작업은 안전한 read와 독립 분석으로 제한합니다. private state machine은 이제 resolved plan을 소비하고 authorization과 dispatch 경계를 분리하며 exact permission settlement와 receipt를 검증하고 선언된 failure/rollback transition을 진행하며 uncertainty나 누적 budget 초과를 차단합니다. append-only checkpoint store는 제한된 parent chain을 검증하고 stale authorization을 복원하지 않는 restart hydration을 지원합니다. dispatch하지 않은 admission은 재승인이 필요하고 dispatch 후 정산하지 못한 step은 reconciliation이 필요합니다. 별도 private store는 canonical receipt body를 compare-and-swap head 뒤에 영속화하고 complete artifact snapshot을 producer-bound manifest가 있는 immutable SHA-256 object로 승격합니다. Private assessor는 보존된 complete artifact 하나를 다시 검증하고 bounded UTF-8, canonical JSON, non-interlaced PNG, 선택적 current-registry `AssetProvenance` 검사를 수행할 수 있지만 결과를 영속화하거나 engine evidence를 확립하지 않습니다. Command dispatch, durable approval, 더 넓은 artifact format QA, retention/export, uncertainty 해제, engine 실행은 아직 구현하지 않았습니다.
 
 ## 실행 결과
 

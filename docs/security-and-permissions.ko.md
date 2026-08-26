@@ -1,6 +1,6 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: 4eed30225372834d9fd8ab177a7b5eb6463db230c0a0310c56f8ad62001a98f4
+source_sha256: e86a884fa55eb48828a1cc87c981e8af5f3d3f34d9547809504cade9bb8cc7bc
 translated_at: 2026-08-27
 ---
 
@@ -21,6 +21,8 @@ Authorization 자체는 execution이 아닙니다. Broker는 general mutation di
 Static project inspection은 local root 하나를 bind하고 directory observation과 file byte를 제한하며 unsafe link와 case ambiguity를 거부하고 read 전후 identity를 다시 확인합니다. `.git` marker는 Git 실행 permission을 부여하지 않으며 Editor lock은 process, session, liveness, connection, mutation authority를 부여하지 않습니다. Report는 mutation, process launch, network access가 없음을 명시합니다. Invalid profile과 ambiguous engine candidate는 그럴듯한 target을 선택하지 않고 이후 authority를 차단합니다.
 
 Private artifact promotion과 receipt store는 current same-process validated registry와 exact project, runtime, command descriptor, handler, workflow plan, 선택적 feature contract에 결합된 receipt만 수용합니다. 미리 존재하는 ignored local directory, stable project-local source snapshot, digest-addressed create-only object, canonical producer manifest, canonical receipt JSON, compare-and-swap head, explicit diagnostic redaction marker, bounded text/artifact를 요구합니다. 검증 중 complete artifact object와 manifest를 두 번 다시 엽니다. Execution authority를 부여하거나 corruption을 repair하거나 mutation을 retry하거나 format QA를 수행하거나 unreachable object를 제거하거나 data를 export하지 않습니다.
+
+별도 private artifact assessor는 추가 authority를 상속하지 않습니다. I/O 전에 request를 snapshot하고 exact promoted complete artifact 하나를 요구하며 보존 byte를 읽기 전후에 receipt/object/manifest를 검증하고 고정된 byte, JSON tree, PNG dimension, pixel, inflate, chunk limit을 적용합니다. 선택적 provenance validation은 exact current registry와 current-file identity를 요구합니다. Assessor는 raw content 대신 bounded code와 metadata를 반환하며 write, process launch, network access, engine control, export, retry, repair, support-grade promotion을 수행하지 않습니다. 지원하지 않는 interlaced PNG는 `unverified`로 남습니다.
 
 ## 기본 permission 모델
 

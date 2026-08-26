@@ -1,6 +1,6 @@
 # Security and Permissions
 
-> Status: planned permission policy with implemented private admission, workflow checkpoints, durable receipt and artifact records, bounded private receipt-head queries, managed-pack transactions, and read-only CLI diagnostics. General mutation dispatch and engine enforcement do not exist.
+> Status: planned permission policy with implemented private admission, workflow checkpoints, durable receipt and artifact records, bounded private receipt-head queries, managed-pack transactions, read-only CLI diagnostics, a read-only STDIO MCP boundary, and write-free Codex setup planning. General mutation dispatch and engine enforcement do not exist.
 
 [한국어](security-and-permissions.ko.md) · [Documentation](README.md)
 
@@ -8,9 +8,13 @@
 
 The current private broker accepts only a registry validated in the same process. It validates command input against the registered schema and binds authorization to project, command and handler, registry, feature, workflow step, optional editor session, normalized scope, budgets, deadline, and run identity. Sensitive authority uses one-permission Ed25519 grants, exact scope, expiration, and single-use reservation.
 
-Authorization is not execution. The broker is not connected to a general mutation dispatcher, MCP server, process workflow, or engine bridge. The narrow pack executor and stable-state recovery finalizer require their own same-process plan, exact `install` decision, and attested project-write lease. Grant reservations and active leases are memory-only and do not survive restart.
+Authorization is not execution. The broker is not connected to a general mutation dispatcher, process workflow, or engine bridge. The current MCP runtime exposes only commands whose generated metadata and registered descriptors prove they are read-only, closed-world, and non-mutating; it has no elevated permission path to the broker. The narrow pack executor and stable-state recovery finalizer require their own same-process plan, exact `install` decision, and attested project-write lease. Grant reservations and active leases are memory-only and do not survive restart.
 
 The current CLI dispatches plan-only `init`, read-only `doctor`, and static read-only `project inspect`. All three descriptors declare `read-project`, no side effect, a `parallel-read` lane, and zero changed-file and changed-byte budgets. None can request elevated authority, call repair, or enter a mutation lane.
+
+MCP startup requires one bounded project root, at least one explicit generated tool name, and acknowledgement that selected project diagnostics can be disclosed to the active host. The runtime binds the canonical path and filesystem identity, rebinds every command input to that exact project, and refuses duplicated, unknown, write-capable, destructive, or open-world tools. It accepts only modern STDIO messages up to 1 MiB, validates registered input and output schemas, enforces command deadlines, emits bounded canonical results, and exposes neither HTTP nor network access. Host approval UI remains host-owned; this acknowledgement is not evidence export or telemetry consent.
+
+The Codex setup planner accepts no caller-selected executable or script. It binds the current supported Node.js executable and this installation's MCP entry point, then renders one machine-specific local-only project configuration with an explicit tool allowlist and prompt approval mode. Inspection rechecks those runtime identities and refuses linked, case-aliased, type-conflicted, or oversized targets. It performs no directory creation, file write, merge, trust change, or skill materialization.
 
 Static project inspection binds one local root, limits directory observations and file bytes, rejects unsafe links and case ambiguity, and rechecks identities around reads. A `.git` marker never grants permission to execute Git, and an Editor lock never grants process, session, liveness, connection, or mutation authority. The report explicitly records no mutation, process launch, or network access. Invalid profiles and ambiguous engine candidates block later authority instead of selecting a likely target.
 

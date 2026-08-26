@@ -1,18 +1,18 @@
 ---
 source: docs/status-and-scope.md
-source_sha256: 0b44244982a979f8d0743b7bce5d2d28b99ccba422c3e674d0c80dddb22d06b8
+source_sha256: f513abe86c79f81e409819a02cd6c02b5b043d7c0f2896956daf92a052c6e177
 translated_at: 2026-08-27
 ---
 
 # 현재 상태와 범위
 
-> 상태: 2026-08-27에 검토한 Stage 2 control-plane 구현 단계입니다. Source-built write-free command 세 개를 사용할 수 있으며 engine 지원은 planned입니다.
+> 상태: 2026-08-27에 검토한 Stage 2 control-plane 구현 단계입니다. Source-built write-free command 세 개와 explicit read-only STDIO MCP runtime이 존재하며 Codex setup은 plan-only이고 engine 지원은 planned입니다.
 
 [English](status-and-scope.md) · [문서](README.ko.md)
 
 ## 현재 저장소 상태
 
-저장소에는 private pnpm/TypeScript workspace, versioned schema, semantic validator, typed registry validation/generation, deterministic workflow-plan attestation, implemented command용 runtime registry, digest 결합 공개 surface, test, Windows/Linux CI, 초기 core package, private evidence package, managed-pack runtime, experimental CLI package가 있습니다.
+저장소에는 private pnpm/TypeScript workspace, versioned schema, semantic validator, typed registry validation/generation, deterministic workflow-plan attestation, implemented command용 runtime registry, digest 결합 공개 surface, test, Windows/Linux CI, 초기 core package, private evidence package, managed-pack runtime, experimental CLI package, experimental MCP package, plan-only Codex adapter package가 있습니다.
 
 구현된 core 경계는 다음을 포함합니다.
 
@@ -28,17 +28,21 @@ translated_at: 2026-08-27
 - canonical filename check, latest-record 존재, same-process load witness, 고정 entry/head/byte limit을 포함한 bounded whole-directory receipt-head query;
 - complete project-local artifact snapshot을 receipt가 증명하는 manifest와 함께 immutable SHA-256 object로 승격하는 private promotion;
 - raw process output을 복사하지 않고 bounded process와 structured test-report observation을 fail-closed로 정규화하는 경계;
-- raw content를 출력하지 않으면서 보존된 UTF-8, canonical JSON 또는 non-interlaced PNG artifact 하나와 선택적 current-registry `AssetProvenance` 일치를 fail-closed로 평가하는 경계.
+- raw content를 출력하지 않으면서 보존된 UTF-8, canonical JSON 또는 non-interlaced PNG artifact 하나와 선택적 current-registry `AssetProvenance` 일치를 fail-closed로 평가하는 경계;
+- exact project binding, host-disclosure acknowledgement, schema validation, bounded message, canonical result를 포함해 explicit generated read-only tool subset을 modern STDIO로 등록하는 경계;
+- filesystem mutation 없이 machine-specific local-only Codex project MCP configuration 하나를 deterministic하게 계획하고 검사하는 경계.
 
 Private pack runtime은 write-free preflight, canonical installed state, exact dependency/ownership, local add/update/remove transaction, active marker, append-only journal, compare-and-swap promotion, clear-failure rollback, marker-bound direct-parent directory ownership, reversible tombstone, bounded recovery inspection, 별도 승인 stable-state finalization을 구현합니다.
 
 Source-built `agpb` executable은 현재 plan-only `init`, read-only `doctor`, static read-only `project inspect`를 노출합니다. `init`은 고정된 project-local target 16개를 분류해 identity-bound `InitReport`를 출력하지만 plan을 apply할 수 없습니다. `doctor`는 runtime-registry parity, 지원 Node.js 범위, canonical project root 하나, fixed runtime layout, installed-pack-state validity, active transaction marker를 검사합니다. `project inspect`는 bounded Godot/Unity/Unreal marker candidate, canonical profile validity/compatibility, marker-only dirty-state knowledge, unbound static Editor signal을 보고합니다. 세 명령 모두 registered report에서 human 또는 canonical JSON output을 만들며 write를 수행하지 않습니다.
 
+Source-built MCP runtime은 startup에서 generated registry surface로부터 명시적으로 선택한 tool name만 노출합니다. 현재 tool은 같은 write-free command 세 개이며 mutation, network, engine, evidence export, arbitrary handler execution을 노출하지 않습니다. Codex adapter는 현재 Node.js와 MCP entry identity를 자체 결정하고 prompt-mode project configuration을 render하며 absent, exact, conflicting, oversized, linked, case-aliased target을 분류합니다. 해당 configuration을 write하거나 기존 file을 merge하거나 project를 trusted로 바꾸거나 skill을 설치하지 않습니다.
+
 ## 사용할 수 없는 것
 
-Installable/published package, MCP server, Codex integration package, general command dispatcher, approval UI, durable approval store, evidence CLI/export path, engine report parser, mutating pack CLI, recovery-finalization command, CPU/memory sandbox, engine bridge, engine pack, live-engine automation, playable golden project는 없습니다.
+Installable/published package, 지원되는 MCP/Codex setup command, configuration apply path, materialized project skill, general command dispatcher, approval UI, durable approval store, evidence CLI/export path, engine report parser, mutating pack CLI, recovery-finalization command, CPU/memory sandbox, engine bridge, engine pack, live-engine automation, playable golden project는 없습니다.
 
-Mutating initialization, pack/skill command, engine command, workflow execution, verification, evidence command, documentation command integration은 planned입니다. Private library function은 public command가 아니며 runtime registry도 이러한 planned operation을 노출하지 않습니다.
+Mutating initialization, pack/skill command, MCP/Codex configuration apply, project-skill materialization, engine command, workflow execution, verification, evidence command, documentation command integration은 planned입니다. Private library function은 public command가 아니며 runtime registry도 이러한 planned operation을 노출하지 않습니다.
 
 Project-state bootstrap, artifact promotion, receipt persistence와 bounded head query, component result normalization, retained-artifact assessment, pack mutation, recovery inspection, recovery finalization은 private API입니다. 현재 `init`은 layout intent와 conflict를 보고할 수 있지만 profile, policy, ignore, runtime-state byte를 만들 수 없습니다. 현재 doctor는 unsafe state를 식별할 수 있지만 initialize, repair, clear, recovery classify, finalize할 수 없습니다. Project inspection은 Git 실행, process 열거, Editor liveness/session identity 확립, stage evidence content 검증, engine 연결, engine support grade 승격을 수행하지 않습니다. Workflow runtime은 general dispatch와 연결되지 않았습니다. Durable receipt JSON, bounded head summary, bounded content-addressed artifact byte, pure process/test outcome normalization, 제한된 UTF-8/canonical-JSON/non-interlaced-PNG 및 provenance assessment는 존재합니다. Head summary는 canonical head data와 latest-record 존재만 증명하며 full-chain validity에는 원본 same-process query witness와 상세 load가 필요합니다. Engine report parsing, 더 넓은 format/decode QA, assessment persistence, runtime-frame provenance, retention, historical migration, evidence command, export는 없습니다.
 

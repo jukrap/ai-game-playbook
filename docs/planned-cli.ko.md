@@ -1,6 +1,6 @@
 ---
 source: docs/planned-cli.md
-source_sha256: 2b93813f1cefc183cde372654a9aebacf19bf470db2899eabd16acf739324318
+source_sha256: 32d3736356b947b6cdb264d91af98fc3e0af161660944f63169f5cca8d06e003
 translated_at: 2026-08-27
 ---
 
@@ -107,4 +107,4 @@ Human/JSON mode는 같은 report status와 exit mapping을 사용합니다. `ini
 
 ## 공통 명령 계약
 
-모든 구현 command는 input/output schema, capability, permission, side effect, execution lane, timeout, cancellation, retry mode, budget, evidence requirement, handler digest를 선언해야 합니다. `init`, `doctor`, `project inspect` handler metadata는 각 compiled module을 attest하며 CI가 digest drift를 거부합니다. 이후 MCP, skill, host runtime도 같은 command와 schema identity를 유지해야 하며 generated metadata만으로 해당 runtime이 존재하는 것은 아닙니다.
+모든 구현 command는 input/output schema, capability, permission, side effect, execution lane, timeout, cancellation, retry mode, budget, evidence requirement, handler digest를 선언해야 합니다. `init`, `doctor`, `project inspect` handler metadata는 각 compiled module을 attest하며 CI가 digest drift를 거부합니다. 현재 source-built MCP runtime은 explicitly enabled read-only tool에 같은 command/schema identity를 유지하지만 CLI setup command나 installer는 아닙니다. 이후 skill과 mutating host runtime도 같은 identity를 유지해야 하며 generated metadata만으로 해당 capability가 존재하는 것은 아닙니다.

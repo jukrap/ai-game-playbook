@@ -1,12 +1,12 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: 67e2a8de5f6bf844076b3dd9afbeca883db9a69fa69ccdc6f397c9c391fa1251
+source_sha256: 34f854c124086acefeff4334e799bade9a008bc0a75b0b06d9dead15b2356a9b
 translated_at: 2026-08-27
 ---
 
 # 보안과 권한
 
-> 상태: private admission, workflow checkpoint, durable receipt/artifact record, bounded private receipt-head query, managed-pack transaction, read-only CLI diagnostic가 구현된 계획 permission policy입니다. General mutation dispatch와 engine enforcement는 아직 없습니다.
+> 상태: private admission, workflow checkpoint, durable receipt/artifact record, bounded private receipt-head query, managed-pack transaction, read-only CLI diagnostic, read-only STDIO MCP 경계, write-free Codex setup planning이 구현된 계획 permission policy입니다. General mutation dispatch와 engine enforcement는 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
@@ -14,9 +14,13 @@ translated_at: 2026-08-27
 
 현재 private broker는 같은 process에서 validate한 registry만 받습니다. Registered schema로 command input을 검증하고 project, command/handler, registry, feature, workflow step, optional Editor session, normalized scope, budget, deadline, run identity에 authorization을 결합합니다. Sensitive authority는 one-permission Ed25519 grant, exact scope, expiration, single-use reservation을 사용합니다.
 
-Authorization 자체는 execution이 아닙니다. Broker는 general mutation dispatcher, MCP server, process workflow, engine bridge와 연결되지 않았습니다. 좁은 pack executor와 stable-state recovery finalizer는 각각 same-process plan, exact `install` decision, attest된 project-write lease를 요구합니다. Grant reservation과 active lease는 memory-only이며 restart 뒤 유지되지 않습니다.
+Authorization 자체는 execution이 아닙니다. Broker는 general mutation dispatcher, process workflow, engine bridge와 연결되지 않았습니다. 현재 MCP runtime은 generated metadata와 registered descriptor가 read-only, closed-world, non-mutating임을 증명하는 command만 노출하며 broker의 elevated permission path를 갖지 않습니다. 좁은 pack executor와 stable-state recovery finalizer는 각각 same-process plan, exact `install` decision, attest된 project-write lease를 요구합니다. Grant reservation과 active lease는 memory-only이며 restart 뒤 유지되지 않습니다.
 
 현재 CLI는 plan-only `init`, read-only `doctor`, static read-only `project inspect`를 dispatch합니다. 세 descriptor 모두 `read-project`, side effect 없음, `parallel-read` lane, changed-file/changed-byte budget 0을 선언합니다. 어느 명령도 elevated authority를 요청하거나 repair를 호출하거나 mutation lane에 진입할 수 없습니다.
+
+MCP startup에는 bounded project root 하나, explicit generated tool name 하나 이상, 선택한 project diagnostic이 active host에 disclose될 수 있다는 acknowledgement가 필요합니다. Runtime은 canonical path와 filesystem identity를 bind하고 모든 command input을 그 exact project에 다시 bind하며 duplicated, unknown, write-capable, destructive, open-world tool을 거부합니다. 최대 1 MiB인 modern STDIO message만 받고 registered input/output schema와 command deadline을 강제하며 bounded canonical result를 출력하고 HTTP/network access를 노출하지 않습니다. Host approval UI는 host 책임이며 이 acknowledgement는 evidence export나 telemetry consent가 아닙니다.
+
+Codex setup planner는 caller가 선택한 executable이나 script를 받지 않습니다. 현재 지원 Node.js executable과 이 installation의 MCP entry point를 bind하고 explicit tool allowlist와 prompt approval mode가 있는 machine-specific local-only project configuration 하나를 render합니다. Inspection은 해당 runtime identity를 다시 확인하고 linked, case-aliased, type-conflicted, oversized target을 거부합니다. Directory 생성, file write, merge, trust 변경, skill materialization을 수행하지 않습니다.
 
 Static project inspection은 local root 하나를 bind하고 directory observation과 file byte를 제한하며 unsafe link와 case ambiguity를 거부하고 read 전후 identity를 다시 확인합니다. `.git` marker는 Git 실행 permission을 부여하지 않으며 Editor lock은 process, session, liveness, connection, mutation authority를 부여하지 않습니다. Report는 mutation, process launch, network access가 없음을 명시합니다. Invalid profile과 ambiguous engine candidate는 그럴듯한 target을 선택하지 않고 이후 authority를 차단합니다.
 

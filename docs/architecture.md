@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, durable private receipt records and artifact objects, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions, plan-only `agpb init`, read-only `agpb doctor`, and static read-only `agpb project inspect` exist. General mutation dispatch, evidence export, MCP runtime, host integration, engines, and bridges remain planned.
+> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, durable private receipt records and artifact objects, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions, plan-only `agpb init`, read-only `agpb doctor`, static read-only `agpb project inspect`, a project-bound read-only STDIO MCP runtime, and a write-free Codex setup planner exist. General mutation dispatch, evidence export, applied host installation, engines, and bridges remain planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -21,7 +21,7 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Generation creates CLI, MCP, documentation, and skill-routing metadata from the same validated identity. The runtime registry currently contains `init`, `doctor`, and `project.inspect`; CLI help, parsing, input/output validation, and dispatch consume those exact descriptors. Generated MCP metadata is schema parity data, not an implemented MCP server. The public foundation plan records the runtime-registry digest and keeps unimplemented commands separate.
+The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Generation creates CLI, MCP, documentation, and skill-routing metadata from the same validated identity. The runtime registry currently contains `init`, `doctor`, and `project.inspect`; CLI help, parsing, input/output validation, and dispatch consume those exact descriptors. The experimental MCP runtime registers an explicitly selected read-only subset from the same generated MCP metadata and exact schemas. The public foundation plan records the runtime-registry digest and keeps unimplemented commands separate.
 
 ## Workspace boundaries
 
@@ -33,8 +33,8 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 | `pack-runtime` | Partial | Write-free preflight, exact ownership, local lifecycle transactions, journals, active barriers, rollback, directory ownership, recovery inspection, and approved stable-state finalization |
 | `cli` | Experimental partial | Registry-derived help/version, fail-closed parsing, stable exit categories, human/JSON output, plan-only `init`, read-only `doctor`, and static `project inspect` |
 | `evidence` | Partial private foundation | Pure bounded-process and structured-test normalization plus limited retained-artifact format/provenance assessment exist alongside canonical receipt records, content-addressed bytes, and producer-bound manifests; engine report parsing, assessment persistence, retention, migration, CLI/MCP listing, and explicit export remain planned |
-| `mcp` | Planned | Registry-derived tools behind the same broker and result contracts |
-| `codex-adapter` | Planned | Project skills, instruction bootstrap, and host routing without new authority |
+| `mcp` | Experimental private runtime | Modern STDIO transport for an explicit generated read-only tool allowlist, exact project binding, schema parity, bounded messages, and canonical results; mutation and network tools are unavailable |
+| `codex-adapter` | Partial private planner | Deterministic local-only project MCP configuration planning and create/retain/conflict inspection without writes, merge, trust changes, or skill materialization |
 | `engine-common` | Contract only | Common capability negotiation and engine-operation contracts |
 | Engine adapters | Planned | Godot, Unity, and Unreal orchestration without broad host authority |
 | Project bridges | Planned | Minimum editor/runtime code needed to expose verified operations |
@@ -54,6 +54,10 @@ The implemented CLI path is deliberately narrow:
 7. Render human or canonical JSON output and map it to a stable exit category.
 
 Handler digests attest the compiled init, doctor, and project-inspection modules separately. Cross-package tests fail if any executable artifact and registry metadata drift.
+
+The current MCP path is also write-free. Startup requires one project root, one or more explicit generated tool names, and acknowledgement that selected project diagnostics may enter the active host context. The runtime binds the canonical project identity, registers only read-only closed-world tools, limits each STDIO message to 1 MiB, validates exact registered input and output schemas, and returns canonical bounded results. It has no HTTP transport, network access, editor control, or mutation route.
+
+The Codex adapter derives the current supported Node.js executable and this installation's MCP entry point rather than accepting caller-selected runtime code. It produces immutable bytes for one project-local `.codex/config.toml` and can classify the target as create, retain, or conflict while rechecking project and runtime identities. It never creates the parent directory, writes or merges configuration, changes project trust, or installs skills. Registry-derived skill targets remain explicitly unmaterialized.
 
 ## Planned mutating execution flow
 

@@ -1,12 +1,12 @@
 # Current Status and Scope
 
-> Status: Stage 2 control-plane implementation in progress, reviewed on 2026-08-27. Three write-free source-built commands are available; engine support remains planned.
+> Status: Stage 2 control-plane implementation in progress, reviewed on 2026-08-27. Three write-free source-built commands and an explicit read-only STDIO MCP runtime exist; Codex setup remains plan-only and engine support remains planned.
 
 [한국어](status-and-scope.ko.md) · [Documentation](README.md)
 
 ## Current repository state
 
-The repository contains a private pnpm/TypeScript workspace, versioned schemas, semantic validators, typed registry validation and generation, deterministic workflow-plan attestation, a runtime registry for implemented commands, a digest-bound public surface, tests, Windows/Linux CI, an early core package, a private evidence package, a managed-pack runtime, and an experimental CLI package.
+The repository contains a private pnpm/TypeScript workspace, versioned schemas, semantic validators, typed registry validation and generation, deterministic workflow-plan attestation, a runtime registry for implemented commands, a digest-bound public surface, tests, Windows/Linux CI, an early core package, a private evidence package, a managed-pack runtime, an experimental CLI package, an experimental MCP package, and a plan-only Codex adapter package.
 
 Implemented core boundaries include:
 
@@ -21,18 +21,22 @@ Implemented core boundaries include:
 - canonical append-only run-receipt records with compare-and-swap heads, exact authority binding, and redaction checks;
 - bounded whole-directory receipt-head queries with canonical filename checks, latest-record presence, same-process load witnesses, and fixed entry/head/byte limits;
 - private promotion of complete project-local artifact snapshots into immutable SHA-256 objects with receipt-attested manifests;
-- fail-closed normalization of bounded process and structured test-report observations without copying raw process output; and
-- fail-closed assessment of one retained UTF-8, canonical JSON, or non-interlaced PNG artifact with optional current-registry `AssetProvenance` matching and no raw-content output.
+- fail-closed normalization of bounded process and structured test-report observations without copying raw process output;
+- fail-closed assessment of one retained UTF-8, canonical JSON, or non-interlaced PNG artifact with optional current-registry `AssetProvenance` matching and no raw-content output;
+- modern STDIO registration of an explicit generated read-only tool subset with exact project binding, host-disclosure acknowledgement, schema validation, bounded messages, and canonical results; and
+- deterministic planning and inspection of one machine-specific local-only Codex project MCP configuration without filesystem mutation.
 
 The private pack runtime implements write-free preflight, canonical installed state, exact dependencies and ownership, local add/update/remove transactions, active markers, append-only journals, compare-and-swap promotion, clear-failure rollback, marker-bound direct-parent directory ownership, reversible tombstones, bounded recovery inspection, and separately approved stable-state finalization.
 
 The source-built `agpb` executable currently exposes plan-only `init`, read-only `doctor`, and static read-only `project inspect`. `init` classifies a fixed 16-target project-local layout and emits an identity-bound `InitReport`; it cannot apply the plan. `doctor` checks runtime-registry parity, the supported Node.js range, one canonical project root, the fixed runtime layout, installed-pack-state validity, and active transaction markers. `project inspect` reports bounded Godot, Unity, and Unreal marker candidates, canonical profile validity and compatibility, marker-only dirty-state knowledge, and unbound static Editor signals. All three produce human or canonical JSON output from registered reports and perform no writes.
 
+The source-built MCP runtime exposes only tool names explicitly selected at startup from the generated registry surface. Its current tools are the same three write-free commands; it does not expose mutation, network, engine, evidence-export, or arbitrary handler execution. The Codex adapter derives the current Node.js and MCP entry identities, renders a prompt-mode project configuration, and classifies an absent, exact, conflicting, oversized, linked, or case-aliased target. It does not write that configuration, merge an existing file, mark a project trusted, or install a skill.
+
 ## What is not available
 
-There is no installable or published package, MCP server, Codex integration package, general command dispatcher, approval UI, durable approval store, evidence CLI or export path, engine report parser, mutating pack CLI, recovery-finalization command, CPU or memory sandbox, engine bridge, engine pack, live-engine automation, or playable golden project.
+There is no installable or published package, supported MCP/Codex setup command, configuration apply path, materialized project skill, general command dispatcher, approval UI, durable approval store, evidence CLI or export path, engine report parser, mutating pack CLI, recovery-finalization command, CPU or memory sandbox, engine bridge, engine pack, live-engine automation, or playable golden project.
 
-Mutating initialization, pack and skill commands, engine commands, workflow execution, verification, evidence commands, and documentation command integration remain planned. Private library functions are not public commands. The runtime registry exposes none of those planned operations.
+Mutating initialization, pack and skill commands, MCP/Codex configuration apply, project-skill materialization, engine commands, workflow execution, verification, evidence commands, and documentation command integration remain planned. Private library functions are not public commands. The runtime registry exposes none of those planned operations.
 
 Project-state bootstrap, artifact promotion, receipt persistence and bounded head query, component result normalization, retained-artifact assessment, pack mutation, recovery inspection, and recovery finalization remain private APIs. The current `init` can report layout intent and conflicts but cannot create profile, policy, ignore, or runtime-state bytes. The current doctor can identify unsafe state but cannot initialize, repair, clear, classify recovery, or finalize it. Project inspection does not run Git, enumerate processes, establish Editor liveness or session identity, validate stage evidence content, connect to an engine, or raise an engine support grade. The workflow runtime is not connected to general dispatch. Durable receipt JSON, bounded head summaries, bounded content-addressed artifact bytes, pure process/test outcome normalization, and limited UTF-8/canonical-JSON/non-interlaced-PNG plus provenance assessment exist. A head summary proves only canonical head data and latest-record presence; full-chain validity still requires the original same-process query witness and detailed load. Engine report parsing, broader format/decode QA, assessment persistence, runtime-frame provenance, retention, historical migration, evidence commands, and export do not.
 

@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: 92e68cc273e1a0b19a17da854636eb2d69d2de7dc21474859c172e6d83fe00cd
+source_sha256: 51b700fb810250e822e0853bfe1bdfb1273aaaa9111d20973f498718b3b1c4bc
 translated_at: 2026-08-27
 ---
 
 # 목표 아키텍처
 
-> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, core 안전 primitive, durable private receipt record와 artifact object, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, managed-pack transaction, skill catalog 검사를 포함한 write-free `agpb` command 다섯 개, project-bound read-only STDIO MCP runtime, registry-derived project-inspection skill artifact, write-free Codex setup planner가 존재합니다. General mutation dispatch, evidence export, 실제 host installation, engine, bridge는 계획 단계입니다.
+> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, core 안전 primitive, durable private receipt record와 artifact object, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, managed-pack transaction, static Godot status를 포함한 write-free `agpb` command 여섯 개, project-bound read-only STDIO MCP runtime, registry-derived project-inspection skill artifact, write-free Codex setup planner가 존재합니다. General mutation dispatch, evidence export, 실제 host installation, live engine, bridge는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -27,23 +27,24 @@ flowchart TD
     W --> F[Safe filesystem와 process layer]
 ```
 
-Typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 authoring source입니다. Generation은 같은 validated identity에서 CLI, MCP, 문서, skill-routing metadata를 만듭니다. Runtime registry에는 현재 `init`, `doctor`, `project.inspect`, `skill.list`, `skill.check`가 있으며 CLI help, parsing, input/output validation, dispatch가 그 exact descriptor를 사용합니다. 실험적 MCP runtime은 같은 generated MCP metadata와 exact schema에서 명시적으로 선택한 read-only subset만 등록합니다. 공개 foundation plan은 runtime-registry digest를 기록하고 미구현 command를 분리합니다.
+Typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 authoring source입니다. Generation은 같은 validated identity에서 CLI, MCP, 문서, skill-routing metadata를 만듭니다. Runtime registry에는 현재 `init`, `doctor`, `project.inspect`, `skill.list`, `skill.check`, `engine.status`가 있으며 CLI help, parsing, input/output validation, dispatch가 그 exact descriptor를 사용합니다. 실험적 MCP runtime은 같은 generated MCP metadata와 exact schema에서 명시적으로 선택한 read-only subset만 등록합니다. 공개 foundation plan은 runtime-registry digest를 기록하고 미구현 command를 분리합니다.
 
 ## Workspace 경계
 
 | 경계 | 상태 | 책임 |
 | --- | --- | --- |
-| `contracts` | 기반 구현 | Versioned schema, canonical data, identifier, approval, workflow, engine, evidence, init-plan, doctor, project-inspection protocol |
+| `contracts` | 기반 구현 | Versioned schema, canonical data, identifier, approval, workflow, engine, evidence, init-plan, doctor, project-inspection, static engine-status protocol |
 | `registry` | 기반 구현 | Descriptor validation, generation, digest, routing, workflow-plan resolution, exact implemented-command inventory |
 | `core` | 일부 구현 | Canonical project identity, safe path, compare-and-swap filesystem operation, bounded process, mutation lease, in-memory permission admission, workflow state, durable checkpoint, append-only run receipt, bounded receipt-head query, private artifact promotion |
 | `pack-runtime` | 일부 구현 | Write-free preflight, exact ownership, local lifecycle transaction, journal, active barrier, rollback, directory ownership, recovery inspection, approved stable-state finalization |
 | `skill-runtime` | Private 기반 일부 구현 | Registry-bound packaged skill catalog, bounded artifact validation, same-process project plan, write-free target inspection. Materialization은 사용할 수 없음 |
-| `cli` | 실험적 일부 구현 | Registry-derived help/version, fail-closed parsing, stable exit category, human/JSON output, plan-only `init`, read-only `doctor`, `project inspect`, `skill list`, `skill check` |
+| `cli` | 실험적 일부 구현 | Registry-derived help/version, fail-closed parsing, stable exit category, human/JSON output, plan-only `init`, read-only `doctor`, `project inspect`, `skill list`, `skill check`, static Godot `engine status` |
 | `evidence` | Private 기반 일부 구현 | Pure bounded-process/structured-test normalization, 제한된 retained-artifact format/provenance assessment, canonical receipt record, content-addressed byte, producer-bound manifest가 존재하며 engine report parsing, assessment persistence, retention, migration, CLI/MCP listing, explicit export는 계획 단계 |
 | `mcp` | 실험적 private runtime | Explicit generated read-only tool allowlist, exact project binding, schema parity, bounded message, canonical result를 제공하는 modern STDIO transport. Mutation/network tool은 사용할 수 없음 |
 | `codex-adapter` | Private planner 일부 구현 | Write, merge, trust 변경, skill materialization 없이 deterministic local-only project MCP configuration과 project-inspection skill target 계획 및 create/retain/conflict 검사 |
 | `engine-common` | Contract만 존재 | 공통 capability negotiation과 engine-operation contract |
-| Engine adapter | 계획 | Broad host authority 없는 Godot, Unity, Unreal orchestration |
+| `godot-adapter` | 실험적 static 경계 | Process launch나 support promotion 없는 Godot project/version compatibility와 private explicit executable-candidate identity |
+| Unity/Unreal adapter | 계획 | Broad host authority 없는 engine-specific orchestration |
 | Project bridge | 계획 | Verified operation 노출에 필요한 최소 Editor/runtime code |
 
 Partial package가 존재한다고 전체 product surface가 존재하는 것은 아닙니다. 현재 어떤 package도 Editor를 제어하거나 live engine frame을 검증하지 않습니다.
@@ -52,15 +53,15 @@ Partial package가 존재한다고 전체 product surface가 존재하는 것은
 
 구현된 CLI 경로는 의도적으로 좁습니다.
 
-1. Global help/version 또는 exact `init`, `doctor`, `project inspect`, `skill list`, `skill check` command와 선언된 flag만 parse합니다.
+1. Global help/version 또는 exact `init`, `doctor`, `project inspect`, `skill list`, `skill check`, `engine status --engine godot` command와 선언된 flag만 parse합니다.
 2. Validated runtime registry에서 선택한 command descriptor를 얻습니다.
 3. Descriptor 결합 input schema로 request를 검증합니다.
-4. `init`은 canonical root 하나를 bind하고 고정된 target 16개를 write 없이 분류합니다. `doctor`는 registry parity, Node.js version, project identity, fixed state directory, installed-pack state, active transaction marker를 write 없이 검사합니다. `project inspect`는 root를 deterministic하게 열거하고 선택한 marker path를 bound root로 resolve하며 stable identity를 통해 bounded marker/profile file을 두 번 읽고 external execution 없이 dirty/process gap을 보존합니다. `skill list`와 `skill check`는 generated stable skill route를 bind하고 packaged artifact를 검증하며 materialization 없이 bounded catalog metadata 또는 target observation만 노출합니다.
+4. `init`은 canonical root 하나를 bind하고 고정된 target 16개를 write 없이 분류합니다. `doctor`는 registry parity, Node.js version, project identity, fixed state directory, installed-pack state, active transaction marker를 write 없이 검사합니다. `project inspect`는 root를 deterministic하게 열거하고 선택한 marker path를 bound root로 resolve하며 stable identity를 통해 bounded marker/profile file을 두 번 읽고 external execution 없이 dirty/process gap을 보존합니다. `skill list`와 `skill check`는 generated stable skill route를 bind하고 packaged artifact를 검증하며 materialization 없이 bounded catalog metadata 또는 target observation만 노출합니다. `engine status`는 exact project inspection을 재사용하고 complete Godot candidate 하나를 요구하며 major/minor hint를 `4.7.2`와 비교하고 host path를 받지 않은 채 executable/runtime evidence 누락을 보존합니다.
 5. Bounded target/check outcome에서 plan 또는 diagnostic status를 계산합니다.
 6. 해당되는 semantic count, identity, digest binding을 검증한 뒤 완성된 report를 descriptor 결합 output schema로 검증합니다.
 7. Human 또는 canonical JSON output을 만들고 stable exit category로 매핑합니다.
 
-Handler digest는 compiled init, doctor, project-inspection module을 각각 attest합니다. 어느 executable artifact든 registry metadata와 drift하면 cross-package test가 실패합니다.
+Handler digest는 여섯 exact compiled command module을 각각 attest합니다. 어느 executable artifact든 registry metadata와 drift하면 cross-package test가 실패합니다.
 
 현재 MCP 경로도 write-free입니다. Startup에는 project root 하나, 명시적인 generated tool name 하나 이상, 선택한 project diagnostic이 active host context에 들어갈 수 있다는 acknowledgement가 필요합니다. Runtime은 canonical project identity를 bind하고 read-only closed-world tool만 등록하며 STDIO message 하나를 1 MiB로 제한하고 exact registered input/output schema를 검증한 뒤 canonical bounded result를 반환합니다. HTTP transport, network access, Editor control, mutation route는 없습니다.
 
@@ -106,7 +107,7 @@ Execution lane은 다음과 같습니다.
 - project serialization 안의 exact Editor session용 `editor-bound`;
 - approved test/build work용 `build-bound`.
 
-현재 `init`, `doctor`, `project inspect`, `skill list`, `skill check` descriptor는 `parallel-read`를 선언하지만 general parallel-reader coordination은 아직 구현하지 않았습니다. Mutation lane은 project마다 lease 하나이며 명시적 renew가 필요합니다.
+현재 `init`, `doctor`, `project inspect`, `skill list`, `skill check`, static `engine status` descriptor는 `parallel-read`를 선언하지만 general parallel-reader coordination은 아직 구현하지 않았습니다. Mutation lane은 project마다 lease 하나이며 명시적 renew가 필요합니다.
 
 ## Engine adapter 경계
 
@@ -114,7 +115,7 @@ Execution lane은 다음과 같습니다.
 
 각 adapter는 offline inspection, headless execution, Editor preview, actual play, packaged runtime evidence를 구분해야 합니다. Thin bridge는 typed bounded operation만 받습니다. Exact project/session을 인증하고 request/output size를 제한하며 outer transport와 inner operation outcome을 모두 보고하고 changed object/file, save/import state, log, evidence locator를 반환해야 합니다.
 
-Godot이 첫 계획 adapter이고 Unity, Unreal이 뒤따릅니다. 세 엔진의 현재 support grade는 모두 `planned`입니다.
+Godot에는 첫 static adapter 경계가 생겼지만 공개 command는 executable path를 받거나 engine을 launch하지 않습니다. Live Godot 실행과 Unity/Unreal adapter는 planned입니다. 세 엔진의 현재 support grade는 모두 `planned`입니다.
 
 ## Degradation과 support claim
 

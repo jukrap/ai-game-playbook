@@ -1,6 +1,6 @@
 ---
 source: docs/roadmap.md
-source_sha256: 872e1f1b79e1ab689f13925ad0ad430e24c5c93a1f0e240a3df75dcadab1f298
+source_sha256: f7c585bd96d3561adef9d8138a933d8dbbefc55df089d8a04d794a9e5510cb8a
 translated_at: 2026-08-27
 ---
 
@@ -18,11 +18,12 @@ translated_at: 2026-08-27
 
 - stable help, version, parsing, output, exit behavior를 가진 executable repository-local CLI;
 - implemented command만 노출하는 exact runtime registry;
-- `InitRequest`, `InitReport`, `DoctorRequest`, `DoctorReport`, `ProjectInspectRequest`, `ProjectInspectReport`, skill-list, skill-check schema;
+- `InitRequest`, `InitReport`, `DoctorRequest`, `DoctorReport`, `ProjectInspectRequest`, `ProjectInspectReport`, skill-list, skill-check, static engine-status schema;
 - 고정된 project-local target 16개를 분류하는 write-free `agpb init`;
 - runtime, registry, project state, installed-pack state, active marker를 검사하는 read-only `agpb doctor`;
 - bounded engine marker, canonical profile compatibility, marker-only dirty state, unbound Editor signal을 검사하는 static read-only `agpb project inspect`;
 - bounded registry catalog와 materialization 없는 missing/current/conflicting/oversized/unsafe project-target observation을 제공하는 read-only `agpb skill list`와 `agpb skill check`;
+- complete Godot project candidate 하나, `4.7.2` major/minor compatibility, explicit evidence gap을 보고하고 host executable path나 process launch를 허용하지 않는 static read-only `agpb engine status --engine godot`;
 - exact runtime/registry authority, compare-and-swap head, redaction check, complete project-local artifact-locator 검증을 포함한 canonical append-only run-receipt persistence;
 - 고정 entry/head/byte limit, explicit summary validation level, same-process detailed-load witness를 포함한 private whole-directory receipt-head query;
 - complete artifact snapshot을 receipt가 증명하는 canonical manifest와 함께 immutable SHA-256 object로 승격하는 private promotion;
@@ -49,13 +50,13 @@ Private library function이 있다는 이유만으로 command를 available로 �
 
 ## Stage 3 — evidence, MCP, Codex integration
 
-Process/test normalization, 제한된 artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, registry-derived project-inspection skill artifact 하나, public read-only skill list/check command, plan-only Codex project-configuration/skill-target 기반은 구현했습니다. Engine report parser, required-test selection, gameplay/capture/performance/build normalizer, 더 넓은 artifact format, runtime-frame provenance, assessment persistence, runtime-to-receipt integration은 계획 단계입니다. 그 밖에 filtered/persistent evidence indexing, receipt-history migration/forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export command, 승인된 Codex configuration/skill materialization, approved mutating skill lifecycle을 계획합니다.
+Process/test normalization, 제한된 artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, registry-derived project-inspection skill artifact 하나, public read-only skill list/check와 static Godot status command, plan-only Codex project-configuration/skill-target 기반은 구현했습니다. Engine process/version/report parser, required-test selection, gameplay/capture/performance/build normalizer, 더 넓은 artifact format, runtime-frame provenance, assessment persistence, runtime-to-receipt integration은 계획 단계입니다. 그 밖에 filtered/persistent evidence indexing, receipt-history migration/forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export command, 승인된 Codex configuration/skill materialization, approved mutating skill lifecycle을 계획합니다.
 
 CLI, MCP, 문서, skill routing은 동일한 command ID, schema digest, permission, handler identity를 유지해야 합니다. MCP annotation은 hint이며 permission broker를 override할 수 없습니다. Background upload나 telemetry path는 계획하지 않습니다.
 
 ## Stage 4 — Godot alpha
 
-Godot이 첫 계획 engine adapter입니다. 공통 3D graybox에서 movement, camera, collision, collectible, HUD count, process restart를 포함한 save/load, failure/restart 처리, win state, actual runtime frame, Windows export, exported-player startup을 증명해야 합니다.
+Godot에는 첫 static status adapter가 생겼고 첫 live engine adapter 계획 대상인 점은 그대로입니다. 공통 3D graybox에서 movement, camera, collision, collectible, HUD count, process restart를 포함한 save/load, failure/restart 처리, win state, actual runtime frame, Windows export, exported-player startup을 증명해야 합니다.
 
 Required Godot capability가 `verified`에 도달하고 pack lifecycle/recovery가 안정화되며 clean external installation, license, release authority가 해결된 뒤에만 `0.1.0-alpha`를 허용합니다. 그 시점에도 Unity와 Unreal은 planned입니다.
 

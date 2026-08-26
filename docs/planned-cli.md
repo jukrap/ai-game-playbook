@@ -1,6 +1,6 @@
 # Command-Line Interface Status
 
-> Status: partial implementation. A source-built `agpb` executable provides plan-only `agpb init` plus read-only `agpb doctor`, `agpb project inspect`, `agpb skill list`, and `agpb skill check`. No package is published.
+> Status: partial implementation. A source-built `agpb` executable provides plan-only `agpb init`; read-only `agpb doctor`, `agpb project inspect`, `agpb skill list`, and `agpb skill check`; and static read-only `agpb engine status --engine godot`. No package is published.
 
 [한국어](planned-cli.ko.md) · [Documentation](README.md)
 
@@ -29,7 +29,7 @@ agpb evidence export
 agpb docs check
 ```
 
-Only `agpb init`, `agpb doctor`, `agpb project inspect`, `agpb skill list`, and `agpb skill check` are marked available in [planned-surface.json](planned-surface.json) and the generated [foundation plan](../generated/foundation-plan.json). Every other entry remains planned. No slash-command interface is promised.
+Only `agpb init`, `agpb doctor`, `agpb project inspect`, `agpb skill list`, `agpb skill check`, and `agpb engine status` are marked available in [planned-surface.json](planned-surface.json) and the generated [foundation plan](../generated/foundation-plan.json). Every other entry remains planned. No slash-command interface is promised.
 
 ## Available now
 
@@ -47,6 +47,8 @@ pnpm run agpb -- skill list --project <project-path>
 pnpm run agpb -- skill list --project <project-path> --json
 pnpm run agpb -- skill check --project <project-path>
 pnpm run agpb -- skill check --project <project-path> --json
+pnpm run agpb -- engine status --engine godot --project <project-path>
+pnpm run agpb -- engine status --engine godot --project <project-path> --json
 ```
 
 `--project` accepts an absolute path or a path relative to the current working directory. Without it, each command selects the current directory. `--json` emits the command's registered report as canonical JSON; the default output is a concise human report with safe next actions.
@@ -82,7 +84,9 @@ Missing markers or profile data and unavailable dirty/process observations are a
 
 `skill list` binds one canonical project and returns the stable registry catalog with relative artifact and target paths, declared capabilities, permissions, invocation mode, version, token bound, and artifact digest. It does not return the skill body or an absolute artifact-source path. `skill check` revalidates the same registry and packaged artifact, then classifies each project target as `missing`, `current`, `conflict`, or `unsafe`. Missing targets are attention-level observations; content conflicts, byte-limit overflow, and unsafe linked or aliased paths are blocking. Neither command installs, copies, replaces, repairs, or removes a skill.
 
-None of the five commands initializes project state, creates profile or policy bytes, repairs files, clears markers, invokes recovery finalization, installs software, accesses the network, or controls an editor.
+`engine status` currently requires `--engine godot`. It reuses the bounded static project inspection, requires one complete Godot candidate, compares its major/minor feature hint with the pinned `4.7.2` target, and returns an identity-bound `EngineStatusReport`. A missing executable observation is attention-level; an unavailable, ambiguous, conflicting, or major/minor-incompatible project is blocking. The public input has no executable-path field: the command does not search the host, read an engine executable, start a process, connect to an Editor, or raise the support grade above `planned`.
+
+None of the six commands initializes project state, creates profile or policy bytes, repairs files, clears markers, invokes recovery finalization, installs software, accesses the network, or controls an editor.
 
 ## Output and exit contract
 
@@ -95,16 +99,16 @@ None of the five commands initializes project state, creates profile or policy b
 | `4` | Reserved for a cancelled command |
 | `5` | Reserved for an uncertain command outcome |
 
-Human and JSON modes use the same report status and exit mapping. An `init` target conflict is blocking and leaves the project unchanged. An uninitialized project is an attention-level doctor result and remains write-free. An unsafe root, unsupported runtime, corrupt managed state, or surviving transaction marker is blocking. Static project inspection returns exit `0` for `ready` or `attention` and exit `3` for `blocked`; its dynamic unknowns are never converted to clean, absent, or verified claims. Skill listing returns `0` for a bound catalog and `3` for an unavailable project. Skill checking returns `0` for `ready` or `attention`, including a missing target, and `3` for conflicts, unsafe paths, byte overflow, or an unavailable project.
+Human and JSON modes use the same report status and exit mapping. An `init` target conflict is blocking and leaves the project unchanged. An uninitialized project is an attention-level doctor result and remains write-free. An unsafe root, unsupported runtime, corrupt managed state, or surviving transaction marker is blocking. Static project inspection returns exit `0` for `ready` or `attention` and exit `3` for `blocked`; its dynamic unknowns are never converted to clean, absent, or verified claims. Skill listing returns `0` for a bound catalog and `3` for an unavailable project. Skill checking returns `0` for `ready` or `attention`, including a missing target, and `3` for conflicts, unsafe paths, byte overflow, or an unavailable project. Godot status returns `0` for a compatible project with explicit attention gaps and `3` for a blocked project observation; it never treats command availability as engine support.
 
 ## Remaining planned groups
 
 - Actual `init` mutation remains planned. It must revalidate the plan, bind exact project-metadata authority, use staged compare-and-swap writes, and still never install engines or system tools.
 - `pack` commands and mutating `skill install` will reuse the approved managed lifecycle and never derive authority from installation alone. Current skill listing and checking remain read-only.
-- `engine` commands will bind exact project/editor sessions and report explicit capability degradation.
+- Remaining `engine capabilities` and `engine connect` commands will bind exact project/editor sessions and report explicit capability degradation. The available static status command is not a live session.
 - `run` and `verify` will execute registered bounded workflows and keep process, test, gameplay, capture, performance, and build outcomes separate.
 - `evidence export` will remain the only planned route for external evidence movement and will require explicit destination approval.
 
 ## Common command contract
 
-Every implemented command must declare input and output schemas, capabilities, permissions, side effects, execution lane, timeout, cancellation, retry mode, budgets, evidence requirements, and a handler digest. The handler metadata for all five current commands attests each compiled module, and CI rejects digest drift. The current source-built MCP runtime preserves the same command and schema identities for explicitly enabled read-only tools, but it is not a CLI setup command or installer. The registry also routes one bounded project-inspection skill, and the shared skill runtime lets CLI, MCP, and the Codex adapter list or inspect its deterministic project target without materializing it. Mutating skill and host runtimes must preserve the same identities; generated metadata alone does not mean those capabilities exist.
+Every implemented command must declare input and output schemas, capabilities, permissions, side effects, execution lane, timeout, cancellation, retry mode, budgets, evidence requirements, and a handler digest. The handler metadata for all six current commands attests each compiled module, and CI rejects digest drift. The current source-built MCP runtime preserves the same command and schema identities for explicitly enabled read-only tools, including the project-only Godot status tool, but it is not a CLI setup command or installer. The registry also routes one bounded project-inspection skill, and the shared skill runtime lets CLI, MCP, and the Codex adapter list or inspect its deterministic project target without materializing it. Mutating skill and host runtimes must preserve the same identities; generated metadata alone does not mean those capabilities exist.

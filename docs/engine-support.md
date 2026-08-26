@@ -25,9 +25,11 @@ Every operation declares whether it is offline, headless, editor-bound, runtime-
 
 Grades are evaluated per environment and capability. Detecting an installed editor does not establish adapter support.
 
+The source-built `agpb engine status --engine godot` command is a control-plane observation, not a support grade. It validates one static Godot project candidate and compares its major/minor hint with the pinned `4.7.2` target. It accepts no executable path, performs no host-tool discovery or version probe, starts no process, and leaves every matrix cell `planned`.
+
 ## Godot direction
 
-Godot is the first planned adapter. Static scene inspection stays separate from engine-backed preflight and runtime play. Script and batch validation, exact project/editor identity, deterministic input through real input mappings, gameplay state assertions, actual runtime frames, logs, and Windows export startup are required for the first alpha.
+Godot has the first static adapter boundary and remains the first planned live adapter. Static scene inspection stays separate from engine-backed preflight and runtime play. Script and batch validation, exact project/editor identity, deterministic input through real input mappings, gameplay state assertions, actual runtime frames, logs, and Windows export startup are required for the first alpha.
 
 A project bridge must be authenticated, fail closed, support Windows, preserve schema parity, serialize editor mutation, bound requests and output, recover locks, and prove real runtime frame/input behavior. If no candidate meets every hard gate, a minimal GDScript bridge will be built.
 

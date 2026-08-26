@@ -1,6 +1,6 @@
 ---
 source: docs/concepts.md
-source_sha256: 4cf4d7cd7d3edae2be13d9ce6f2c793fff281dade96155d434c731782f3b9d67
+source_sha256: 1b9ca1e37d75e9c2178858f605d844e29ef1b6b5af1b4640999b75081e90905a
 translated_at: 2026-08-27
 ---
 
@@ -30,6 +30,7 @@ adapter는 지원하지 않는 단계를 보고할 수 있습니다. 필수 단�
 | `PackManifest` | pack version, 호환 engine, 제공 skill/command, dependency, digest, owned path, install/update/remove lifecycle |
 | `GameProjectProfile` | engine, version, project identity, development stage, target platform, 선언한 quality/change budget |
 | `EngineCapabilityReport` | 현재 환경에서 탐지한 operation, limitation, identity, support grade |
+| `EngineStatusReport` | Explicit executable/evidence gap을 포함한 static engine/project compatibility observation 하나. `planned`보다 높은 support grade를 확립할 수 없음 |
 | `FeatureContract` | 플레이어가 볼 결과, 허용 변경 범위, 완료 조건, 위험, budget, rollback plan |
 | `ApprovalGrant` | exact project, command, request, scope, budget, expiration, 필요한 경우 feature/workflow/Editor session identity에 결합된 단일 signed permission |
 | `ResolvedWorkflowPlan` | 실행 전 exact registry, workflow, stage, command와 handler authority, lane, permission, budget, transition, evidence duty에 결합된 하나의 유한 DAG |

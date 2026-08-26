@@ -1,12 +1,12 @@
 ---
 source: docs/planned-cli.md
-source_sha256: 05a686d0a4671de8826664efe54019d3600725e60e8e110726a70de35d9e80d0
+source_sha256: 093a0035ef169f895d32999564d5653db01f870292f81e62eb11f8b2523076a3
 translated_at: 2026-08-27
 ---
 
 # 명령줄 인터페이스 상태
 
-> 상태: 일부 구현 상태입니다. Source-built `agpb` executable이 plan-only `agpb init`과 read-only `agpb doctor`, `agpb project inspect`, `agpb skill list`, `agpb skill check`를 제공합니다. Published package는 없습니다.
+> 상태: 일부 구현 상태입니다. Source-built `agpb` executable이 plan-only `agpb init`, read-only `agpb doctor`, `agpb project inspect`, `agpb skill list`, `agpb skill check`, static read-only `agpb engine status --engine godot`를 제공합니다. Published package는 없습니다.
 
 [English](planned-cli.md) · [문서](README.ko.md)
 
@@ -35,7 +35,7 @@ agpb evidence export
 agpb docs check
 ```
 
-[planned-surface.json](planned-surface.json)과 생성된 [foundation plan](../generated/foundation-plan.json)에서 available로 표시된 것은 `agpb init`, `agpb doctor`, `agpb project inspect`, `agpb skill list`, `agpb skill check`뿐입니다. 나머지 entry는 모두 planned입니다. Slash-command interface는 약속하지 않습니다.
+[planned-surface.json](planned-surface.json)과 생성된 [foundation plan](../generated/foundation-plan.json)에서 available로 표시된 것은 `agpb init`, `agpb doctor`, `agpb project inspect`, `agpb skill list`, `agpb skill check`, `agpb engine status`입니다. 나머지 entry는 모두 planned입니다. Slash-command interface는 약속하지 않습니다.
 
 ## 현재 사용 가능
 
@@ -53,6 +53,8 @@ pnpm run agpb -- skill list --project <project-path>
 pnpm run agpb -- skill list --project <project-path> --json
 pnpm run agpb -- skill check --project <project-path>
 pnpm run agpb -- skill check --project <project-path> --json
+pnpm run agpb -- engine status --engine godot --project <project-path>
+pnpm run agpb -- engine status --engine godot --project <project-path> --json
 ```
 
 `--project`는 absolute path 또는 현재 working directory 기준 relative path를 받습니다. 생략하면 각 명령이 현재 directory를 선택합니다. `--json`은 해당 명령의 등록된 report를 canonical JSON으로 출력하며 기본 모드는 safe next action이 포함된 간결한 human report입니다.
@@ -88,7 +90,9 @@ Marker/profile 누락과 관찰하지 않은 dirty/process 상태는 attention f
 
 `skill list`는 canonical project 하나를 bind하고 relative artifact/target path, 선언 capability, permission, invocation mode, version, token bound, artifact digest를 포함한 stable registry catalog를 반환합니다. Skill body나 absolute artifact-source path는 반환하지 않습니다. `skill check`는 같은 registry와 packaged artifact를 다시 검증하고 각 project target을 `missing`, `current`, `conflict`, `unsafe`로 분류합니다. Missing target은 attention observation이고 content conflict, byte limit 초과, unsafe linked/aliased path는 blocking입니다. 두 명령 모두 skill을 install, copy, replace, repair, remove하지 않습니다.
 
-다섯 명령 모두 project state 초기화, profile/policy byte 생성, file repair, marker clear, recovery finalization 호출, software 설치, network access, Editor 제어를 수행하지 않습니다.
+`engine status`는 현재 `--engine godot`를 요구합니다. Bounded static project inspection을 재사용해 complete Godot candidate 하나를 요구하고 major/minor feature hint를 pin된 `4.7.2` target과 비교한 뒤 identity-bound `EngineStatusReport`를 반환합니다. Executable observation 누락은 attention이고 unavailable, ambiguous, conflicting, major/minor-incompatible project는 blocking입니다. 공개 input에는 executable-path field가 없습니다. 이 명령은 host를 검색하거나 engine executable을 읽거나 process를 시작하거나 Editor에 연결하거나 support grade를 `planned`보다 높이지 않습니다.
+
+여섯 명령 모두 project state 초기화, profile/policy byte 생성, file repair, marker clear, recovery finalization 호출, software 설치, network access, Editor 제어를 수행하지 않습니다.
 
 ## 출력과 종료 계약
 
@@ -101,16 +105,16 @@ Marker/profile 누락과 관찰하지 않은 dirty/process 상태는 attention f
 | `4` | 취소된 command용 예약 값 |
 | `5` | uncertain command outcome용 예약 값 |
 
-Human/JSON mode는 같은 report status와 exit mapping을 사용합니다. `init` target conflict는 blocking이며 project를 변경하지 않습니다. 미초기화 project는 doctor의 attention 결과이며 write-free입니다. Unsafe root, unsupported runtime, corrupt managed state, surviving transaction marker는 blocking입니다. Static project inspection은 `ready`/`attention`에 exit `0`, `blocked`에 exit `3`을 반환하며 dynamic unknown을 clean, absent, verified claim으로 바꾸지 않습니다. Skill list는 bound catalog에 `0`, unavailable project에 `3`을 반환합니다. Skill check는 missing target을 포함한 `ready`/`attention`에 `0`, conflict, unsafe path, byte overflow, unavailable project에 `3`을 반환합니다.
+Human/JSON mode는 같은 report status와 exit mapping을 사용합니다. `init` target conflict는 blocking이며 project를 변경하지 않습니다. 미초기화 project는 doctor의 attention 결과이며 write-free입니다. Unsafe root, unsupported runtime, corrupt managed state, surviving transaction marker는 blocking입니다. Static project inspection은 `ready`/`attention`에 exit `0`, `blocked`에 exit `3`을 반환하며 dynamic unknown을 clean, absent, verified claim으로 바꾸지 않습니다. Skill list는 bound catalog에 `0`, unavailable project에 `3`을 반환합니다. Skill check는 missing target을 포함한 `ready`/`attention`에 `0`, conflict, unsafe path, byte overflow, unavailable project에 `3`을 반환합니다. Godot status는 명시적 attention gap이 남은 compatible project에 `0`, blocked project observation에 `3`을 반환하며 command availability를 engine support로 취급하지 않습니다.
 
 ## 남은 계획 명령군
 
 - 실제 `init` mutation은 planned입니다. Plan을 다시 검증하고 exact project-metadata authority를 bind하며 staged compare-and-swap write를 사용해야 하고, engine이나 system tool은 계속 설치하지 않습니다.
 - `pack` command와 mutating `skill install`은 승인된 managed lifecycle을 재사용하며 설치 자체에서 authority를 만들지 않습니다. 현재 skill list/check는 read-only를 유지합니다.
-- `engine` command는 exact project/editor session을 bind하고 capability degradation을 명시적으로 보고합니다.
+- 남은 `engine capabilities`와 `engine connect` command는 exact project/editor session을 bind하고 capability degradation을 명시적으로 보고합니다. 현재 available인 static status command는 live session이 아닙니다.
 - `run`과 `verify`는 registered bounded workflow를 실행하고 process, test, gameplay, capture, performance, build outcome을 분리합니다.
 - `evidence export`는 external evidence movement의 유일한 계획 경로이며 explicit destination approval이 필요합니다.
 
 ## 공통 명령 계약
 
-모든 구현 command는 input/output schema, capability, permission, side effect, execution lane, timeout, cancellation, retry mode, budget, evidence requirement, handler digest를 선언해야 합니다. 현재 다섯 command의 handler metadata는 각 compiled module을 attest하며 CI가 digest drift를 거부합니다. 현재 source-built MCP runtime은 explicitly enabled read-only tool에 같은 command/schema identity를 유지하지만 CLI setup command나 installer는 아닙니다. Registry는 bounded project-inspection skill 하나도 route하며 shared skill runtime을 통해 CLI, MCP, Codex adapter가 이를 materialize하지 않고 deterministic project target을 list/inspect합니다. Mutating skill/host runtime도 같은 identity를 유지해야 하며 generated metadata만으로 해당 capability가 존재하는 것은 아닙니다.
+모든 구현 command는 input/output schema, capability, permission, side effect, execution lane, timeout, cancellation, retry mode, budget, evidence requirement, handler digest를 선언해야 합니다. 현재 여섯 command의 handler metadata는 각 compiled module을 attest하며 CI가 digest drift를 거부합니다. 현재 source-built MCP runtime은 project-only Godot status tool을 포함해 explicitly enabled read-only tool에 같은 command/schema identity를 유지하지만 CLI setup command나 installer는 아닙니다. Registry는 bounded project-inspection skill 하나도 route하며 shared skill runtime을 통해 CLI, MCP, Codex adapter가 이를 materialize하지 않고 deterministic project target을 list/inspect합니다. Mutating skill/host runtime도 같은 identity를 유지해야 하며 generated metadata만으로 해당 capability가 존재하는 것은 아닙니다.

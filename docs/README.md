@@ -1,6 +1,6 @@
 # Documentation
 
-> Status: public design and implementation-status package, reviewed on 2026-08-27. The control-plane foundation and five source-built write-free CLI commands are in progress.
+> Status: public design and implementation-status package, reviewed on 2026-08-27. The control-plane foundation and six source-built write-free CLI commands are in progress.
 
 [한국어](README.ko.md) · [Project overview](../README.md)
 
@@ -14,7 +14,7 @@ This package is for prospective users, contributors, and maintainers who need to
 | --- | --- |
 | [Status and scope](status-and-scope.md) | Current repository state, initial audience, included work, and exclusions |
 | [Concepts](concepts.md) | Shared lifecycle, public types, support grades, and run outcomes |
-| [CLI status](planned-cli.md) | Available `agpb init`, `agpb doctor`, `agpb project inspect`, `agpb skill list`, and `agpb skill check` behavior plus the remaining planned groups |
+| [CLI status](planned-cli.md) | Available `agpb init`, `agpb doctor`, `agpb project inspect`, `agpb skill list`, `agpb skill check`, and static Godot `agpb engine status` behavior plus the remaining planned groups |
 | [Architecture](architecture.md) | Control plane, adapters, bridges, project state, and generated surfaces |
 | [Engine support](engine-support.md) | Common engine contract and engine-specific verification thresholds |
 | [Security and permissions](security-and-permissions.md) | Approval classes, stop conditions, isolation, and data movement |

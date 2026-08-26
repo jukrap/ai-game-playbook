@@ -24,6 +24,7 @@ The current foundation implements these contracts as versioned JSON schemas and 
 | `PackManifest` | Pack version, compatible engines, supplied skills and commands, dependencies, digest, owned paths, and install/update/remove lifecycle |
 | `GameProjectProfile` | Engine, version, project identity, development stage, target platform, and declared quality/change budgets |
 | `EngineCapabilityReport` | Detected operations, limitations, identity, and support grade for the current environment |
+| `EngineStatusReport` | One static engine/project compatibility observation with explicit executable and evidence gaps; it cannot establish a support grade above `planned` |
 | `FeatureContract` | Player-visible outcome, allowed change scope, completion conditions, risks, budgets, and rollback plan |
 | `ApprovalGrant` | One signed permission bound to exact project, command, request, scope, budget, expiration, and optional feature, workflow, or editor session identity |
 | `ResolvedWorkflowPlan` | One finite DAG bound to exact registry, workflow, stage, command and handler authority, lanes, permissions, budgets, transitions, and evidence duties before execution |

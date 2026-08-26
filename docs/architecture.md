@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, durable private receipt records and artifact objects, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions, five write-free `agpb` commands including skill catalog inspection, a project-bound read-only STDIO MCP runtime, a registry-derived project-inspection skill artifact, and a write-free Codex setup planner exist. General mutation dispatch, evidence export, applied host installation, engines, and bridges remain planned.
+> Status: target architecture with a partial control plane. Contracts, the runtime registry, core safety primitives, durable private receipt records and artifact objects, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions, six write-free `agpb` commands including static Godot status, a project-bound read-only STDIO MCP runtime, a registry-derived project-inspection skill artifact, and a write-free Codex setup planner exist. General mutation dispatch, evidence export, applied host installation, live engines, and bridges remain planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -21,23 +21,24 @@ flowchart TD
     W --> F[Safe filesystem and process layer]
 ```
 
-The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Generation creates CLI, MCP, documentation, and skill-routing metadata from the same validated identity. The runtime registry currently contains `init`, `doctor`, `project.inspect`, `skill.list`, and `skill.check`; CLI help, parsing, input/output validation, and dispatch consume those exact descriptors. The experimental MCP runtime registers an explicitly selected read-only subset from the same generated MCP metadata and exact schemas. The public foundation plan records the runtime-registry digest and keeps unimplemented commands separate.
+The typed registry is the authoring source for command, skill, role-lens, workflow, schema, and pack descriptors. Generation creates CLI, MCP, documentation, and skill-routing metadata from the same validated identity. The runtime registry currently contains `init`, `doctor`, `project.inspect`, `skill.list`, `skill.check`, and `engine.status`; CLI help, parsing, input/output validation, and dispatch consume those exact descriptors. The experimental MCP runtime registers an explicitly selected read-only subset from the same generated MCP metadata and exact schemas. The public foundation plan records the runtime-registry digest and keeps unimplemented commands separate.
 
 ## Workspace boundaries
 
 | Boundary | Status | Responsibility |
 | --- | --- | --- |
-| `contracts` | Foundation implemented | Versioned schemas, canonical data, identifiers, approval, workflow, engine, evidence, init-plan, doctor, and project-inspection protocols |
+| `contracts` | Foundation implemented | Versioned schemas, canonical data, identifiers, approval, workflow, engine, evidence, init-plan, doctor, project-inspection, and static engine-status protocols |
 | `registry` | Foundation implemented | Descriptor validation, generation, digesting, routing, workflow-plan resolution, and exact implemented-command inventory |
 | `core` | Partial | Canonical project identity, safe paths, compare-and-swap filesystem operations, bounded processes, mutation leases, in-memory permission admission, workflow state, durable checkpoints, append-only run receipts, bounded receipt-head queries, and private artifact promotion |
 | `pack-runtime` | Partial | Write-free preflight, exact ownership, local lifecycle transactions, journals, active barriers, rollback, directory ownership, recovery inspection, and approved stable-state finalization |
 | `skill-runtime` | Partial private foundation | Registry-bound packaged skill catalog, bounded artifact validation, same-process project plans, and write-free target inspection; materialization is unavailable |
-| `cli` | Experimental partial | Registry-derived help/version, fail-closed parsing, stable exit categories, human/JSON output, plan-only `init`, and read-only `doctor`, `project inspect`, `skill list`, and `skill check` |
+| `cli` | Experimental partial | Registry-derived help/version, fail-closed parsing, stable exit categories, human/JSON output, plan-only `init`, read-only `doctor`, `project inspect`, `skill list`, `skill check`, and static Godot `engine status` |
 | `evidence` | Partial private foundation | Pure bounded-process and structured-test normalization plus limited retained-artifact format/provenance assessment exist alongside canonical receipt records, content-addressed bytes, and producer-bound manifests; engine report parsing, assessment persistence, retention, migration, CLI/MCP listing, and explicit export remain planned |
 | `mcp` | Experimental private runtime | Modern STDIO transport for an explicit generated read-only tool allowlist, exact project binding, schema parity, bounded messages, and canonical results; mutation and network tools are unavailable |
 | `codex-adapter` | Partial private planner | Deterministic local-only project MCP configuration and project-inspection skill target planning plus create/retain/conflict inspection without writes, merge, trust changes, or skill materialization |
 | `engine-common` | Contract only | Common capability negotiation and engine-operation contracts |
-| Engine adapters | Planned | Godot, Unity, and Unreal orchestration without broad host authority |
+| `godot-adapter` | Experimental static boundary | Godot project/version compatibility and private explicit executable-candidate identity without process launch or support promotion |
+| Unity and Unreal adapters | Planned | Engine-specific orchestration without broad host authority |
 | Project bridges | Planned | Minimum editor/runtime code needed to expose verified operations |
 
 A partial package is not a claim that its full product surface exists. No current package controls an editor or verifies a live engine frame.
@@ -46,15 +47,15 @@ A partial package is not a claim that its full product surface exists. No curren
 
 The implemented CLI path is deliberately narrow:
 
-1. Parse only global help/version or the exact `init`, `doctor`, `project inspect`, `skill list`, and `skill check` commands with their declared flags.
+1. Parse only global help/version or the exact `init`, `doctor`, `project inspect`, `skill list`, `skill check`, and `engine status --engine godot` commands with their declared flags.
 2. Obtain the selected command descriptor from the validated runtime registry.
 3. Validate the request against the descriptor-bound input schema.
-4. For `init`, bind one canonical root and classify the fixed 16-target layout without writing. For `doctor`, inspect registry parity, Node.js version, project identity, fixed state directories, installed-pack state, and active transaction marker without writing. For `project inspect`, list the root deterministically, resolve selected marker paths through the bound root, read bounded marker/profile files twice through stable identities, and preserve dirty/process gaps without external execution. For `skill list` and `skill check`, bind the generated stable skill route, validate the packaged artifact, and expose only bounded catalog metadata or target observations without materialization.
+4. For `init`, bind one canonical root and classify the fixed 16-target layout without writing. For `doctor`, inspect registry parity, Node.js version, project identity, fixed state directories, installed-pack state, and active transaction marker without writing. For `project inspect`, list the root deterministically, resolve selected marker paths through the bound root, read bounded marker/profile files twice through stable identities, and preserve dirty/process gaps without external execution. For `skill list` and `skill check`, bind the generated stable skill route, validate the packaged artifact, and expose only bounded catalog metadata or target observations without materialization. For `engine status`, reuse the exact project inspection, require one complete Godot candidate, compare its major/minor hint with `4.7.2`, and preserve missing executable/runtime evidence without accepting a host path.
 5. Derive plan or diagnostic status from bounded target/check outcomes.
 6. Validate semantic counts, identity and digest bindings where applicable, then validate the complete report against the descriptor-bound output schema.
 7. Render human or canonical JSON output and map it to a stable exit category.
 
-Handler digests attest the compiled init, doctor, and project-inspection modules separately. Cross-package tests fail if any executable artifact and registry metadata drift.
+Handler digests attest each of the six exact compiled command modules. Cross-package tests fail if any executable artifact and registry metadata drift.
 
 The current MCP path is also write-free. Startup requires one project root, one or more explicit generated tool names, and acknowledgement that selected project diagnostics may enter the active host context. The runtime binds the canonical project identity, registers only read-only closed-world tools, limits each STDIO message to 1 MiB, validates exact registered input and output schemas, and returns canonical bounded results. It has no HTTP transport, network access, editor control, or mutation route.
 
@@ -100,7 +101,7 @@ Execution lanes are:
 - `editor-bound` for one exact editor session inside project serialization; and
 - `build-bound` for approved test and build work.
 
-The current `init`, `doctor`, `project inspect`, `skill list`, and `skill check` descriptors declare `parallel-read`, but general parallel-reader coordination is not yet implemented. Mutating lanes remain one lease per project and require explicit renewal.
+The current `init`, `doctor`, `project inspect`, `skill list`, `skill check`, and static `engine status` descriptors declare `parallel-read`, but general parallel-reader coordination is not yet implemented. Mutating lanes remain one lease per project and require explicit renewal.
 
 ## Engine adapter boundary
 
@@ -108,7 +109,7 @@ The common target contract is `detect → negotiate → inspect → mutate → s
 
 Each adapter must separate offline inspection, headless execution, editor preview, actual play, and packaged runtime evidence. Thin bridges receive only typed bounded operations. They must authenticate the exact project/session, limit request and output sizes, report both outer transport and inner operation outcomes, and return changed objects, files, save/import state, logs, and evidence locators.
 
-Godot is the first planned adapter, followed by Unity and Unreal. The current engine support grade for all three remains `planned`.
+Godot now has the first static adapter boundary; its public command does not accept an executable path or launch the engine. Live Godot execution and the Unity and Unreal adapters remain planned. The current engine support grade for all three remains `planned`.
 
 ## Degradation and support claims
 

@@ -439,8 +439,10 @@ function validateProfileAssessment(value: ProjectProfileAssessment): void {
   if (
     hasCandidate !== (value.candidateDigest !== undefined) ||
     (["valid", "mismatch"].includes(value.status) !== hasCandidate) ||
-    (["valid", "invalid", "mismatch"].includes(value.status) !==
-      (value.fileDigest !== undefined))
+    (["valid", "mismatch"].includes(value.status) &&
+      value.fileDigest === undefined) ||
+    (["missing", "not-inspected"].includes(value.status) &&
+      value.fileDigest !== undefined)
   ) {
     throw new TypeError("profile assessment status contradicts its evidence");
   }

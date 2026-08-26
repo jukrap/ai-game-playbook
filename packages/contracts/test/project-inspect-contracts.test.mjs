@@ -404,6 +404,56 @@ test("project inspection report semantics reject derived-state contradictions", 
   );
 });
 
+test("bounded inspection can report an unreadable profile without inventing a digest", () => {
+  const base = reportFields();
+  const fields = {
+    ...base,
+    profile: {
+      status: "invalid",
+      path: ".ai-game-playbook/profile.json",
+      reason: "The profile exceeds the bounded read limit.",
+    },
+    issues: [
+      ...base.issues,
+      {
+        severity: "blocked",
+        code: "profile-read-budget-exceeded",
+        path: ".ai-game-playbook/profile.json",
+        message: "The profile could not be read within its declared byte budget.",
+        nextAction: "Reduce the profile to the documented bounded format.",
+      },
+    ],
+  };
+  const summary = contracts.summarizeProjectInspection(fields);
+  const unreadable = {
+    schemaVersion: "1.0.0",
+    commandId: "project.inspect",
+    status: contracts.computeProjectInspectionStatus(summary),
+    controlPlaneVersion: "0.0.0",
+    registryDigest,
+    ...fields,
+    summary,
+    inspectionDigest: contracts.computeProjectInspectionDigest({
+      registryDigest,
+      projectIdentityDigest: rootIdentityDigest,
+      engine: fields.engine,
+      profile: fields.profile,
+      dirtyState: fields.dirtyState,
+      instances: fields.instances,
+      issues: fields.issues,
+    }),
+    mutationReady: false,
+    mutationPerformed: false,
+    externalProcessStarted: false,
+    networkAccessPerformed: false,
+  };
+
+  assert.equal(unreadable.profile.fileDigest, undefined);
+  assert.doesNotThrow(() =>
+    contracts.assertProjectInspectReportSemantics(unreadable),
+  );
+});
+
 test("unbound inspection reports cannot carry observations or an attested digest", () => {
   const fields = {
     project: { requestedPath: "D:\\games\\missing" },

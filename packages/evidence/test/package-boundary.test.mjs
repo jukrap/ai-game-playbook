@@ -17,6 +17,7 @@ test("the evidence package is private and follows the workspace dependency bound
   assert.deepEqual(packageJson.dependencies, {
     "@ai-game-playbook/contracts": "workspace:*",
     "@ai-game-playbook/core": "workspace:*",
+    "@ai-game-playbook/registry": "workspace:*",
   });
   assert.deepEqual(packageJson.exports, {
     ".": {
@@ -27,6 +28,7 @@ test("the evidence package is private and follows the workspace dependency bound
   assert.equal(tsconfig.compilerOptions.rootDir, "src");
   assert.deepEqual(tsconfig.references, [
     { path: "../contracts" },
+    { path: "../registry" },
     { path: "../core" },
   ]);
   assert.equal(

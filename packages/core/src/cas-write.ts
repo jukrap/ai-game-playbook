@@ -45,6 +45,28 @@ export interface ProjectFileCasRequest {
   readonly maxDirectoryEntries?: number;
 }
 
+export interface ProjectFileReadRequest {
+  readonly root: CanonicalProjectRoot;
+  readonly path: unknown;
+  readonly maxBytes: number;
+  readonly maxDirectoryEntries?: number;
+}
+
+export interface ProjectFileSnapshotResult {
+  readonly path: PortableProjectPath;
+  readonly digest: Sha256Digest;
+  readonly bytes: number;
+  readonly content: Uint8Array;
+}
+
+export interface ProjectFileCasDeleteRequest {
+  readonly root: CanonicalProjectRoot;
+  readonly path: unknown;
+  readonly expectedDigest: Sha256Digest;
+  readonly maxBytes: number;
+  readonly maxDirectoryEntries?: number;
+}
+
 export type StagedCasState =
   | "aborted"
   | "aborting"
@@ -73,12 +95,30 @@ export interface StagedProjectFileCasWrite {
   abort(): Promise<void>;
 }
 
+export interface ProjectFileCasDeleteResult {
+  readonly status: "deleted";
+  readonly path: PortableProjectPath;
+  readonly beforeDigest: Sha256Digest;
+  readonly bytes: number;
+}
+
+export interface StagedProjectFileCasDelete {
+  readonly state: StagedCasState;
+  readonly path: PortableProjectPath;
+  readonly beforeDigest: Sha256Digest;
+  readonly bytes: number;
+  readonly preimage: Uint8Array;
+  commit(): Promise<ProjectFileCasDeleteResult>;
+  abort(): Promise<void>;
+}
+
 interface FileSnapshot extends FilesystemIdentity {
   readonly digest: Sha256Digest;
   readonly size: number;
   readonly mode: number;
   readonly modifiedNanoseconds: string;
   readonly changedNanoseconds: string;
+  readonly content: Buffer;
 }
 
 interface StagedFile extends FilesystemIdentity {
@@ -92,6 +132,25 @@ interface ValidatedCasRequest {
   readonly expected: CasPrecondition;
   readonly maxBytes: number;
   readonly maxDirectoryEntries?: number;
+}
+
+interface ValidatedFileReadRequest {
+  readonly root: CanonicalProjectRoot;
+  readonly path: unknown;
+  readonly maxBytes: number;
+  readonly maxDirectoryEntries?: number;
+}
+
+interface ValidatedCasDeleteRequest extends ValidatedFileReadRequest {
+  readonly expectedDigest: Sha256Digest;
+}
+
+interface CasDeleteStageContext {
+  readonly request: ValidatedCasDeleteRequest;
+  readonly target: ResolvedProjectPath;
+  readonly parentPath: string;
+  readonly parentIdentity: FilesystemIdentity;
+  readonly before: FileSnapshot;
 }
 
 interface CasStageContext {
@@ -252,6 +311,73 @@ function validateCasRequest(value: ProjectFileCasRequest): ValidatedCasRequest {
   };
 }
 
+function validateFileReadRequest(
+  value: ProjectFileReadRequest,
+): ValidatedFileReadRequest {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !objectHasExactKeys(
+      value,
+      value.maxDirectoryEntries === undefined
+        ? ["root", "path", "maxBytes"]
+        : ["root", "path", "maxBytes", "maxDirectoryEntries"],
+    )
+  ) {
+    invalidRequest("file snapshot request contains undeclared fields");
+  }
+  if (
+    !Number.isSafeInteger(value.maxBytes) ||
+    value.maxBytes < 1 ||
+    value.maxBytes > CAS_MAX_WRITE_BYTES
+  ) {
+    invalidRequest("file snapshot byte budget is outside the runtime boundary");
+  }
+  return {
+    root: value.root,
+    path: value.path,
+    maxBytes: value.maxBytes,
+    ...(value.maxDirectoryEntries === undefined
+      ? {}
+      : { maxDirectoryEntries: value.maxDirectoryEntries }),
+  };
+}
+
+function validateCasDeleteRequest(
+  value: ProjectFileCasDeleteRequest,
+): ValidatedCasDeleteRequest {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !objectHasExactKeys(
+      value,
+      value.maxDirectoryEntries === undefined
+        ? ["root", "path", "expectedDigest", "maxBytes"]
+        : [
+            "root",
+            "path",
+            "expectedDigest",
+            "maxBytes",
+            "maxDirectoryEntries",
+          ],
+    )
+  ) {
+    invalidRequest("CAS delete request contains undeclared fields");
+  }
+  if (!isSha256Digest(value.expectedDigest)) {
+    invalidRequest("CAS delete requires an exact SHA-256 preimage digest");
+  }
+  const common = validateFileReadRequest({
+    root: value.root,
+    path: value.path,
+    maxBytes: value.maxBytes,
+    ...(value.maxDirectoryEntries === undefined
+      ? {}
+      : { maxDirectoryEntries: value.maxDirectoryEntries }),
+  });
+  return { ...common, expectedDigest: value.expectedDigest };
+}
+
 async function assertDirectoryIdentity(
   absolutePath: string,
   identity: FilesystemIdentity,
@@ -375,6 +501,7 @@ async function snapshotFile(
       mode: Number(after.mode & 0o777n),
       modifiedNanoseconds: after.mtimeNs.toString(),
       changedNanoseconds: after.ctimeNs.toString(),
+      content,
     };
   } catch (error) {
     operationError = error;
@@ -847,6 +974,309 @@ export async function writeProjectFileCas(
       } catch (cleanupError) {
         throw cleanupError;
       }
+    }
+    throw error;
+  }
+}
+
+function sameIdentity(
+  left: FilesystemIdentity,
+  right: FilesystemIdentity | undefined,
+): boolean {
+  return (
+    right !== undefined &&
+    left.device === right.device &&
+    left.inode === right.inode
+  );
+}
+
+async function resolveRequiredFile(
+  request: ValidatedFileReadRequest,
+): Promise<ResolvedProjectPath> {
+  return resolveProjectPath(request.root, request.path, {
+    expectedType: "file",
+    existence: "required",
+    ...(request.maxDirectoryEntries === undefined
+      ? {}
+      : { maxDirectoryEntries: request.maxDirectoryEntries }),
+  });
+}
+
+export async function readProjectFileSnapshot(
+  value: ProjectFileReadRequest,
+): Promise<ProjectFileSnapshotResult> {
+  const request = validateFileReadRequest(value);
+  await assertProjectRootIdentity(request.root);
+  const firstTarget = await resolveRequiredFile(request);
+  const first = await snapshotFile(firstTarget, request.maxBytes);
+  await assertProjectRootIdentity(request.root);
+  const secondTarget = await resolveRequiredFile(request);
+  if (!sameIdentity(first, secondTarget.targetIdentity)) {
+    preconditionFailure(
+      firstTarget.relativePath,
+      "target identity changed while its snapshot was created",
+    );
+  }
+  const second = await snapshotFile(secondTarget, request.maxBytes);
+  if (!snapshotMatches(first, second)) {
+    preconditionFailure(
+      firstTarget.relativePath,
+      "target changed while its snapshot was confirmed",
+    );
+  }
+  return Object.freeze({
+    path: secondTarget.relativePath,
+    digest: second.digest,
+    bytes: second.size,
+    content: new Uint8Array(second.content),
+  });
+}
+
+async function restoreMovedDeleteTarget(
+  context: CasDeleteStageContext,
+  tombstonePath: string,
+): Promise<boolean> {
+  try {
+    await assertProjectRootIdentity(context.request.root);
+    await assertDirectoryIdentity(
+      context.parentPath,
+      context.parentIdentity,
+      context.target.relativePath,
+    );
+    const current = await resolveProjectPath(
+      context.request.root,
+      context.target.relativePath,
+      { expectedType: "file", existence: "optional" },
+    );
+    if (current.kind !== "absent") {
+      return false;
+    }
+    await link(tombstonePath, current.absolutePath);
+    const restored = await resolveProjectPath(
+      context.request.root,
+      context.target.relativePath,
+      { expectedType: "file", existence: "required" },
+    );
+    if (!sameIdentity(context.before, restored.targetIdentity)) {
+      return false;
+    }
+    await unlink(tombstonePath);
+    await syncDirectory(context.parentPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function commitDeleteStage(
+  context: CasDeleteStageContext,
+): Promise<ProjectFileCasDeleteResult> {
+  await assertProjectRootIdentity(context.request.root);
+  const current = await resolveRequiredFile(context.request);
+  if (
+    current.parentIdentity.device !== context.parentIdentity.device ||
+    current.parentIdentity.inode !== context.parentIdentity.inode
+  ) {
+    preconditionFailure(
+      context.target.relativePath,
+      "target parent changed after the CAS delete stage was created",
+    );
+  }
+  const beforeCommit = await snapshotFile(current, context.request.maxBytes);
+  if (
+    beforeCommit.digest !== context.request.expectedDigest ||
+    !snapshotMatches(context.before, beforeCommit)
+  ) {
+    preconditionFailure(
+      context.target.relativePath,
+      "target changed after the CAS delete stage was created",
+    );
+  }
+
+  const tombstoneName = `.agpb-cas-${randomUUID()}.deleted`;
+  const tombstonePath = join(context.parentPath, tombstoneName);
+  try {
+    await rename(current.absolutePath, tombstonePath);
+  } catch (error) {
+    if (isMissing(error)) {
+      preconditionFailure(
+        context.target.relativePath,
+        "target disappeared before the CAS delete committed",
+      );
+    }
+    throw new CoreBoundaryError(
+      "cas-commit-failed",
+      context.target.relativePath,
+      "atomic delete move outcome could not be proven",
+      true,
+    );
+  }
+
+  let movedMatches = false;
+  try {
+    await assertProjectRootIdentity(context.request.root);
+    await assertDirectoryIdentity(
+      context.parentPath,
+      context.parentIdentity,
+      context.target.relativePath,
+    );
+    const relativeDirectory = dirname(context.target.relativePath);
+    const tombstoneRelative =
+      relativeDirectory === "."
+        ? tombstoneName
+        : `${relativeDirectory}/${tombstoneName}`;
+    const movedTarget = await resolveProjectPath(
+      context.request.root,
+      tombstoneRelative,
+      { expectedType: "file", existence: "required" },
+    );
+    const moved = await snapshotFile(movedTarget, context.request.maxBytes);
+    movedMatches =
+      sameIdentity(context.before, moved) &&
+      moved.digest === context.before.digest &&
+      moved.size === context.before.size &&
+      moved.mode === context.before.mode;
+    const original = await resolveProjectPath(
+      context.request.root,
+      context.target.relativePath,
+      { expectedType: "file", existence: "optional" },
+    );
+    if (!movedMatches || original.kind !== "absent") {
+      throw new Error("moved delete target failed its precondition");
+    }
+  } catch {
+    const restored = await restoreMovedDeleteTarget(context, tombstonePath);
+    if (restored) {
+      preconditionFailure(
+        context.target.relativePath,
+        "target changed during the CAS delete and was restored",
+      );
+    }
+    throw new CoreBoundaryError(
+      "cas-postcondition-failed",
+      context.target.relativePath,
+      "delete target was moved but could not be safely reconciled",
+      true,
+    );
+  }
+
+  try {
+    await unlink(tombstonePath);
+    await assertProjectRootIdentity(context.request.root);
+    await assertDirectoryIdentity(
+      context.parentPath,
+      context.parentIdentity,
+      context.target.relativePath,
+    );
+    const finalTarget = await resolveProjectPath(
+      context.request.root,
+      context.target.relativePath,
+      { expectedType: "file", existence: "optional" },
+    );
+    if (finalTarget.kind !== "absent") {
+      throw new Error("deleted target reappeared");
+    }
+    await syncDirectory(context.parentPath);
+  } catch {
+    throw new CoreBoundaryError(
+      "cas-cleanup-conflict",
+      context.target.relativePath,
+      "CAS delete committed but tombstone cleanup or final verification failed",
+      true,
+    );
+  }
+
+  return Object.freeze({
+    status: "deleted",
+    path: context.target.relativePath,
+    beforeDigest: context.before.digest,
+    bytes: context.before.size,
+  });
+}
+
+function createStagedDelete(
+  context: CasDeleteStageContext,
+): StagedProjectFileCasDelete {
+  let state: StagedCasState = "staged";
+  const exposedPreimage = new Uint8Array(context.before.content);
+  const commit = async (): Promise<ProjectFileCasDeleteResult> => {
+    if (state !== "staged") {
+      throw new CoreBoundaryError(
+        "cas-state-invalid",
+        context.target.relativePath,
+        `CAS delete stage cannot commit from ${state}`,
+        state === "uncertain",
+      );
+    }
+    state = "committing";
+    try {
+      const result = await commitDeleteStage(context);
+      state = "committed";
+      return result;
+    } catch (error) {
+      state =
+        error instanceof CoreBoundaryError && error.mutationUncertain
+          ? "uncertain"
+          : "staged";
+      throw error;
+    }
+  };
+  const abort = async (): Promise<void> => {
+    if (state !== "staged") {
+      throw new CoreBoundaryError(
+        "cas-state-invalid",
+        context.target.relativePath,
+        `CAS delete stage cannot abort from ${state}`,
+        state === "uncertain",
+      );
+    }
+    state = "aborting";
+    state = "aborted";
+  };
+  return Object.freeze({
+    get state(): StagedCasState {
+      return state;
+    },
+    path: context.target.relativePath,
+    beforeDigest: context.before.digest,
+    bytes: context.before.size,
+    preimage: exposedPreimage,
+    commit,
+    abort,
+  });
+}
+
+export async function stageProjectFileCasDelete(
+  value: ProjectFileCasDeleteRequest,
+): Promise<StagedProjectFileCasDelete> {
+  const request = validateCasDeleteRequest(value);
+  await assertProjectRootIdentity(request.root);
+  const target = await resolveRequiredFile(request);
+  const before = await snapshotFile(target, request.maxBytes);
+  if (before.digest !== request.expectedDigest) {
+    preconditionFailure(
+      target.relativePath,
+      "target digest does not match the CAS delete preimage",
+    );
+  }
+  return createStagedDelete({
+    request,
+    target,
+    parentPath: dirname(target.absolutePath),
+    parentIdentity: target.parentIdentity,
+    before,
+  });
+}
+
+export async function deleteProjectFileCas(
+  value: ProjectFileCasDeleteRequest,
+): Promise<ProjectFileCasDeleteResult> {
+  const staged = await stageProjectFileCasDelete(value);
+  try {
+    return await staged.commit();
+  } catch (error) {
+    if (staged.state === "staged") {
+      await staged.abort();
     }
     throw error;
   }

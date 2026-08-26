@@ -2,15 +2,23 @@ export { CoreBoundaryError } from "./errors.js";
 export type { CoreBoundaryErrorCode } from "./errors.js";
 export {
   CAS_MAX_WRITE_BYTES,
+  deleteProjectFileCas,
+  readProjectFileSnapshot,
+  stageProjectFileCasDelete,
   stageProjectFileCas,
   writeProjectFileCas,
 } from "./cas-write.js";
 export type {
   CasPrecondition,
+  ProjectFileCasDeleteRequest,
+  ProjectFileCasDeleteResult,
   ProjectFileCasRequest,
   ProjectFileCasResult,
   ProjectFileCasStatus,
+  ProjectFileReadRequest,
+  ProjectFileSnapshotResult,
   StagedCasState,
+  StagedProjectFileCasDelete,
   StagedProjectFileCasWrite,
 } from "./cas-write.js";
 export {

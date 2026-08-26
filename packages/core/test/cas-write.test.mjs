@@ -303,3 +303,142 @@ test("root replacement makes staged cleanup uncertain without deleting a new fil
   assert.equal(staged.state, "uncertain");
   assert.equal(await readFile(sentinel, "utf8"), "new-root-file\n");
 });
+
+test("bounded project snapshots detach content and attest one regular file", async (t) => {
+  const initial = "owned-content\n";
+  const { root, target } = await fixture(t, initial);
+
+  assert.equal(typeof core.readProjectFileSnapshot, "function");
+  const snapshot = await core.readProjectFileSnapshot({
+    root,
+    path: "Config/settings.json",
+    maxBytes: 1024,
+  });
+
+  assert.deepEqual(
+    {
+      path: snapshot.path,
+      digest: snapshot.digest,
+      bytes: snapshot.bytes,
+      content: Buffer.from(snapshot.content).toString("utf8"),
+    },
+    {
+      path: "Config/settings.json",
+      digest: contracts.sha256Digest(initial),
+      bytes: Buffer.byteLength(initial),
+      content: initial,
+    },
+  );
+  snapshot.content.fill(0x78);
+  const second = await core.readProjectFileSnapshot({
+    root,
+    path: "Config/settings.json",
+    maxBytes: 1024,
+  });
+  assert.equal(Buffer.from(second.content).toString("utf8"), initial);
+  assert.equal(await readFile(target, "utf8"), initial);
+
+  await assert.rejects(
+    core.readProjectFileSnapshot({
+      root,
+      path: "Config/settings.json",
+      maxBytes: 4,
+    }),
+    expectCoreError("cas-budget-exceeded", false),
+  );
+});
+
+test("staged CAS delete preserves the target until exact commit", async (t) => {
+  const initial = "managed-file\n";
+  const { root, target } = await fixture(t, initial);
+  const expectedDigest = contracts.sha256Digest(initial);
+
+  assert.equal(typeof core.stageProjectFileCasDelete, "function");
+  assert.equal(typeof core.deleteProjectFileCas, "function");
+  const staged = await core.stageProjectFileCasDelete({
+    root,
+    path: "Config/settings.json",
+    expectedDigest,
+    maxBytes: 1024,
+  });
+
+  assert.equal(staged.state, "staged");
+  assert.equal(staged.beforeDigest, expectedDigest);
+  assert.equal(Buffer.from(staged.preimage).toString("utf8"), initial);
+  staged.preimage.fill(0x78);
+  assert.equal(await readFile(target, "utf8"), initial);
+
+  const result = await staged.commit();
+  assert.deepEqual(result, {
+    status: "deleted",
+    path: "Config/settings.json",
+    beforeDigest: expectedDigest,
+    bytes: Buffer.byteLength(initial),
+  });
+  assert.equal(staged.state, "committed");
+  await assert.rejects(readFile(target), (error) => error?.code === "ENOENT");
+  assert.deepEqual(await readdir(join(root.canonicalPath, "Config")), []);
+  await assert.rejects(staged.commit(), expectCoreError("cas-state-invalid"));
+});
+
+test("CAS delete aborts cleanly and refuses digest or identity drift", async (t) => {
+  const initial = "managed-file\n";
+  const competing = "user-change\n";
+  const { root, target } = await fixture(t, initial);
+  const expectedDigest = contracts.sha256Digest(initial);
+
+  const aborted = await core.stageProjectFileCasDelete({
+    root,
+    path: "Config/settings.json",
+    expectedDigest,
+    maxBytes: 1024,
+  });
+  await aborted.abort();
+  assert.equal(aborted.state, "aborted");
+  assert.equal(await readFile(target, "utf8"), initial);
+
+  await assert.rejects(
+    core.stageProjectFileCasDelete({
+      root,
+      path: "Config/settings.json",
+      expectedDigest: `sha256:${"f".repeat(64)}`,
+      maxBytes: 1024,
+    }),
+    expectCoreError("cas-precondition-failed", false),
+  );
+
+  const raced = await core.stageProjectFileCasDelete({
+    root,
+    path: "Config/settings.json",
+    expectedDigest,
+    maxBytes: 1024,
+  });
+  await writeFile(target, competing, "utf8");
+  await assert.rejects(
+    raced.commit(),
+    expectCoreError("cas-precondition-failed", false),
+  );
+  assert.equal(raced.state, "staged");
+  assert.equal(await readFile(target, "utf8"), competing);
+  await raced.abort();
+});
+
+test("CAS delete supports a root-level owned file without broad deletion", async (t) => {
+  const { root, project } = await fixture(t);
+  const target = join(project, "managed.txt");
+  const sibling = join(project, "user.txt");
+  await writeFile(target, "managed\n", "utf8");
+  await writeFile(sibling, "user\n", "utf8");
+
+  const result = await core.deleteProjectFileCas({
+    root,
+    path: "managed.txt",
+    expectedDigest: contracts.sha256Digest("managed\n"),
+    maxBytes: 1024,
+  });
+
+  assert.equal(result.path, "managed.txt");
+  await assert.rejects(readFile(target), (error) => error?.code === "ENOENT");
+  assert.equal(await readFile(sibling, "utf8"), "user\n");
+  assert.deepEqual((await readdir(project)).sort(), ["Config", "user.txt"]);
+});

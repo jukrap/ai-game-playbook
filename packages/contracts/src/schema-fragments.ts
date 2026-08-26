@@ -10,6 +10,10 @@ import {
   PERMISSION_CLASSES,
   PROJECT_STAGES,
 } from "./contract-vocabulary.js";
+import {
+  PORTABLE_PROJECT_PATH_MAX_LENGTH,
+  PORTABLE_PROJECT_PATH_PATTERN,
+} from "./portable-path.js";
 
 export type SchemaProperties = Readonly<
   Record<string, CanonicalJsonValue>
@@ -21,12 +25,6 @@ const semanticVersionPattern =
   "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$";
 const schemaIdPattern =
   "^urn:ai-game-playbook:schema:[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*:(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$";
-const windowsReservedPathSegment =
-  "(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.[A-Za-z0-9._-]*)?";
-const portablePathPattern =
-  "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)" +
-  `(?!.*(?:^|/)${windowsReservedPathSegment}(?:/|$))` +
-  "(?!.*\\.(?:/|$))(?:[A-Za-z0-9._-]{1,255}/)*[A-Za-z0-9._-]{1,255}$";
 
 export function closedObject(
   properties: SchemaProperties,
@@ -145,9 +143,9 @@ export const COMMON_SCHEMA_DEFINITIONS: Readonly<
   uuid: { type: "string", format: "uuid", maxLength: 64 },
   portablePath: {
     type: "string",
-    pattern: portablePathPattern,
+    pattern: PORTABLE_PROJECT_PATH_PATTERN,
     minLength: 1,
-    maxLength: 512,
+    maxLength: PORTABLE_PROJECT_PATH_MAX_LENGTH,
   },
   decimalAmount: {
     type: "string",

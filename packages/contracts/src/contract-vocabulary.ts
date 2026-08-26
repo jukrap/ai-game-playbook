@@ -2,6 +2,8 @@ import type { SemanticVersion } from "./semantic-version.js";
 import type { Sha256Digest } from "./digest.js";
 import type { StableId } from "./stable-id.js";
 
+export type { PortableProjectPath } from "./portable-path.js";
+
 export type ProjectStage =
   | "concept"
   | "risk-prototype"
@@ -80,7 +82,6 @@ export type Lifecycle =
 export type OperatingSystem = "windows" | "linux" | "macos";
 export type CpuArchitecture = "x64" | "arm64";
 export type DecimalAmount = string;
-export type PortableProjectPath = string;
 
 export interface SchemaReference {
   readonly schemaId: string;

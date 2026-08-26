@@ -77,6 +77,13 @@ export type { Sha256Digest, Sha256Input } from "./digest.js";
 export { ContractValueError } from "./errors.js";
 export type { ContractValueErrorCode } from "./errors.js";
 export {
+  PORTABLE_PROJECT_PATH_MAX_LENGTH,
+  PORTABLE_PROJECT_PATH_MAX_SEGMENT_LENGTH,
+  PORTABLE_PROJECT_PATH_PATTERN,
+  isPortableProjectPath,
+  parsePortableProjectPath,
+} from "./portable-path.js";
+export {
   buildArtifactEvidenceSchema,
   inputReplayTraceSchema,
   runtimeFrameEvidenceSchema,

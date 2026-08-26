@@ -1,6 +1,6 @@
 # Command-Line Interface Status
 
-> Status: partial implementation. A source-built `agpb` executable provides plan-only `agpb init` and read-only `agpb doctor`. No package is published.
+> Status: partial implementation. A source-built `agpb` executable provides plan-only `agpb init`, read-only `agpb doctor`, and static read-only `agpb project inspect`. No package is published.
 
 [한국어](planned-cli.ko.md) · [Documentation](README.md)
 
@@ -29,7 +29,7 @@ agpb evidence export
 agpb docs check
 ```
 
-Only `agpb init` and `agpb doctor` are marked available in [planned-surface.json](planned-surface.json) and the generated [foundation plan](../generated/foundation-plan.json). Every other entry remains planned. No slash-command interface is promised.
+Only `agpb init`, `agpb doctor`, and `agpb project inspect` are marked available in [planned-surface.json](planned-surface.json) and the generated [foundation plan](../generated/foundation-plan.json). Every other entry remains planned. No slash-command interface is promised.
 
 ## Available now
 
@@ -41,9 +41,11 @@ pnpm run agpb -- init --project <project-path>
 pnpm run agpb -- init --project <project-path> --json
 pnpm run agpb -- doctor --project <project-path>
 pnpm run agpb -- doctor --project <project-path> --json
+pnpm run agpb -- project inspect --project <project-path>
+pnpm run agpb -- project inspect --project <project-path> --json
 ```
 
-`--project` accepts an absolute path or a path relative to the current working directory. Without it, either command selects the current directory. `--json` emits the command's registered report as canonical JSON; the default output is a concise human report with safe next actions.
+`--project` accepts an absolute path or a path relative to the current working directory. Without it, each command selects the current directory. `--json` emits the command's registered report as canonical JSON; the default output is a concise human report with safe next actions.
 
 `init` is write-plan-only. It classifies a fixed set of 16 project-local targets as `create`, `retain`, or `conflict`:
 
@@ -63,7 +65,18 @@ The plan digest binds the runtime registry, canonical project identity, ordered 
 - canonical installed-pack state; and
 - an active or malformed pack transaction marker.
 
-Neither command initializes project state, creates profile or policy bytes, repairs files, clears markers, invokes recovery finalization, installs software, accesses the network, or controls an editor.
+`project inspect` performs bounded, static checks for:
+
+- one canonical project root and deterministic root entries;
+- complete or partial Godot, Unity, and Unreal project markers, including multiple-candidate ambiguity;
+- a BOM-free, canonical, schema-valid `.ai-game-playbook/profile.json` of at most 1 MiB and its portable identity;
+- profile engine and version compatibility with detected marker evidence;
+- a case-exact `.git` marker without running Git; and
+- static Editor signals such as `Temp/UnityLockfile` without PID, liveness, session, or selection claims.
+
+Missing markers or profile data and unavailable dirty/process observations are attention findings. An unavailable root, invalid or mismatched profile, engine ambiguity, or exceeded bounded candidate report is blocking. The command never reports static detection as engine support, never verifies stage evidence content, and does not run an engine, enumerate operating-system processes, connect to an Editor, write files, or access the network.
+
+None of the three commands initializes project state, creates profile or policy bytes, repairs files, clears markers, invokes recovery finalization, installs software, accesses the network, or controls an editor.
 
 ## Output and exit contract
 
@@ -76,12 +89,11 @@ Neither command initializes project state, creates profile or policy bytes, repa
 | `4` | Reserved for a cancelled command |
 | `5` | Reserved for an uncertain command outcome |
 
-Human and JSON modes use the same report status and exit mapping. An `init` target conflict is blocking and leaves the project unchanged. An uninitialized project is an attention-level doctor result and remains write-free. An unsafe root, unsupported runtime, corrupt managed state, or surviving transaction marker is blocking.
+Human and JSON modes use the same report status and exit mapping. An `init` target conflict is blocking and leaves the project unchanged. An uninitialized project is an attention-level doctor result and remains write-free. An unsafe root, unsupported runtime, corrupt managed state, or surviving transaction marker is blocking. Static project inspection returns exit `0` for `ready` or `attention` and exit `3` for `blocked`; its dynamic unknowns are never converted to clean, absent, or verified claims.
 
 ## Remaining planned groups
 
 - Actual `init` mutation remains planned. It must revalidate the plan, bind exact project-metadata authority, use staged compare-and-swap writes, and still never install engines or system tools.
-- `project inspect` will report engine markers, project identity, stage, targets, budgets, dirty state, and instance ambiguity.
 - `pack` and `skill` mutations will reuse the approved managed lifecycle and never derive authority from installation alone.
 - `engine` commands will bind exact project/editor sessions and report explicit capability degradation.
 - `run` and `verify` will execute registered bounded workflows and keep process, test, gameplay, capture, performance, and build outcomes separate.
@@ -89,4 +101,4 @@ Human and JSON modes use the same report status and exit mapping. An `init` targ
 
 ## Common command contract
 
-Every implemented command must declare input and output schemas, capabilities, permissions, side effects, execution lane, timeout, cancellation, retry mode, budgets, evidence requirements, and a handler digest. The handler metadata for `init` and `doctor` attests each compiled module, and CI rejects digest drift. Future CLI, MCP, documentation, and host surfaces must preserve the same command and schema identities.
+Every implemented command must declare input and output schemas, capabilities, permissions, side effects, execution lane, timeout, cancellation, retry mode, budgets, evidence requirements, and a handler digest. The handler metadata for `init`, `doctor`, and `project inspect` attests each compiled module, and CI rejects digest drift. Future MCP, skill, and host runtimes must preserve the same command and schema identities; generated metadata alone does not mean those runtimes exist.

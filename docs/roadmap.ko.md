@@ -1,6 +1,6 @@
 ---
 source: docs/roadmap.md
-source_sha256: ed08680d1ee1f7f162a3add0983c1e71dc24181cd0cef1ebf953e2dbb7d885e8
+source_sha256: a32eccdaf9fcdafcac3d9999ceabfbd4c1270a70fe1359d881e825d85bc7a6aa
 translated_at: 2026-08-26
 ---
 
@@ -18,9 +18,10 @@ translated_at: 2026-08-26
 
 - stable help, version, parsing, output, exit behavior를 가진 executable repository-local CLI;
 - implemented command만 노출하는 exact runtime registry;
-- `InitRequest`, `InitReport`, `DoctorRequest`, `DoctorReport` schema;
+- `InitRequest`, `InitReport`, `DoctorRequest`, `DoctorReport`, `ProjectInspectRequest`, `ProjectInspectReport` schema;
 - 고정된 project-local target 16개를 분류하는 write-free `agpb init`;
 - runtime, registry, project state, installed-pack state, active marker를 검사하는 read-only `agpb doctor`;
+- bounded engine marker, canonical profile compatibility, marker-only dirty state, unbound Editor signal을 검사하는 static read-only `agpb project inspect`;
 - compiled-handler digest attestation;
 - generated/public availability parity.
 
@@ -31,11 +32,10 @@ translated_at: 2026-08-26
 다음 control-plane 작업은 다음과 같습니다.
 
 1. 기존 write-plan-only `init` 뒤의 mutation을 explicit project-metadata authority, fresh plan validation, staged write, rollback에 결합합니다.
-2. Engine marker, project identity, stage, target, budget, dirty state, process ambiguity를 포함한 read-only `project inspect`를 추가합니다.
-3. Mutation command보다 먼저 pack/skill list와 check command를 추가합니다.
-4. 기존 plan, approval, lane, CAS, journal, rollback 요구를 약화하지 않고 approved pack add/update/remove와 recovery finalization을 general dispatcher에 연결합니다.
-5. Approval interaction, stable error envelope, command deadline, durable command receipt를 추가합니다.
-6. Executable surface에서 clean install, reinstall, update, conflict, interruption, rollback, recovery, uninstall을 검증합니다.
+2. Mutation command보다 먼저 pack/skill list와 check command를 추가합니다.
+3. 기존 plan, approval, lane, CAS, journal, rollback 요구를 약화하지 않고 approved pack add/update/remove와 recovery finalization을 general dispatcher에 연결합니다.
+4. Approval interaction, stable error envelope, command deadline, durable command receipt를 추가합니다.
+5. Executable surface에서 clean install, reinstall, update, conflict, interruption, rollback, recovery, uninstall을 검증합니다.
 
 Private library function이 있다는 이유만으로 command를 available로 표시하지 않습니다.
 

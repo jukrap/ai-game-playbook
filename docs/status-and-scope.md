@@ -1,6 +1,6 @@
 # Current Status and Scope
 
-> Status: Stage 2 control-plane implementation in progress, reviewed on 2026-08-26. Two write-free source-built commands are available; engine support remains planned.
+> Status: Stage 2 control-plane implementation in progress, reviewed on 2026-08-26. Three write-free source-built commands are available; engine support remains planned.
 
 [한국어](status-and-scope.ko.md) · [Documentation](README.md)
 
@@ -11,7 +11,7 @@ The repository contains a private pnpm/TypeScript workspace, versioned schemas, 
 Implemented core boundaries include:
 
 - canonical project-root binding and portable path resolution without writable link traversal;
-- bounded directory and file inspection;
+- bounded deterministic root-entry, directory, and file inspection;
 - staged SHA-256 compare-and-swap writes, deletion, and reversible empty-directory removal;
 - digest-bound direct process execution with environment, working-directory, time, idle, and output limits;
 - one root/project-bound mutation lease with bounded waiting and dead-owner-only recovery;
@@ -21,17 +21,17 @@ Implemented core boundaries include:
 
 The private pack runtime implements write-free preflight, canonical installed state, exact dependencies and ownership, local add/update/remove transactions, active markers, append-only journals, compare-and-swap promotion, clear-failure rollback, marker-bound direct-parent directory ownership, reversible tombstones, bounded recovery inspection, and separately approved stable-state finalization.
 
-The source-built `agpb` executable currently exposes plan-only `init` and read-only `doctor`. `init` classifies a fixed 16-target project-local layout and emits an identity-bound `InitReport`; it cannot apply the plan. `doctor` checks runtime-registry parity, the supported Node.js range, one canonical project root, the fixed runtime layout, installed-pack-state validity, and active transaction markers. Both produce human or canonical JSON output from registered reports and perform no writes.
+The source-built `agpb` executable currently exposes plan-only `init`, read-only `doctor`, and static read-only `project inspect`. `init` classifies a fixed 16-target project-local layout and emits an identity-bound `InitReport`; it cannot apply the plan. `doctor` checks runtime-registry parity, the supported Node.js range, one canonical project root, the fixed runtime layout, installed-pack-state validity, and active transaction markers. `project inspect` reports bounded Godot, Unity, and Unreal marker candidates, canonical profile validity and compatibility, marker-only dirty-state knowledge, and unbound static Editor signals. All three produce human or canonical JSON output from registered reports and perform no writes.
 
 ## What is not available
 
 There is no installable or published package, MCP server, Codex integration package, general command dispatcher, approval UI, durable approval store, evidence store, mutating pack CLI, recovery-finalization command, CPU or memory sandbox, engine bridge, engine pack, live-engine automation, or playable golden project.
 
-Mutating initialization, project inspection, pack and skill commands, engine commands, workflow execution, verification, evidence commands, and documentation command integration remain planned. Private library functions are not public commands. The runtime registry exposes none of those planned operations.
+Mutating initialization, pack and skill commands, engine commands, workflow execution, verification, evidence commands, and documentation command integration remain planned. Private library functions are not public commands. The runtime registry exposes none of those planned operations.
 
-Project-state bootstrap, pack mutation, recovery inspection, and recovery finalization remain private APIs. The current `init` can report layout intent and conflicts but cannot create profile, policy, ignore, or runtime-state bytes. The current doctor can identify unsafe state but cannot initialize, repair, clear, classify recovery, or finalize it. The workflow runtime is not connected to general dispatch, and durable receipts and evidence payloads are not implemented.
+Project-state bootstrap, pack mutation, recovery inspection, and recovery finalization remain private APIs. The current `init` can report layout intent and conflicts but cannot create profile, policy, ignore, or runtime-state bytes. The current doctor can identify unsafe state but cannot initialize, repair, clear, classify recovery, or finalize it. Project inspection does not run Git, enumerate processes, establish Editor liveness or session identity, validate stage evidence content, connect to an engine, or raise an engine support grade. The workflow runtime is not connected to general dispatch, and durable receipts and evidence payloads are not implemented.
 
-All Godot, Unity, and Unreal capabilities remain `planned`. Availability of `init` and `doctor` is a control-plane command status, not engine evidence.
+All Godot, Unity, and Unreal capabilities remain `planned`. Availability of `init`, `doctor`, and `project inspect` is a control-plane command status, not engine evidence.
 
 ## Intended users and first outcome
 

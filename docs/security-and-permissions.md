@@ -10,7 +10,9 @@ The current private broker accepts only a registry validated in the same process
 
 Authorization is not execution. The broker is not connected to a general mutation dispatcher, MCP server, process workflow, or engine bridge. The narrow pack executor and stable-state recovery finalizer require their own same-process plan, exact `install` decision, and attested project-write lease. Grant reservations and active leases are memory-only and do not survive restart.
 
-The current CLI dispatches plan-only `init` and read-only `doctor`. Both descriptors declare `read-project`, no side effect, a `parallel-read` lane, and zero changed-file and changed-byte budgets. Neither command can request elevated authority, call repair, or enter a mutation lane.
+The current CLI dispatches plan-only `init`, read-only `doctor`, and static read-only `project inspect`. All three descriptors declare `read-project`, no side effect, a `parallel-read` lane, and zero changed-file and changed-byte budgets. None can request elevated authority, call repair, or enter a mutation lane.
+
+Static project inspection binds one local root, limits directory observations and file bytes, rejects unsafe links and case ambiguity, and rechecks identities around reads. A `.git` marker never grants permission to execute Git, and an Editor lock never grants process, session, liveness, connection, or mutation authority. The report explicitly records no mutation, process launch, or network access. Invalid profiles and ambiguous engine candidates block later authority instead of selecting a likely target.
 
 ## Default permission model
 

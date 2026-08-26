@@ -1,6 +1,6 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: 62d8c7b7015069a7ec6e8df40802e4600d94aebc95cf685c5fbb1d80106b4b45
+source_sha256: 9015cd7484579ed088d17eda5478279c249bc8d9db1a2910ca757b4674b08181
 translated_at: 2026-08-26
 ---
 
@@ -16,7 +16,9 @@ translated_at: 2026-08-26
 
 Authorization 자체는 execution이 아닙니다. Broker는 general mutation dispatcher, MCP server, process workflow, engine bridge와 연결되지 않았습니다. 좁은 pack executor와 stable-state recovery finalizer는 각각 same-process plan, exact `install` decision, attest된 project-write lease를 요구합니다. Grant reservation과 active lease는 memory-only이며 restart 뒤 유지되지 않습니다.
 
-현재 CLI는 plan-only `init`과 read-only `doctor`를 dispatch합니다. 두 descriptor 모두 `read-project`, side effect 없음, `parallel-read` lane, changed-file/changed-byte budget 0을 선언합니다. 두 명령 모두 elevated authority를 요청하거나 repair를 호출하거나 mutation lane에 진입할 수 없습니다.
+현재 CLI는 plan-only `init`, read-only `doctor`, static read-only `project inspect`를 dispatch합니다. 세 descriptor 모두 `read-project`, side effect 없음, `parallel-read` lane, changed-file/changed-byte budget 0을 선언합니다. 어느 명령도 elevated authority를 요청하거나 repair를 호출하거나 mutation lane에 진입할 수 없습니다.
+
+Static project inspection은 local root 하나를 bind하고 directory observation과 file byte를 제한하며 unsafe link와 case ambiguity를 거부하고 read 전후 identity를 다시 확인합니다. `.git` marker는 Git 실행 permission을 부여하지 않으며 Editor lock은 process, session, liveness, connection, mutation authority를 부여하지 않습니다. Report는 mutation, process launch, network access가 없음을 명시합니다. Invalid profile과 ambiguous engine candidate는 그럴듯한 target을 선택하지 않고 이후 authority를 차단합니다.
 
 ## 기본 permission 모델
 

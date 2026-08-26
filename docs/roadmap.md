@@ -12,9 +12,10 @@ The current Stage 2 product slice adds:
 
 - an executable repository-local CLI with stable help, version, parsing, output, and exit behavior;
 - an exact runtime registry that exposes only implemented commands;
-- `InitRequest`, `InitReport`, `DoctorRequest`, and `DoctorReport` schemas;
+- `InitRequest`, `InitReport`, `DoctorRequest`, `DoctorReport`, `ProjectInspectRequest`, and `ProjectInspectReport` schemas;
 - write-free `agpb init` classification for a fixed 16-target project-local layout;
 - read-only `agpb doctor` checks for runtime, registry, project-state, installed-pack-state, and active-marker safety;
+- static read-only `agpb project inspect` for bounded engine markers, canonical profile compatibility, marker-only dirty state, and unbound Editor signals;
 - compiled-handler digest attestation; and
 - generated/public availability parity.
 
@@ -25,11 +26,10 @@ This does not make the package installable and does not raise any engine capabil
 The next control-plane work is:
 
 1. Bind mutation behind the existing write-plan-only `init` to explicit project-metadata authority, fresh plan validation, staged writes, and rollback.
-2. Add read-only `project inspect` with engine markers, project identity, stage, targets, budgets, dirty state, and process ambiguity.
-3. Add pack and skill list/check commands before any mutation command.
-4. Connect approved pack add/update/remove and recovery finalization through a general dispatcher without weakening the existing plan, approval, lane, CAS, journal, or rollback requirements.
-5. Add approval interaction, stable error envelopes, command deadlines, and durable command receipts.
-6. Verify clean install, reinstall, update, conflict, interruption, rollback, recovery, and uninstall behavior from the executable surface.
+2. Add pack and skill list/check commands before any mutation command.
+3. Connect approved pack add/update/remove and recovery finalization through a general dispatcher without weakening the existing plan, approval, lane, CAS, journal, or rollback requirements.
+4. Add approval interaction, stable error envelopes, command deadlines, and durable command receipts.
+5. Verify clean install, reinstall, update, conflict, interruption, rollback, recovery, and uninstall behavior from the executable surface.
 
 No command may be marked available merely because a private library function exists.
 

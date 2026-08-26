@@ -266,11 +266,61 @@ test("contract schemas reject unsafe identity, scope, support, and cost shapes",
     ],
     [
       "feature-contract",
+      (() => {
+        const { approval: _, ...withoutApproval } =
+          validPublicContractFixtures["feature-contract"];
+        return { ...withoutApproval, status: "completed" };
+      })(),
+    ],
+    [
+      "feature-contract",
+      (() => {
+        const { approval: _, ...withoutApproval } =
+          validPublicContractFixtures["feature-contract"];
+        return { ...withoutApproval, status: "expired" };
+      })(),
+    ],
+    [
+      "feature-contract",
       {
         ...validPublicContractFixtures["feature-contract"],
         rollback: {
           ...validPublicContractFixtures["feature-contract"].rollback,
           preimageRequired: false,
+        },
+      },
+    ],
+    [
+      "feature-contract",
+      {
+        ...validPublicContractFixtures["feature-contract"],
+        rollback: {
+          mode: "not-applicable",
+          preimageRequired: true,
+          requiredEvidence: [],
+        },
+      },
+    ],
+    [
+      "feature-contract",
+      {
+        ...validPublicContractFixtures["feature-contract"],
+        rollback: {
+          mode: "not-applicable",
+          preimageRequired: false,
+          commandId: "engine.rollback",
+          requiredEvidence: [],
+        },
+      },
+    ],
+    [
+      "feature-contract",
+      {
+        ...validPublicContractFixtures["feature-contract"],
+        rollback: {
+          mode: "not-applicable",
+          preimageRequired: false,
+          requiredEvidence: ["rollback-state"],
         },
       },
     ],
@@ -386,4 +436,21 @@ test("contract schemas reject unsafe identity, scope, support, and cost shapes",
       `${id} accepted an unsafe fixture`,
     );
   }
+});
+
+test("feature contracts allow a rollback-free draft without approval", () => {
+  const ajv = createValidator();
+  const validate = ajv.compile(
+    contracts.ALL_CONTRACT_SCHEMAS["feature-contract"].schema,
+  );
+  const { approval: _, ...draft } =
+    structuredClone(validPublicContractFixtures["feature-contract"]);
+  draft.status = "draft";
+  draft.rollback = {
+    mode: "not-applicable",
+    preimageRequired: false,
+    requiredEvidence: [],
+  };
+
+  assert.equal(validate(draft), true, JSON.stringify(validate.errors));
 });

@@ -38,6 +38,61 @@ const capabilityReport = {
   ],
 };
 
+const featureContract = {
+  schemaVersion: "1.0.0",
+  featureId: "feature.collectible-loop",
+  version: "1.0.0",
+  projectId: "sample.graybox",
+  status: "approved",
+  playerOutcome: "Collect every item and reach the win state.",
+  scope: {
+    allowedPaths: [
+      { path: "gameplay/collectibles", access: "read-write", recursive: true },
+    ],
+    allowedEditorObjects: [],
+    allowedChangeKinds: ["source", "scene", "test"],
+    exclusions: ["project settings"],
+  },
+  completion: {
+    oracleId: "oracle.collectible-win",
+    criteria: [
+      {
+        id: "criterion.win-state",
+        statement: "A deterministic replay reaches the win state.",
+        evidenceKinds: ["input-replay", "state-oracle"],
+      },
+    ],
+    zeroTestPolicy: "fail",
+  },
+  risk: {
+    level: "medium",
+    factors: ["scene mutation"],
+    uncertainMutationPolicy: "stop",
+  },
+  budgets: {
+    maxChangedFiles: 12,
+    maxChangedBytes: 131072,
+    maxDurationMs: 600000,
+    maxOutputBytes: 2097152,
+    maxRepairCycles: 3,
+  },
+  rollback: {
+    mode: "required",
+    preimageRequired: true,
+    commandId: "engine.rollback",
+    requiredEvidence: ["rollback-state"],
+  },
+  approval: {
+    approvalId: "approval.collectible-loop",
+    approvedBy: "user",
+    approvedAt: startedAt,
+    expiresAt: "2026-08-27T01:02:03.000Z",
+    contractDigest: digest,
+  },
+};
+featureContract.approval.contractDigest =
+  contracts.computeFeatureContractApprovalDigest(featureContract);
+
 const runReceipt = {
   schemaVersion: "1.0.0",
   receiptId: "018f6f35-2c9e-7d1a-8a4b-123456789abc",
@@ -91,6 +146,10 @@ runReceipt.receiptDigest = contracts.computeRunReceiptDigest(runReceipt);
 
 test("semantic checks accept internally consistent capability and receipt fixtures", () => {
   assert.deepEqual(
+    contracts.checkFeatureContractSemantics(featureContract),
+    [],
+  );
+  assert.deepEqual(
     contracts.checkEngineCapabilityReportSemantics(
       capabilityReport,
     ),
@@ -101,6 +160,48 @@ test("semantic checks accept internally consistent capability and receipt fixtur
       runReceipt,
     ),
     [],
+  );
+});
+
+test("feature contract semantics retain approval across lifecycle transitions", () => {
+  for (const status of ["approved", "active", "completed", "expired"]) {
+    const contract = structuredClone(featureContract);
+    contract.status = status;
+    assert.equal(contracts.isFeatureContractApprovalDigestValid(contract), true);
+    assert.deepEqual(contracts.checkFeatureContractSemantics(contract), []);
+  }
+});
+
+test("feature contract semantics reject stale approval and rollback contradictions", () => {
+  const tampered = structuredClone(featureContract);
+  tampered.playerOutcome = "A changed outcome.";
+  tampered.approval.expiresAt = tampered.approval.approvedAt;
+  tampered.rollback = {
+    mode: "not-applicable",
+    preimageRequired: true,
+    commandId: "engine.rollback",
+    requiredEvidence: ["rollback-state"],
+  };
+
+  assert.deepEqual(
+    contracts
+      .checkFeatureContractSemantics(tampered)
+      .map(({ code }) => code),
+    [
+      "feature-contract-approval-window-invalid",
+      "feature-contract-digest-mismatch",
+      "feature-contract-rollback-contradiction",
+    ],
+  );
+
+  const missingApproval = structuredClone(featureContract);
+  missingApproval.status = "completed";
+  delete missingApproval.approval;
+  assert.deepEqual(
+    contracts
+      .checkFeatureContractSemantics(missingApproval)
+      .map(({ code }) => code),
+    ["feature-contract-approval-required"],
   );
 });
 

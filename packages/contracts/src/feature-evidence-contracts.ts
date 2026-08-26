@@ -83,6 +83,33 @@ export interface FeatureContract {
   };
 }
 
+export type FeatureContractApprovalDigestInput = Omit<
+  FeatureContract,
+  "approval"
+> &
+  Partial<Pick<FeatureContract, "approval">>;
+
+export function computeFeatureContractApprovalDigest(
+  contract: FeatureContractApprovalDigestInput,
+): Sha256Digest {
+  const { approval: _approval, status: _status, ...approvalSubject } = contract;
+  return digestCanonicalJson(approvalSubject);
+}
+
+export function isFeatureContractApprovalDigestValid(
+  contract: FeatureContract,
+): boolean {
+  try {
+    return (
+      contract.approval !== undefined &&
+      computeFeatureContractApprovalDigest(contract) ===
+        contract.approval.contractDigest
+    );
+  } catch {
+    return false;
+  }
+}
+
 const allowedPath = closedObject(
   {
     path: reference("portablePath"),
@@ -232,7 +259,11 @@ export const featureContractSchema: VersionedContractSchema =
         {
           if: {
             type: "object",
-            properties: { status: { enum: ["approved", "active"] } },
+            properties: {
+              status: {
+                enum: ["approved", "active", "completed", "expired"],
+              },
+            },
             required: ["status"],
           },
           then: {
@@ -268,6 +299,33 @@ export const featureContractSchema: VersionedContractSchema =
                   "commandId",
                   "requiredEvidence",
                 ],
+              },
+            },
+          },
+        },
+        {
+          if: {
+            type: "object",
+            properties: {
+              rollback: {
+                type: "object",
+                properties: { mode: { const: "not-applicable" } },
+                required: ["mode"],
+              },
+            },
+            required: ["rollback"],
+          },
+          then: {
+            type: "object",
+            properties: {
+              rollback: {
+                type: "object",
+                properties: {
+                  preimageRequired: { const: false },
+                  commandId: false,
+                  requiredEvidence: { type: "array", maxItems: 0 },
+                },
+                required: ["preimageRequired", "requiredEvidence"],
               },
             },
           },

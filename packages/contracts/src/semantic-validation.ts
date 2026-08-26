@@ -1,10 +1,17 @@
 import {
+  isFeatureContractApprovalDigestValid,
   computeRunReceiptDigest,
+  type FeatureContract,
   type RunReceipt,
 } from "./feature-evidence-contracts.js";
 import type { EngineCapabilityReport } from "./project-engine-contracts.js";
 
 export type ContractSemanticIssueCode =
+  | "feature-contract-approval-required"
+  | "feature-contract-approval-timestamp-invalid"
+  | "feature-contract-approval-window-invalid"
+  | "feature-contract-digest-mismatch"
+  | "feature-contract-rollback-contradiction"
   | "engine-capability-duplicate-id"
   | "engine-capability-duplicate-operation"
   | "engine-capability-future-observation"
@@ -47,6 +54,80 @@ function freezeIssues(
 function timestampMillis(value: string): number | undefined {
   const milliseconds = Date.parse(value);
   return Number.isFinite(milliseconds) ? milliseconds : undefined;
+}
+
+export function checkFeatureContractSemantics(
+  contract: FeatureContract,
+): readonly ContractSemanticIssue[] {
+  const issues: ContractSemanticIssue[] = [];
+  const approvalRequired =
+    contract.status === "approved" ||
+    contract.status === "active" ||
+    contract.status === "completed" ||
+    contract.status === "expired";
+
+  if (approvalRequired && contract.approval === undefined) {
+    issues.push(
+      issue(
+        "feature-contract-approval-required",
+        "/approval",
+        `Feature status ${contract.status} must retain its user approval.`,
+      ),
+    );
+  }
+
+  if (contract.approval !== undefined) {
+    const approvedAt = timestampMillis(contract.approval.approvedAt);
+    const expiresAt = timestampMillis(contract.approval.expiresAt);
+    if (approvedAt === undefined || expiresAt === undefined) {
+      issues.push(
+        issue(
+          "feature-contract-approval-timestamp-invalid",
+          "/approval",
+          "Approval timestamps must be valid date-time values.",
+        ),
+      );
+    } else if (approvedAt >= expiresAt) {
+      issues.push(
+        issue(
+          "feature-contract-approval-window-invalid",
+          "/approval/expiresAt",
+          "Approval expiry must occur after approval time.",
+        ),
+      );
+    }
+
+    if (!isFeatureContractApprovalDigestValid(contract)) {
+      issues.push(
+        issue(
+          "feature-contract-digest-mismatch",
+          "/approval/contractDigest",
+          "Approval digest does not attest the immutable feature contract body.",
+        ),
+      );
+    }
+  }
+
+  const rollbackContradiction =
+    (contract.rollback.mode === "required" &&
+      (!contract.rollback.preimageRequired ||
+        contract.rollback.commandId === undefined ||
+        contract.rollback.requiredEvidence.length === 0)) ||
+    (contract.rollback.mode === "not-applicable" &&
+      (contract.rollback.preimageRequired ||
+        contract.rollback.commandId !== undefined ||
+        contract.rollback.requiredEvidence.length > 0));
+  if (rollbackContradiction) {
+    issues.push(
+      issue(
+        "feature-contract-rollback-contradiction",
+        "/rollback",
+        "Rollback declarations must be internally consistent with their mode.",
+      ),
+    );
+  }
+
+  return freezeIssues(issues);
 }
 
 export function checkRunReceiptSemantics(

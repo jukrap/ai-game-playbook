@@ -86,8 +86,10 @@ export type {
 } from "./engine-evidence-contracts.js";
 export {
   assetProvenanceSchema,
+  computeFeatureContractApprovalDigest,
   computeRunReceiptDigest,
   featureContractSchema,
+  isFeatureContractApprovalDigestValid,
   isRunReceiptDigestValid,
   runReceiptSchema,
 } from "./feature-evidence-contracts.js";
@@ -97,6 +99,7 @@ export type {
   AssetProvenance,
   AssetQaResult,
   FeatureContract,
+  FeatureContractApprovalDigestInput,
   RunReceipt,
   RunReceiptDigestInput,
   RunStatus,
@@ -159,6 +162,7 @@ export type {
 } from "./run-engine-contracts.js";
 export {
   checkEngineCapabilityReportSemantics,
+  checkFeatureContractSemantics,
   checkRunReceiptSemantics,
 } from "./semantic-validation.js";
 export type {

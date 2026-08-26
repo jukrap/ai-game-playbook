@@ -111,6 +111,13 @@ export function packOperationAuthorizationPaths(
   for (const change of plan.changes) {
     paths.add(change.path);
   }
+  for (const change of plan.directoryChanges) {
+    paths.add(change.path);
+    if (change.kind === "delete") {
+      paths.add(change.tombstonePath);
+      paths.add(`${change.tombstonePath}/owned`);
+    }
+  }
   return Object.freeze([...paths].sort(compareCanonicalText));
 }
 

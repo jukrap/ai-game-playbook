@@ -4,7 +4,10 @@ import type { ValidatedRegistry } from "@ai-game-playbook/registry";
 
 import { PackRuntimeError } from "./errors.js";
 import type { LoadedInstalledPackState } from "./state.js";
-import type { PreparedPackOperation } from "./types.js";
+import type {
+  PackDirectoryOwnershipMarker,
+  PreparedPackOperation,
+} from "./types.js";
 
 export interface PreparedArtifactContent {
   readonly target: string;
@@ -19,6 +22,7 @@ export interface PreparedPackOperationInternals {
   readonly installed: LoadedInstalledPackState;
   readonly sourceArtifacts: readonly PreparedArtifactContent[];
   readonly preimages: readonly PreparedArtifactContent[];
+  readonly nextDirectories: readonly PackDirectoryOwnershipMarker[];
 }
 
 const preparedInstances = new WeakSet<object>();

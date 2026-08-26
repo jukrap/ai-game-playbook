@@ -6,16 +6,22 @@ import {
 } from "@ai-game-playbook/contracts";
 import {
   CoreBoundaryError,
+  createProjectDirectoryCas,
+  deleteProjectDirectoryCas,
   deleteProjectFileCas,
+  readProjectDirectoryIdentity,
+  stageProjectDirectoryCasRemoval,
   stageProjectFileCas,
   stageProjectFileCasDelete,
   writeProjectFileCas,
   resolveProjectPath,
   type PermissionSettlement,
+  type ProjectDirectoryIdentity,
   type ProjectFileCasResult,
   type ProjectLaneLease,
   type StagedProjectFileCasDelete,
   type StagedProjectFileCasWrite,
+  type StagedProjectDirectoryCasRemoval,
 } from "@ai-game-playbook/core";
 import { performance } from "node:perf_hooks";
 
@@ -58,6 +64,7 @@ import {
 import type {
   ExecutePackOperationRequest,
   PackChange,
+  PackDirectoryChange,
   PackExecutionErrorSummary,
   PackExecutionResult,
   PreparedPackOperation,
@@ -67,6 +74,18 @@ type MutableRecord = Record<string, unknown>;
 type ArtifactStage = StagedProjectFileCasWrite | StagedProjectFileCasDelete;
 type MutatingPackChange = Exclude<PackChange, { readonly kind: "unchanged" }>;
 type FinalPackChange = Exclude<PackChange, { readonly kind: "delete" }>;
+type PackDirectoryCreateChange = Extract<
+  PackDirectoryChange,
+  { readonly kind: "create" }
+>;
+type PackDirectoryDeleteChange = Extract<
+  PackDirectoryChange,
+  { readonly kind: "delete" }
+>;
+type PackDirectoryRetainChange = Extract<
+  PackDirectoryChange,
+  { readonly kind: "retain" }
+>;
 
 interface StagedArtifactChange {
   readonly change: MutatingPackChange;
@@ -76,6 +95,16 @@ interface StagedArtifactChange {
 interface StagedArtifactGuard {
   readonly change: FinalPackChange;
   readonly stage: StagedProjectFileCasWrite;
+}
+
+interface AppliedDirectoryCreate {
+  readonly change: PackDirectoryCreateChange;
+  readonly identity: ProjectDirectoryIdentity;
+}
+
+interface DetachedDirectoryRemoval {
+  readonly change: PackDirectoryDeleteChange;
+  readonly stage: StagedProjectDirectoryCasRemoval;
 }
 
 interface ExecutionTracker {
@@ -367,6 +396,152 @@ async function rollbackAppliedChanges(
         change.kind === "create"
           ? change.bytes
           : (preimages.get(change.path)?.byteLength ?? change.bytes);
+      return Object.freeze({ ...failure, mutationUncertain: true });
+    }
+  }
+  return undefined;
+}
+
+function directoryIdentitiesMatch(
+  left: ProjectDirectoryIdentity,
+  right: ProjectDirectoryIdentity,
+): boolean {
+  return (
+    left.schemaVersion === right.schemaVersion &&
+    left.path === right.path &&
+    left.rootIdentityDigest === right.rootIdentityDigest &&
+    left.identityDigest === right.identityDigest
+  );
+}
+
+async function rollbackCreatedDirectories(
+  plan: PreparedPackOperation,
+  root: ReturnType<typeof internalsForPreparedPackOperation>["targetRoot"],
+  applied: readonly AppliedDirectoryCreate[],
+  lane: ProjectLaneLease,
+  tracker: ExecutionTracker,
+): Promise<ExecutionFailure | undefined> {
+  for (const { change, identity } of [...applied].reverse()) {
+    try {
+      await assertLaneOwned(lane);
+      await deleteProjectDirectoryCas({
+        root,
+        path: change.path,
+        expectedIdentity: identity,
+        maxDirectoryEntries: plan.limits.maxDirectoryEntries,
+      });
+      tracker.touchedPaths.add(change.path);
+      tracker.rolledBackPaths.push(change.path);
+    } catch (error) {
+      const failure = summarizeFailure(error, change.path);
+      tracker.touchedPaths.add(change.path);
+      return Object.freeze({ ...failure, mutationUncertain: true });
+    }
+  }
+  return undefined;
+}
+
+async function assertCreatedDirectoryIdentities(
+  plan: PreparedPackOperation,
+  root: ReturnType<typeof internalsForPreparedPackOperation>["targetRoot"],
+  applied: readonly AppliedDirectoryCreate[],
+  authority: Awaited<ReturnType<typeof validatePackExecutionAuthority>>,
+): Promise<void> {
+  for (const { change, identity } of applied) {
+    await assertForwardAuthority(authority);
+    const actual = await readProjectDirectoryIdentity({
+      root,
+      path: change.path,
+      maxDirectoryEntries: plan.limits.maxDirectoryEntries,
+    });
+    if (!directoryIdentitiesMatch(identity, actual)) {
+      throw new PackRuntimeError(
+        "pack-execution-uncertain",
+        change.path,
+        "created pack directory identity changed before state promotion",
+        true,
+      );
+    }
+  }
+}
+
+async function assertRetainedDirectoryIdentities(
+  plan: PreparedPackOperation,
+  root: ReturnType<typeof internalsForPreparedPackOperation>["targetRoot"],
+  changes: readonly PackDirectoryRetainChange[],
+  authority: Awaited<ReturnType<typeof validatePackExecutionAuthority>>,
+): Promise<void> {
+  for (const change of changes) {
+    await assertForwardAuthority(authority);
+    const actual = await readProjectDirectoryIdentity({
+      root,
+      path: change.path,
+      maxDirectoryEntries: plan.limits.maxDirectoryEntries,
+    });
+    if (!directoryIdentitiesMatch(change.expectedIdentity, actual)) {
+      throw new PackRuntimeError(
+        "pack-execution-uncertain",
+        change.path,
+        "retained pack directory identity changed before state promotion",
+        true,
+      );
+    }
+  }
+}
+
+function directoryRemovalPaths(
+  change: PackDirectoryDeleteChange,
+): readonly string[] {
+  return Object.freeze([
+    change.path,
+    change.tombstonePath,
+    `${change.tombstonePath}/owned`,
+  ]);
+}
+
+function trackDirectoryRemovalPaths(
+  tracker: ExecutionTracker,
+  change: PackDirectoryDeleteChange,
+  collection?: string[],
+): void {
+  for (const path of directoryRemovalPaths(change)) {
+    tracker.touchedPaths.add(path);
+    collection?.push(path);
+  }
+}
+
+async function restoreDetachedDirectories(
+  applied: readonly DetachedDirectoryRemoval[],
+  lane: ProjectLaneLease,
+  tracker: ExecutionTracker,
+): Promise<ExecutionFailure | undefined> {
+  for (const { change, stage } of [...applied].reverse()) {
+    try {
+      await assertLaneOwned(lane);
+      await stage.restore();
+      trackDirectoryRemovalPaths(tracker, change, tracker.rolledBackPaths);
+    } catch (error) {
+      const failure = summarizeFailure(error, change.path);
+      trackDirectoryRemovalPaths(tracker, change);
+      return Object.freeze({ ...failure, mutationUncertain: true });
+    }
+  }
+  return undefined;
+}
+
+async function finalizeDetachedDirectories(
+  applied: readonly DetachedDirectoryRemoval[],
+  authority: Awaited<ReturnType<typeof validatePackExecutionAuthority>>,
+  tracker: ExecutionTracker,
+): Promise<ExecutionFailure | undefined> {
+  for (const { change, stage } of applied) {
+    try {
+      await assertForwardAuthority(authority);
+      await stage.finalize();
+      trackDirectoryRemovalPaths(tracker, change);
+    } catch (error) {
+      const failure = summarizeFailure(error, change.path);
+      trackDirectoryRemovalPaths(tracker, change);
       return Object.freeze({ ...failure, mutationUncertain: true });
     }
   }
@@ -796,6 +971,7 @@ export async function executePreparedPackOperation(
         : { manifest: internals.manifest }),
       installed: internals.installed.state,
       sourceArtifacts: internals.sourceArtifacts,
+      directories: internals.nextDirectories,
       timestamp: startedAt,
     });
     stateContent = serializeInstalledPackState(nextState);
@@ -961,6 +1137,7 @@ export async function executePreparedPackOperation(
 
   let stateStage: StagedProjectFileCasWrite | undefined;
   const stagedArtifacts: StagedArtifactChange[] = [];
+  const appliedDirectories: AppliedDirectoryCreate[] = [];
   let stagingFailure: ExecutionFailure | undefined;
   try {
     await assertForwardAuthority(authority);
@@ -975,6 +1152,18 @@ export async function executePreparedPackOperation(
       maxBytes: PACK_INSTALLED_STATE_MAX_BYTES,
       maxDirectoryEntries: plan.limits.maxDirectoryEntries,
     });
+    for (const change of plan.directoryChanges) {
+      if (change.kind !== "create") continue;
+      await assertForwardAuthority(authority);
+      const result = await createProjectDirectoryCas({
+        root: internals.targetRoot,
+        path: change.path,
+        maxDirectoryEntries: plan.limits.maxDirectoryEntries,
+      });
+      appliedDirectories.push({ change, identity: result.identity });
+      tracker.touchedPaths.add(change.path);
+      tracker.appliedPaths.push(change.path);
+    }
     for (const change of plan.changes) {
       if (change.kind === "unchanged") continue;
       await assertForwardAuthority(authority);
@@ -992,6 +1181,16 @@ export async function executePreparedPackOperation(
 
   if (stagingFailure !== undefined) {
     const abortFailure = await abortStages(stateStage, stagedArtifacts);
+    const directoryRollbackFailure =
+      stagingFailure.mutationUncertain || abortFailure !== undefined
+        ? undefined
+        : await rollbackCreatedDirectories(
+            plan,
+            internals.targetRoot,
+            appliedDirectories,
+            authority.lane,
+            tracker,
+          );
     accountUncertainFileAttempt(
       plan,
       stagingFailure,
@@ -1006,13 +1205,20 @@ export async function executePreparedPackOperation(
       preimages,
       tracker,
     );
-    const failure = abortFailure ?? stagingFailure;
+    const failure =
+      directoryRollbackFailure ?? abortFailure ?? stagingFailure;
     const uncertain =
-      stagingFailure.mutationUncertain || abortFailure !== undefined;
+      stagingFailure.mutationUncertain ||
+      abortFailure !== undefined ||
+      directoryRollbackFailure !== undefined;
+    const rolledBack =
+      !uncertain &&
+      appliedDirectories.length > 0 &&
+      tracker.rolledBackPaths.length === appliedDirectories.length;
     const terminal = await closeTransaction(
       plan,
       started,
-      uncertain ? "recovery-required" : "failed",
+      uncertain ? "recovery-required" : rolledBack ? "rolled-back" : "failed",
       uncertain,
       tracker,
       undefined,
@@ -1031,7 +1237,7 @@ export async function executePreparedPackOperation(
     );
     return executedResult(
       plan,
-      finalUncertain ? "recovery-required" : "failed",
+      finalUncertain ? "recovery-required" : rolledBack ? "rolled-back" : "failed",
       finalUncertain,
       tracker,
       settlement,
@@ -1045,6 +1251,7 @@ export async function executePreparedPackOperation(
 
   const appliedStages: StagedArtifactChange[] = [];
   const guardStages: StagedArtifactGuard[] = [];
+  const detachedDirectories: DetachedDirectoryRemoval[] = [];
   let commitFailure: ExecutionFailure | undefined;
   for (const staged of stagedArtifacts) {
     try {
@@ -1112,6 +1319,87 @@ export async function executePreparedPackOperation(
     }
   }
 
+  if (commitFailure === undefined) {
+    try {
+      await assertCreatedDirectoryIdentities(
+        plan,
+        internals.targetRoot,
+        appliedDirectories,
+        authority,
+      );
+      await assertRetainedDirectoryIdentities(
+        plan,
+        internals.targetRoot,
+        plan.directoryChanges.filter(
+          (change): change is PackDirectoryRetainChange =>
+            change.kind === "retain",
+        ),
+        authority,
+      );
+    } catch (error) {
+      commitFailure = summarizeFailure(error, "$execution.directory-guard");
+    }
+  }
+
+  if (commitFailure === undefined) {
+    const removals = plan.directoryChanges
+      .filter(
+        (change): change is PackDirectoryDeleteChange =>
+          change.kind === "delete",
+      )
+      .sort((left, right) => {
+        const depthOrder =
+          right.path.split("/").length - left.path.split("/").length;
+        return depthOrder !== 0
+          ? depthOrder
+          : compareCanonicalText(right.path, left.path);
+      });
+    for (const change of removals) {
+      let stage: StagedProjectDirectoryCasRemoval | undefined;
+      try {
+        await assertForwardAuthority(authority);
+        stage = await stageProjectDirectoryCasRemoval({
+          root: internals.targetRoot,
+          path: change.path,
+          expectedIdentity: change.expectedIdentity,
+          tombstonePath: change.tombstonePath,
+          maxDirectoryEntries: plan.limits.maxDirectoryEntries,
+        });
+        await assertForwardAuthority(authority);
+        await stage.detach();
+        detachedDirectories.push({ change, stage });
+        trackDirectoryRemovalPaths(
+          tracker,
+          change,
+          tracker.appliedPaths,
+        );
+      } catch (error) {
+        commitFailure = summarizeFailure(error, change.path);
+        if (stage?.state === "staged") {
+          try {
+            await stage.abort();
+          } catch (abortError) {
+            commitFailure = Object.freeze({
+              ...summarizeFailure(abortError, change.path),
+              mutationUncertain: true,
+            });
+          }
+        }
+        if (
+          commitFailure.mutationUncertain ||
+          (stage !== undefined && stage.state === "uncertain")
+        ) {
+          trackDirectoryRemovalPaths(tracker, change);
+          commitFailure = Object.freeze({
+            ...commitFailure,
+            mutationUncertain: true,
+          });
+        }
+        break;
+      }
+    }
+  }
+
   let stateResult: ProjectFileCasResult | undefined;
   if (commitFailure === undefined) {
     try {
@@ -1142,14 +1430,30 @@ export async function executePreparedPackOperation(
   if (commitFailure !== undefined) {
     let rollbackFailure: ExecutionFailure | undefined;
     if (!commitFailure.mutationUncertain) {
-      rollbackFailure = await rollbackAppliedChanges(
-        plan,
-        internals.targetRoot,
-        appliedStages,
-        preimages,
+      rollbackFailure = await restoreDetachedDirectories(
+        detachedDirectories,
         authority.lane,
         tracker,
       );
+      if (rollbackFailure === undefined) {
+        rollbackFailure = await rollbackAppliedChanges(
+          plan,
+          internals.targetRoot,
+          appliedStages,
+          preimages,
+          authority.lane,
+          tracker,
+        );
+      }
+      if (rollbackFailure === undefined) {
+        rollbackFailure = await rollbackCreatedDirectories(
+          plan,
+          internals.targetRoot,
+          appliedDirectories,
+          authority.lane,
+          tracker,
+        );
+      }
     }
     const abortFailure = await abortStages(stateStage, [
       ...stagedArtifacts,
@@ -1168,8 +1472,14 @@ export async function executePreparedPackOperation(
       abortFailure !== undefined;
     const rolledBack =
       !uncertain &&
-      appliedStages.length > 0 &&
-      tracker.rolledBackPaths.length === appliedStages.length;
+      appliedStages.length +
+          appliedDirectories.length +
+          detachedDirectories.length >
+        0 &&
+      tracker.rolledBackPaths.length ===
+        appliedStages.length +
+          appliedDirectories.length +
+          detachedDirectories.length * 3;
     const outcome: PackTransactionOutcome = uncertain
       ? "recovery-required"
       : rolledBack
@@ -1212,6 +1522,46 @@ export async function executePreparedPackOperation(
       undefined,
       undefined,
       terminal.failure ?? failure,
+    );
+  }
+
+
+  const finalizeFailure = await finalizeDetachedDirectories(
+    detachedDirectories,
+    authority,
+    tracker,
+  );
+  if (finalizeFailure !== undefined) {
+    const terminal = await closeTransaction(
+      plan,
+      started,
+      "recovery-required",
+      true,
+      tracker,
+      nextState.stateDigest,
+      finalizeFailure,
+      internals.targetRoot,
+      authority.lane,
+      active,
+    );
+    const settlement = settleAuthorization(
+      authority.authorization,
+      tracker,
+      startedClock,
+      "uncertain",
+      true,
+    );
+    return executedResult(
+      plan,
+      "recovery-required",
+      true,
+      tracker,
+      settlement,
+      startedRecordDigest,
+      terminal.recordDigest,
+      nextState,
+      stateResult?.afterDigest,
+      terminal.failure ?? finalizeFailure,
     );
   }
 

@@ -210,6 +210,16 @@ function manifest(content, version = "1.0.0") {
   return value;
 }
 
+function manifestWithOwnedDirectory(content, version = "1.0.0") {
+  const value = manifest(content, version);
+  value.ownedPaths.unshift({
+    path: ".ai-game-playbook/packs/local-demo",
+    kind: "directory",
+  });
+  value.digest = contracts.computePackManifestDigest(value);
+  return value;
+}
+
 function multiArtifactManifest(artifacts, version = "1.0.0") {
   const value = {
     schemaVersion: "1.0.0",
@@ -277,7 +287,7 @@ function commandFor(operation) {
   command.lane = "project-write";
   command.retry = { mode: "never", maxAttempts: 1 };
   command.budgets = {
-    maxChangedFiles: 128,
+    maxChangedFiles: 512,
     maxChangedBytes: 16_777_216,
     maxDurationMs: 30_000,
     maxOutputBytes: 65_536,
@@ -317,7 +327,7 @@ function recoveryCommand(definition) {
   command.lane = "project-write";
   command.retry = { mode: "never", maxAttempts: 1 };
   command.budgets = {
-    maxChangedFiles: 4,
+    maxChangedFiles: 512,
     maxChangedBytes: 4_194_304,
     maxDurationMs: 30_000,
     maxOutputBytes: 65_536,
@@ -467,7 +477,7 @@ function authorize(plan, selectedRegistry, options = {}) {
       identityDigest: projectIdentityDigest,
       stage: "vertical-slice",
       budgets: budgets({
-        maxChangedFiles: 128,
+        maxChangedFiles: 512,
         maxChangedBytes: 16_777_216,
         maxDurationMs: 900_000,
       }),
@@ -505,7 +515,7 @@ function authorizeRecovery(plan, selectedRegistry, options = {}) {
       identityDigest: projectIdentityDigest,
       stage: "vertical-slice",
       budgets: budgets({
-        maxChangedFiles: 128,
+        maxChangedFiles: 512,
         maxChangedBytes: 16_777_216,
         maxDurationMs: 900_000,
       }),
@@ -517,7 +527,7 @@ function authorizeRecovery(plan, selectedRegistry, options = {}) {
   });
   const request = packRuntime.createPackRecoveryAuthorizationRequest({
     plan,
-    budgets: budgets({ maxChangedFiles: 4 }),
+    budgets: budgets({ maxChangedFiles: 512 }),
     deadlineAt,
   });
   const pending = broker.authorize(request, []);
@@ -657,6 +667,469 @@ test("authorized local add commits artifacts, installed state, and an append-onl
   assert.equal(JSON.stringify(journal).includes(f.content), false);
 
   await lane.release();
+});
+
+test("owned artifact parents install and remove through marker-bound reversible staging", async (t) => {
+  const f = await fixture(t);
+  const directoryPath = ".ai-game-playbook/packs/local-demo";
+  const nativeDirectory = join(f.project, ...directoryPath.split("/"));
+  await rm(nativeDirectory, { recursive: true, force: true });
+  const pack = manifestWithOwnedDirectory(f.content);
+  const addRegistry = validatedRegistry(pack, "add");
+  const addPlan = await packRuntime.preparePackOperation(
+    prepareRequest(f, addRegistry, pack),
+  );
+  assert.equal(addPlan.disposition, "ready");
+  assert.equal(addPlan.directoryChanges[0]?.kind, "create");
+  const { decision: addDecision } = authorize(addPlan, addRegistry);
+  const addLane = await acquireLane(f.targetRoot);
+  const added = await packRuntime.executePreparedPackOperation({
+    plan: addPlan,
+    authorization: addDecision,
+    lane: addLane,
+  });
+  assert.equal(added.status, "succeeded");
+  await addLane.release();
+
+  assert.equal(await readFile(f.target, "utf8"), f.content);
+  const markerPath = join(nativeDirectory, ".agpb-owned");
+  const markerText = await readFile(markerPath, "utf8");
+  assert.equal(markerText.endsWith("\n"), true);
+  const installedPath = join(
+    f.project,
+    ".ai-game-playbook",
+    "state",
+    "packs",
+    "installed.json",
+  );
+  const installed = JSON.parse(await readFile(installedPath, "utf8"));
+  assert.equal(installed.schemaVersion, "1.1.0");
+  assert.deepEqual(installed.packs[0].directories, [
+    addPlan.directoryChanges[0].marker,
+  ]);
+  const addJournal = await packRuntime.loadPackTransactionJournal({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(addJournal.started.schemaVersion, "1.1.0");
+  assert.deepEqual(
+    addJournal.started.directoryChanges,
+    addPlan.directoryChanges,
+  );
+  assert.equal(addJournal.terminal.schemaVersion, "1.1.0");
+  const markerOnlyStarted = structuredClone(addJournal.started);
+  markerOnlyStarted.changes = markerOnlyStarted.changes.filter(
+    ({ path }) => path === `${directoryPath}/.agpb-owned`,
+  );
+  markerOnlyStarted.recordDigest =
+    transactionInternals.computePackTransactionRecordDigest(markerOnlyStarted);
+  assert.throws(
+    () =>
+      transactionInternals.parsePackTransactionStartedRecord(
+        markerOnlyStarted,
+        runId,
+        {
+          id: "sample.graybox",
+          identityDigest: projectIdentityDigest,
+        },
+      ),
+    expectPackError("pack-transaction-corrupt"),
+  );
+
+  const removeRegistry = validatedRegistryWithoutPack("remove");
+  const removePlan = await packRuntime.preparePackOperation(
+    prepareRequest(f, removeRegistry, pack, {
+      operation: "remove",
+      selectedRunId: removeRunId,
+    }),
+  );
+  assert.equal(removePlan.disposition, "ready");
+  assert.equal(removePlan.directoryChanges[0]?.kind, "delete");
+  assert.equal(removePlan.directoryChanges[0]?.path, directoryPath);
+  assert.equal(
+    removePlan.directoryChanges[0]?.marker.digest,
+    contracts.sha256Digest(markerText),
+  );
+  assert.equal(
+    removePlan.changes.some(({ path }) => path === `${directoryPath}/.agpb-owned`),
+    true,
+  );
+  const { decision: removeDecision } = authorize(removePlan, removeRegistry);
+  const removeLane = await acquireLane(f.targetRoot, removeRunId);
+  const removed = await packRuntime.executePreparedPackOperation({
+    plan: removePlan,
+    authorization: removeDecision,
+    lane: removeLane,
+  });
+  assert.equal(removed.status, "succeeded");
+  await removeLane.release();
+
+  await assert.rejects(
+    readFile(markerPath),
+    (error) => error?.code === "ENOENT",
+  );
+  await assert.rejects(
+    readFile(f.target),
+    (error) => error?.code === "ENOENT",
+  );
+  await assert.rejects(
+    readFile(nativeDirectory),
+    (error) => error?.code === "ENOENT" || error?.code === "EISDIR",
+  );
+  const finalState = JSON.parse(await readFile(installedPath, "utf8"));
+  assert.deepEqual(finalState.packs, []);
+  const recovery = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId: removeRunId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(recovery.observedState, "postimage");
+  assert.equal(recovery.consistency, "consistent");
+  assert.deepEqual(
+    recovery.observations
+      .filter(({ role }) => role.startsWith("owned-directory"))
+      .map(({ role, path, match }) => ({ role, path, match })),
+    [
+      {
+        role: "owned-directory",
+        path: directoryPath,
+        match: "after",
+      },
+      {
+        role: "owned-directory-detached",
+        path: `${removePlan.directoryChanges[0].tombstonePath}/owned`,
+        match: "both",
+      },
+      {
+        role: "owned-directory-tombstone",
+        path: removePlan.directoryChanges[0].tombstonePath,
+        match: "both",
+      },
+    ].sort((left, right) => left.path.localeCompare(right.path)),
+  );
+});
+
+test("owned artifact parent updates rotate marker ownership without replacing the directory", async (t) => {
+  const f = await fixture(t, "version one\n");
+  const directoryPath = ".ai-game-playbook/packs/local-demo";
+  const nativeDirectory = join(f.project, ...directoryPath.split("/"));
+  await rm(nativeDirectory, { recursive: true, force: true });
+  const firstPack = manifestWithOwnedDirectory(f.content, "1.0.0");
+  const addRegistry = validatedRegistry(firstPack, "add");
+  const addPlan = await packRuntime.preparePackOperation(
+    prepareRequest(f, addRegistry, firstPack),
+  );
+  const addLane = await acquireLane(f.targetRoot);
+  assert.equal(
+    (
+      await packRuntime.executePreparedPackOperation({
+        plan: addPlan,
+        authorization: authorize(addPlan, addRegistry).decision,
+        lane: addLane,
+      })
+    ).status,
+    "succeeded",
+  );
+  await addLane.release();
+  const identityBefore = await core.readProjectDirectoryIdentity({
+    root: f.targetRoot,
+    path: directoryPath,
+    maxDirectoryEntries: 1000,
+  });
+
+  const nextContent = "version two\n";
+  await writeFile(join(f.source, "dist", "demo.txt"), nextContent, "utf8");
+  const nextPack = manifestWithOwnedDirectory(nextContent, "1.1.0");
+  const updateRegistry = validatedRegistry(nextPack, "update");
+  const updatePlan = await packRuntime.preparePackOperation(
+    prepareRequest(f, updateRegistry, nextPack, {
+      operation: "update",
+      selectedRunId: updateRunId,
+    }),
+  );
+  assert.equal(updatePlan.disposition, "ready");
+  assert.equal(updatePlan.directoryChanges.length, 1);
+  assert.equal(updatePlan.directoryChanges[0].kind, "retain");
+  assert.equal(updatePlan.directoryChanges[0].path, directoryPath);
+  const markerChange = updatePlan.changes.find(
+    ({ path }) => path === `${directoryPath}/.agpb-owned`,
+  );
+  assert.equal(markerChange?.kind, "replace");
+  assert.equal(markerChange?.beforeDigest, addPlan.directoryChanges[0].marker.digest);
+
+  const updateLane = await acquireLane(f.targetRoot, updateRunId);
+  const updated = await packRuntime.executePreparedPackOperation({
+    plan: updatePlan,
+    authorization: authorize(updatePlan, updateRegistry).decision,
+    lane: updateLane,
+  });
+  assert.equal(updated.status, "succeeded");
+  await updateLane.release();
+
+  const identityAfter = await core.readProjectDirectoryIdentity({
+    root: f.targetRoot,
+    path: directoryPath,
+    maxDirectoryEntries: 1000,
+  });
+  assert.deepEqual(identityAfter, identityBefore);
+  const installed = JSON.parse(
+    await readFile(
+      join(
+        f.project,
+        ".ai-game-playbook",
+        "state",
+        "packs",
+        "installed.json",
+      ),
+      "utf8",
+    ),
+  );
+  assert.equal(installed.packs[0].directories.length, 1);
+  assert.equal(installed.packs[0].directories[0].ownerPackDigest, nextPack.digest);
+  assert.equal(installed.packs[0].directories[0].digest, markerChange.afterDigest);
+  assert.equal(await readFile(f.target, "utf8"), nextContent);
+});
+
+test("directory removal rolls owned files back and preserves unexpected user content", async (t) => {
+  const f = await fixture(t);
+  const directoryPath = ".ai-game-playbook/packs/local-demo";
+  const nativeDirectory = join(f.project, ...directoryPath.split("/"));
+  await rm(nativeDirectory, { recursive: true, force: true });
+  const pack = manifestWithOwnedDirectory(f.content);
+  const addRegistry = validatedRegistry(pack, "add");
+  const addPlan = await packRuntime.preparePackOperation(
+    prepareRequest(f, addRegistry, pack),
+  );
+  const addLane = await acquireLane(f.targetRoot);
+  assert.equal(
+    (
+      await packRuntime.executePreparedPackOperation({
+        plan: addPlan,
+        authorization: authorize(addPlan, addRegistry).decision,
+        lane: addLane,
+      })
+    ).status,
+    "succeeded",
+  );
+  await addLane.release();
+  const markerPath = join(nativeDirectory, ".agpb-owned");
+  const markerBefore = await readFile(markerPath, "utf8");
+  const userPath = join(nativeDirectory, "user-note.txt");
+  await writeFile(userPath, "preserve me\n", "utf8");
+
+  const removeRegistry = validatedRegistryWithoutPack("remove");
+  const removePlan = await packRuntime.preparePackOperation(
+    prepareRequest(f, removeRegistry, pack, {
+      operation: "remove",
+      selectedRunId: removeRunId,
+    }),
+  );
+  const removeLane = await acquireLane(f.targetRoot, removeRunId);
+  const removed = await packRuntime.executePreparedPackOperation({
+    plan: removePlan,
+    authorization: authorize(removePlan, removeRegistry).decision,
+    lane: removeLane,
+  });
+  assert.equal(removed.status, "rolled-back");
+  assert.equal(removed.mutationUncertain, false);
+  await removeLane.release();
+
+  assert.equal(await readFile(userPath, "utf8"), "preserve me\n");
+  assert.equal(await readFile(f.target, "utf8"), f.content);
+  assert.equal(await readFile(markerPath, "utf8"), markerBefore);
+  const state = JSON.parse(
+    await readFile(
+      join(
+        f.project,
+        ".ai-game-playbook",
+        "state",
+        "packs",
+        "installed.json",
+      ),
+      "utf8",
+    ),
+  );
+  assert.equal(state.revision, 1);
+  assert.equal(state.packs[0].id, pack.id);
+  const journal = await packRuntime.loadPackTransactionJournal({
+    root: f.targetRoot,
+    runId: removeRunId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(journal.terminal.outcome, "rolled-back");
+});
+
+test("approved recovery finalizes an exact detached directory before journal closure", async (t) => {
+  const f = await fixture(t);
+  const directoryPath = ".ai-game-playbook/packs/local-demo";
+  const nativeDirectory = join(f.project, ...directoryPath.split("/"));
+  await rm(nativeDirectory, { recursive: true, force: true });
+  const pack = manifestWithOwnedDirectory(f.content);
+  const addRegistry = validatedRegistry(pack, "add");
+  const addPlan = await packRuntime.preparePackOperation(
+    prepareRequest(f, addRegistry, pack),
+  );
+  const addLane = await acquireLane(f.targetRoot);
+  assert.equal(
+    (
+      await packRuntime.executePreparedPackOperation({
+        plan: addPlan,
+        authorization: authorize(addPlan, addRegistry).decision,
+        lane: addLane,
+      })
+    ).status,
+    "succeeded",
+  );
+  await addLane.release();
+
+  const removeRegistry = validatedRegistryWithoutPack("remove");
+  const removePlan = await packRuntime.preparePackOperation(
+    prepareRequest(f, removeRegistry, pack, {
+      operation: "remove",
+      selectedRunId: removeRunId,
+    }),
+  );
+  const removeAuthority = authorize(removePlan, removeRegistry).decision;
+  const installedPath = join(
+    f.project,
+    ".ai-game-playbook",
+    "state",
+    "packs",
+    "installed.json",
+  );
+  const installed = JSON.parse(await readFile(installedPath, "utf8"));
+  const nextStateBody = {
+    schemaVersion: "1.1.0",
+    project: installed.project,
+    revision: installed.revision + 1,
+    packs: [],
+  };
+  const nextState = {
+    ...nextStateBody,
+    stateDigest: packRuntime.computeInstalledPackStateDigest(nextStateBody),
+  };
+  const nextStateContent = Buffer.from(
+    `${contracts.canonicalizeJson(nextState)}\n`,
+    "utf8",
+  );
+  const started = transactionInternals.createStartedPackTransaction({
+    plan: removePlan,
+    authorizationId: removeAuthority.lease.authorizationId,
+    requestDigest: removeAuthority.challenge.requestDigest,
+    installedStateAfter: {
+      revision: nextState.revision,
+      digest: nextState.stateDigest,
+      fileDigest: contracts.sha256Digest(nextStateContent),
+    },
+    startedAt: new Date().toISOString(),
+  });
+  await writeActiveForStarted(f, started);
+  await transactionInternals.writePackTransactionRecord(
+    f.targetRoot,
+    started,
+    1000,
+  );
+  for (const change of removePlan.changes) {
+    assert.equal(change.kind, "delete");
+    await core.deleteProjectFileCas({
+      root: f.targetRoot,
+      path: change.path,
+      expectedDigest: change.beforeDigest,
+      maxBytes: 1024,
+      maxDirectoryEntries: 1000,
+    });
+  }
+  const directoryChange = removePlan.directoryChanges[0];
+  assert.equal(directoryChange.kind, "delete");
+  const detached = await core.stageProjectDirectoryCasRemoval({
+    root: f.targetRoot,
+    path: directoryChange.path,
+    expectedIdentity: directoryChange.expectedIdentity,
+    tombstonePath: directoryChange.tombstonePath,
+    maxDirectoryEntries: 1000,
+  });
+  await detached.detach();
+  await core.writeProjectFileCas({
+    root: f.targetRoot,
+    path: ".ai-game-playbook/state/packs/installed.json",
+    content: nextStateContent,
+    expected: { mode: "digest", digest: removePlan.installedState.fileDigest },
+    maxBytes: 1024 * 1024,
+    maxDirectoryEntries: 1000,
+  });
+
+  const report = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId: removeRunId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(report.observedState, "postimage");
+  assert.equal(report.finalizationAction, "append-terminal");
+  assert.equal(report.finalizationOutcome, "committed");
+  assert.equal(report.mutationUncertain, true);
+  assert.deepEqual(report.directoryCleanup, [
+    {
+      path: directoryPath,
+      tombstonePath: directoryChange.tombstonePath,
+      expectedIdentity: directoryChange.expectedIdentity,
+    },
+  ]);
+
+  const recoveryPlan =
+    packRuntime.preparePackTransactionRecoveryFinalization({
+      report,
+      registry: removeRegistry,
+    });
+  assert.equal(recoveryPlan.paths.includes(directoryPath), true);
+  assert.equal(recoveryPlan.paths.includes(directoryChange.tombstonePath), true);
+  const recoveryAuthority = authorizeRecovery(
+    recoveryPlan,
+    removeRegistry,
+  ).decision;
+  const recoveryLane = await acquireLane(f.targetRoot, removeRunId);
+  const finalized = await packRuntime.finalizePackTransactionRecovery({
+    plan: recoveryPlan,
+    authorization: recoveryAuthority,
+    lane: recoveryLane,
+  });
+  assert.equal(finalized.status, "finalized");
+  await recoveryLane.release();
+
+  await assert.rejects(
+    readFile(nativeDirectory),
+    (error) => error?.code === "ENOENT" || error?.code === "EISDIR",
+  );
+  await assert.rejects(
+    readFile(join(f.project, ...directoryChange.tombstonePath.split("/"))),
+    (error) => error?.code === "ENOENT" || error?.code === "EISDIR",
+  );
+  const journal = await packRuntime.loadPackTransactionJournal({
+    root: f.targetRoot,
+    runId: removeRunId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(journal.terminal.outcome, "committed");
 });
 
 test("same-process authorization and lane capabilities cannot be replaced by copies", async (t) => {
@@ -1366,9 +1839,24 @@ test("pack execution attests its expected post-state and clears the active marke
           id: "sample.graybox",
           identityDigest: projectIdentityDigest,
         },
-      ),
+    ),
     expectPackError("pack-transaction-corrupt"),
   );
+  const legacyStarted = structuredClone(journal.started);
+  legacyStarted.schemaVersion = "1.0.0";
+  delete legacyStarted.directoryChanges;
+  legacyStarted.recordDigest =
+    transactionInternals.computePackTransactionRecordDigest(legacyStarted);
+  const parsedLegacy = transactionInternals.parsePackTransactionStartedRecord(
+    legacyStarted,
+    runId,
+    {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+  );
+  assert.equal(parsedLegacy.schemaVersion, "1.0.0");
+  assert.equal(parsedLegacy.directoryChanges, undefined);
   await assert.rejects(
     readFile(
       join(

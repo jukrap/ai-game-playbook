@@ -20,14 +20,19 @@ import {
 } from "@ai-game-playbook/core";
 
 import { PackRuntimeError } from "./errors.js";
+import { createPackDirectoryOwnershipMarker } from "./directory-ownership.js";
 import type { PreparedArtifactContent } from "./prepared-plan.js";
-import type { PackOperation } from "./types.js";
+import type {
+  PackDirectoryOwnershipMarker,
+  PackOperation,
+} from "./types.js";
 
 export const PACK_INSTALLED_STATE_PATH: string =
   ".ai-game-playbook/state/packs/installed.json";
 export const PACK_INSTALLED_STATE_MAX_BYTES: number = 1024 * 1024;
 const MAX_INSTALLED_PACKS = 1024;
 const MAX_ARTIFACTS_PER_PACK = 64;
+const MAX_DIRECTORIES_PER_PACK = 64;
 
 export interface InstalledPackArtifact {
   readonly path: string;
@@ -47,12 +52,13 @@ export interface InstalledPackRecord {
   readonly digest: Sha256Digest;
   readonly dependencies: readonly InstalledPackDependency[];
   readonly artifacts: readonly InstalledPackArtifact[];
+  readonly directories?: readonly PackDirectoryOwnershipMarker[];
   readonly installedAt: string;
   readonly updatedAt: string;
 }
 
 export interface InstalledPackState {
-  readonly schemaVersion: "1.0.0";
+  readonly schemaVersion: "1.0.0" | "1.1.0";
   readonly project: {
     readonly id: StableId;
     readonly identityDigest: Sha256Digest;
@@ -77,6 +83,7 @@ export interface CreateNextInstalledPackStateRequest {
   readonly manifest?: PackManifest;
   readonly installed: InstalledPackState;
   readonly sourceArtifacts: readonly PreparedArtifactContent[];
+  readonly directories?: readonly PackDirectoryOwnershipMarker[];
   readonly timestamp: string;
 }
 
@@ -166,24 +173,76 @@ function parseDependency(value: unknown): InstalledPackDependency {
   });
 }
 
-function parsePack(value: unknown): InstalledPackRecord {
+function parseDirectory(
+  value: unknown,
+  pack: Pick<PackManifest, "id" | "digest">,
+): PackDirectoryOwnershipMarker {
   if (
     !isRecord(value) ||
     !exactKeys(value, [
-      "id",
-      "version",
+      "directoryPath",
+      "path",
       "digest",
-      "dependencies",
-      "artifacts",
-      "installedAt",
-      "updatedAt",
+      "bytes",
+      "ownershipDigest",
+      "ownerPackDigest",
     ]) ||
+    !isPortableProjectPath(value["directoryPath"]) ||
+    !isPortableProjectPath(value["path"]) ||
+    !isSha256Digest(value["digest"]) ||
+    !Number.isSafeInteger(value["bytes"]) ||
+    (value["bytes"] as number) < 1 ||
+    (value["bytes"] as number) > 67_108_864 ||
+    !isSha256Digest(value["ownershipDigest"]) ||
+    !isSha256Digest(value["ownerPackDigest"]) ||
+    value["ownerPackDigest"] !== pack.digest
+  ) {
+    throw new PackRuntimeError(
+      "pack-state-corrupt",
+      "$state.packs[].directories[]",
+      "installed directory ownership state is malformed",
+    );
+  }
+  const descriptor = createPackDirectoryOwnershipMarker(
+    pack,
+    value["directoryPath"],
+  ).descriptor;
+  if (canonicalizeJson(descriptor) !== canonicalizeJson(value)) {
+    throw new PackRuntimeError(
+      "pack-state-corrupt",
+      "$state.packs[].directories[]",
+      "installed directory ownership marker is not self-consistent",
+    );
+  }
+  return descriptor;
+}
+
+function parsePack(
+  value: unknown,
+  schemaVersion: InstalledPackState["schemaVersion"],
+): InstalledPackRecord {
+  const expectedKeys = [
+    "id",
+    "version",
+    "digest",
+    "dependencies",
+    "artifacts",
+    ...(schemaVersion === "1.1.0" ? ["directories"] : []),
+    "installedAt",
+    "updatedAt",
+  ];
+  if (
+    !isRecord(value) ||
+    !exactKeys(value, expectedKeys) ||
     !isStableId(value["id"]) ||
     !isSha256Digest(value["digest"]) ||
     !Array.isArray(value["dependencies"]) ||
     value["dependencies"].length > MAX_INSTALLED_PACKS ||
     !Array.isArray(value["artifacts"]) ||
     value["artifacts"].length > MAX_ARTIFACTS_PER_PACK ||
+    (schemaVersion === "1.1.0" &&
+      (!Array.isArray(value["directories"]) ||
+        value["directories"].length > MAX_DIRECTORIES_PER_PACK)) ||
     !canonicalTimestamp(value["installedAt"]) ||
     !canonicalTimestamp(value["updatedAt"])
   ) {
@@ -206,6 +265,15 @@ function parsePack(value: unknown): InstalledPackRecord {
   }
   const dependencies = value["dependencies"].map(parseDependency);
   const artifacts = value["artifacts"].map(parseArtifact);
+  const directories =
+    schemaVersion === "1.1.0"
+      ? (value["directories"] as unknown[]).map((entry) =>
+          parseDirectory(entry, {
+            id: value["id"] as StableId,
+            digest: value["digest"] as Sha256Digest,
+          }),
+        )
+      : undefined;
   if (
     dependencies.some(
       (entry, index) =>
@@ -216,6 +284,14 @@ function parsePack(value: unknown): InstalledPackRecord {
       (entry, index) =>
         index > 0 &&
         compareCanonicalText(artifacts[index - 1]?.path ?? "", entry.path) >= 0,
+    ) ||
+    directories?.some(
+      (entry, index) =>
+        index > 0 &&
+        compareCanonicalText(
+          directories[index - 1]?.directoryPath ?? "",
+          entry.directoryPath,
+        ) >= 0,
     ) ||
     Date.parse(value["installedAt"]) > Date.parse(value["updatedAt"])
   ) {
@@ -231,6 +307,9 @@ function parsePack(value: unknown): InstalledPackRecord {
     digest: value["digest"],
     dependencies: Object.freeze(dependencies),
     artifacts: Object.freeze(artifacts),
+    ...(directories === undefined
+      ? {}
+      : { directories: Object.freeze(directories) }),
     installedAt: value["installedAt"],
     updatedAt: value["updatedAt"],
   });
@@ -258,7 +337,7 @@ export function createEmptyInstalledPackState(project: {
   readonly identityDigest: Sha256Digest;
 }): InstalledPackState {
   const body = {
-    schemaVersion: "1.0.0" as const,
+    schemaVersion: "1.1.0" as const,
     project: Object.freeze({ ...project }),
     revision: 0,
     packs: Object.freeze([]) as readonly InstalledPackRecord[],
@@ -345,6 +424,39 @@ function artifactRecords(
   );
 }
 
+function directoryRecords(
+  pack: Pick<PackManifest, "id" | "digest">,
+  directories: readonly PackDirectoryOwnershipMarker[],
+): readonly PackDirectoryOwnershipMarker[] {
+  if (directories.length > MAX_DIRECTORIES_PER_PACK) {
+    throw new PackRuntimeError(
+      "pack-state-corrupt",
+      "$state.packs[].directories",
+      "installed directory ownership exceeds the runtime limit",
+    );
+  }
+  const records = directories.map((directory) =>
+    parseDirectory(structuredClone(directory), pack),
+  );
+  records.sort((left, right) =>
+    compareCanonicalText(left.directoryPath, right.directoryPath),
+  );
+  if (
+    records.some(
+      (entry, index) =>
+        index > 0 &&
+        records[index - 1]?.directoryPath === entry.directoryPath,
+    )
+  ) {
+    throw new PackRuntimeError(
+      "pack-state-corrupt",
+      "$state.packs[].directories",
+      "installed directory ownership must be unique",
+    );
+  }
+  return Object.freeze(records);
+}
+
 export function createNextInstalledPackState(
   request: CreateNextInstalledPackStateRequest,
 ): InstalledPackState {
@@ -401,6 +513,10 @@ export function createNextInstalledPackState(
       digest: manifest.digest,
       dependencies: dependencyRecords(manifest, request.installed),
       artifacts: artifactRecords(manifest, request.sourceArtifacts),
+      directories: directoryRecords(
+        manifest,
+        request.directories ?? Object.freeze([]),
+      ),
       installedAt,
       updatedAt: new Date(updatedMilliseconds).toISOString(),
     });
@@ -410,10 +526,21 @@ export function createNextInstalledPackState(
     ];
   }
   const sortedPacks = Object.freeze(
-    [...packs].sort((left, right) => compareCanonicalText(left.id, right.id)),
+    packs
+      .map((pack) =>
+        pack.directories === undefined
+          ? Object.freeze({
+              ...pack,
+              directories: Object.freeze(
+                [],
+              ) as readonly PackDirectoryOwnershipMarker[],
+            })
+          : pack,
+      )
+      .sort((left, right) => compareCanonicalText(left.id, right.id)),
   );
   const body = {
-    schemaVersion: "1.0.0" as const,
+    schemaVersion: "1.1.0" as const,
     project: Object.freeze({ ...request.installed.project }),
     revision: request.installed.revision + 1,
     packs: sortedPacks,
@@ -443,7 +570,8 @@ function parseState(
       "packs",
       "stateDigest",
     ]) ||
-    value["schemaVersion"] !== "1.0.0" ||
+    (value["schemaVersion"] !== "1.0.0" &&
+      value["schemaVersion"] !== "1.1.0") ||
     !isRecord(value["project"]) ||
     !exactKeys(value["project"], ["id", "identityDigest"]) ||
     value["project"]["id"] !== project.id ||
@@ -460,7 +588,10 @@ function parseState(
       "installed pack state is malformed or belongs to another project",
     );
   }
-  const packs = value["packs"].map(parsePack);
+  const schemaVersion = value["schemaVersion"] as InstalledPackState["schemaVersion"];
+  const packs = value["packs"].map((pack) =>
+    parsePack(pack, schemaVersion),
+  );
   if (
     packs.some(
       (entry, index) =>
@@ -530,8 +661,49 @@ function parseState(
       );
     }
   }
+  const directoryOwners = packs
+    .flatMap((pack) =>
+      (pack.directories ?? []).map((directory) => ({
+        packId: pack.id,
+        path: directory.directoryPath.toLowerCase(),
+        markerPath: directory.path.toLowerCase(),
+      })),
+    )
+    .sort((left, right) => compareCanonicalText(left.path, right.path));
+  for (let index = 0; index < directoryOwners.length; index += 1) {
+    const current = directoryOwners[index] as (typeof directoryOwners)[number];
+    const previous = directoryOwners[index - 1];
+    if (
+      previous !== undefined &&
+      (current.path === previous.path ||
+        current.path.startsWith(`${previous.path}/`))
+    ) {
+      throw new PackRuntimeError(
+        "pack-state-corrupt",
+        "$state.packs[].directories",
+        "installed directory ownership overlaps under portable filesystem rules",
+      );
+    }
+    for (const pack of packs) {
+      for (const artifact of pack.artifacts) {
+        const artifactPath = artifact.path.toLowerCase();
+        if (
+          artifactPath === current.markerPath ||
+          (pack.id !== current.packId &&
+            (artifactPath === current.path ||
+              artifactPath.startsWith(`${current.path}/`)))
+        ) {
+          throw new PackRuntimeError(
+            "pack-state-corrupt",
+            "$state.packs[].directories",
+            "installed directory ownership conflicts with another owned path",
+          );
+        }
+      }
+    }
+  }
   const state: InstalledPackState = Object.freeze({
-    schemaVersion: "1.0.0",
+    schemaVersion,
     project: Object.freeze({
       id: project.id,
       identityDigest: project.identityDigest,

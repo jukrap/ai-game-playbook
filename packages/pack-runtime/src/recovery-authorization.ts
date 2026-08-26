@@ -23,7 +23,10 @@ import {
   internalsForPreparedPackRecoveryFinalization,
   type PreparedPackRecoveryFinalization,
 } from "./recovery-plan.js";
-import { PACK_TRANSACTION_MAX_RECORD_BYTES } from "./transaction-journal.js";
+import {
+  PACK_TRANSACTION_DIRECTORY,
+  PACK_TRANSACTION_MAX_RECORD_BYTES,
+} from "./transaction-journal.js";
 
 type MutableRecord = Record<string, unknown>;
 
@@ -102,7 +105,9 @@ function snapshotBudgets(value: unknown): ExecutionBudgets {
 
 function requiredChangedBytes(plan: PreparedPackRecoveryFinalization): number {
   const recordWrites = plan.paths.filter(
-    (path) => path !== PACK_ACTIVE_TRANSACTION_PATH,
+    (path) =>
+      path.startsWith(`${PACK_TRANSACTION_DIRECTORY}/`) &&
+      path.endsWith(".json"),
   ).length;
   return (
     PACK_ACTIVE_TRANSACTION_MAX_BYTES * 2 +

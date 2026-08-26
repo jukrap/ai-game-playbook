@@ -9,8 +9,10 @@ import {
 } from "@ai-game-playbook/contracts";
 import {
   CoreBoundaryError,
+  readProjectDirectoryIdentity,
   readProjectFileSnapshot,
   type CanonicalProjectRoot,
+  type ProjectDirectoryIdentity,
 } from "@ai-game-playbook/core";
 
 import {
@@ -25,22 +27,33 @@ import {
   type PackTransactionOutcome,
   type PackTransactionStartedRecord,
 } from "./transaction-journal.js";
-import type { PackChange } from "./types.js";
+import type { PackChange, PackDirectoryChange } from "./types.js";
 
 type MutableRecord = Record<string, unknown>;
 
-export type PackRecoveryExpectedFile =
+export type PackRecoveryExpectedPath =
   | { readonly kind: "absent" }
-  | { readonly kind: "file"; readonly digest: Sha256Digest };
+  | { readonly kind: "file"; readonly digest: Sha256Digest }
+  | {
+      readonly kind: "directory";
+      readonly identityDigest?: Sha256Digest;
+    };
 
-export type PackRecoveryActualFile =
+export type PackRecoveryActualPath =
   | { readonly kind: "absent" }
   | {
       readonly kind: "file";
       readonly digest: Sha256Digest;
       readonly bytes: number;
     }
+  | {
+      readonly kind: "directory";
+      readonly identityDigest: Sha256Digest;
+    }
   | { readonly kind: "unreadable"; readonly errorCode: string };
+
+export type PackRecoveryExpectedFile = PackRecoveryExpectedPath;
+export type PackRecoveryActualFile = PackRecoveryActualPath;
 
 export type PackRecoveryObservationMatch =
   | "after"
@@ -63,11 +76,22 @@ export type PackRecoveryFinalizationOutcome =
 
 export interface PackRecoveryObservation {
   readonly path: string;
-  readonly role: "artifact" | "installed-state";
-  readonly before: PackRecoveryExpectedFile;
-  readonly after: PackRecoveryExpectedFile;
-  readonly actual: PackRecoveryActualFile;
+  readonly role:
+    | "artifact"
+    | "installed-state"
+    | "owned-directory"
+    | "owned-directory-detached"
+    | "owned-directory-tombstone";
+  readonly before: PackRecoveryExpectedPath;
+  readonly after: PackRecoveryExpectedPath;
+  readonly actual: PackRecoveryActualPath;
   readonly match: PackRecoveryObservationMatch;
+}
+
+export interface PackRecoveryDirectoryCleanup {
+  readonly path: string;
+  readonly tombstonePath: string;
+  readonly expectedIdentity: ProjectDirectoryIdentity;
 }
 
 export interface InspectPackTransactionRecoveryRequest {
@@ -81,7 +105,7 @@ export interface InspectPackTransactionRecoveryRequest {
 }
 
 export interface PackTransactionRecoveryReport {
-  readonly schemaVersion: "1.0.0";
+  readonly schemaVersion: "1.1.0";
   readonly runId: string;
   readonly project: {
     readonly id: StableId;
@@ -111,6 +135,7 @@ export interface PackTransactionRecoveryReport {
   readonly safeTerminalOutcome?: "committed" | "failed";
   readonly finalizationAction: PackRecoveryFinalizationAction;
   readonly finalizationOutcome?: PackRecoveryFinalizationOutcome;
+  readonly directoryCleanup: readonly PackRecoveryDirectoryCleanup[];
   readonly observations: readonly PackRecoveryObservation[];
   readonly reportDigest: Sha256Digest;
 }
@@ -188,38 +213,42 @@ function validateRequest(
   });
 }
 
-function absent(): PackRecoveryExpectedFile {
+function absent(): PackRecoveryExpectedPath {
   return Object.freeze({ kind: "absent" });
 }
 
-function file(digest: Sha256Digest): PackRecoveryExpectedFile {
+function file(digest: Sha256Digest): PackRecoveryExpectedPath {
   return Object.freeze({ kind: "file", digest });
 }
 
 function expectedForChange(
   change: PackChange,
-): readonly [PackRecoveryExpectedFile, PackRecoveryExpectedFile] {
+): readonly [PackRecoveryExpectedPath, PackRecoveryExpectedPath] {
   if (change.kind === "create") return Object.freeze([absent(), file(change.afterDigest)]);
   if (change.kind === "delete") return Object.freeze([file(change.beforeDigest), absent()]);
   return Object.freeze([file(change.beforeDigest), file(change.afterDigest)]);
 }
 
 function expectedMatches(
-  expected: PackRecoveryExpectedFile,
-  actual: PackRecoveryActualFile,
+  expected: PackRecoveryExpectedPath,
+  actual: PackRecoveryActualPath,
 ): boolean {
   return (
     (expected.kind === "absent" && actual.kind === "absent") ||
     (expected.kind === "file" &&
       actual.kind === "file" &&
-      expected.digest === actual.digest)
+      expected.digest === actual.digest) ||
+    (expected.kind === "directory" &&
+      actual.kind === "directory" &&
+      (expected.identityDigest === undefined ||
+        expected.identityDigest === actual.identityDigest))
   );
 }
 
 function observationMatch(
   before: PackRecoveryExpectedFile,
   after: PackRecoveryExpectedFile,
-  actual: PackRecoveryActualFile,
+  actual: PackRecoveryActualPath,
 ): PackRecoveryObservationMatch {
   const matchesBefore = expectedMatches(before, actual);
   const matchesAfter = expectedMatches(after, actual);
@@ -246,6 +275,59 @@ async function observeFile(
       kind: "file",
       digest: snapshot.digest,
       bytes: snapshot.bytes,
+    });
+  } catch (error) {
+    if (
+      error instanceof CoreBoundaryError &&
+      error.code === "project-path-not-found"
+    ) {
+      return Object.freeze({ kind: "absent" });
+    }
+    if (error instanceof CoreBoundaryError) {
+      return Object.freeze({ kind: "unreadable", errorCode: error.code });
+    }
+    return Object.freeze({
+      kind: "unreadable",
+      errorCode: "filesystem-operation-failed",
+    });
+  }
+}
+
+function directory(
+  identityDigest?: Sha256Digest,
+): PackRecoveryExpectedPath {
+  return Object.freeze({
+    kind: "directory",
+    ...(identityDigest === undefined ? {} : { identityDigest }),
+  });
+}
+
+function expectedForDirectoryChange(
+  change: PackDirectoryChange,
+): readonly [PackRecoveryExpectedPath, PackRecoveryExpectedPath] {
+  if (change.kind === "create") {
+    return Object.freeze([absent(), directory()]);
+  }
+  const retained = directory(change.expectedIdentity.identityDigest);
+  return change.kind === "retain"
+    ? Object.freeze([retained, retained])
+    : Object.freeze([retained, absent()]);
+}
+
+async function observeDirectory(
+  root: CanonicalProjectRoot,
+  path: string,
+  maxDirectoryEntries: number,
+): Promise<PackRecoveryActualPath> {
+  try {
+    const identity = await readProjectDirectoryIdentity({
+      root,
+      path,
+      maxDirectoryEntries,
+    });
+    return Object.freeze({
+      kind: "directory",
+      identityDigest: identity.identityDigest,
     });
   } catch (error) {
     if (
@@ -305,6 +387,52 @@ async function collectObservations(
     );
   }
 
+  for (const change of started.directoryChanges ?? []) {
+    const [before, after] = expectedForDirectoryChange(change);
+    const actual = await observeDirectory(
+      root,
+      change.path,
+      maxDirectoryEntries,
+    );
+    observations.push(
+      Object.freeze({
+        path: change.path,
+        role: "owned-directory",
+        before,
+        after,
+        actual,
+        match: observationMatch(before, after, actual),
+      }),
+    );
+    if (change.kind === "delete") {
+      for (const [path, role] of [
+        [change.tombstonePath, "owned-directory-tombstone"],
+        [`${change.tombstonePath}/owned`, "owned-directory-detached"],
+      ] as const) {
+        const residual = await observeDirectory(
+          root,
+          path,
+          maxDirectoryEntries,
+        );
+        const expectedAbsent = absent();
+        observations.push(
+          Object.freeze({
+            path,
+            role,
+            before: expectedAbsent,
+            after: expectedAbsent,
+            actual: residual,
+            match: observationMatch(
+              expectedAbsent,
+              expectedAbsent,
+              residual,
+            ),
+          }),
+        );
+      }
+    }
+  }
+
   const beforeState =
     started.installedState.fileDigest === undefined
       ? absent()
@@ -350,6 +478,58 @@ function observedState(
   return "mixed";
 }
 
+function directoryCleanupState(
+  started: PackTransactionStartedRecord,
+  observations: readonly PackRecoveryObservation[],
+): {
+  readonly cleanup: readonly PackRecoveryDirectoryCleanup[];
+  readonly invalid: boolean;
+} {
+  const byRoleAndPath = new Map(
+    observations.map((observation) => [
+      `${observation.role}\0${observation.path}`,
+      observation,
+    ]),
+  );
+  const cleanup: PackRecoveryDirectoryCleanup[] = [];
+  let invalid = false;
+  for (const change of started.directoryChanges ?? []) {
+    if (change.kind !== "delete") continue;
+    const target = byRoleAndPath.get(`owned-directory\0${change.path}`);
+    const tombstone = byRoleAndPath.get(
+      `owned-directory-tombstone\0${change.tombstonePath}`,
+    );
+    const detached = byRoleAndPath.get(
+      `owned-directory-detached\0${change.tombstonePath}/owned`,
+    );
+    if (target === undefined || tombstone === undefined || detached === undefined) {
+      invalid = true;
+      continue;
+    }
+    const residualAbsent =
+      tombstone.actual.kind === "absent" &&
+      detached.actual.kind === "absent";
+    if (residualAbsent) continue;
+    const exactDetachedCandidate =
+      target.actual.kind === "absent" &&
+      tombstone.actual.kind === "directory" &&
+      detached.actual.kind === "directory";
+    if (!exactDetachedCandidate) {
+      invalid = true;
+      continue;
+    }
+    cleanup.push(
+      Object.freeze({
+        path: change.path,
+        tombstonePath: change.tombstonePath,
+        expectedIdentity: Object.freeze({ ...change.expectedIdentity }),
+      }),
+    );
+  }
+  cleanup.sort((left, right) => compareCanonicalText(left.path, right.path));
+  return Object.freeze({ cleanup: Object.freeze(cleanup), invalid });
+}
+
 function activeMarkerStatus(
   active: LoadedActivePackTransaction | undefined,
   started: PackTransactionStartedRecord,
@@ -375,6 +555,14 @@ function freezeReport(
   return Object.freeze({
     ...report,
     project: Object.freeze({ ...report.project }),
+    directoryCleanup: Object.freeze(
+      report.directoryCleanup.map((cleanup) =>
+        Object.freeze({
+          ...cleanup,
+          expectedIdentity: Object.freeze({ ...cleanup.expectedIdentity }),
+        }),
+      ),
+    ),
     observations: Object.freeze([...report.observations]),
   });
 }
@@ -501,7 +689,17 @@ export async function inspectPackTransactionRecovery(
   const journal = journalAfter.journal;
   const markerOnly = journalAfter.source === "marker";
   const observations = second;
-  const observed = observedState(observations);
+  const observed = observedState(
+    observations.filter(
+      ({ role }) =>
+        role !== "owned-directory-tombstone" &&
+        role !== "owned-directory-detached",
+    ),
+  );
+  const directoryCleanup = directoryCleanupState(
+    journal.started,
+    observations,
+  );
   const marker = activeMarkerStatus(activeAfter, journal.started);
   const recordedOutcome = journal.terminal?.outcome;
 
@@ -590,12 +788,39 @@ export async function inspectPackTransactionRecovery(
     }
   }
 
+  if (directoryCleanup.invalid) {
+    consistency = "unresolved";
+    mutationUncertain = true;
+    safeTerminalOutcome = undefined;
+    finalizationAction = "blocked";
+    finalizationOutcome = undefined;
+  } else if (directoryCleanup.cleanup.length > 0) {
+    const closesIncompleteCommit =
+      finalizationAction === "append-started-and-terminal" ||
+      finalizationAction === "append-terminal" ||
+      finalizationAction === "append-reconciliation";
+    if (
+      marker !== "matching" ||
+      observed !== "postimage" ||
+      finalizationOutcome !== "committed" ||
+      !closesIncompleteCommit
+    ) {
+      consistency = "unresolved";
+      mutationUncertain = true;
+      safeTerminalOutcome = undefined;
+      finalizationAction = "blocked";
+      finalizationOutcome = undefined;
+    } else {
+      mutationUncertain = true;
+    }
+  }
+
   const journalSnapshotDigest = computePackRecoveryJournalSnapshotDigest(
     journal,
     journalAfter.source,
   );
   const body = {
-    schemaVersion: "1.0.0",
+    schemaVersion: "1.1.0",
     runId: request.runId,
     project: Object.freeze({
       ...request.project,
@@ -628,6 +853,7 @@ export async function inspectPackTransactionRecovery(
     ...(safeTerminalOutcome === undefined ? {} : { safeTerminalOutcome }),
     finalizationAction,
     ...(finalizationOutcome === undefined ? {} : { finalizationOutcome }),
+    directoryCleanup: directoryCleanup.cleanup,
     observations,
   } satisfies Omit<PackTransactionRecoveryReport, "reportDigest">;
   const report = freezeReport({

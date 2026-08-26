@@ -4,6 +4,7 @@ import {
 } from "@ai-game-playbook/contracts";
 import {
   CoreBoundaryError,
+  finalizeDetachedProjectDirectoryCasRemoval,
   type PermissionSettlement,
 } from "@ai-game-playbook/core";
 import { performance } from "node:perf_hooks";
@@ -31,6 +32,7 @@ import {
   createPackTransactionReconciliation,
   createTerminalPackTransaction,
   packTransactionRecordPath,
+  PACK_TRANSACTION_DIRECTORY,
   PACK_TRANSACTION_MAX_RECORD_BYTES,
   serializePackTransactionRecord,
   writePackTransactionRecord,
@@ -220,6 +222,34 @@ function terminalTouchedPaths(
   if (committed) {
     paths.add(PACK_INSTALLED_STATE_PATH);
     for (const change of started.changes) paths.add(change.path);
+    for (const change of started.directoryChanges ?? []) {
+      if (change.kind === "retain") continue;
+      paths.add(change.path);
+      if (change.kind === "delete") {
+        paths.add(change.tombstonePath);
+        paths.add(`${change.tombstonePath}/owned`);
+      }
+    }
+  }
+  return sorted(paths);
+}
+
+function terminalAppliedPaths(
+  started: PackTransactionStartedRecord,
+): readonly string[] {
+  const paths = new Set(
+    started.changes
+      .filter(({ kind }) => kind !== "unchanged")
+      .map(({ path }) => path),
+  );
+  for (const change of started.directoryChanges ?? []) {
+    if (change.kind === "create") {
+      paths.add(change.path);
+    } else if (change.kind === "delete") {
+      paths.add(change.path);
+      paths.add(change.tombstonePath);
+      paths.add(`${change.tombstonePath}/owned`);
+    }
   }
   return sorted(paths);
 }
@@ -238,12 +268,7 @@ async function appendTerminal(
     outcome: committed ? "committed" : "failed",
     mutationUncertain: false,
     touchedPaths: terminalTouchedPaths(started, committed),
-    appliedPaths: committed
-      ? started.changes
-          .filter(({ kind }) => kind !== "unchanged")
-          .map(({ path }) => path)
-          .sort(compareCanonicalText)
-      : [],
+    appliedPaths: committed ? terminalAppliedPaths(started) : [],
     rolledBackPaths: [],
     ...(committed
       ? { installedStateAfterDigest: started.installedStateAfter.digest }
@@ -432,7 +457,22 @@ export async function finalizePackTransactionRecovery(
   }
 
   let journalRecordDigest: Sha256Digest | undefined;
+  let finalizedDirectoryCount = 0;
   try {
+    for (const cleanup of freshReport.directoryCleanup) {
+      await assertForwardAuthority(authority);
+      await finalizeDetachedProjectDirectoryCasRemoval({
+        root: freshInternals.root,
+        path: cleanup.path,
+        expectedIdentity: cleanup.expectedIdentity,
+        tombstonePath: cleanup.tombstonePath,
+        maxDirectoryEntries,
+      });
+      finalizedDirectoryCount += 1;
+      tracker.touchedPaths.add(cleanup.path);
+      tracker.touchedPaths.add(cleanup.tombstonePath);
+      tracker.touchedPaths.add(`${cleanup.tombstonePath}/owned`);
+    }
     if (plan.action === "append-started-and-terminal") {
       await assertForwardAuthority(authority);
       const written = await writePackTransactionRecord(
@@ -525,13 +565,20 @@ export async function finalizePackTransactionRecovery(
     tracker.touchedPaths.add(PACK_ACTIVE_TRANSACTION_PATH);
     tracker.changedBytes += cleared.bytes;
   } catch (error) {
-    const failure = summarizeFailure(error, "$recovery.finalize");
+    let failure = summarizeFailure(error, "$recovery.finalize");
+    if (finalizedDirectoryCount > 0 && !failure.mutationUncertain) {
+      failure = Object.freeze({ ...failure, mutationUncertain: true });
+    }
     if (failure.mutationUncertain && plan.paths.includes(failure.path)) {
       tracker.touchedPaths.add(failure.path);
-      tracker.changedBytes +=
-        failure.path === PACK_ACTIVE_TRANSACTION_PATH
-          ? PACK_ACTIVE_TRANSACTION_MAX_BYTES
-          : PACK_TRANSACTION_MAX_RECORD_BYTES;
+      if (failure.path === PACK_ACTIVE_TRANSACTION_PATH) {
+        tracker.changedBytes += PACK_ACTIVE_TRANSACTION_MAX_BYTES;
+      } else if (
+        failure.path.startsWith(`${PACK_TRANSACTION_DIRECTORY}/`) &&
+        failure.path.endsWith(".json")
+      ) {
+        tracker.changedBytes += PACK_TRANSACTION_MAX_RECORD_BYTES;
+      }
     }
     const mutationUncertain = failure.mutationUncertain;
     const settlement = settle(

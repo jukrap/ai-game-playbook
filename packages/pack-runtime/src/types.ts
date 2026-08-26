@@ -8,6 +8,7 @@ import type {
   AuthorizedPermissionDecision,
   PermissionAuthorizationRequest,
   PermissionSettlement,
+  ProjectDirectoryIdentity,
   ProjectLaneLease,
 } from "@ai-game-playbook/core";
 
@@ -61,6 +62,35 @@ export type PackChange =
       readonly bytes: number;
     };
 
+export interface PackDirectoryOwnershipMarker {
+  readonly directoryPath: string;
+  readonly path: string;
+  readonly digest: Sha256Digest;
+  readonly bytes: number;
+  readonly ownershipDigest: Sha256Digest;
+  readonly ownerPackDigest: Sha256Digest;
+}
+
+export type PackDirectoryChange =
+  | {
+      readonly kind: "create";
+      readonly path: string;
+      readonly marker: PackDirectoryOwnershipMarker;
+    }
+  | {
+      readonly kind: "retain";
+      readonly path: string;
+      readonly marker: PackDirectoryOwnershipMarker;
+      readonly expectedIdentity: ProjectDirectoryIdentity;
+    }
+  | {
+      readonly kind: "delete";
+      readonly path: string;
+      readonly marker: PackDirectoryOwnershipMarker;
+      readonly expectedIdentity: ProjectDirectoryIdentity;
+      readonly tombstonePath: string;
+    };
+
 export type PackConflictCode =
   | "already-installed"
   | "dependency-in-use"
@@ -104,6 +134,7 @@ export interface PreparedPackOperation {
     readonly fileDigest?: Sha256Digest;
   };
   readonly limits: PackOperationLimits;
+  readonly directoryChanges: readonly PackDirectoryChange[];
   readonly changes: readonly PackChange[];
   readonly conflicts: readonly PackConflict[];
   readonly planDigest: Sha256Digest;

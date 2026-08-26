@@ -15,6 +15,8 @@ import * as contracts from "@ai-game-playbook/contracts";
 import * as core from "@ai-game-playbook/core";
 import * as registry from "@ai-game-playbook/registry";
 import * as packRuntime from "../dist/index.js";
+import * as directoryOwnership from "../dist/directory-ownership.js";
+import * as stateInternals from "../dist/state.js";
 
 import { createValidRegistryDefinition } from "../../registry/test/fixtures/registry.mjs";
 
@@ -74,6 +76,27 @@ function manifest({ content, version = "1.0.0", overrides = {} }) {
   return value;
 }
 
+function multiArtifactManifest(artifacts, version) {
+  const value = manifest({
+    content: artifacts[0].content,
+    version,
+    overrides: {
+      artifacts: artifacts.map(({ name, content }) => ({
+        source: `dist/${name}`,
+        target: `.ai-game-playbook/packs/local-demo/${name}`,
+        digest: contracts.sha256Digest(content),
+        mode: "file",
+      })),
+      ownedPaths: artifacts.map(({ name, content }) => ({
+        path: `.ai-game-playbook/packs/local-demo/${name}`,
+        kind: "file",
+        digest: contracts.sha256Digest(content),
+      })),
+    },
+  });
+  return value;
+}
+
 function validatedRegistry(...packs) {
   const definition = createValidRegistryDefinition();
   definition.packs.push(...packs);
@@ -129,7 +152,7 @@ function request(f, pack, overrides = {}) {
   return value;
 }
 
-async function writeInstalledState(f, packs) {
+async function writeInstalledState(f, packs, schemaVersion = "1.0.0") {
   const directory = join(
     f.project,
     ".ai-game-playbook",
@@ -138,7 +161,7 @@ async function writeInstalledState(f, packs) {
   );
   await mkdir(directory, { recursive: true });
   const body = {
-    schemaVersion: "1.0.0",
+    schemaVersion,
     project: {
       id: "sample.graybox",
       identityDigest: projectIdentityDigest,
@@ -365,6 +388,66 @@ test("exact version update plans a replacement and preserves its rollback preima
   assert.equal(await readFile(f.target, "utf8"), oldContent);
 });
 
+test("aggregate rollback preimages cannot exceed the total byte limit", async (t) => {
+  const oldArtifacts = [
+    { name: "one.txt", content: "123456\n" },
+    { name: "two.txt", content: "abcdef\n" },
+  ];
+  const newArtifacts = [
+    { name: "one.txt", content: "1\n" },
+    { name: "two.txt", content: "2\n" },
+  ];
+  const f = await fixture(t);
+  const oldPack = multiArtifactManifest(oldArtifacts, "1.0.0");
+  const newPack = multiArtifactManifest(newArtifacts, "1.1.0");
+  for (const artifact of oldArtifacts) {
+    await writeFile(
+      join(f.project, ".ai-game-playbook", "packs", "local-demo", artifact.name),
+      artifact.content,
+      "utf8",
+    );
+  }
+  for (const artifact of newArtifacts) {
+    await writeFile(
+      join(f.source, "dist", artifact.name),
+      artifact.content,
+      "utf8",
+    );
+  }
+  await writeInstalledState(f, [
+    installedPack(oldPack, oldArtifacts[0].content, {
+      artifacts: oldArtifacts.map(({ name, content }) => ({
+        path: `.ai-game-playbook/packs/local-demo/${name}`,
+        digest: contracts.sha256Digest(content),
+        bytes: Buffer.byteLength(content),
+      })),
+    }),
+  ]);
+
+  await assert.rejects(
+    packRuntime.preparePackOperation(
+      request(f, newPack, {
+        operation: "update",
+        limits: {
+          maxArtifactBytes: 8,
+          maxTotalBytes: 10,
+          maxDirectoryEntries: 1000,
+        },
+      }),
+    ),
+    expectPackError("pack-artifact-budget-exceeded"),
+  );
+  for (const artifact of oldArtifacts) {
+    assert.equal(
+      await readFile(
+        join(f.project, ".ai-game-playbook", "packs", "local-demo", artifact.name),
+        "utf8",
+      ),
+      artifact.content,
+    );
+  }
+});
+
 test("single-pack update refuses to invalidate an installed dependent", async (t) => {
   const f = await fixture(t, "version one\n");
   const installed = manifest({ content: f.content, version: "1.0.0" });
@@ -585,4 +668,274 @@ test("source links and missing target parents fail closed without writes", async
       path: pack.artifacts[0].target,
     },
   ]);
+});
+
+test("declared missing artifact parents prepare owned directory creation without writes", async (t) => {
+  const f = await fixture(t);
+  const base = manifest({ content: f.content });
+  const directoryPath = ".ai-game-playbook/packs/local-demo";
+  const pack = manifest({
+    content: f.content,
+    overrides: {
+      ownedPaths: [
+        { path: directoryPath, kind: "directory" },
+        base.ownedPaths[0],
+      ],
+    },
+  });
+  await rm(join(f.project, ...directoryPath.split("/")), {
+    recursive: true,
+    force: true,
+  });
+
+  const prepared = await packRuntime.preparePackOperation(request(f, pack));
+
+  assert.equal(prepared.disposition, "ready");
+  assert.equal(prepared.directoryChanges.length, 1);
+  const directoryChange = prepared.directoryChanges[0];
+  assert.equal(directoryChange.kind, "create");
+  assert.equal(directoryChange.path, directoryPath);
+  assert.equal(directoryChange.marker.path, `${directoryPath}/.agpb-owned`);
+  assert.equal(directoryChange.marker.ownerPackDigest, pack.digest);
+  assert.match(directoryChange.marker.ownershipDigest, /^sha256:[0-9a-f]{64}$/);
+  assert.match(directoryChange.marker.digest, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(Number.isSafeInteger(directoryChange.marker.bytes), true);
+  assert.deepEqual(
+    prepared.changes.map(({ kind, path }) => ({ kind, path })),
+    [
+      { kind: "create", path: `${directoryPath}/.agpb-owned` },
+      { kind: "create", path: pack.artifacts[0].target },
+    ],
+  );
+  await assert.rejects(
+    readFile(join(f.project, ...directoryPath.split("/"), ".agpb-owned")),
+    (error) => error?.code === "ENOENT",
+  );
+  await assert.rejects(readFile(f.target), (error) => error?.code === "ENOENT");
+});
+
+test("declared existing artifact parents remain shared and are never claimed", async (t) => {
+  const f = await fixture(t);
+  const base = manifest({ content: f.content });
+  const directoryPath = ".ai-game-playbook/packs/local-demo";
+  const pack = manifest({
+    content: f.content,
+    overrides: {
+      ownedPaths: [
+        { path: directoryPath, kind: "directory" },
+        base.ownedPaths[0],
+      ],
+    },
+  });
+
+  const prepared = await packRuntime.preparePackOperation(request(f, pack));
+
+  assert.equal(prepared.disposition, "ready");
+  assert.deepEqual(prepared.directoryChanges, []);
+  assert.deepEqual(prepared.changes, [
+    {
+      kind: "create",
+      path: pack.artifacts[0].target,
+      afterDigest: contracts.sha256Digest(f.content),
+      bytes: Buffer.byteLength(f.content),
+    },
+  ]);
+  await assert.rejects(
+    readFile(join(f.project, ...directoryPath.split("/"), ".agpb-owned")),
+    (error) => error?.code === "ENOENT",
+  );
+});
+
+test("nested owned directory declarations fail closed before inspection", async (t) => {
+  const f = await fixture(t);
+  const base = manifest({ content: f.content });
+  const pack = manifest({
+    content: f.content,
+    overrides: {
+      ownedPaths: [
+        { path: ".ai-game-playbook/packs", kind: "directory" },
+        {
+          path: ".ai-game-playbook/packs/local-demo",
+          kind: "directory",
+        },
+        base.ownedPaths[0],
+      ],
+    },
+  });
+
+  await assert.rejects(
+    packRuntime.preparePackOperation(request(f, pack)),
+    expectPackError("pack-surface-unsupported"),
+  );
+  await assert.rejects(readFile(f.target), (error) => error?.code === "ENOENT");
+});
+
+test("owned directory declarations must identify direct artifact parents", async (t) => {
+  const f = await fixture(t);
+  const base = manifest({ content: f.content });
+  const pack = manifest({
+    content: f.content,
+    overrides: {
+      ownedPaths: [
+        { path: ".ai-game-playbook/packs", kind: "directory" },
+        base.ownedPaths[0],
+      ],
+    },
+  });
+
+  await assert.rejects(
+    packRuntime.preparePackOperation(request(f, pack)),
+    expectPackError("pack-surface-unsupported"),
+  );
+});
+
+test("installed directory markers must bind the exact installed pack digest", async (t) => {
+  const f = await fixture(t);
+  const base = manifest({ content: f.content });
+  const directoryPath = ".ai-game-playbook/packs/local-demo";
+  const pack = manifest({
+    content: f.content,
+    overrides: {
+      ownedPaths: [
+        { path: directoryPath, kind: "directory" },
+        base.ownedPaths[0],
+      ],
+    },
+  });
+  const wrongPackDigest = contracts.sha256Digest("another pack snapshot");
+  const wrongMarker = directoryOwnership.createPackDirectoryOwnershipMarker(
+    { id: pack.id, digest: wrongPackDigest },
+    directoryPath,
+  ).descriptor;
+  await writeInstalledState(
+    f,
+    [
+      installedPack(pack, f.content, {
+        directories: [wrongMarker],
+      }),
+    ],
+    "1.1.0",
+  );
+
+  await assert.rejects(
+    packRuntime.preparePackOperation(request(f, pack)),
+    expectPackError("pack-state-corrupt"),
+  );
+});
+
+test("installed state rejects cross-pack ownership of the same directory", async (t) => {
+  const f = await fixture(t);
+  const directoryPath = ".ai-game-playbook/packs/local-demo";
+  const firstBase = manifest({ content: f.content });
+  const firstPack = manifest({
+    content: f.content,
+    overrides: {
+      ownedPaths: [
+        { path: directoryPath, kind: "directory" },
+        firstBase.ownedPaths[0],
+      ],
+    },
+  });
+  const secondTarget = `${directoryPath}/other.txt`;
+  const secondPack = manifest({
+    content: f.content,
+    overrides: {
+      id: "tool.other-demo",
+      artifacts: [
+        {
+          source: "dist/demo.txt",
+          target: secondTarget,
+          digest: contracts.sha256Digest(f.content),
+          mode: "file",
+        },
+      ],
+      ownedPaths: [
+        { path: directoryPath, kind: "directory" },
+        {
+          path: secondTarget,
+          kind: "file",
+          digest: contracts.sha256Digest(f.content),
+        },
+      ],
+    },
+  });
+  const firstMarker = directoryOwnership.createPackDirectoryOwnershipMarker(
+    firstPack,
+    directoryPath,
+  ).descriptor;
+  const secondMarker = directoryOwnership.createPackDirectoryOwnershipMarker(
+    secondPack,
+    directoryPath,
+  ).descriptor;
+  await writeInstalledState(
+    f,
+    [
+      installedPack(firstPack, f.content, { directories: [firstMarker] }),
+      installedPack(secondPack, f.content, { directories: [secondMarker] }),
+    ],
+    "1.1.0",
+  );
+
+  await assert.rejects(
+    packRuntime.preparePackOperation(request(f, firstPack)),
+    expectPackError("pack-state-corrupt"),
+  );
+});
+
+test("state migration adds empty directory ownership arrays to untouched legacy packs", () => {
+  const firstPack = manifest({ content: "first\n" });
+  const secondPack = manifest({
+    content: "second\n",
+    overrides: {
+      id: "tool.second-demo",
+      artifacts: [
+        {
+          source: "dist/demo.txt",
+          target: ".ai-game-playbook/packs/second/demo.txt",
+          digest: contracts.sha256Digest("second\n"),
+          mode: "file",
+        },
+      ],
+      ownedPaths: [
+        {
+          path: ".ai-game-playbook/packs/second/demo.txt",
+          kind: "file",
+          digest: contracts.sha256Digest("second\n"),
+        },
+      ],
+    },
+  });
+  const body = {
+    schemaVersion: "1.0.0",
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    revision: 1,
+    packs: [
+      installedPack(firstPack, "first\n"),
+      installedPack(secondPack, "second\n"),
+    ],
+  };
+  const legacyState = {
+    ...body,
+    stateDigest: packRuntime.computeInstalledPackStateDigest(body),
+  };
+
+  const next = stateInternals.createNextInstalledPackState({
+    operation: "remove",
+    pack: {
+      id: firstPack.id,
+      version: firstPack.version,
+      digest: firstPack.digest,
+    },
+    installed: legacyState,
+    sourceArtifacts: [],
+    directories: [],
+    timestamp: "2026-08-26T07:00:00.000Z",
+  });
+
+  assert.equal(next.schemaVersion, "1.1.0");
+  assert.deepEqual(next.packs[0].directories, []);
+  assert.doesNotThrow(() => stateInternals.serializeInstalledPackState(next));
 });

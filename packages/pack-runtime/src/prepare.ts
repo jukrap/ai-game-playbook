@@ -11,6 +11,7 @@ import {
 import {
   assertProjectRootIdentity,
   CoreBoundaryError,
+  readProjectDirectoryIdentity,
   readProjectFileSnapshot,
   resolveProjectPath,
   type CanonicalProjectRoot,
@@ -22,6 +23,7 @@ import {
 } from "@ai-game-playbook/registry";
 
 import { PackRuntimeError } from "./errors.js";
+import { createPackDirectoryOwnershipMarker } from "./directory-ownership.js";
 import { registerPreparedPackOperation } from "./prepared-plan.js";
 import {
   loadInstalledPackState,
@@ -33,6 +35,7 @@ import { loadActivePackTransactionRecord } from "./active-transaction.js";
 import type {
   PackChange,
   PackConflict,
+  PackDirectoryChange,
   PackOperation,
   PackOperationLimits,
   PreparePackOperationRequest,
@@ -40,6 +43,7 @@ import type {
 } from "./types.js";
 
 const PACK_RUNTIME_MAX_ARTIFACTS = 64;
+const PACK_RUNTIME_MAX_DIRECTORIES = 64;
 const PACK_RUNTIME_MAX_ARTIFACT_BYTES = 64 * 1024 * 1024;
 const PACK_RUNTIME_MAX_TOTAL_BYTES = 256 * 1024 * 1024;
 const PACK_RUNTIME_MAX_DIRECTORY_ENTRIES = 100_000;
@@ -67,6 +71,21 @@ interface NormalizedPrepareRequest {
 interface SnapshotByPath {
   readonly path: string;
   readonly snapshot: ProjectFileSnapshotResult;
+}
+
+interface GeneratedContentByPath {
+  readonly path: string;
+  readonly content: Uint8Array;
+}
+
+interface PlannedDirectoryChanges {
+  readonly changes: readonly PackDirectoryChange[];
+  readonly markerChanges: readonly PackChange[];
+  readonly generatedContents: readonly GeneratedContentByPath[];
+  readonly preimages: readonly SnapshotByPath[];
+  readonly nextDirectories: readonly PackDirectoryChange["marker"][];
+  readonly createdPaths: ReadonlySet<string>;
+  readonly conflicts: readonly PackConflict[];
 }
 
 function exactKeys(value: object, expected: readonly string[]): boolean {
@@ -226,6 +245,19 @@ function assertSupportedManifest(manifest: PackManifest): void {
       .filter(({ kind }) => kind === "file")
       .map(({ path }) => path),
   );
+  const ownedDirectoryPaths = new Set(
+    manifest.ownedPaths
+      .filter(({ kind }) => kind === "directory")
+      .map(({ path }) => path),
+  );
+  const ownedPaths = new Set(manifest.ownedPaths.map(({ path }) => path));
+  const reservedPath = (path: string): boolean => {
+    const foldedTarget = path.toLowerCase();
+    return PACK_RUNTIME_RESERVED_TARGET_ROOTS.some(
+      (root) =>
+        foldedTarget === root || foldedTarget.startsWith(`${root}/`),
+    );
+  };
   if (
     manifest.lifecycle === "deprecated" ||
     manifest.lifecycle === "internal" ||
@@ -234,26 +266,272 @@ function assertSupportedManifest(manifest: PackManifest): void {
     manifest.network.destinations.length > 0 ||
     Object.keys(manifest.lifecycleHooks).length > 0 ||
     manifest.artifacts.length > PACK_RUNTIME_MAX_ARTIFACTS ||
+    ownedDirectoryPaths.size > PACK_RUNTIME_MAX_DIRECTORIES ||
     manifest.artifacts.some(({ mode }) => mode !== "file") ||
-    manifest.artifacts.some(({ target }) => {
-      const foldedTarget = target.toLowerCase();
-      return PACK_RUNTIME_RESERVED_TARGET_ROOTS.some(
-        (root) =>
-          foldedTarget === root || foldedTarget.startsWith(`${root}/`),
-      );
-    }) ||
-    manifest.ownedPaths.some(({ kind }) => kind !== "file") ||
+    manifest.artifacts.some(({ target }) => reservedPath(target)) ||
+    manifest.ownedPaths.some(({ path }) => reservedPath(path)) ||
+    manifest.ownedPaths.some(
+      ({ kind }) => kind !== "file" && kind !== "directory",
+    ) ||
     artifactTargets.size !== manifest.artifacts.length ||
-    ownedFilePaths.size !== manifest.ownedPaths.length ||
     artifactTargets.size !== ownedFilePaths.size ||
-    [...artifactTargets].some((path) => !ownedFilePaths.has(path))
+    ownedPaths.size !== manifest.ownedPaths.length ||
+    [...artifactTargets].some((path) => !ownedFilePaths.has(path)) ||
+    [...ownedDirectoryPaths].some(
+      (directory) =>
+        ![...artifactTargets].some(
+          (target) => parentPath(target) === directory,
+        ),
+    ) ||
+    [...ownedDirectoryPaths].some((directory) =>
+      ownedPaths.has(`${directory}/.agpb-owned`),
+    ) ||
+    [...ownedDirectoryPaths].some((directory) =>
+      artifactTargets.has(`${directory}/.agpb-owned`),
+    ) ||
+    [...ownedDirectoryPaths].some((directory) =>
+      [...ownedDirectoryPaths].some(
+        (candidate) =>
+          candidate !== directory &&
+          candidate.toLowerCase().startsWith(`${directory.toLowerCase()}/`),
+      ),
+    )
   ) {
     throw new PackRuntimeError(
       "pack-surface-unsupported",
       `$pack.${manifest.id}`,
-      "initial local runtime accepts only offline, hook-free regular files outside reserved control-plane state",
+      "local runtime accepts offline hook-free files and explicit artifact-parent directories outside reserved control-plane state",
     );
   }
+}
+
+function pathDepth(path: string): number {
+  return path.split("/").length;
+}
+
+function parentPath(path: string): string {
+  const separator = path.lastIndexOf("/");
+  return separator === -1 ? "." : path.slice(0, separator);
+}
+
+function directoryChangeSort(
+  left: PackDirectoryChange,
+  right: PackDirectoryChange,
+): number {
+  const depthOrder = pathDepth(left.path) - pathDepth(right.path);
+  return depthOrder !== 0
+    ? depthOrder
+    : compareCanonicalText(left.path, right.path);
+}
+
+async function planDeclaredDirectoryChanges(
+  request: NormalizedPrepareRequest,
+  manifest: PackManifest,
+  active: InstalledPackRecord | undefined,
+): Promise<PlannedDirectoryChanges> {
+  const changes: PackDirectoryChange[] = [];
+  const markerChanges: PackChange[] = [];
+  const generatedContents: GeneratedContentByPath[] = [];
+  const preimages: SnapshotByPath[] = [];
+  const nextDirectories: PackDirectoryChange["marker"][] = [];
+  const createdPaths = new Set<string>();
+  const conflicts: PackConflict[] = [];
+  const directories = manifest.ownedPaths
+    .filter(({ kind }) => kind === "directory")
+    .map(({ path }) => path)
+    .sort((left, right) => {
+      const depthOrder = pathDepth(left) - pathDepth(right);
+      return depthOrder !== 0
+        ? depthOrder
+        : compareCanonicalText(left, right);
+    });
+  const declared = new Set(directories);
+  if (
+    (active?.directories ?? []).some(
+      ({ directoryPath }) => !declared.has(directoryPath),
+    )
+  ) {
+    throw new PackRuntimeError(
+      "pack-surface-unsupported",
+      `$pack.${manifest.id}.ownedPaths`,
+      "updates cannot relinquish an owned artifact parent in the initial directory lifecycle",
+    );
+  }
+  const activeByPath = new Map(
+    (active?.directories ?? []).map((marker) => [marker.directoryPath, marker]),
+  );
+
+  for (const directory of directories) {
+    const installedMarker = activeByPath.get(directory);
+    if (installedMarker !== undefined) {
+      const snapshot = await snapshotInstalledArtifact(
+        request.targetRoot,
+        installedMarker,
+        request.limits,
+      );
+      if (snapshot === undefined) {
+        conflicts.push({
+          code: "owned-target-missing",
+          path: installedMarker.path,
+          expectedDigest: installedMarker.digest,
+        });
+        continue;
+      }
+      if (snapshot.digest !== installedMarker.digest) {
+        conflicts.push({
+          code: "user-modified",
+          path: installedMarker.path,
+          expectedDigest: installedMarker.digest,
+          actualDigest: snapshot.digest,
+        });
+        continue;
+      }
+      if (snapshot.bytes !== installedMarker.bytes) {
+        throw new PackRuntimeError(
+          "pack-state-corrupt",
+          installedMarker.path,
+          "installed directory marker byte count does not match its owned file",
+        );
+      }
+      let expectedIdentity;
+      try {
+        expectedIdentity = await readProjectDirectoryIdentity({
+          root: request.targetRoot,
+          path: directory,
+          maxDirectoryEntries: request.limits.maxDirectoryEntries,
+        });
+      } catch (error) {
+        if (
+          error instanceof CoreBoundaryError &&
+          error.code === "project-path-not-found"
+        ) {
+          conflicts.push({ code: "owned-target-missing", path: directory });
+          continue;
+        }
+        throw new PackRuntimeError(
+          "pack-target-invalid",
+          directory,
+          "owned directory identity could not be read safely",
+        );
+      }
+      const nextMarker = createPackDirectoryOwnershipMarker(
+        manifest,
+        directory,
+      );
+      if (
+        nextMarker.descriptor.bytes > request.limits.maxArtifactBytes ||
+        nextMarker.descriptor.bytes > request.limits.maxTotalBytes
+      ) {
+        throw new PackRuntimeError(
+          "pack-artifact-budget-exceeded",
+          nextMarker.descriptor.path,
+          "directory ownership marker exceeds the pack byte limit",
+        );
+      }
+      changes.push({
+        kind: "retain",
+        path: directory,
+        marker: nextMarker.descriptor,
+        expectedIdentity,
+      });
+      markerChanges.push(
+        installedMarker.digest === nextMarker.descriptor.digest
+          ? {
+              kind: "unchanged",
+              path: installedMarker.path,
+              beforeDigest: installedMarker.digest,
+              afterDigest: nextMarker.descriptor.digest,
+              bytes: nextMarker.descriptor.bytes,
+            }
+          : {
+              kind: "replace",
+              path: installedMarker.path,
+              beforeDigest: installedMarker.digest,
+              afterDigest: nextMarker.descriptor.digest,
+              bytes: nextMarker.descriptor.bytes,
+            },
+      );
+      generatedContents.push({
+        path: nextMarker.descriptor.path,
+        content: new Uint8Array(nextMarker.content),
+      });
+      preimages.push({ path: snapshot.path, snapshot });
+      nextDirectories.push(nextMarker.descriptor);
+      continue;
+    }
+    let absent = false;
+    try {
+      const resolved = await resolveProjectPath(request.targetRoot, directory, {
+        expectedType: "directory",
+        existence: "optional",
+        maxDirectoryEntries: request.limits.maxDirectoryEntries,
+      });
+      absent = resolved.kind === "absent";
+    } catch (error) {
+      if (
+        error instanceof CoreBoundaryError &&
+        error.code === "project-path-not-found" &&
+        createdPaths.has(parentPath(directory))
+      ) {
+        absent = true;
+      } else if (
+        error instanceof CoreBoundaryError &&
+        error.code === "project-path-not-found"
+      ) {
+        conflicts.push({
+          code: "target-parent-missing",
+          path: directory,
+        });
+        continue;
+      } else {
+        throw new PackRuntimeError(
+          "pack-target-invalid",
+          directory,
+          "declared artifact parent is not a safe directory location",
+        );
+      }
+    }
+    if (!absent) continue;
+
+    const marker = createPackDirectoryOwnershipMarker(manifest, directory);
+    if (
+      marker.descriptor.bytes > request.limits.maxArtifactBytes ||
+      marker.descriptor.bytes > request.limits.maxTotalBytes
+    ) {
+      throw new PackRuntimeError(
+        "pack-artifact-budget-exceeded",
+        marker.descriptor.path,
+        "directory ownership marker exceeds the pack byte limit",
+      );
+    }
+    changes.push({
+      kind: "create",
+      path: directory,
+      marker: marker.descriptor,
+    });
+    markerChanges.push({
+      kind: "create",
+      path: marker.descriptor.path,
+      afterDigest: marker.descriptor.digest,
+      bytes: marker.descriptor.bytes,
+    });
+    generatedContents.push({
+      path: marker.descriptor.path,
+      content: new Uint8Array(marker.content),
+    });
+    nextDirectories.push(marker.descriptor);
+    createdPaths.add(directory);
+  }
+
+  return Object.freeze({
+    changes: Object.freeze(changes.sort(directoryChangeSort)),
+    markerChanges: Object.freeze(markerChanges.sort(changeSort)),
+    generatedContents: Object.freeze(generatedContents),
+    preimages: Object.freeze(preimages),
+    nextDirectories: Object.freeze(nextDirectories),
+    createdPaths,
+    conflicts: Object.freeze(conflicts.sort(conflictSort)),
+  });
 }
 
 async function readSourceArtifacts(
@@ -345,6 +623,7 @@ async function snapshotUnownedTarget(
   path: string,
   maxBytes: number,
   limits: PackOperationLimits,
+  createdDirectories: ReadonlySet<string>,
 ): Promise<
   | ProjectFileSnapshotResult
   | "absent"
@@ -368,7 +647,9 @@ async function snapshotUnownedTarget(
       error instanceof CoreBoundaryError &&
       error.code === "project-path-not-found"
     ) {
-      return "parent-missing";
+      return createdDirectories.has(parentPath(path))
+        ? "absent"
+        : "parent-missing";
     }
     throw new PackRuntimeError(
       "pack-target-invalid",
@@ -480,6 +761,7 @@ async function planRemovalChanges(
   request: NormalizedPrepareRequest,
   installed: LoadedInstalledPackState,
 ): Promise<{
+  readonly directoryChanges: readonly PackDirectoryChange[];
   readonly changes: readonly PackChange[];
   readonly conflicts: readonly PackConflict[];
   readonly preimages: readonly SnapshotByPath[];
@@ -487,6 +769,7 @@ async function planRemovalChanges(
   const active = installed.state.packs.find(({ id }) => id === request.packId);
   if (active === undefined) {
     return {
+      directoryChanges: Object.freeze([]),
       changes: Object.freeze([]),
       conflicts: Object.freeze([]),
       preimages: Object.freeze([]),
@@ -495,28 +778,134 @@ async function planRemovalChanges(
   const conflicts = dependentConflicts(installed, active.id);
   const inspected = await inspectOwnedRecord(request, active);
   conflicts.push(...inspected.conflicts);
-  const preimages = [...inspected.snapshots.values()].map((snapshot) => ({
+  const preimages: SnapshotByPath[] = [...inspected.snapshots.values()].map((snapshot) => ({
     path: snapshot.path,
     snapshot,
   }));
+  const markerChanges: PackChange[] = [];
+  const directoryChanges: PackDirectoryChange[] = [];
+  for (const marker of active.directories ?? []) {
+    const snapshot = await snapshotInstalledArtifact(
+      request.targetRoot,
+      marker,
+      request.limits,
+    );
+    if (snapshot === undefined) {
+      conflicts.push({
+        code: "owned-target-missing",
+        path: marker.path,
+        expectedDigest: marker.digest,
+      });
+      continue;
+    }
+    if (snapshot.digest !== marker.digest) {
+      conflicts.push({
+        code: "user-modified",
+        path: marker.path,
+        expectedDigest: marker.digest,
+        actualDigest: snapshot.digest,
+      });
+      continue;
+    }
+    if (snapshot.bytes !== marker.bytes) {
+      throw new PackRuntimeError(
+        "pack-state-corrupt",
+        marker.path,
+        "installed directory marker byte count does not match its owned file",
+      );
+    }
+    let expectedIdentity;
+    try {
+      expectedIdentity = await readProjectDirectoryIdentity({
+        root: request.targetRoot,
+        path: marker.directoryPath,
+        maxDirectoryEntries: request.limits.maxDirectoryEntries,
+      });
+    } catch (error) {
+      if (
+        error instanceof CoreBoundaryError &&
+        error.code === "project-path-not-found"
+      ) {
+        conflicts.push({
+          code: "owned-target-missing",
+          path: marker.directoryPath,
+        });
+        continue;
+      }
+      throw new PackRuntimeError(
+        "pack-target-invalid",
+        marker.directoryPath,
+        "owned directory identity could not be read safely",
+      );
+    }
+    const tombstoneDigest = digestCanonicalJson({
+      domain: "ai-game-playbook.pack-directory-removal",
+      version: "1",
+      runId: request.runId,
+      installedStateDigest: installed.state.stateDigest,
+      directoryPath: marker.directoryPath,
+    });
+    const tombstoneName = `.agpb-cas-dir-${tombstoneDigest.slice(7, 39)}.deleted`;
+    const parent = parentPath(marker.directoryPath);
+    const tombstonePath =
+      parent === "." ? tombstoneName : `${parent}/${tombstoneName}`;
+    try {
+      const tombstone = await resolveProjectPath(
+        request.targetRoot,
+        tombstonePath,
+        {
+          expectedType: "directory",
+          existence: "optional",
+          maxDirectoryEntries: request.limits.maxDirectoryEntries,
+        },
+      );
+      if (tombstone.kind !== "absent") {
+        conflicts.push({ code: "non-owned-target", path: tombstonePath });
+        continue;
+      }
+    } catch {
+      conflicts.push({ code: "non-owned-target", path: tombstonePath });
+      continue;
+    }
+    preimages.push({ path: snapshot.path, snapshot });
+    markerChanges.push({
+      kind: "delete",
+      path: marker.path,
+      beforeDigest: marker.digest,
+      bytes: marker.bytes,
+    });
+    directoryChanges.push({
+      kind: "delete",
+      path: marker.directoryPath,
+      marker,
+      expectedIdentity,
+      tombstonePath,
+    });
+  }
   if (conflicts.length > 0) {
     return {
+      directoryChanges: Object.freeze([]),
       changes: Object.freeze([]),
       conflicts: Object.freeze(conflicts.sort(conflictSort)),
       preimages: Object.freeze(preimages),
     };
   }
   return {
+    directoryChanges: Object.freeze(
+      directoryChanges.sort(directoryChangeSort),
+    ),
     changes: Object.freeze(
-      active.artifacts
-        .filter(({ path }) => inspected.snapshots.has(path))
-        .map((artifact) => ({
-          kind: "delete" as const,
-          path: artifact.path,
-          beforeDigest: artifact.digest,
-          bytes: artifact.bytes,
-        }))
-        .sort(changeSort),
+      [
+        ...markerChanges,
+        ...active.artifacts
+          .filter(({ path }) => inspected.snapshots.has(path))
+          .map((artifact) => ({
+            kind: "delete" as const,
+            path: artifact.path,
+            beforeDigest: artifact.digest,
+            bytes: artifact.bytes,
+          })),
+      ].sort(changeSort),
     ),
     conflicts: Object.freeze([]),
     preimages: Object.freeze(preimages),
@@ -528,6 +917,7 @@ async function planInstallChanges(
   manifest: PackManifest,
   installed: LoadedInstalledPackState,
   sourceArtifacts: readonly SnapshotByPath[],
+  createdDirectories: ReadonlySet<string>,
 ): Promise<{
   readonly changes: readonly PackChange[];
   readonly conflicts: readonly PackConflict[];
@@ -658,6 +1048,7 @@ async function planInstallChanges(
           artifact.target,
           request.limits.maxArtifactBytes,
           request.limits,
+          createdDirectories,
         );
         if (target === "absent") {
           changes.push({
@@ -698,6 +1089,7 @@ async function planInstallChanges(
         artifact.target,
         request.limits.maxArtifactBytes,
         request.limits,
+        createdDirectories,
       );
       if (target === "absent") {
         changes.push({
@@ -789,15 +1181,95 @@ export async function preparePackOperation(
     request.operation === "remove"
       ? Object.freeze([])
       : await readSourceArtifacts(request, manifest as PackManifest);
-  const planned =
+  const directoryPlan: PlannedDirectoryChanges =
     request.operation === "remove"
-      ? await planRemovalChanges(request, installed)
-      : await planInstallChanges(
+      ? Object.freeze({
+          changes: Object.freeze([]),
+          markerChanges: Object.freeze([]),
+          generatedContents: Object.freeze([]),
+          preimages: Object.freeze([]),
+          nextDirectories: Object.freeze([]),
+          createdPaths: new Set<string>(),
+          conflicts: Object.freeze([]),
+        })
+      : await planDeclaredDirectoryChanges(
           request,
           manifest as PackManifest,
-          installed,
-          sourceArtifacts,
+          active,
         );
+  const sourceAndMarkerBytes =
+    sourceArtifacts.reduce((total, entry) => total + entry.snapshot.bytes, 0) +
+    directoryPlan.generatedContents.reduce(
+      (total, entry) => total + entry.content.byteLength,
+      0,
+    );
+  if (sourceAndMarkerBytes > request.limits.maxTotalBytes) {
+    throw new PackRuntimeError(
+      "pack-artifact-budget-exceeded",
+      "$pack.artifacts",
+      "source artifacts and directory ownership markers exceed the total byte limit",
+    );
+  }
+  const artifactPlan =
+    directoryPlan.conflicts.length > 0
+      ? {
+          directoryChanges: Object.freeze([]) as readonly PackDirectoryChange[],
+          changes: Object.freeze([]) as readonly PackChange[],
+          conflicts: Object.freeze([]) as readonly PackConflict[],
+          preimages: Object.freeze([]) as readonly SnapshotByPath[],
+        }
+      : request.operation === "remove"
+        ? await planRemovalChanges(request, installed)
+        : {
+            ...(await planInstallChanges(
+              request,
+              manifest as PackManifest,
+              installed,
+              sourceArtifacts,
+              directoryPlan.createdPaths,
+            )),
+            directoryChanges: Object.freeze(
+              [],
+            ) as readonly PackDirectoryChange[],
+          };
+  const combinedConflicts = Object.freeze(
+    [...directoryPlan.conflicts, ...artifactPlan.conflicts].sort(conflictSort),
+  );
+  const planned = {
+    directoryChanges:
+      combinedConflicts.length === 0
+        ? request.operation === "remove"
+          ? artifactPlan.directoryChanges
+          : directoryPlan.changes
+        : Object.freeze([]),
+    changes:
+      combinedConflicts.length === 0
+        ? Object.freeze(
+            [...directoryPlan.markerChanges, ...artifactPlan.changes].sort(
+              changeSort,
+            ),
+          )
+        : Object.freeze([]),
+    conflicts: combinedConflicts,
+    preimages: Object.freeze([
+      ...directoryPlan.preimages,
+      ...artifactPlan.preimages,
+    ]),
+  };
+  const rollbackPreimageBytes = planned.preimages.reduce(
+    (total, entry) => total + entry.snapshot.bytes,
+    0,
+  );
+  if (
+    !Number.isSafeInteger(rollbackPreimageBytes) ||
+    rollbackPreimageBytes > request.limits.maxTotalBytes
+  ) {
+    throw new PackRuntimeError(
+      "pack-artifact-budget-exceeded",
+      "$pack.rollbackPreimages",
+      "rollback preimages exceed the total byte limit",
+    );
+  }
   const selectedPack =
     request.operation === "remove" && active !== undefined
       ? active
@@ -846,6 +1318,7 @@ export async function preparePackOperation(
         : { fileDigest: installed.fileDigest }),
     },
     limits: request.limits,
+    directoryChanges: planned.directoryChanges,
     changes: planned.changes,
     conflicts: planned.conflicts,
   };
@@ -864,14 +1337,23 @@ export async function preparePackOperation(
     ...(manifest === undefined ? {} : { manifest }),
     installed,
     sourceArtifacts: Object.freeze(
-      sourceArtifacts.map(({ path, snapshot }) =>
-        Object.freeze({ target: path, content: new Uint8Array(snapshot.content) }),
-      ),
+      [
+        ...sourceArtifacts.map(({ path, snapshot }) =>
+          Object.freeze({
+            target: path,
+            content: new Uint8Array(snapshot.content),
+          }),
+        ),
+        ...directoryPlan.generatedContents.map(({ path, content }) =>
+          Object.freeze({ target: path, content: new Uint8Array(content) }),
+        ),
+      ],
     ),
     preimages: Object.freeze(
       planned.preimages.map(({ path, snapshot }) =>
         Object.freeze({ target: path, content: new Uint8Array(snapshot.content) }),
       ),
     ),
+    nextDirectories: Object.freeze(directoryPlan.nextDirectories),
   });
 }

@@ -86,22 +86,27 @@ function invalid(path: string, message: string): never {
 function finalizationPaths(
   runId: string,
   action: ActionablePackRecoveryFinalization,
+  report: PackTransactionRecoveryReport,
 ): readonly string[] {
-  const paths = [PACK_ACTIVE_TRANSACTION_PATH];
+  const paths = new Set<string>([PACK_ACTIVE_TRANSACTION_PATH]);
   if (action === "append-started-and-terminal") {
-    paths.push(packTransactionRecordPath(runId, 0));
+    paths.add(packTransactionRecordPath(runId, 0));
   }
   if (
     action === "append-started-and-terminal" ||
     action === "append-terminal"
   ) {
-    paths.push(packTransactionRecordPath(runId, 1));
+    paths.add(packTransactionRecordPath(runId, 1));
   }
   if (action === "append-reconciliation") {
-    paths.push(packTransactionRecordPath(runId, 2));
+    paths.add(packTransactionRecordPath(runId, 2));
   }
-  paths.sort(compareCanonicalText);
-  return Object.freeze(paths);
+  for (const cleanup of report.directoryCleanup) {
+    paths.add(cleanup.path);
+    paths.add(cleanup.tombstonePath);
+    paths.add(`${cleanup.tombstonePath}/owned`);
+  }
+  return Object.freeze([...paths].sort(compareCanonicalText));
 }
 
 function assertRecoveryCommand(registry: ValidatedRegistry): void {
@@ -187,7 +192,7 @@ export function preparePackTransactionRecoveryFinalization(
     journalSnapshotDigest: report.journalSnapshotDigest,
     action,
     finalOutcome: report.finalizationOutcome,
-    paths: finalizationPaths(report.runId, action),
+    paths: finalizationPaths(report.runId, action, report),
   };
   const plan = Object.freeze({
     ...body,

@@ -15,11 +15,15 @@ import {
   readProjectFileSnapshot,
   writeProjectFileCas,
   type CanonicalProjectRoot,
+  type ProjectDirectoryIdentity,
 } from "@ai-game-playbook/core";
 
+import { createPackDirectoryOwnershipMarker } from "./directory-ownership.js";
 import { PackRuntimeError } from "./errors.js";
 import type {
   PackChange,
+  PackDirectoryChange,
+  PackDirectoryOwnershipMarker,
   PackOperation,
   PackOperationLimits,
   PreparedPackOperation,
@@ -33,7 +37,8 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 const ERROR_CODE_PATTERN = /^[a-z][a-z0-9-]{0,127}$/;
-const MAX_TRANSACTION_PATHS = 256;
+const MAX_TRANSACTION_PATHS = 512;
+const MAX_TRANSACTION_CHANGES = 128;
 const MAX_ARTIFACT_BYTES = 64 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 256 * 1024 * 1024;
 const MAX_DIRECTORY_ENTRIES = 100_000;
@@ -48,8 +53,10 @@ export type PackTransactionOutcome =
 
 export type PackTransactionReconciliationOutcome = "committed" | "failed";
 
+export type PackTransactionSchemaVersion = "1.0.0" | "1.1.0";
+
 export interface PackTransactionStartedRecord {
-  readonly schemaVersion: "1.0.0";
+  readonly schemaVersion: PackTransactionSchemaVersion;
   readonly kind: "started";
   readonly sequence: 0;
   readonly runId: string;
@@ -81,13 +88,14 @@ export interface PackTransactionStartedRecord {
     readonly fileDigest: Sha256Digest;
   };
   readonly limits: PackOperationLimits;
+  readonly directoryChanges?: readonly PackDirectoryChange[];
   readonly changes: readonly PackChange[];
   readonly startedAt: string;
   readonly recordDigest: Sha256Digest;
 }
 
 export interface PackTransactionTerminalRecord {
-  readonly schemaVersion: "1.0.0";
+  readonly schemaVersion: PackTransactionSchemaVersion;
   readonly kind: "terminal";
   readonly sequence: 1;
   readonly runId: string;
@@ -112,7 +120,7 @@ export interface PackTransactionTerminalRecord {
 }
 
 export interface PackTransactionReconciliationRecord {
-  readonly schemaVersion: "1.0.0";
+  readonly schemaVersion: PackTransactionSchemaVersion;
   readonly kind: "reconciliation";
   readonly sequence: 2;
   readonly runId: string;
@@ -279,6 +287,33 @@ function freezeChange(change: PackChange): PackChange {
   return Object.freeze({ ...change });
 }
 
+function freezeDirectoryMarker(
+  marker: PackDirectoryOwnershipMarker,
+): PackDirectoryOwnershipMarker {
+  return Object.freeze({ ...marker });
+}
+
+function freezeDirectoryIdentity(
+  identity: ProjectDirectoryIdentity,
+): ProjectDirectoryIdentity {
+  return Object.freeze({ ...identity });
+}
+
+function freezeDirectoryChange(
+  change: PackDirectoryChange,
+): PackDirectoryChange {
+  return change.kind === "create"
+    ? Object.freeze({
+        ...change,
+        marker: freezeDirectoryMarker(change.marker),
+      })
+    : Object.freeze({
+        ...change,
+        marker: freezeDirectoryMarker(change.marker),
+        expectedIdentity: freezeDirectoryIdentity(change.expectedIdentity),
+      });
+}
+
 function freezeStarted(
   record: PackTransactionStartedRecord,
 ): PackTransactionStartedRecord {
@@ -290,6 +325,13 @@ function freezeStarted(
     installedState: Object.freeze({ ...record.installedState }),
     installedStateAfter: Object.freeze({ ...record.installedStateAfter }),
     limits: Object.freeze({ ...record.limits }),
+    ...(record.directoryChanges === undefined
+      ? {}
+      : {
+          directoryChanges: Object.freeze(
+            record.directoryChanges.map(freezeDirectoryChange),
+          ),
+        }),
     changes: Object.freeze(record.changes.map(freezeChange)),
   });
 }
@@ -377,7 +419,7 @@ export function createStartedPackTransaction(
     );
   }
   const body = {
-    schemaVersion: "1.0.0" as const,
+    schemaVersion: "1.1.0" as const,
     kind: "started" as const,
     sequence: 0 as const,
     runId: request.plan.runId,
@@ -393,6 +435,7 @@ export function createStartedPackTransaction(
     installedState: { ...request.plan.installedState },
     installedStateAfter: { ...request.installedStateAfter },
     limits: { ...request.plan.limits },
+    directoryChanges: request.plan.directoryChanges.map(freezeDirectoryChange),
     changes: request.plan.changes.map(freezeChange),
     startedAt: request.startedAt,
   };
@@ -463,7 +506,7 @@ export function createTerminalPackTransaction(
     );
   }
   const body = {
-    schemaVersion: "1.0.0" as const,
+    schemaVersion: request.started.schemaVersion,
     kind: "terminal" as const,
     sequence: 1 as const,
     runId: request.started.runId,
@@ -500,6 +543,7 @@ export function createPackTransactionReconciliation(
     2,
   );
   if (
+    request.terminal.schemaVersion !== request.started.schemaVersion ||
     request.terminal.runId !== request.started.runId ||
     request.terminal.parentRecordDigest !== request.started.recordDigest ||
     request.terminal.outcome !== "recovery-required" ||
@@ -521,7 +565,7 @@ export function createPackTransactionReconciliation(
     );
   }
   const body = {
-    schemaVersion: "1.0.0" as const,
+    schemaVersion: request.started.schemaVersion,
     kind: "reconciliation" as const,
     sequence: 2 as const,
     runId: request.started.runId,
@@ -614,6 +658,178 @@ function parseChange(value: unknown): PackChange {
   return freezeChange(value as unknown as PackChange);
 }
 
+function portableParent(path: string): string {
+  const separator = path.lastIndexOf("/");
+  return separator === -1 ? "." : path.slice(0, separator);
+}
+
+function portableName(path: string): string {
+  const separator = path.lastIndexOf("/");
+  return separator === -1 ? path : path.slice(separator + 1);
+}
+
+function parseDirectoryIdentity(
+  value: unknown,
+  directoryPath: string,
+  rootIdentityDigest: Sha256Digest,
+): ProjectDirectoryIdentity {
+  if (
+    !isRecord(value) ||
+    !exactKeys(value, [
+      "schemaVersion",
+      "path",
+      "rootIdentityDigest",
+      "identityDigest",
+    ]) ||
+    value["schemaVersion"] !== "1.0.0" ||
+    value["path"] !== directoryPath ||
+    value["rootIdentityDigest"] !== rootIdentityDigest ||
+    !isSha256Digest(value["identityDigest"])
+  ) {
+    transactionError(
+      "pack-transaction-corrupt",
+      "$transaction.directoryChanges[].expectedIdentity",
+      "directory deletion identity is malformed or belongs to another target",
+    );
+  }
+  return freezeDirectoryIdentity(
+    value as unknown as ProjectDirectoryIdentity,
+  );
+}
+
+function parseDirectoryMarker(
+  value: unknown,
+  directoryPath: string,
+  pack: PackTransactionStartedRecord["pack"],
+): PackDirectoryOwnershipMarker {
+  if (
+    !isRecord(value) ||
+    !exactKeys(value, [
+      "directoryPath",
+      "path",
+      "digest",
+      "bytes",
+      "ownershipDigest",
+      "ownerPackDigest",
+    ]) ||
+    value["directoryPath"] !== directoryPath ||
+    !isPortableProjectPath(value["path"]) ||
+    value["ownerPackDigest"] !== pack.digest ||
+    !isSha256Digest(value["digest"]) ||
+    !Number.isSafeInteger(value["bytes"]) ||
+    (value["bytes"] as number) < 1 ||
+    (value["bytes"] as number) > MAX_ARTIFACT_BYTES ||
+    !isSha256Digest(value["ownershipDigest"])
+  ) {
+    transactionError(
+      "pack-transaction-corrupt",
+      "$transaction.directoryChanges[].marker",
+      "directory ownership marker is malformed or belongs to another pack",
+    );
+  }
+  const expected = createPackDirectoryOwnershipMarker(
+    { id: pack.id, digest: pack.digest },
+    directoryPath,
+  ).descriptor;
+  if (canonicalizeJson(value) !== canonicalizeJson(expected)) {
+    transactionError(
+      "pack-transaction-corrupt",
+      "$transaction.directoryChanges[].marker",
+      "directory ownership marker is not self-consistent",
+    );
+  }
+  return freezeDirectoryMarker(expected);
+}
+
+function parseDirectoryChange(
+  value: unknown,
+  pack: PackTransactionStartedRecord["pack"],
+  rootIdentityDigest: Sha256Digest,
+): PackDirectoryChange {
+  if (
+    !isRecord(value) ||
+    (value["kind"] !== "create" &&
+      value["kind"] !== "retain" &&
+      value["kind"] !== "delete") ||
+    !exactKeys(
+      value,
+      value["kind"] === "create"
+        ? ["kind", "path", "marker"]
+        : value["kind"] === "retain"
+          ? ["kind", "path", "marker", "expectedIdentity"]
+          : [
+            "kind",
+            "path",
+            "marker",
+            "expectedIdentity",
+            "tombstonePath",
+          ],
+    ) ||
+    !isPortableProjectPath(value["path"])
+  ) {
+    transactionError(
+      "pack-transaction-corrupt",
+      "$transaction.directoryChanges[]",
+      "transaction directory change is malformed",
+    );
+  }
+  const directoryPath = value["path"];
+  const marker = parseDirectoryMarker(value["marker"], directoryPath, pack);
+  if (value["kind"] === "create") {
+    return freezeDirectoryChange({
+      kind: "create",
+      path: directoryPath,
+      marker,
+    });
+  }
+  if (value["kind"] === "retain") {
+    return freezeDirectoryChange({
+      kind: "retain",
+      path: directoryPath,
+      marker,
+      expectedIdentity: parseDirectoryIdentity(
+        value["expectedIdentity"],
+        directoryPath,
+        rootIdentityDigest,
+      ),
+    });
+  }
+  if (
+    !isPortableProjectPath(value["tombstonePath"]) ||
+    portableParent(value["tombstonePath"]) !== portableParent(directoryPath) ||
+    !/^\.agpb-cas-dir-[0-9a-f]{32}\.deleted$/.test(
+      portableName(value["tombstonePath"]),
+    )
+  ) {
+    transactionError(
+      "pack-transaction-corrupt",
+      "$transaction.directoryChanges[].tombstonePath",
+      "directory removal tombstone is not a fixed-format direct sibling",
+    );
+  }
+  return freezeDirectoryChange({
+    kind: "delete",
+    path: directoryPath,
+    marker,
+    expectedIdentity: parseDirectoryIdentity(
+      value["expectedIdentity"],
+      directoryPath,
+      rootIdentityDigest,
+    ),
+    tombstonePath: value["tombstonePath"],
+  });
+}
+
+function directoryChangeOrder(
+  left: PackDirectoryChange,
+  right: PackDirectoryChange,
+): number {
+  const depthOrder = left.path.split("/").length - right.path.split("/").length;
+  return depthOrder !== 0
+    ? depthOrder
+    : compareCanonicalText(left.path, right.path);
+}
+
 function parseProject(
   value: unknown,
   expected: {
@@ -649,8 +865,16 @@ export function parsePackTransactionStartedRecord(
     readonly identityDigest: Sha256Digest;
   },
 ): PackTransactionStartedRecord {
+  if (!isRecord(value)) {
+    transactionError(
+      "pack-transaction-corrupt",
+      "$transaction.started",
+      "started transaction record is malformed",
+    );
+  }
+  const schemaVersion = value["schemaVersion"];
   if (
-    !isRecord(value) ||
+    (schemaVersion !== "1.0.0" && schemaVersion !== "1.1.0") ||
     !exactKeys(value, [
       "schemaVersion",
       "kind",
@@ -665,11 +889,11 @@ export function parsePackTransactionStartedRecord(
       "installedState",
       "installedStateAfter",
       "limits",
+      ...(schemaVersion === "1.1.0" ? ["directoryChanges"] : []),
       "changes",
       "startedAt",
       "recordDigest",
     ]) ||
-    value["schemaVersion"] !== "1.0.0" ||
     value["kind"] !== "started" ||
     value["sequence"] !== 0 ||
     value["runId"] !== expectedRunId ||
@@ -724,8 +948,11 @@ export function parsePackTransactionStartedRecord(
     (value["limits"]["maxDirectoryEntries"] as number) < 1 ||
     (value["limits"]["maxDirectoryEntries"] as number) >
       MAX_DIRECTORY_ENTRIES ||
+    (schemaVersion === "1.1.0" &&
+      (!Array.isArray(value["directoryChanges"]) ||
+        value["directoryChanges"].length > 64)) ||
     !Array.isArray(value["changes"]) ||
-    value["changes"].length > 64 ||
+    value["changes"].length > MAX_TRANSACTION_CHANGES ||
     !canonicalTimestamp(value["startedAt"]) ||
     !isSha256Digest(value["recordDigest"])
   ) {
@@ -746,21 +973,81 @@ export function parsePackTransactionStartedRecord(
       "transaction pack version is invalid",
     );
   }
+  const project = parseProject(value["project"], expectedProject);
+  const pack = Object.freeze({
+    id: value["pack"]["id"],
+    version,
+    digest: value["pack"]["digest"],
+  });
   const maxArtifactBytes = value["limits"]["maxArtifactBytes"] as number;
   const maxTotalBytes = value["limits"]["maxTotalBytes"] as number;
   const changes = value["changes"].map(parseChange);
+  const directoryChanges =
+    schemaVersion === "1.1.0"
+      ? (value["directoryChanges"] as unknown[]).map((change) =>
+          parseDirectoryChange(change, pack, project.rootIdentityDigest),
+        )
+      : undefined;
   if (
     changes.some(
       (change, index) =>
         index > 0 &&
         compareCanonicalText(changes[index - 1]?.path ?? "", change.path) >= 0,
     ) ||
-    changes.some((change) => change.bytes > maxArtifactBytes)
+    changes.some((change) => change.bytes > maxArtifactBytes) ||
+    directoryChanges?.some(
+      (change, index) =>
+        index > 0 &&
+        directoryChangeOrder(directoryChanges[index - 1] as PackDirectoryChange, change) >= 0,
+    ) ||
+    directoryChanges?.some((directoryChange) => {
+      const markerChange = changes.find(
+        (change) => change.path === directoryChange.marker.path,
+      );
+      if (directoryChange.kind === "create") {
+        return (
+          markerChange?.kind !== "create" ||
+          markerChange.afterDigest !== directoryChange.marker.digest ||
+          markerChange.bytes !== directoryChange.marker.bytes
+        );
+      }
+      if (directoryChange.kind === "retain") {
+        return (
+          (markerChange?.kind !== "replace" &&
+            markerChange?.kind !== "unchanged") ||
+          markerChange.afterDigest !== directoryChange.marker.digest ||
+          markerChange.bytes !== directoryChange.marker.bytes
+        );
+      }
+      return (
+        markerChange?.kind !== "delete" ||
+        markerChange.beforeDigest !== directoryChange.marker.digest ||
+        markerChange.bytes !== directoryChange.marker.bytes
+      );
+    }) ||
+    directoryChanges?.some(
+      (directoryChange) =>
+        !changes.some(
+          (change) =>
+            change.path !== directoryChange.marker.path &&
+            portableParent(change.path).toLowerCase() ===
+              directoryChange.path.toLowerCase(),
+        ),
+    ) ||
+    directoryChanges?.some((directoryChange, index) =>
+      directoryChanges.some(
+        (candidate, candidateIndex) =>
+          candidateIndex !== index &&
+          candidate.path
+            .toLowerCase()
+            .startsWith(`${directoryChange.path.toLowerCase()}/`),
+      ),
+    )
   ) {
     transactionError(
       "pack-transaction-corrupt",
       "$transaction.started.changes",
-      "transaction changes must be sorted, unique, and within artifact limits",
+      "transaction changes must be sorted, unique, bounded, and preserve direct nonnested directory ownership",
     );
   }
   const totalChangeBytes = changes.reduce(
@@ -778,11 +1065,11 @@ export function parsePackTransactionStartedRecord(
     );
   }
   const record = freezeStarted({
-    schemaVersion: "1.0.0",
+    schemaVersion,
     kind: "started",
     sequence: 0,
     runId: expectedRunId,
-    project: parseProject(value["project"], expectedProject),
+    project,
     registryDigest: value["registryDigest"],
     planDigest: value["planDigest"],
     authorization: Object.freeze({
@@ -790,11 +1077,7 @@ export function parsePackTransactionStartedRecord(
       requestDigest: value["authorization"]["requestDigest"],
     }),
     operation: value["operation"] as PackOperation,
-    pack: Object.freeze({
-      id: value["pack"]["id"],
-      version,
-      digest: value["pack"]["digest"],
-    }),
+    pack,
     installedState: Object.freeze({
       revision: value["installedState"]["revision"] as number,
       digest: value["installedState"]["digest"],
@@ -812,6 +1095,9 @@ export function parsePackTransactionStartedRecord(
       maxTotalBytes: value["limits"]["maxTotalBytes"] as number,
       maxDirectoryEntries: value["limits"]["maxDirectoryEntries"] as number,
     }),
+    ...(directoryChanges === undefined
+      ? {}
+      : { directoryChanges: Object.freeze(directoryChanges) }),
     changes: Object.freeze(changes),
     startedAt: value["startedAt"],
     recordDigest: value["recordDigest"],
@@ -851,7 +1137,7 @@ function parseTerminal(
       ],
       ["installedStateAfterDigest", "error"],
     ) ||
-    value["schemaVersion"] !== "1.0.0" ||
+    value["schemaVersion"] !== started.schemaVersion ||
     value["kind"] !== "terminal" ||
     value["sequence"] !== 1 ||
     value["runId"] !== started.runId ||
@@ -940,7 +1226,7 @@ function parseReconciliation(
       "reconciledAt",
       "recordDigest",
     ]) ||
-    value["schemaVersion"] !== "1.0.0" ||
+    value["schemaVersion"] !== started.schemaVersion ||
     value["kind"] !== "reconciliation" ||
     value["sequence"] !== 2 ||
     value["runId"] !== started.runId ||

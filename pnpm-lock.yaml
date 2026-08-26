@@ -97,6 +97,9 @@ importers:
       '@ai-game-playbook/core':
         specifier: workspace:*
         version: link:../core
+      '@ai-game-playbook/evidence':
+        specifier: workspace:*
+        version: link:../evidence
       '@ai-game-playbook/project-runtime':
         specifier: workspace:*
         version: link:../project-runtime

@@ -95,6 +95,7 @@ test("workspace packages stay private and follow the foundation dependency direc
   assert.deepEqual(godotAdapter.dependencies, {
     "@ai-game-playbook/contracts": "workspace:*",
     "@ai-game-playbook/core": "workspace:*",
+    "@ai-game-playbook/evidence": "workspace:*",
     "@ai-game-playbook/project-runtime": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
   });

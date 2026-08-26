@@ -9,6 +9,7 @@
     { "path": "../contracts" },
     { "path": "../registry" },
     { "path": "../core" },
+    { "path": "../evidence" },
     { "path": "../project-runtime" }
   ],
   "include": ["src/**/*.ts"]

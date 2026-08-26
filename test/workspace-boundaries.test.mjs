@@ -15,6 +15,9 @@ test("workspace packages stay private and follow the foundation dependency direc
   const core = await readJson(
     new URL("../packages/core/package.json", import.meta.url),
   );
+  const packRuntime = await readJson(
+    new URL("../packages/pack-runtime/package.json", import.meta.url),
+  );
 
   assert.equal(root.private, true);
   assert.equal(root.license, "UNLICENSED");
@@ -38,6 +41,13 @@ test("workspace packages stay private and follow the foundation dependency direc
   assert.equal(core.license, "UNLICENSED");
   assert.deepEqual(core.dependencies, {
     "@ai-game-playbook/contracts": "workspace:*",
+    "@ai-game-playbook/registry": "workspace:*",
+  });
+  assert.equal(packRuntime.private, true);
+  assert.equal(packRuntime.license, "UNLICENSED");
+  assert.deepEqual(packRuntime.dependencies, {
+    "@ai-game-playbook/contracts": "workspace:*",
+    "@ai-game-playbook/core": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
   });
 });
@@ -68,9 +78,13 @@ test("package-local compiler paths are not inherited from the root config", asyn
   const core = await readJson(
     new URL("../packages/core/tsconfig.json", import.meta.url),
   );
+  const packRuntime = await readJson(
+    new URL("../packages/pack-runtime/tsconfig.json", import.meta.url),
+  );
 
   assert.equal(base.compilerOptions.rootDir, undefined);
   assert.equal(contracts.compilerOptions.rootDir, "src");
   assert.equal(registry.compilerOptions.rootDir, "src");
   assert.equal(core.compilerOptions.rootDir, "src");
+  assert.equal(packRuntime.compilerOptions.rootDir, "src");
 });

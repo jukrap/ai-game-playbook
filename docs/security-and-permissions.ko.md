@@ -1,12 +1,12 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: 64c12cfcd5f15ac4cfbc50d130720fbd423de0edf4986bc1e973b85523f42b47
+source_sha256: 604ea78300627b55041d9922c8c90bc97f6eea26c163275781693b8249b3fc59
 translated_at: 2026-08-26
 ---
 
 # 보안과 권한
 
-> 상태: 초기 private admission, workflow-checkpoint, durable checkpoint-store primitive가 포함된 계획된 permission 정책입니다. command dispatch, Editor 또는 bridge enforcement는 아직 없습니다.
+> 상태: 초기 private admission, workflow-checkpoint, durable checkpoint-store, read-only pack-preflight primitive가 포함된 계획된 permission 정책입니다. command dispatch, Editor 또는 bridge enforcement는 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
@@ -56,7 +56,7 @@ authorization은 실행이 아닙니다. 이 primitive는 아직 process runner,
 
 ## Filesystem과 pack 안전
 
-현재 core는 canonical project root를 결합하고 writable path link와 portable path ambiguity를 거부하며 제한된 staged SHA-256 compare-and-swap 쓰기를 수행합니다. managed pack lifecycle은 아직 계획 단계입니다. install/update는 content를 stage하고 digest/manifest를 검증하며 사용자 변경을 탐지한 뒤 owned path만 promote할 예정입니다. uninstall은 owned hash와 계속 일치하는 file만 제거할 예정입니다.
+현재 core는 canonical project root를 결합하고 writable path link와 portable path ambiguity를 거부하며 제한된 staged SHA-256 compare-and-swap 쓰기와 exact-digest 단일 파일 삭제를 수행합니다. private pack preflight는 같은 process에서 검증한 registry와 offline·hook-free regular-file artifact만 받습니다. local content, canonical installed state, exact dependency, downgrade policy, owned hash, 비소유 충돌, resource limit를 확인한 뒤 immutable plan을 만듭니다. directory나 state를 만들거나 approval·mutation lane을 획득하고 content를 promote·rollback·uninstall하지 않습니다. 이러한 managed lifecycle 실행 단계는 아직 계획 단계입니다.
 
 path 검사는 최종 target을 resolve하고 traversal, absolute-path injection, symlink escape를 거부합니다. engine과 system tool은 탐지하지만 자동 설치하지 않습니다.
 

@@ -1,6 +1,6 @@
 # Target Architecture
 
-> Status: target architecture. The `contracts` and `registry` foundations and early `core` filesystem, process, mutating-lane, permission, workflow-checkpoint, and durable checkpoint-store boundaries exist; the remaining runtime and bridge boundaries are planned.
+> Status: target architecture. The `contracts` and `registry` foundations, early `core` safety boundaries, and managed-pack preflight exist; the remaining runtime and bridge boundaries are planned.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -33,13 +33,13 @@ The typed registry is the authoring source for command, skill, role-lens, workfl
 | `cli` | Planned | `agpb` argument parsing, local interaction, stable exit behavior, and help |
 | `mcp` | Planned | Schema-derived tools and resources behind the same permission broker |
 | `codex-adapter` | Planned | Skills, host routing metadata, and project instruction integration |
-| `pack-runtime` | Planned | Staged install, owned paths, dependency checks, update, rollback, and uninstall |
+| `pack-runtime` | Partial | Validated-registry and local-file preflight, artifact/state digest checks, installed dependency and ownership conflict planning exist; approval/lane admission, durable transaction journal, promotion, rollback, and uninstall execution remain planned |
 | `evidence` | Planned | Content-addressed artifacts, receipts, exports, retention, and redaction |
 | `engine-common` | Contract only | Common capability negotiation and engine operation contracts |
 | Engine adapters | Planned | Godot, Unity, and Unreal orchestration without broad host authority |
 | Project bridges | Planned | Minimum editor/runtime code needed to expose verified engine operations |
 
-Only `contracts`, `registry`, and the partial private `core` currently exist as workspace packages. A listed boundary is not a claim that its runtime package or capability already exists.
+Only `contracts`, `registry`, the partial private `core`, and the read-only private `pack-runtime` currently exist as workspace packages. A listed boundary is not a claim that its complete runtime capability already exists.
 
 ## Execution flow
 
@@ -56,7 +56,7 @@ Only `contracts`, `registry`, and the partial private `core` currently exist as 
 
 A consuming game project is planned to contain `.ai-game-playbook/`. Commit-worthy state includes the project profile, feature contracts, and policy. Cache, logs, screenshots, locks, receipts containing local details, local secrets, and machine-specific configuration remain ignored.
 
-Writes use owned-path rules and compare-and-swap preimages. The private core now advances a resolved workflow through pre-dispatch, dispatched, settled, rollback, blocked, terminal, and uncertain checkpoints. Each transition re-resolves the exact plan, accepts only same-process permission authority, binds a domain-separated receipt to command and authorization identity, preserves a receipt chain, and aggregates workflow budgets and complete evidence. Canonical checkpoint records are append-only under a fixed project-local directory, while a compare-and-swap head selects the current chain. Loading bounds record count and bytes, rechecks every parent transition and current registry/project identity, preserves corrupt state for diagnosis, and refuses competing heads. Restart recovery returns an undispatched admission to a reauthorization state and converts a dispatched but unsettled step to `uncertain`. The state machine is not yet wired to lane acquisition or command dispatch; approval consumption, active leases, full receipts, and evidence payloads are not durable. The core also does not yet discover or control an editor. Pack lifecycle operations and parallel-read coordination remain planned.
+Writes use owned-path rules and compare-and-swap preimages. The private core now advances a resolved workflow through pre-dispatch, dispatched, settled, rollback, blocked, terminal, and uncertain checkpoints. Each transition re-resolves the exact plan, accepts only same-process permission authority, binds a domain-separated receipt to command and authorization identity, preserves a receipt chain, and aggregates workflow budgets and complete evidence. Canonical checkpoint records are append-only under a fixed project-local directory, while a compare-and-swap head selects the current chain. Loading bounds record count and bytes, rechecks every parent transition and current registry/project identity, preserves corrupt state for diagnosis, and refuses competing heads. Restart recovery returns an undispatched admission to a reauthorization state and converts a dispatched but unsettled step to `uncertain`. Pack preflight now binds a same-process validated registry, target/source root identities, local artifact bytes, installed-state digest, intended file changes, conflicts, and limits into an immutable plan. It accepts only offline, hook-free regular-file packs and performs no mutation. The state machine and pack plan are not yet wired to lane acquisition or command dispatch; approval consumption, active leases, full receipts, and evidence payloads are not durable. The core also does not yet discover or control an editor. Pack promotion, rollback, uninstall execution, and parallel-read coordination remain planned.
 
 ## Host integration
 

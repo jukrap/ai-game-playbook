@@ -35,6 +35,18 @@ importers:
         specifier: workspace:*
         version: link:../registry
 
+  packages/pack-runtime:
+    dependencies:
+      '@ai-game-playbook/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@ai-game-playbook/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ai-game-playbook/registry':
+        specifier: workspace:*
+        version: link:../registry
+
   packages/registry:
     dependencies:
       '@ai-game-playbook/contracts':

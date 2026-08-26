@@ -1,6 +1,6 @@
 # Security and Permissions
 
-> Status: planned permission policy with early private admission, workflow-checkpoint, and durable checkpoint-store primitives. Command dispatch and editor or bridge enforcement do not exist.
+> Status: planned permission policy with early private admission, workflow-checkpoint, durable checkpoint-store, and read-only pack-preflight primitives. Command dispatch and editor or bridge enforcement do not exist.
 
 [한국어](security-and-permissions.ko.md) · [Documentation](README.md)
 
@@ -50,7 +50,7 @@ Planned local bridges use authenticated, project-scoped sessions, bounded reques
 
 ## Filesystem and pack safety
 
-The current core binds a canonical project root, rejects writable path links and portable path ambiguity, and performs bounded staged SHA-256 compare-and-swap writes. The managed pack lifecycle remains planned: install and update will stage content, validate digests and manifests, detect user changes, and promote only owned paths. Uninstall will remove only files still matching owned hashes.
+The current core binds a canonical project root, rejects writable path links and portable path ambiguity, and performs bounded staged SHA-256 compare-and-swap writes and exact-digest single-file deletion. The private pack preflight accepts only a same-process validated registry and offline, hook-free regular-file artifacts. It verifies local content, canonical installed state, exact dependencies, downgrade policy, owned hashes, non-owned collisions, and resource limits before producing an immutable plan. It does not create directories or state, acquire approval or a mutation lane, promote content, roll back, or uninstall. Those managed lifecycle execution steps remain planned.
 
 Path checks resolve the final target and reject traversal, absolute-path injection, and symlink escape. Engine and system tools are detected but not installed automatically.
 

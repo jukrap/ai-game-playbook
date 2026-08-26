@@ -326,7 +326,7 @@ test("timeouts terminate the complete owned process tree", async (t) => {
   const base = await request(root, ["--input-type=commonjs", "-e", script]);
   const result = await core.runBoundedProcess({
     ...base,
-    limits: { ...base.limits, timeoutMs: 1_500 },
+    limits: { ...base.limits, timeoutMs: 5_000 },
   });
 
   assert.equal(result.outcome, "timed-out");

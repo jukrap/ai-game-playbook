@@ -19,6 +19,11 @@ import {
   type BoundProcessExecutable,
 } from "./process-executable.js";
 import {
+  snapshotDenseDataArray,
+  snapshotEnumerableDataRecord,
+  snapshotExactDataRecord,
+} from "./plain-data.js";
+import {
   assertProjectRootIdentity,
   resolveProjectPath,
   type CanonicalProjectRoot,
@@ -226,15 +231,6 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve: resolvePromise };
 }
 
-function objectHasExactKeys(value: object, keys: readonly string[]): boolean {
-  const actual = Object.keys(value).sort();
-  const expected = [...keys].sort();
-  return (
-    actual.length === expected.length &&
-    actual.every((key, index) => key === expected[index])
-  );
-}
-
 function invalidProcessRequest(message: string): never {
   throw new CoreBoundaryError(
     "invalid-process-request",
@@ -243,13 +239,14 @@ function invalidProcessRequest(message: string): never {
   );
 }
 
-function validateArguments(value: readonly unknown[]): readonly string[] {
-  if (!Array.isArray(value) || value.length > PROCESS_MAX_ARGUMENTS) {
+function validateArguments(value: unknown): readonly string[] {
+  const values = snapshotDenseDataArray(value, PROCESS_MAX_ARGUMENTS);
+  if (values === undefined) {
     invalidProcessRequest("process argument count exceeds the runtime boundary");
   }
   const arguments_: string[] = [];
   let totalBytes = 0;
-  for (const argument of value) {
+  for (const argument of values) {
     if (
       typeof argument !== "string" ||
       argument.includes("\0") ||
@@ -267,25 +264,21 @@ function validateArguments(value: readonly unknown[]): readonly string[] {
 }
 
 function validateEnvironment(
-  value: Readonly<Record<string, unknown>>,
+  value: unknown,
 ): Readonly<Record<string, string>> {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    (Object.getPrototypeOf(value) !== Object.prototype &&
-      Object.getPrototypeOf(value) !== null)
-  ) {
+  const values = snapshotEnumerableDataRecord(value, true);
+  if (values === undefined) {
     invalidProcessRequest("process environment must be a plain exact object");
   }
   const output = Object.create(null) as Record<string, string>;
   const foldedKeys = new Set<string>();
   let totalBytes = 0;
-  const keys = Object.keys(value);
+  const keys = Object.keys(values);
   if (keys.length > PROCESS_MAX_ENVIRONMENT_KEYS) {
     invalidProcessRequest("process environment key count exceeds the boundary");
   }
   for (const key of keys) {
-    const environmentValue = value[key];
+    const environmentValue = values[key];
     if (
       key.length > 128 ||
       !environmentKeyPattern.test(key) ||
@@ -313,77 +306,85 @@ function validateEnvironment(
   return Object.freeze(output);
 }
 
-function validateLimits(value: BoundedProcessLimits): BoundedProcessLimits {
+function validateLimits(value: unknown): BoundedProcessLimits {
+  const record = snapshotExactDataRecord(value, [
+    "timeoutMs",
+    "idleTimeoutMs",
+    "maxOutputBytes",
+    "terminationGraceMs",
+  ]);
+  if (record === undefined) {
+    invalidProcessRequest("process limits are invalid or exceed runtime ceilings");
+  }
+  const {
+    timeoutMs,
+    idleTimeoutMs,
+    maxOutputBytes,
+    terminationGraceMs,
+  } = record;
   if (
-    typeof value !== "object" ||
-    value === null ||
-    !objectHasExactKeys(value, [
-      "timeoutMs",
-      "idleTimeoutMs",
-      "maxOutputBytes",
-      "terminationGraceMs",
-    ]) ||
-    !Number.isSafeInteger(value.timeoutMs) ||
-    value.timeoutMs < 1 ||
-    value.timeoutMs > PROCESS_MAX_DURATION_MS ||
-    !Number.isSafeInteger(value.idleTimeoutMs) ||
-    value.idleTimeoutMs < 0 ||
-    value.idleTimeoutMs > value.timeoutMs ||
-    !Number.isSafeInteger(value.maxOutputBytes) ||
-    value.maxOutputBytes < 1 ||
-    value.maxOutputBytes > PROCESS_MAX_OUTPUT_BYTES ||
-    !Number.isSafeInteger(value.terminationGraceMs) ||
-    value.terminationGraceMs < 0 ||
-    value.terminationGraceMs > PROCESS_MAX_TERMINATION_GRACE_MS
+    typeof timeoutMs !== "number" ||
+    !Number.isSafeInteger(timeoutMs) ||
+    timeoutMs < 1 ||
+    timeoutMs > PROCESS_MAX_DURATION_MS ||
+    typeof idleTimeoutMs !== "number" ||
+    !Number.isSafeInteger(idleTimeoutMs) ||
+    idleTimeoutMs < 0 ||
+    idleTimeoutMs > timeoutMs ||
+    typeof maxOutputBytes !== "number" ||
+    !Number.isSafeInteger(maxOutputBytes) ||
+    maxOutputBytes < 1 ||
+    maxOutputBytes > PROCESS_MAX_OUTPUT_BYTES ||
+    typeof terminationGraceMs !== "number" ||
+    !Number.isSafeInteger(terminationGraceMs) ||
+    terminationGraceMs < 0 ||
+    terminationGraceMs > PROCESS_MAX_TERMINATION_GRACE_MS
   ) {
     invalidProcessRequest("process limits are invalid or exceed runtime ceilings");
   }
   return Object.freeze({
-    timeoutMs: value.timeoutMs,
-    idleTimeoutMs: value.idleTimeoutMs,
-    maxOutputBytes: value.maxOutputBytes,
-    terminationGraceMs: value.terminationGraceMs,
+    timeoutMs,
+    idleTimeoutMs,
+    maxOutputBytes,
+    terminationGraceMs,
   });
 }
 
 function validateProcessRequest(
   value: BoundedProcessRequest,
 ): ValidatedProcessRequest {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    !objectHasExactKeys(value, [
-      "root",
-      "executable",
-      "arguments",
-      "workingDirectory",
-      "environment",
-      "limits",
-      "signal",
-    ])
-  ) {
+  const record = snapshotExactDataRecord(value, [
+    "root",
+    "executable",
+    "arguments",
+    "workingDirectory",
+    "environment",
+    "limits",
+    "signal",
+  ]);
+  if (record === undefined) {
     invalidProcessRequest("process request contains undeclared fields");
   }
   if (
-    value.workingDirectory !== null &&
-    typeof value.workingDirectory !== "string"
+    record.workingDirectory !== null &&
+    typeof record.workingDirectory !== "string"
   ) {
     invalidProcessRequest("working directory must be null or a portable path");
   }
   if (
-    value.signal !== null &&
-    !(value.signal instanceof AbortSignal)
+    record.signal !== null &&
+    !(record.signal instanceof AbortSignal)
   ) {
     invalidProcessRequest("process signal must be an AbortSignal or null");
   }
   return {
-    root: value.root,
-    executable: value.executable,
-    arguments: validateArguments(value.arguments),
-    workingDirectory: value.workingDirectory,
-    environment: validateEnvironment(value.environment),
-    limits: validateLimits(value.limits),
-    signal: value.signal,
+    root: record.root as CanonicalProjectRoot,
+    executable: record.executable as BoundProcessExecutable,
+    arguments: validateArguments(record.arguments),
+    workingDirectory: record.workingDirectory,
+    environment: validateEnvironment(record.environment),
+    limits: validateLimits(record.limits),
+    signal: record.signal,
   };
 }
 

@@ -142,6 +142,141 @@ test("process executables are digest-bound with a portable environment allowlist
   );
 });
 
+test("process executable binding rejects hidden fields and accessors without invoking them", async () => {
+  let getterCalled = false;
+  const accessorRequest = {
+    maxBytes: 512 * 1024 * 1024,
+    allowedEnvironmentKeys: [],
+  };
+  Object.defineProperty(accessorRequest, "path", {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return process.execPath;
+    },
+  });
+  await assert.rejects(
+    core.bindProcessExecutable(accessorRequest),
+    expectCoreError("invalid-process-executable", false),
+  );
+  assert.equal(getterCalled, false);
+
+  for (const hiddenRequest of [
+    (() => {
+      const value = {
+        path: process.execPath,
+        maxBytes: 512 * 1024 * 1024,
+        allowedEnvironmentKeys: [],
+      };
+      Object.defineProperty(value, "provider", { value: "hidden" });
+      return value;
+    })(),
+    {
+      path: process.execPath,
+      maxBytes: 512 * 1024 * 1024,
+      allowedEnvironmentKeys: [],
+      [Symbol("authority")]: true,
+    },
+  ]) {
+    await assert.rejects(
+      core.bindProcessExecutable(hiddenRequest),
+      expectCoreError("invalid-process-executable", false),
+    );
+  }
+
+  getterCalled = false;
+  const accessorAllowlist = [];
+  Object.defineProperty(accessorAllowlist, "0", {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return "AGPB_TEST_VALUE";
+    },
+  });
+  await assert.rejects(
+    core.bindProcessExecutable({
+      path: process.execPath,
+      maxBytes: 512 * 1024 * 1024,
+      allowedEnvironmentKeys: accessorAllowlist,
+    }),
+    expectCoreError("invalid-process-executable", false),
+  );
+  assert.equal(getterCalled, false);
+});
+
+test("bounded process requests reject hidden fields and accessors without invoking them", async (t) => {
+  const { root } = await fixture(t);
+  const base = await request(root, ["--version"]);
+  let getterCalled = false;
+  const accessorRequest = {};
+  for (const [key, value] of Object.entries(base)) {
+    Object.defineProperty(accessorRequest, key, {
+      enumerable: true,
+      ...(key === "root"
+        ? {
+            get() {
+              getterCalled = true;
+              return value;
+            },
+          }
+        : { value }),
+    });
+  }
+  await assert.rejects(
+    core.runBoundedProcess(accessorRequest),
+    expectCoreError("invalid-process-request", false),
+  );
+  assert.equal(getterCalled, false);
+
+  for (const hiddenRequest of [
+    (() => {
+      const value = { ...base };
+      Object.defineProperty(value, "provider", { value: "hidden" });
+      return value;
+    })(),
+    { ...base, [Symbol("authority")]: true },
+  ]) {
+    await assert.rejects(
+      core.runBoundedProcess(hiddenRequest),
+      expectCoreError("invalid-process-request", false),
+    );
+  }
+
+  for (const field of ["arguments", "environment", "limits"]) {
+    getterCalled = false;
+    const nested = field === "arguments" ? [] : {};
+    const nestedKey =
+      field === "arguments"
+        ? "0"
+        : field === "environment"
+          ? "AGPB_TEST_VALUE"
+          : "timeoutMs";
+    Object.defineProperty(nested, nestedKey, {
+      enumerable: true,
+      get() {
+        getterCalled = true;
+        return field === "arguments"
+          ? "--version"
+          : field === "environment"
+            ? "value"
+            : 5_000;
+      },
+    });
+    if (field === "limits") {
+      Object.assign(nested, {
+        idleTimeoutMs: 0,
+        maxOutputBytes: 64 * 1024,
+        terminationGraceMs: 100,
+      });
+    }
+    await assert.rejects(
+      core.runBoundedProcess({ ...base, [field]: nested }),
+      expectCoreError("invalid-process-request", false),
+    );
+    assert.equal(getterCalled, false, `${field} getter must not run`);
+  }
+});
+
 test("bounded processes use direct arguments, exact environment, and call-time snapshots", async (t) => {
   const { project, root } = await fixture(t);
   const previousParentSecret = process.env.AGPB_PARENT_SECRET;

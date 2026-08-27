@@ -15,6 +15,10 @@ import {
 import { isAbsolute, normalize } from "node:path";
 
 import { CoreBoundaryError } from "./errors.js";
+import {
+  snapshotDenseDataArray,
+  snapshotExactDataRecord,
+} from "./plain-data.js";
 import type { FilesystemIdentity } from "./project-path.js";
 
 export const PROCESS_MAX_EXECUTABLE_BYTES: number = 2 * 1024 * 1024 * 1024;
@@ -55,15 +59,6 @@ interface ValidatedBindRequest {
 const boundProcessExecutables = new WeakSet<object>();
 const environmentKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const blockedEnvironmentKeys = new Set(["__proto__", "constructor", "prototype"]);
-
-function objectHasExactKeys(value: object, keys: readonly string[]): boolean {
-  const actual = Object.keys(value).sort();
-  const expected = [...keys].sort();
-  return (
-    actual.length === expected.length &&
-    actual.every((key, index) => key === expected[index])
-  );
-}
 
 function isMissing(error: unknown): boolean {
   return (
@@ -115,15 +110,13 @@ function invalidExecutable(message: string): never {
   );
 }
 
-function validateEnvironmentKeys(value: readonly unknown[]): readonly string[] {
-  if (
-    !Array.isArray(value) ||
-    value.length > PROCESS_MAX_ENVIRONMENT_KEYS
-  ) {
+function validateEnvironmentKeys(value: unknown): readonly string[] {
+  const values = snapshotDenseDataArray(value, PROCESS_MAX_ENVIRONMENT_KEYS);
+  if (values === undefined) {
     invalidExecutable("environment allowlist exceeds the executable boundary");
   }
   const portableKeys = new Map<string, string>();
-  for (const key of value) {
+  for (const key of values) {
     if (
       typeof key !== "string" ||
       key.length > 128 ||
@@ -144,23 +137,24 @@ function validateEnvironmentKeys(value: readonly unknown[]): readonly string[] {
 function validateBindRequest(
   value: BindProcessExecutableRequest,
 ): ValidatedBindRequest {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    !objectHasExactKeys(value, ["path", "maxBytes", "allowedEnvironmentKeys"])
-  ) {
+  const record = snapshotExactDataRecord(value, [
+    "path",
+    "maxBytes",
+    "allowedEnvironmentKeys",
+  ]);
+  if (record === undefined) {
     invalidExecutable("executable request contains undeclared fields");
   }
   if (
-    typeof value.path !== "string" ||
-    value.path.length === 0 ||
-    value.path.length > 32767 ||
-    value.path.includes("\0") ||
-    !isAbsolute(value.path)
+    typeof record.path !== "string" ||
+    record.path.length === 0 ||
+    record.path.length > 32767 ||
+    record.path.includes("\0") ||
+    !isAbsolute(record.path)
   ) {
     invalidExecutable("executable path must be a bounded absolute path");
   }
-  const requestedPath = normalize(value.path);
+  const requestedPath = normalize(record.path);
   if (
     process.platform === "win32" &&
     (requestedPath.startsWith("\\\\") ||
@@ -169,18 +163,20 @@ function validateBindRequest(
   ) {
     invalidExecutable("UNC and device executable paths are outside the boundary");
   }
+  const maxBytes = record.maxBytes;
   if (
-    !Number.isSafeInteger(value.maxBytes) ||
-    value.maxBytes < 1 ||
-    value.maxBytes > PROCESS_MAX_EXECUTABLE_BYTES
+    typeof maxBytes !== "number" ||
+    !Number.isSafeInteger(maxBytes) ||
+    maxBytes < 1 ||
+    maxBytes > PROCESS_MAX_EXECUTABLE_BYTES
   ) {
     invalidExecutable("executable byte budget is outside the runtime boundary");
   }
   return {
     requestedPath,
-    maxBytes: value.maxBytes,
+    maxBytes,
     allowedEnvironmentKeys: validateEnvironmentKeys(
-      value.allowedEnvironmentKeys,
+      record.allowedEnvironmentKeys,
     ),
   };
 }

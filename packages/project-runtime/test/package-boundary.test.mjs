@@ -3,7 +3,19 @@ import test from "node:test";
 
 import * as projectRuntime from "../dist/index.js";
 
-test("project runtime exposes only the read-only inspection entry point", () => {
-  assert.deepEqual(Object.keys(projectRuntime), ["runProjectInspect"]);
+test("project runtime exposes inspection and write-free initialization preparation", () => {
+  assert.deepEqual(Object.keys(projectRuntime), [
+    "PROJECT_INITIALIZATION_IGNORE_POLICY",
+    "ProjectRuntimeError",
+    "assertPreparedProjectInitialization",
+    "prepareProjectInitialization",
+    "runProjectInspect",
+  ]);
+  assert.equal(typeof projectRuntime.ProjectRuntimeError, "function");
+  assert.equal(
+    typeof projectRuntime.assertPreparedProjectInitialization,
+    "function",
+  );
+  assert.equal(typeof projectRuntime.prepareProjectInitialization, "function");
   assert.equal(typeof projectRuntime.runProjectInspect, "function");
 });

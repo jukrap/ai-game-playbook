@@ -74,6 +74,30 @@ export const PROJECT_INITIALIZATION_TARGETS: readonly ProjectInitializationTarge
     ),
     target(".ai-game-playbook/cache", "directory", "local-only", "none"),
     target(".ai-game-playbook/evidence", "directory", "local-only", "none"),
+    target(
+      ".ai-game-playbook/evidence/artifacts",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    target(
+      ".ai-game-playbook/evidence/artifacts/manifests",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    target(
+      ".ai-game-playbook/evidence/artifacts/objects",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    target(
+      ".ai-game-playbook/evidence/receipts",
+      "directory",
+      "local-only",
+      "none",
+    ),
     target(".ai-game-playbook/logs", "directory", "local-only", "none"),
     target(
       ".ai-game-playbook/screenshots",

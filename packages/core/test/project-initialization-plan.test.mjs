@@ -32,7 +32,7 @@ function nativePath(project, portablePath) {
 
 test("initialization planning reports the fixed layout without writing", async (t) => {
   assert.equal(typeof core.planProjectInitialization, "function");
-  assert.equal(core.PROJECT_INITIALIZATION_TARGETS.length, 16);
+  assert.equal(core.PROJECT_INITIALIZATION_TARGETS.length, 20);
   assert.equal(Object.isFrozen(core.PROJECT_INITIALIZATION_TARGETS), true);
 
   const { project, root } = await fixture(t);
@@ -47,7 +47,7 @@ test("initialization planning reports the fixed layout without writing", async (
   assert.equal(Object.isFrozen(plan), true);
   assert.equal(Object.isFrozen(plan.targets), true);
   assert.equal(Object.isFrozen(plan.issues), true);
-  assert.equal(plan.targets.length, 16);
+  assert.equal(plan.targets.length, 20);
   assert.equal(plan.targets.every(({ action }) => action === "create"), true);
   assert.deepEqual(plan.issues, []);
   assert.deepEqual(
@@ -58,6 +58,18 @@ test("initialization planning reports the fixed layout without writing", async (
       content,
     })),
     core.PROJECT_INITIALIZATION_TARGETS,
+  );
+  assert.deepEqual(
+    core.PROJECT_INITIALIZATION_TARGETS
+      .filter(({ path }) => path.startsWith(".ai-game-playbook/evidence"))
+      .map(({ path }) => path),
+    [
+      ".ai-game-playbook/evidence",
+      ".ai-game-playbook/evidence/artifacts",
+      ".ai-game-playbook/evidence/artifacts/manifests",
+      ".ai-game-playbook/evidence/artifacts/objects",
+      ".ai-game-playbook/evidence/receipts",
+    ],
   );
   await assert.rejects(lstat(join(project, ".ai-game-playbook")), {
     code: "ENOENT",

@@ -80,6 +80,20 @@ export type {
   PackRegistryStatus,
 } from "./pack-inspection-contracts.js";
 export {
+  PROJECT_PACK_LOCK_MAX_DEPENDENCIES,
+  PROJECT_PACK_LOCK_MAX_PACKS,
+  assertProjectPackLockSemantics,
+  computeProjectPackLockDigest,
+  createEmptyProjectPackLock,
+  projectPackLockSchema,
+} from "./project-pack-lock-contracts.js";
+export type {
+  ProjectPackLock,
+  ProjectPackLockDependency,
+  ProjectPackLockDigestInput,
+  ProjectPackLockEntry,
+} from "./project-pack-lock-contracts.js";
+export {
   INIT_PLAN_MAX_ISSUES,
   INIT_PLAN_MAX_TARGETS,
   INIT_PLAN_TARGET_ACTIONS,

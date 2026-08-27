@@ -1,6 +1,6 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: fbcc0ce4b1390cb40dd25369e172ed57eea9695ceed80941269125f572133f08
+source_sha256: fc688925aaab4bd247c4e69d40bcb74512dad93af3f564fbb269356f3279aaa9
 translated_at: 2026-08-27
 ---
 
@@ -56,7 +56,7 @@ MCP annotation, skill text, engine bridge, host UI label은 permission을 부여
 
 ## 초기화 계획 경계
 
-`agpb init`은 고정된 16개 target의 project layout을 관찰하고 검증된 plan만 반환합니다. Directory 생성, profile/policy byte 쓰기, pack 설치, network access, mutation authority 예약을 수행하지 않습니다. 예상 filesystem kind와 일치하는 기존 target은 retain하며 type, case, link, parent, observation conflict는 충돌 대상을 변경하지 않고 plan을 차단합니다. Retain은 기존 metadata 내용의 유효성을 검증하지 않습니다.
+`agpb init`은 고정된 20개 target의 project layout을 관찰하고 검증된 plan만 반환합니다. Directory 생성, profile/policy byte 쓰기, pack 설치, network access, mutation authority 예약을 수행하지 않습니다. 예상 filesystem kind와 일치하는 기존 target은 retain하며 type, case, link, parent, observation conflict는 충돌 대상을 변경하지 않고 plan을 차단합니다. Retain은 기존 metadata 내용의 유효성을 검증하지 않습니다.
 
 Ready plan은 runtime registry, canonical project identity, 정렬된 target intent, 관찰된 target state를 결합한 digest를 가집니다. 이 digest는 plan drift를 탐지하지만 approval grant, write lease, checkpoint, apply token이 아닙니다. 별도 mutation contract와 permission path가 구현되기 전까지 `--apply`는 invalid usage로 거부됩니다.
 

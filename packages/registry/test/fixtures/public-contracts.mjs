@@ -93,6 +93,14 @@ export const validPublicContractFixtures = {
     digest: secondDigest,
     license: { status: "unresolved" },
   },
+  "project-pack-lock": {
+    schemaVersion: "1.0.0",
+    projectId: "sample.graybox",
+    projectIdentityDigest: digest,
+    packs: [],
+    lockDigest:
+      "sha256:6862a77032f16eb95a49bb5dd01fb092b821efd4f0d28c60af34bb7bcd4aa163",
+  },
   "game-project-profile": {
     schemaVersion: "1.0.0",
     projectId: "sample.graybox",

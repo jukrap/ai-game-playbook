@@ -32,10 +32,10 @@ test("init produces an immutable validated plan without changing the project", a
   assert.equal(report.applySupported, false);
   assert.equal(report.externalInstallPlanned, false);
   assert.equal(report.networkAccessPlanned, false);
-  assert.equal(report.summary.create, 16);
+  assert.equal(report.summary.create, 20);
   assert.equal(report.summary.retain, 0);
   assert.equal(report.summary.conflict, 0);
-  assert.equal(report.targets.length, 16);
+  assert.equal(report.targets.length, 20);
   assert.deepEqual(report.issues, []);
   assert.match(report.planDigest, /^sha256:[0-9a-f]{64}$/);
   assert.equal(Object.isFrozen(report), true);

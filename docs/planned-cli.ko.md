@@ -1,6 +1,6 @@
 ---
 source: docs/planned-cli.md
-source_sha256: dfccd4327bd394ca04b875c0704c838743c8dea531034bfb4e898cccacf8b98c
+source_sha256: 1d257be9cabc81814b58273ef6c607d5715b432b0fa49b64ca1b9f1d703ef3be
 translated_at: 2026-08-27
 ---
 
@@ -65,7 +65,7 @@ pnpm run agpb -- engine capabilities --engine godot --project <project-path> --j
 
 `--project`는 absolute path 또는 현재 working directory 기준 relative path를 받습니다. 생략하면 각 명령이 현재 directory를 선택합니다. `--json`은 해당 명령의 등록된 report를 canonical JSON으로 출력하며 기본 모드는 safe next action이 포함된 간결한 human report입니다.
 
-`init`은 write-plan-only입니다. 고정된 project-local target 16개를 `create`, `retain`, `conflict`로 분류합니다.
+`init`은 write-plan-only입니다. 고정된 project-local target 20개를 `create`, `retain`, `conflict`로 분류합니다.
 
 - commit 대상인 profile, policy, feature, pack lock, 내부 ignore policy target;
 - local-only인 cache, evidence, log, screenshot, lock, local configuration, runtime state target.

@@ -2,7 +2,7 @@
   "name": "@ai-game-playbook/project-runtime",
   "version": "0.0.0",
   "private": true,
-  "description": "Registry-bound read-only game project inspection runtime.",
+  "description": "Registry-bound game project inspection and initialization runtime.",
   "license": "UNLICENSED",
   "type": "module",
   "exports": {

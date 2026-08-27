@@ -1,6 +1,6 @@
 ---
 source: docs/concepts.md
-source_sha256: a6d71d79606cf33d99da0cb9c8dac931fcbdf298541a85e3fa2c121f0d1b609e
+source_sha256: f036f75612073674801ba670674609a509670829f9886b361083a7ab6c5331b6
 translated_at: 2026-08-27
 ---
 
@@ -28,6 +28,7 @@ adapter는 지원하지 않는 단계를 보고할 수 있습니다. 필수 단�
 | --- | --- |
 | `CommandDescriptor` | 한 operation의 input/output schema, required capability, permission, side effect, lane, timeout, retry, budget, required evidence |
 | `PackManifest` | pack version, 호환 engine, 제공 skill/command, dependency, digest, owned path, install/update/remove lifecycle |
+| `ProjectPackLock` | Canonical project-bound installed-pack identity, exact dependency binding, manifest digest, self-attested lock digest |
 | `GameProjectProfile` | engine, version, project identity, development stage, target platform, 선언한 quality/change budget |
 | `EngineCapabilityReport` | 현재 환경에서 탐지한 operation, limitation, identity, support grade |
 | `EngineStatusReport` | Explicit executable/evidence gap을 포함한 static engine/project compatibility observation 하나. `planned`보다 높은 support grade를 확립할 수 없음 |

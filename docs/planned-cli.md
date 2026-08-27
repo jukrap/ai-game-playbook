@@ -59,7 +59,7 @@ pnpm run agpb -- engine capabilities --engine godot --project <project-path> --j
 
 `--project` accepts an absolute path or a path relative to the current working directory. Without it, each command selects the current directory. `--json` emits the command's registered report as canonical JSON; the default output is a concise human report with safe next actions.
 
-`init` is write-plan-only. It classifies a fixed set of 16 project-local targets as `create`, `retain`, or `conflict`:
+`init` is write-plan-only. It classifies a fixed set of 20 project-local targets as `create`, `retain`, or `conflict`:
 
 - commit-worthy profile, policy, feature, pack-lock, and internal ignore-policy targets; and
 - local-only cache, evidence, log, screenshot, lock, local-configuration, and runtime-state targets.

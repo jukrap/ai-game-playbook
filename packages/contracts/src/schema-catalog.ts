@@ -84,6 +84,7 @@ import {
   packListReportSchema,
   packListRequestSchema,
 } from "./pack-inspection-contracts.js";
+import { projectPackLockSchema } from "./project-pack-lock-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -96,6 +97,7 @@ export const PUBLIC_CONTRACT_SCHEMAS: ContractSchemaCatalog = Object.freeze({
   "feature-contract": featureContractSchema,
   "game-project-profile": gameProjectProfileSchema,
   "pack-manifest": packManifestSchema,
+  "project-pack-lock": projectPackLockSchema,
   "run-receipt": runReceiptSchema,
 });
 

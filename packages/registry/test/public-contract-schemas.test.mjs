@@ -18,6 +18,7 @@ const publicIds = [
   "feature-contract",
   "game-project-profile",
   "pack-manifest",
+  "project-pack-lock",
   "run-receipt",
 ];
 const orchestrationIds = [

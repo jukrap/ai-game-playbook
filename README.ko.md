@@ -1,6 +1,6 @@
 ---
 source: README.md
-source_sha256: a9c659c909e441f1806db4c6493a1771e81afcbfc1ebd5acefeb213b54d51073
+source_sha256: 4d6c0f9b72ff8f7f90a16b5f0598ea093b0ceb9e3b76dfc268ec99ef9b2c3408
 translated_at: 2026-08-27
 ---
 
@@ -29,7 +29,7 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine을 사용하는 개인과 
 - Bounded pack inspection과 두 static Godot engine command를 available로 표시하되 pack mutation, mutating skill command와 모든 live-engine capability 및 support grade를 planned로 유지하는 digest 결합 공개 surface.
 - 영어 공개 문서와 한국어 mirror, Windows/Linux conformance check.
 
-현재 CLI slice는 고정된 16개 `.ai-game-playbook/` target layout을 계획하고, 지원 Node.js 범위, runtime-registry parity, project state, installed-pack state, active transaction marker를 진단하며, bounded Godot/Unity/Unreal project marker와 canonical committed project profile을 검사합니다. 또한 artifact content나 source location 없이 installed-pack identity와 bounded ownership count를 나열하고, repair/finalization 없이 owned artifact·directory integrity와 active recovery state를 검사하며, bounded registry skill catalog를 나열·검사합니다. 탐지된 Godot project version hint 하나를 pin된 `4.7.2` status target과 비교하고 같은 static identity에 공통 Godot operation contract 14개를 결합해 보고합니다. Project inspection은 `.git` marker만 관찰하면 dirty state를 unknown으로 유지하고 static lock을 process나 선택 가능한 Editor session으로 간주하지 않습니다. 두 engine command는 `--engine godot`만 받고 host executable/provider input을 받지 않습니다. 보고하는 모든 operation은 `planned`와 `documented`를 유지하고 compiled containment-provider catalog는 비어 있으며 provider self-test와 launch는 수행하거나 사용할 수 없습니다. 아홉 명령 모두 간결한 human output 또는 등록된 canonical JSON을 출력하며 write, process launch, network access, Editor control을 수행하지 않습니다.
+현재 CLI slice는 고정된 20개 `.ai-game-playbook/` target layout을 계획하고, 지원 Node.js 범위, runtime-registry parity, project state, installed-pack state, active transaction marker를 진단하며, bounded Godot/Unity/Unreal project marker와 canonical committed project profile을 검사합니다. 또한 artifact content나 source location 없이 installed-pack identity와 bounded ownership count를 나열하고, repair/finalization 없이 owned artifact·directory integrity와 active recovery state를 검사하며, bounded registry skill catalog를 나열·검사합니다. 탐지된 Godot project version hint 하나를 pin된 `4.7.2` status target과 비교하고 같은 static identity에 공통 Godot operation contract 14개를 결합해 보고합니다. Project inspection은 `.git` marker만 관찰하면 dirty state를 unknown으로 유지하고 static lock을 process나 선택 가능한 Editor session으로 간주하지 않습니다. 두 engine command는 `--engine godot`만 받고 host executable/provider input을 받지 않습니다. 보고하는 모든 operation은 `planned`와 `documented`를 유지하고 compiled containment-provider catalog는 비어 있으며 provider self-test와 launch는 수행하거나 사용할 수 없습니다. 아홉 명령 모두 간결한 human output 또는 등록된 canonical JSON을 출력하며 write, process launch, network access, Editor control을 수행하지 않습니다.
 
 공개 pack inspection은 read-only이며 pack add, update, remove, repair, transaction finalization은 사용할 수 없습니다.
 

@@ -13,7 +13,7 @@ The current Stage 2 product slice adds:
 - an executable repository-local CLI with stable help, version, parsing, output, and exit behavior;
 - an exact runtime registry that exposes only implemented commands;
 - `InitRequest`, `InitReport`, `DoctorRequest`, `DoctorReport`, `ProjectInspectRequest`, `ProjectInspectReport`, pack-list, pack-doctor, skill-list, skill-check, static engine-status, and static engine-capabilities schemas;
-- write-free `agpb init` classification for a fixed 16-target project-local layout;
+- write-free `agpb init` classification for a fixed 20-target project-local layout;
 - read-only `agpb doctor` checks for runtime, registry, project-state, installed-pack-state, and active-marker safety;
 - static read-only `agpb project inspect` for bounded engine markers, canonical profile compatibility, marker-only dirty state, and unbound Editor signals;
 - read-only `agpb pack list` and `agpb pack doctor` for bounded installed identity, ownership counts, artifact and directory integrity, and active recovery summaries without content disclosure, repair, or finalization;

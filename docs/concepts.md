@@ -22,6 +22,7 @@ The current foundation implements these contracts as versioned JSON schemas and 
 | --- | --- |
 | `CommandDescriptor` | Input/output schemas, required capabilities, permissions, side effects, lane, timeout, retry, budgets, and required evidence for one operation |
 | `PackManifest` | Pack version, compatible engines, supplied skills and commands, dependencies, digest, owned paths, and install/update/remove lifecycle |
+| `ProjectPackLock` | Canonical project-bound installed-pack identities, exact dependency bindings, manifest digests, and a self-attested lock digest |
 | `GameProjectProfile` | Engine, version, project identity, development stage, target platform, and declared quality/change budgets |
 | `EngineCapabilityReport` | Detected operations, limitations, identity, and support grade for the current environment |
 | `EngineStatusReport` | One static engine/project compatibility observation with explicit executable and evidence gaps; it cannot establish a support grade above `planned` |

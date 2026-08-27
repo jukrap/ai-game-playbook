@@ -47,6 +47,7 @@ const reviewDesignSurface = {
   publicTypes: [
     "CommandDescriptor",
     "PackManifest",
+    "ProjectPackLock",
     "GameProjectProfile",
     "EngineCapabilityReport",
     "FeatureContract",

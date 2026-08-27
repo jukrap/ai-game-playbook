@@ -1,6 +1,6 @@
 ---
 source: docs/roadmap.md
-source_sha256: 731989dd3dc22944e10d9f5a0973a7be06f9fd9d6513e16f508a6f80247de655
+source_sha256: e85e97f7105dff1b82cd1da465926a8c0685921553a5f238e288c9e0eab28d5a
 translated_at: 2026-08-27
 ---
 
@@ -19,7 +19,7 @@ translated_at: 2026-08-27
 - stable help, version, parsing, output, exit behavior를 가진 executable repository-local CLI;
 - implemented command만 노출하는 exact runtime registry;
 - `InitRequest`, `InitReport`, `DoctorRequest`, `DoctorReport`, `ProjectInspectRequest`, `ProjectInspectReport`, pack-list, pack-doctor, skill-list, skill-check, static engine-status/engine-capabilities schema;
-- 고정된 project-local target 16개를 분류하는 write-free `agpb init`;
+- 고정된 project-local target 20개를 분류하는 write-free `agpb init`;
 - runtime, registry, project state, installed-pack state, active marker를 검사하는 read-only `agpb doctor`;
 - bounded engine marker, canonical profile compatibility, marker-only dirty state, unbound Editor signal을 검사하는 static read-only `agpb project inspect`;
 - content 노출, repair, finalization 없이 bounded installed identity, ownership count, artifact/directory integrity, active recovery summary를 제공하는 read-only `agpb pack list`와 `agpb pack doctor`;

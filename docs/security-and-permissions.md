@@ -50,7 +50,7 @@ MCP annotations, skill text, engine bridges, and host UI labels never grant perm
 
 ## Initialization planning boundary
 
-`agpb init` observes a fixed 16-target project layout and returns only a validated plan. It does not create a directory, write profile or policy bytes, install a pack, access the network, or reserve mutation authority. Existing targets with the expected filesystem kind are retained; type, case, link, parent, and observation conflicts block the plan without modifying the conflicting object. Retention does not validate existing metadata content.
+`agpb init` observes a fixed 20-target project layout and returns only a validated plan. It does not create a directory, write profile or policy bytes, install a pack, access the network, or reserve mutation authority. Existing targets with the expected filesystem kind are retained; type, case, link, parent, and observation conflicts block the plan without modifying the conflicting object. Retention does not validate existing metadata content.
 
 A ready plan carries a digest over the runtime registry, canonical project identity, ordered target intent, and observed target state. The digest detects plan drift; it is not an approval grant, write lease, checkpoint, or apply token. `--apply` is rejected as invalid usage until a separate mutation contract and permission path are implemented.
 

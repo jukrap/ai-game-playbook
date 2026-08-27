@@ -21,6 +21,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
       "init",
       "pack.doctor",
       "pack.list",
+      "project.initialization-recovery.assess",
       "project.initialize",
       "project.inspect",
       "skill.check",
@@ -304,6 +305,61 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   );
   assert.match(initialize.handler.digest, digestPattern);
 
+  const recoveryAssessment = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "project.initialization-recovery.assess",
+  );
+  assert.notEqual(recoveryAssessment, undefined);
+  assert.equal(recoveryAssessment.lifecycle, "internal");
+  assert.deepEqual(recoveryAssessment.cli, {
+    path: ["internal", "project", "initialization-recovery", "assess"],
+    aliases: [],
+  });
+  assert.deepEqual(recoveryAssessment.permissions, ["read-project"]);
+  assert.deepEqual(recoveryAssessment.sideEffects, [
+    {
+      kind: "none",
+      scope: "project-initialization-recovery-assessment",
+      boundary: "local",
+    },
+  ]);
+  assert.equal(recoveryAssessment.lane, "parallel-read");
+  assert.equal(recoveryAssessment.timeoutMs, 10_000);
+  assert.deepEqual(recoveryAssessment.cancellation, {
+    mode: "not-applicable",
+    graceMs: 0,
+  });
+  assert.deepEqual(recoveryAssessment.retry, {
+    mode: "never",
+    maxAttempts: 1,
+  });
+  assert.deepEqual(recoveryAssessment.budgets, {
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: 10_000,
+    maxOutputBytes: 1_048_576,
+    maxRepairCycles: 0,
+  });
+  assert.deepEqual(recoveryAssessment.requiredEvidence, [
+    "project-initialization-recovery-assessment",
+  ]);
+  assert.equal(
+    recoveryAssessment.input.schemaId,
+    contracts.projectInitializationRecoveryRequestSchema.schemaId,
+  );
+  assert.equal(
+    recoveryAssessment.output.schemaId,
+    contracts.projectInitializationRecoveryReportSchema.schemaId,
+  );
+  assert.equal(
+    recoveryAssessment.handler.package,
+    "@ai-game-playbook/project-runtime",
+  );
+  assert.equal(
+    recoveryAssessment.handler.export,
+    "runProjectInitializationRecoveryAssessment",
+  );
+  assert.match(recoveryAssessment.handler.digest, digestPattern);
+
   for (const [id, inputSchema, outputSchema, exportName, scope] of [
     [
       "pack.doctor",
@@ -525,6 +581,25 @@ test("builtin generated surfaces preserve implemented schema and command identit
   assert.equal(
     surfaces.mcp.data.tools.every(({ enabledByDefault }) => !enabledByDefault),
     true,
+  );
+  const recoveryCommandId = "project.initialization-recovery.assess";
+  assert.equal(
+    surfaces.cli.data.commands.some(({ id }) => id === recoveryCommandId),
+    false,
+  );
+  assert.equal(
+    surfaces.docs.data.commands.some(({ id }) => id === recoveryCommandId),
+    false,
+  );
+  assert.equal(
+    surfaces.mcp.data.tools.some(
+      ({ commandId }) => commandId === recoveryCommandId,
+    ),
+    false,
+  );
+  assert.equal(
+    JSON.stringify(surfaces.skills.data).includes(recoveryCommandId),
+    false,
   );
   assert.equal(
     surfaces.mcp.data.tools[0].outputSchemaId,

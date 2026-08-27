@@ -149,6 +149,24 @@ test("a same-process query can load exactly one current checkpoint chain without
   assert.equal(loaded.chainLength, 1);
 });
 
+test("a same-process query can retain the validated chronological checkpoint chain", async (t) => {
+  const { root } = await fixture(t);
+  const { checkpoint, stored } = await persistInitialCheckpoint(root);
+  const query = await core.queryWorkflowCheckpointHeads(queryRequest(root));
+
+  assert.equal(typeof core.loadQueriedWorkflowCheckpointChain, "function");
+  const loaded = await core.loadQueriedWorkflowCheckpointChain({
+    query,
+    runId: RUN_ID,
+  });
+
+  assert.equal(Object.isFrozen(loaded), true);
+  assert.equal(Object.isFrozen(loaded.checkpoints), true);
+  assert.equal(loaded.stored.headDigest, stored.headDigest);
+  assert.equal(loaded.stored.chainLength, 1);
+  assert.deepEqual(loaded.checkpoints, [checkpoint]);
+});
+
 test("queried checkpoint loading rejects copied authority and a changed head witness", async (t) => {
   const { project, root } = await fixture(t);
   await persistInitialCheckpoint(root);

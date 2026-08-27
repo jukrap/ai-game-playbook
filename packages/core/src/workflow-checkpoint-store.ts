@@ -108,6 +108,7 @@ interface StoredMetadata {
   readonly head: WorkflowCheckpointHead;
   readonly headFileDigest: Sha256Digest;
   readonly recordFileDigest: Sha256Digest;
+  readonly checkpoints?: readonly WorkflowCheckpointRecord[];
 }
 
 interface NormalizedQueryRequest {
@@ -144,6 +145,11 @@ export interface StoredWorkflowCheckpoint {
   readonly headDigest: Sha256Digest;
   readonly chainLength: number;
   readonly checkpoint: WorkflowCheckpointRecord;
+}
+
+export interface LoadedWorkflowCheckpointChain {
+  readonly stored: StoredWorkflowCheckpoint;
+  readonly checkpoints: readonly WorkflowCheckpointRecord[];
 }
 
 export interface PersistWorkflowCheckpointRequest {
@@ -1802,6 +1808,27 @@ export async function loadQueriedWorkflowCheckpoint(
   return loaded;
 }
 
+export async function loadQueriedWorkflowCheckpointChain(
+  value: LoadQueriedWorkflowCheckpointRequest,
+): Promise<LoadedWorkflowCheckpointChain> {
+  const stored = await loadQueriedWorkflowCheckpoint(value);
+  const metadata = storedMetadata.get(stored);
+  const checkpoints = metadata?.checkpoints;
+  if (
+    checkpoints === undefined ||
+    checkpoints.length !== stored.chainLength ||
+    checkpoints.at(-1)?.checkpointDigest !==
+      stored.checkpoint.checkpointDigest
+  ) {
+    throw storeError(
+      "workflow-checkpoint-store-corrupt",
+      "$checkpointChain",
+      "validated checkpoint chain metadata is unavailable or inconsistent",
+    );
+  }
+  return Object.freeze({ stored, checkpoints });
+}
+
 async function writeImmutableRecord(
   root: CanonicalProjectRoot,
   path: string,
@@ -1949,6 +1976,7 @@ function makeStored(
   head: WorkflowCheckpointHead,
   headFileDigest: Sha256Digest,
   recordFileDigest: Sha256Digest,
+  checkpoints?: readonly WorkflowCheckpointRecord[],
 ): StoredWorkflowCheckpoint {
   const stored: StoredWorkflowCheckpoint = Object.freeze({
     rootIdentityDigest: root.identityDigest,
@@ -1961,6 +1989,9 @@ function makeStored(
     head,
     headFileDigest,
     recordFileDigest,
+    ...(checkpoints === undefined
+      ? {}
+      : { checkpoints: Object.freeze([...checkpoints]) }),
   });
   return stored;
 }
@@ -2278,6 +2309,7 @@ export async function loadWorkflowCheckpoint(
   let child: WorkflowCheckpointRecord | undefined;
   let current: WorkflowCheckpointRecord | undefined;
   let headRecordFileDigest: Sha256Digest | undefined;
+  const checkpointsNewestFirst: WorkflowCheckpointRecord[] = [];
   const visited = new Set<Sha256Digest>();
   while (expectedSequence >= 0) {
     if (visited.has(expectedDigest)) {
@@ -2326,6 +2358,7 @@ export async function loadWorkflowCheckpoint(
       );
     }
     const plan = assertPlanBinding(request.registry, current);
+    checkpointsNewestFirst.push(current);
     if (child !== undefined) assertSuccessor(current, child, plan);
     if (expectedSequence === head.sequence) {
       headRecordFileDigest = file.digest;
@@ -2403,12 +2436,25 @@ export async function loadWorkflowCheckpoint(
     currentRecordPath,
   );
   assertExpectedIdentity(request, headCheckpoint);
+  const checkpoints = checkpointsNewestFirst.reverse();
+  checkpoints[checkpoints.length - 1] = headCheckpoint;
+  if (
+    checkpoints.length !== head.sequence + 1 ||
+    checkpoints.at(-1)?.checkpointDigest !== head.checkpointDigest
+  ) {
+    throw storeError(
+      "workflow-checkpoint-store-corrupt",
+      checkpointHeadPath,
+      "validated checkpoint chain length or head is inconsistent",
+    );
+  }
   return makeStored(
     request.root,
     headCheckpoint,
     head,
     headFile.digest,
     currentRecordFile.digest,
+    checkpoints,
   );
 }
 

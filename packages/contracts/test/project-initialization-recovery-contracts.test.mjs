@@ -289,3 +289,28 @@ test("recovery reports reject unbound authority promoted as current and noncanon
     /candidate/i,
   );
 });
+
+test("current authority may be corrupt but cannot be mislabeled as stale", () => {
+  const corrupt = candidate({
+    disposition: "corrupt",
+    actionCode: "repair-initialization-evidence",
+  });
+  const valid = reportWithCandidates([corrupt], {
+    status: "blocked",
+    code: "initialization-recovery-blocked",
+  });
+  assert.doesNotThrow(() =>
+    contracts.assertProjectInitializationRecoveryReportSemantics(valid),
+  );
+
+  const mislabeled = candidate({
+    disposition: "authority-stale",
+    actionCode: "inspect-initialization-authority",
+  });
+  const invalid = { ...valid, candidates: [mislabeled] };
+  assert.throws(
+    () =>
+      contracts.assertProjectInitializationRecoveryReportSemantics(invalid),
+    /candidate|authority/i,
+  );
+});

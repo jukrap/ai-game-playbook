@@ -8,15 +8,21 @@ test("project runtime exposes inspection and bounded initialization execution", 
     "PROJECT_INITIALIZATION_IGNORE_POLICY",
     "ProjectRuntimeError",
     "assertPreparedProjectInitialization",
+    "assertProjectInitializationRecoveryAssessmentWitness",
     "createProjectInitializationAuthorizationRequest",
     "createProjectInitializationCommandInput",
     "executePreparedProjectInitialization",
     "prepareProjectInitialization",
+    "runProjectInitializationRecoveryAssessment",
     "runProjectInspect",
   ]);
   assert.equal(typeof projectRuntime.ProjectRuntimeError, "function");
   assert.equal(
     typeof projectRuntime.assertPreparedProjectInitialization,
+    "function",
+  );
+  assert.equal(
+    typeof projectRuntime.assertProjectInitializationRecoveryAssessmentWitness,
     "function",
   );
   assert.equal(
@@ -32,5 +38,9 @@ test("project runtime exposes inspection and bounded initialization execution", 
     "function",
   );
   assert.equal(typeof projectRuntime.prepareProjectInitialization, "function");
+  assert.equal(
+    typeof projectRuntime.runProjectInitializationRecoveryAssessment,
+    "function",
+  );
   assert.equal(typeof projectRuntime.runProjectInspect, "function");
 });

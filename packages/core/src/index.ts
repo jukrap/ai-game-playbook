@@ -224,6 +224,7 @@ export type {
 } from "./project-lane.js";
 export {
   loadQueriedWorkflowCheckpoint,
+  loadQueriedWorkflowCheckpointChain,
   loadWorkflowCheckpoint,
   persistWorkflowCheckpoint,
   queryWorkflowCheckpointHeads,
@@ -239,6 +240,7 @@ export {
 } from "./workflow-checkpoint-store.js";
 export type {
   LoadQueriedWorkflowCheckpointRequest,
+  LoadedWorkflowCheckpointChain,
   LoadWorkflowCheckpointRequest,
   PersistWorkflowCheckpointRequest,
   QueryWorkflowCheckpointHeadsRequest,

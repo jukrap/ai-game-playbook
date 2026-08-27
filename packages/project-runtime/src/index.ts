@@ -20,4 +20,8 @@ export type {
   CreateProjectInitializationAuthorizationRequest,
   ExecutePreparedProjectInitializationRequest,
 } from "./project-initialization-execute.js";
+export {
+  assertProjectInitializationRecoveryAssessmentWitness,
+  runProjectInitializationRecoveryAssessment,
+} from "./project-initialization-recovery-assess.js";
 export { runProjectInspect } from "./project-inspect.js";

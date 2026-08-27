@@ -40,6 +40,8 @@ const expectedIds = [
   "process-containment-self-test-report",
   "process-containment-self-test-request",
   "project-initialization-command-input",
+  "project-initialization-recovery-report",
+  "project-initialization-recovery-request",
   "project-initialization-report",
   "project-inspect-report",
   "project-inspect-request",

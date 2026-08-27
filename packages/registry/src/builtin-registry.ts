@@ -33,8 +33,11 @@ import {
   PROJECT_INITIALIZATION_COMMAND_MAX_MUTATION_BYTES,
   PROJECT_INITIALIZATION_COMMAND_MAX_OUTPUT_BYTES,
   PROJECT_INITIALIZATION_COMMAND_TARGET_COUNT,
+  PROJECT_INITIALIZATION_RECOVERY_ASSESS_COMMAND_ID,
   projectInitializationCommandInputSchema,
   projectInitializationReportSchema,
+  projectInitializationRecoveryReportSchema,
+  projectInitializationRecoveryRequestSchema,
   projectInspectReportSchema,
   projectInspectRequestSchema,
   runReceiptSchema,
@@ -582,6 +585,66 @@ const projectInspectCommand: CommandDescriptor = Object.freeze({
   }),
 });
 
+const projectInitializationRecoveryAssessmentCommand: CommandDescriptor =
+  Object.freeze({
+    schemaVersion: parseSemanticVersion("1.0.0").value,
+    id: parseStableId(PROJECT_INITIALIZATION_RECOVERY_ASSESS_COMMAND_ID),
+    version: parseSemanticVersion("1.0.0").value,
+    lifecycle: "internal",
+    summary:
+      "Assess bounded project initialization recovery state without mutation.",
+    cli: Object.freeze({
+      path: Object.freeze([
+        "internal",
+        "project",
+        "initialization-recovery",
+        "assess",
+      ]),
+      aliases: Object.freeze([]),
+    }),
+    input: Object.freeze({
+      schemaId: projectInitializationRecoveryRequestSchema.schemaId,
+      digest: projectInitializationRecoveryRequestSchema.digest,
+    }),
+    output: Object.freeze({
+      schemaId: projectInitializationRecoveryReportSchema.schemaId,
+      digest: projectInitializationRecoveryReportSchema.digest,
+    }),
+    capabilities: Object.freeze([
+      parseStableId(PROJECT_INITIALIZATION_RECOVERY_ASSESS_COMMAND_ID),
+    ]),
+    supportedStages: supportedStages(),
+    permissions: Object.freeze<PermissionClass[]>(["read-project"]),
+    sideEffects: Object.freeze([
+      Object.freeze({
+        kind: "none",
+        scope: "project-initialization-recovery-assessment",
+        boundary: "local",
+      }),
+    ]),
+    lane: "parallel-read",
+    timeoutMs: 10_000,
+    cancellation: Object.freeze({ mode: "not-applicable", graceMs: 0 }),
+    retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+    budgets: Object.freeze({
+      maxChangedFiles: 0,
+      maxChangedBytes: 0,
+      maxDurationMs: 10_000,
+      maxOutputBytes: 1_048_576,
+      maxRepairCycles: 0,
+    }),
+    requiredEvidence: Object.freeze([
+      parseStableId("project-initialization-recovery-assessment"),
+    ]),
+    handler: Object.freeze({
+      package: "@ai-game-playbook/project-runtime",
+      export: "runProjectInitializationRecoveryAssessment",
+      digest: parseSha256Digest(
+        "sha256:dbb1166633739c6c637845af97c74bee2793fb57f1bb3806ab280fe78fc3b79a",
+      ),
+    }),
+  });
+
 const projectInitializationCommand: CommandDescriptor = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   id: parseStableId("project.initialize"),
@@ -884,6 +947,8 @@ const definition: RegistryDefinition = Object.freeze({
     processContainmentAssessmentReportSchema,
     projectInitializationCommandInputSchema,
     projectInitializationReportSchema,
+    projectInitializationRecoveryRequestSchema,
+    projectInitializationRecoveryReportSchema,
     projectInspectRequestSchema,
     projectInspectReportSchema,
     runReceiptSchema,
@@ -903,6 +968,7 @@ const definition: RegistryDefinition = Object.freeze({
     initCommand,
     packDoctorCommand,
     packListCommand,
+    projectInitializationRecoveryAssessmentCommand,
     projectInitializationCommand,
     projectInspectCommand,
     skillCheckCommand,

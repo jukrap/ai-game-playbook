@@ -479,11 +479,15 @@ function validateCandidate(value: unknown): ProjectInitializationRecoveryCandida
       !isSha256Digest(candidate["receiptChainHead"])) ||
     (candidate["projectAuthority"] === "unbound") !==
       (candidate["projectRootIdentityDigest"] === undefined) ||
-    (candidate["registryAuthority"] === "stale") !==
-      (disposition === "authority-stale" || disposition === "corrupt") ||
+    (candidate["registryAuthority"] === "stale" &&
+      disposition !== "authority-stale" &&
+      disposition !== "corrupt") ||
     (candidate["projectAuthority"] !== "current" &&
       disposition !== "authority-stale" &&
-      disposition !== "corrupt")
+      disposition !== "corrupt") ||
+    (disposition === "authority-stale" &&
+      candidate["registryAuthority"] === "current" &&
+      candidate["projectAuthority"] === "current")
   ) {
     throw new TypeError("recovery candidate identity is contradictory");
   }

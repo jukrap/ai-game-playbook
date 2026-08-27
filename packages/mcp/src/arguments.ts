@@ -1,4 +1,5 @@
 import { McpRuntimeBoundaryError } from "./errors.js";
+import { snapshotDenseDataArray } from "./plain-data.js";
 
 export interface McpRuntimeArguments {
   readonly projectRoot: string;
@@ -32,11 +33,14 @@ function boundedArgument(value: string | undefined): string {
 export function parseMcpRuntimeArguments(
   argv: readonly string[],
 ): McpRuntimeArguments {
-  if (!Array.isArray(argv) || argv.length === 0 || argv.length > MAX_ARGUMENTS) {
+  const values = snapshotDenseDataArray(argv, MAX_ARGUMENTS);
+  if (values === undefined || values.length === 0) {
     invalidArguments();
   }
-  for (const value of argv) {
-    boundedArgument(value);
+  const arguments_: string[] = [];
+  for (const value of values) {
+    if (typeof value !== "string") invalidArguments();
+    arguments_.push(boundedArgument(value));
   }
 
   let projectRoot: string | undefined;
@@ -44,18 +48,18 @@ export function parseMcpRuntimeArguments(
   const enabledTools: string[] = [];
   const seenTools = new Set<string>();
 
-  for (let index = 0; index < argv.length; index += 1) {
-    const option = argv[index];
+  for (let index = 0; index < arguments_.length; index += 1) {
+    const option = arguments_[index];
     if (option === "--project-root") {
       if (projectRoot !== undefined) {
         invalidArguments();
       }
-      projectRoot = boundedArgument(argv[index + 1]);
+      projectRoot = boundedArgument(arguments_[index + 1]);
       index += 1;
       continue;
     }
     if (option === "--enable-tool") {
-      const tool = boundedArgument(argv[index + 1]);
+      const tool = boundedArgument(arguments_[index + 1]);
       if (
         tool.length > 128 ||
         !/^agpb_[a-z][a-z0-9_]*$/u.test(tool) ||

@@ -34,6 +34,10 @@ import type { CallToolResult } from "@modelcontextprotocol/server";
 import { isAbsolute, resolve } from "node:path";
 
 import { McpRuntimeBoundaryError } from "./errors.js";
+import {
+  snapshotDenseDataArray,
+  snapshotExactDataRecord,
+} from "./plain-data.js";
 
 export interface McpRuntimeTool {
   readonly commandId: string;
@@ -195,17 +199,6 @@ const HANDLERS: ReadonlyMap<string, HandlerBinding> = new Map<
   ],
 ]);
 
-function keysAreExact(
-  value: object,
-  expected: readonly string[],
-): boolean {
-  const actual = Object.keys(value).sort();
-  return (
-    actual.length === expected.length &&
-    actual.every((key, index) => key === [...expected].sort()[index])
-  );
-}
-
 function samePath(left: string, right: string): boolean {
   return process.platform === "win32"
     ? left.toLowerCase() === right.toLowerCase()
@@ -276,36 +269,40 @@ function publicTool(tool: McpToolSurface): McpRuntimeTool {
 }
 
 function validateOptions(
-  options: CreateMcpRuntimePlanOptions,
+  options: unknown,
 ): CreateMcpRuntimePlanOptions {
+  const record = snapshotExactDataRecord(options, [
+    "allowHostDisclosure",
+    "enabledTools",
+    "projectRoot",
+  ]);
+  const enabledTools = snapshotDenseDataArray(record?.enabledTools, 32);
   if (
-    typeof options !== "object" ||
-    options === null ||
-    !keysAreExact(options, [
-      "allowHostDisclosure",
-      "enabledTools",
-      "projectRoot",
-    ]) ||
-    typeof options.projectRoot !== "string" ||
-    options.projectRoot.length === 0 ||
-    options.projectRoot.length > 32_767 ||
-    /[\u0000-\u001F\u007F]/u.test(options.projectRoot) ||
-    !Array.isArray(options.enabledTools) ||
-    options.enabledTools.length === 0 ||
-    options.enabledTools.length > 32
+    record === undefined ||
+    typeof record.projectRoot !== "string" ||
+    record.projectRoot.length === 0 ||
+    record.projectRoot.length > 32_767 ||
+    /[\u0000-\u001F\u007F]/u.test(record.projectRoot) ||
+    enabledTools === undefined ||
+    enabledTools.length === 0 ||
+    enabledTools.some((tool) => typeof tool !== "string")
   ) {
     throw new McpRuntimeBoundaryError(
       "mcp-tool-selection-invalid",
       "MCP tool selection does not satisfy the bounded runtime contract.",
     );
   }
-  if (options.allowHostDisclosure !== true) {
+  if (record.allowHostDisclosure !== true) {
     throw new McpRuntimeBoundaryError(
       "mcp-host-disclosure-required",
       "MCP startup requires explicit host disclosure acknowledgement.",
     );
   }
-  return options;
+  return Object.freeze({
+    projectRoot: record.projectRoot,
+    enabledTools: enabledTools as readonly string[],
+    allowHostDisclosure: true,
+  });
 }
 
 export async function createMcpRuntimePlan(
@@ -515,18 +512,17 @@ export async function invokeMcpTool(
 ): Promise<CallToolResult> {
   const state = assertPlan(plan);
   try {
+    const record = snapshotExactDataRecord(request, ["arguments", "name"]);
     if (
-      typeof request !== "object" ||
-      request === null ||
-      !keysAreExact(request, ["arguments", "name"]) ||
-      typeof request.name !== "string"
+      record === undefined ||
+      typeof record.name !== "string"
     ) {
       throw new McpRuntimeBoundaryError(
         "mcp-command-input-invalid",
         "MCP invocation request is outside the bounded call contract.",
       );
     }
-    const tool = state.tools.get(request.name);
+    const tool = state.tools.get(record.name);
     if (tool === undefined) {
       throw new McpRuntimeBoundaryError(
         "mcp-tool-unavailable",
@@ -535,7 +531,7 @@ export async function invokeMcpTool(
     }
     const command = tool.meta.command;
     const binding = assertHandlerBinding(command);
-    const input = await boundCommandInput(state, command, request.arguments);
+    const input = await boundCommandInput(state, command, record.arguments);
     const output = await runWithDeadline(
       () => binding.invoke(input),
       command.timeoutMs,

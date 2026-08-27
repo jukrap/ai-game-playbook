@@ -82,6 +82,50 @@ test("runtime arguments require explicit project, tool allowlist, and host discl
   }
 });
 
+test("runtime arguments reject hidden array state and accessors without invoking them", () => {
+  const valid = [
+    "--project-root",
+    ".",
+    "--enable-tool",
+    "agpb_doctor",
+    "--allow-host-disclosure",
+  ];
+  let getterCalled = false;
+  const accessorArguments = [...valid];
+  Object.defineProperty(accessorArguments, "0", {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return "--project-root";
+    },
+  });
+  assert.throws(
+    () => parseMcpRuntimeArguments(accessorArguments),
+    (error) =>
+      error instanceof McpRuntimeBoundaryError &&
+      error.code === "mcp-arguments-invalid",
+  );
+  assert.equal(getterCalled, false);
+
+  class ArgumentList extends Array {}
+  for (const hiddenArguments of [
+    (() => {
+      const value = [...valid];
+      Object.defineProperty(value, "provider", { value: "hidden" });
+      return value;
+    })(),
+    Object.assign([...valid], { [Symbol("authority")]: true }),
+    new ArgumentList(...valid),
+  ]) {
+    assert.throws(
+      () => parseMcpRuntimeArguments(hiddenArguments),
+      (error) =>
+        error instanceof McpRuntimeBoundaryError &&
+        error.code === "mcp-arguments-invalid",
+    );
+  }
+});
+
 test("runtime plans bind explicit generated read-only tools to one project identity", async () => {
   await withProject(async (root) => {
     const plan = await createMcpRuntimePlan({
@@ -124,6 +168,76 @@ test("runtime plans bind explicit generated read-only tools to one project ident
         error instanceof McpRuntimeBoundaryError &&
         error.code === "mcp-host-disclosure-required",
     );
+  });
+});
+
+test("runtime plan options reject hidden fields and accessors without invoking them", async () => {
+  await withProject(async (root) => {
+    let getterCalled = false;
+    const accessorOptions = {
+      enabledTools: ["agpb_doctor"],
+      allowHostDisclosure: true,
+    };
+    Object.defineProperty(accessorOptions, "projectRoot", {
+      enumerable: true,
+      get() {
+        getterCalled = true;
+        return root;
+      },
+    });
+    await assert.rejects(
+      createMcpRuntimePlan(accessorOptions),
+      (error) =>
+        error instanceof McpRuntimeBoundaryError &&
+        error.code === "mcp-tool-selection-invalid",
+    );
+    assert.equal(getterCalled, false);
+
+    for (const hiddenOptions of [
+      (() => {
+        const value = {
+          projectRoot: root,
+          enabledTools: ["agpb_doctor"],
+          allowHostDisclosure: true,
+        };
+        Object.defineProperty(value, "provider", { value: "hidden" });
+        return value;
+      })(),
+      {
+        projectRoot: root,
+        enabledTools: ["agpb_doctor"],
+        allowHostDisclosure: true,
+        [Symbol("authority")]: true,
+      },
+    ]) {
+      await assert.rejects(
+        createMcpRuntimePlan(hiddenOptions),
+        (error) =>
+          error instanceof McpRuntimeBoundaryError &&
+          error.code === "mcp-tool-selection-invalid",
+      );
+    }
+
+    getterCalled = false;
+    const accessorTools = [];
+    Object.defineProperty(accessorTools, "0", {
+      enumerable: true,
+      get() {
+        getterCalled = true;
+        return "agpb_doctor";
+      },
+    });
+    await assert.rejects(
+      createMcpRuntimePlan({
+        projectRoot: root,
+        enabledTools: accessorTools,
+        allowHostDisclosure: true,
+      }),
+      (error) =>
+        error instanceof McpRuntimeBoundaryError &&
+        error.code === "mcp-tool-selection-invalid",
+    );
+    assert.equal(getterCalled, false);
   });
 });
 
@@ -175,6 +289,73 @@ test("direct invocation validates the exact bound project and emits canonical st
     } finally {
       await rm(foreign, { recursive: true, force: true });
     }
+  });
+});
+
+test("direct invocation rejects hidden fields and accessors without invoking them", async () => {
+  await withProject(async (root) => {
+    const plan = await createMcpRuntimePlan({
+      projectRoot: root,
+      enabledTools: ["agpb_doctor"],
+      allowHostDisclosure: true,
+    });
+    const arguments_ = { schemaVersion: "1.0.0", projectRoot: root };
+    let getterCalled = false;
+    const accessorRequest = { arguments: arguments_ };
+    Object.defineProperty(accessorRequest, "name", {
+      enumerable: true,
+      get() {
+        getterCalled = true;
+        return "agpb_doctor";
+      },
+    });
+    const accessorResult = await invokeMcpTool(plan, accessorRequest);
+    assert.equal(accessorResult.isError, true);
+    assert.match(
+      accessorResult.content[0]?.text ?? "",
+      /mcp-command-input-invalid/u,
+    );
+    assert.equal(getterCalled, false);
+
+    for (const hiddenRequest of [
+      (() => {
+        const value = { name: "agpb_doctor", arguments: arguments_ };
+        Object.defineProperty(value, "provider", { value: "hidden" });
+        return value;
+      })(),
+      {
+        name: "agpb_doctor",
+        arguments: arguments_,
+        [Symbol("authority")]: true,
+      },
+    ]) {
+      const denied = await invokeMcpTool(plan, hiddenRequest);
+      assert.equal(denied.isError, true);
+      assert.match(
+        denied.content[0]?.text ?? "",
+        /mcp-command-input-invalid/u,
+      );
+    }
+
+    getterCalled = false;
+    const accessorArgumentsRequest = { name: "agpb_doctor" };
+    Object.defineProperty(accessorArgumentsRequest, "arguments", {
+      enumerable: true,
+      get() {
+        getterCalled = true;
+        return arguments_;
+      },
+    });
+    const argumentsResult = await invokeMcpTool(
+      plan,
+      accessorArgumentsRequest,
+    );
+    assert.equal(argumentsResult.isError, true);
+    assert.match(
+      argumentsResult.content[0]?.text ?? "",
+      /mcp-command-input-invalid/u,
+    );
+    assert.equal(getterCalled, false);
   });
 });
 

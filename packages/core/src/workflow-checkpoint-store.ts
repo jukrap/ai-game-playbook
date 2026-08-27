@@ -24,7 +24,7 @@ import {
   type ValidatedRegistry,
 } from "@ai-game-playbook/registry";
 import { constants, type BigIntStats } from "node:fs";
-import { open, type FileHandle } from "node:fs/promises";
+import { open, opendir, type FileHandle } from "node:fs/promises";
 
 import { writeProjectFileCas } from "./cas-write.js";
 import {
@@ -52,10 +52,18 @@ export const WORKFLOW_CHECKPOINT_MAX_RECORD_BYTES: number = 1024 * 1024;
 export const WORKFLOW_CHECKPOINT_MAX_HEAD_BYTES: number = 16 * 1024;
 export const WORKFLOW_CHECKPOINT_MAX_CHAIN_LENGTH = 4096;
 export const WORKFLOW_CHECKPOINT_MAX_CHAIN_BYTES: number = 64 * 1024 * 1024;
+export const WORKFLOW_CHECKPOINT_QUERY_MAX_ENTRIES = 16_384;
+export const WORKFLOW_CHECKPOINT_QUERY_MAX_HEADS = 1_024;
+export const WORKFLOW_CHECKPOINT_QUERY_MAX_TOTAL_HEAD_BYTES: number =
+  16 * 1024 * 1024;
 
 const HEAD_SCHEMA_VERSION = "1.0.0" as const;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const HEAD_FILE_PATTERN =
+  /^([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.head\.json$/;
+const RECORD_FILE_PATTERN =
+  /^([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.(0|[1-9][0-9]{0,6})\.([0-9a-f]{64})\.checkpoint\.json$/;
 const PROJECT_STAGES = new Set<ProjectStage>([
   "concept",
   "risk-prototype",
@@ -102,6 +110,35 @@ interface StoredMetadata {
   readonly recordFileDigest: Sha256Digest;
 }
 
+interface NormalizedQueryRequest {
+  readonly root: CanonicalProjectRoot;
+  readonly registry: ValidatedRegistry;
+  readonly maxEntries: number;
+  readonly maxHeads: number;
+  readonly maxTotalHeadBytes: number;
+}
+
+interface WorkflowCheckpointStoreInventory {
+  readonly entries: readonly string[];
+  readonly headFiles: readonly string[];
+  readonly recordFiles: readonly string[];
+}
+
+interface QueriedWorkflowCheckpointHeadWitness {
+  readonly head: WorkflowCheckpointHead;
+  readonly headFileDigest: Sha256Digest;
+  readonly latestCheckpoint: WorkflowCheckpointRecord;
+  readonly recordPath: string;
+  readonly recordFileDigest: Sha256Digest;
+}
+
+interface WorkflowCheckpointHeadQueryMetadata {
+  readonly request: NormalizedQueryRequest;
+  readonly directory?: ResolvedProjectPath;
+  readonly inventory: WorkflowCheckpointStoreInventory;
+  readonly heads: ReadonlyMap<string, QueriedWorkflowCheckpointHeadWitness>;
+}
+
 export interface StoredWorkflowCheckpoint {
   readonly rootIdentityDigest: Sha256Digest;
   readonly headDigest: Sha256Digest;
@@ -128,6 +165,68 @@ export interface LoadWorkflowCheckpointRequest {
   readonly now?: () => number;
 }
 
+export interface QueryWorkflowCheckpointHeadsRequest {
+  readonly root: CanonicalProjectRoot;
+  readonly registry: ValidatedRegistry;
+  readonly maxEntries: number;
+  readonly maxHeads: number;
+  readonly maxTotalHeadBytes: number;
+}
+
+export interface LoadQueriedWorkflowCheckpointRequest {
+  readonly query: WorkflowCheckpointHeadQuery;
+  readonly runId: string;
+}
+
+export type WorkflowCheckpointProjectAuthority =
+  | "current"
+  | "foreign"
+  | "unbound";
+export type WorkflowCheckpointRegistryAuthority = "current" | "stale";
+
+export interface WorkflowCheckpointHeadSummary {
+  readonly runId: string;
+  readonly checkpointId: string;
+  readonly sequence: number;
+  readonly checkpointDigest: Sha256Digest;
+  readonly status: WorkflowCheckpointStatus;
+  readonly projectId: StableId;
+  readonly projectIdentityDigest: Sha256Digest;
+  readonly projectRootIdentityDigest?: Sha256Digest;
+  readonly projectAuthority: WorkflowCheckpointProjectAuthority;
+  readonly projectStage: ProjectStage;
+  readonly registryDigest: Sha256Digest;
+  readonly registryAuthority: WorkflowCheckpointRegistryAuthority;
+  readonly workflowId: StableId;
+  readonly workflowVersion: string;
+  readonly resolvedPlanDigest: Sha256Digest;
+  readonly inputDigest: Sha256Digest;
+  readonly featureId?: StableId;
+  readonly featureContractDigest?: Sha256Digest;
+  readonly receiptChainHead?: Sha256Digest;
+  readonly inFlight?: {
+    readonly phase: "command" | "rollback";
+    readonly sideEffect:
+      | "not-started"
+      | "started"
+      | "confirmed"
+      | "rolled-back"
+      | "uncertain";
+  };
+  readonly updatedAt: string;
+  readonly headDigest: Sha256Digest;
+}
+
+export interface WorkflowCheckpointHeadQuery {
+  readonly validationLevel: "head-and-latest-record-presence";
+  readonly rootIdentityDigest: Sha256Digest;
+  readonly registryDigest: Sha256Digest;
+  readonly entriesObserved: number;
+  readonly headFilesObserved: number;
+  readonly recordFilesObserved: number;
+  readonly heads: readonly WorkflowCheckpointHeadSummary[];
+}
+
 export type WorkflowCheckpointResumePolicy = "never" | "safe";
 export type WorkflowCheckpointResumeDisposition =
   | "ready-for-authorization"
@@ -151,12 +250,17 @@ export interface WorkflowCheckpointResumeResult {
 
 const storedMetadata = new WeakMap<object, StoredMetadata>();
 const persistedSuccessors = new WeakMap<object, StoredWorkflowCheckpoint>();
+const queriedHeadMetadata = new WeakMap<
+  object,
+  WorkflowCheckpointHeadQueryMetadata
+>();
 
 function storeError(
   code: Extract<
     CoreBoundaryErrorCode,
     | "invalid-workflow-checkpoint-store-request"
     | "workflow-checkpoint-resume-unsafe"
+    | "workflow-checkpoint-store-budget-exceeded"
     | "workflow-checkpoint-store-conflict"
     | "workflow-checkpoint-store-corrupt"
     | "workflow-checkpoint-store-mismatch"
@@ -230,6 +334,53 @@ function assertRegistry(value: unknown): asserts value is ValidatedRegistry {
       "registry must be validated by this registry runtime",
     );
   }
+}
+
+function queryBudget(value: unknown, maximum: number, path: string): number {
+  if (
+    !Number.isSafeInteger(value) ||
+    (value as number) < 1 ||
+    (value as number) > maximum
+  ) {
+    throw storeError(
+      "invalid-workflow-checkpoint-store-request",
+      path,
+      "query budget is outside the fixed runtime boundary",
+    );
+  }
+  return value as number;
+}
+
+function normalizeQueryRequest(
+  value: QueryWorkflowCheckpointHeadsRequest,
+): NormalizedQueryRequest {
+  const request = dataRecord(value, "$request");
+  exactKeys(
+    request,
+    ["root", "registry", "maxEntries", "maxHeads", "maxTotalHeadBytes"],
+    ["root", "registry", "maxEntries", "maxHeads", "maxTotalHeadBytes"],
+    "$request",
+  );
+  assertRegistry(request["registry"]);
+  return Object.freeze({
+    root: request["root"] as CanonicalProjectRoot,
+    registry: request["registry"],
+    maxEntries: queryBudget(
+      request["maxEntries"],
+      WORKFLOW_CHECKPOINT_QUERY_MAX_ENTRIES,
+      "$request.maxEntries",
+    ),
+    maxHeads: queryBudget(
+      request["maxHeads"],
+      WORKFLOW_CHECKPOINT_QUERY_MAX_HEADS,
+      "$request.maxHeads",
+    ),
+    maxTotalHeadBytes: queryBudget(
+      request["maxTotalHeadBytes"],
+      WORKFLOW_CHECKPOINT_QUERY_MAX_TOTAL_HEAD_BYTES,
+      "$request.maxTotalHeadBytes",
+    ),
+  });
 }
 
 function readClock(value: unknown): number {
@@ -1036,6 +1187,619 @@ async function ensureStoreDirectory(root: CanonicalProjectRoot): Promise<void> {
     expectedType: "directory",
     existence: "required",
   });
+}
+
+async function resolveOptionalWorkflowStore(
+  root: CanonicalProjectRoot,
+): Promise<ResolvedProjectPath | undefined> {
+  try {
+    const directory = await resolveProjectPath(
+      root,
+      WORKFLOW_CHECKPOINT_STORE_PATH,
+      { expectedType: "directory", existence: "optional" },
+    );
+    return directory.kind === "absent" ? undefined : directory;
+  } catch (error) {
+    if (
+      error instanceof CoreBoundaryError &&
+      error.code === "project-path-not-found"
+    ) {
+      return undefined;
+    }
+    if (
+      error instanceof CoreBoundaryError &&
+      error.code === "project-root-drift"
+    ) {
+      throw storeError(
+        "workflow-checkpoint-store-mismatch",
+        WORKFLOW_CHECKPOINT_STORE_PATH,
+        "project root changed before checkpoint storage was opened",
+      );
+    }
+    throw storeError(
+      "workflow-checkpoint-store-corrupt",
+      WORKFLOW_CHECKPOINT_STORE_PATH,
+      "checkpoint storage is not an exact project-local directory",
+    );
+  }
+}
+
+function sameStoreDirectory(
+  left: ResolvedProjectPath,
+  right: ResolvedProjectPath,
+): boolean {
+  return (
+    left.absolutePath === right.absolutePath &&
+    left.targetIdentity !== undefined &&
+    right.targetIdentity !== undefined &&
+    left.targetIdentity.device === right.targetIdentity.device &&
+    left.targetIdentity.inode === right.targetIdentity.inode
+  );
+}
+
+function canonicalRecordFilename(value: string): boolean {
+  const match = RECORD_FILE_PATTERN.exec(value);
+  if (match === null) return false;
+  const sequence = Number(match[2]);
+  return Number.isSafeInteger(sequence) && sequence <= 1_000_000;
+}
+
+function queryStoreFailure(error: unknown): never {
+  if (error instanceof CoreBoundaryError) throw error;
+  throw storeError(
+    "workflow-checkpoint-store-corrupt",
+    WORKFLOW_CHECKPOINT_STORE_PATH,
+    "checkpoint store inventory could not be read within its boundary",
+  );
+}
+
+async function enumerateWorkflowCheckpointStore(
+  absolutePath: string,
+  request: NormalizedQueryRequest,
+): Promise<WorkflowCheckpointStoreInventory> {
+  const entries = new Set<string>();
+  const headFiles: string[] = [];
+  const recordFiles: string[] = [];
+  let observed = 0;
+  let directory: Awaited<ReturnType<typeof opendir>> | undefined;
+  let failure: unknown;
+  try {
+    directory = await opendir(absolutePath);
+    while (true) {
+      const entry = await directory.read();
+      if (entry === null) break;
+      observed += 1;
+      if (observed > request.maxEntries) {
+        throw storeError(
+          "workflow-checkpoint-store-budget-exceeded",
+          WORKFLOW_CHECKPOINT_STORE_PATH,
+          "checkpoint store entry budget was exceeded",
+        );
+      }
+      if (entries.has(entry.name)) {
+        throw storeError(
+          "workflow-checkpoint-store-conflict",
+          WORKFLOW_CHECKPOINT_STORE_PATH,
+          "checkpoint store returned a duplicate entry during inspection",
+        );
+      }
+      entries.add(entry.name);
+      if (!entry.isFile()) {
+        throw storeError(
+          "workflow-checkpoint-store-corrupt",
+          WORKFLOW_CHECKPOINT_STORE_PATH,
+          "checkpoint store entries must be regular files",
+        );
+      }
+      if (HEAD_FILE_PATTERN.test(entry.name)) {
+        headFiles.push(entry.name);
+        if (headFiles.length > request.maxHeads) {
+          throw storeError(
+            "workflow-checkpoint-store-budget-exceeded",
+            WORKFLOW_CHECKPOINT_STORE_PATH,
+            "checkpoint head budget was exceeded",
+          );
+        }
+      } else if (canonicalRecordFilename(entry.name)) {
+        recordFiles.push(entry.name);
+      } else {
+        throw storeError(
+          "workflow-checkpoint-store-corrupt",
+          WORKFLOW_CHECKPOINT_STORE_PATH,
+          "checkpoint store entry does not use a canonical filename",
+        );
+      }
+    }
+  } catch (error) {
+    failure = error;
+  }
+  if (directory !== undefined) {
+    try {
+      await directory.close();
+    } catch (error) {
+      failure ??= error;
+    }
+  }
+  if (failure !== undefined) queryStoreFailure(failure);
+  const sorted = (values: string[]): readonly string[] =>
+    Object.freeze(values.sort(compareCanonicalText));
+  return Object.freeze({
+    entries: sorted([...entries]),
+    headFiles: sorted(headFiles),
+    recordFiles: sorted(recordFiles),
+  });
+}
+
+function sameStringList(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((entry, index) => entry === right[index])
+  );
+}
+
+function sameInventory(
+  left: WorkflowCheckpointStoreInventory,
+  right: WorkflowCheckpointStoreInventory,
+): boolean {
+  return (
+    sameStringList(left.entries, right.entries) &&
+    sameStringList(left.headFiles, right.headFiles) &&
+    sameStringList(left.recordFiles, right.recordFiles)
+  );
+}
+
+function emptyWorkflowCheckpointQuery(
+  request: NormalizedQueryRequest,
+): WorkflowCheckpointHeadQuery {
+  return Object.freeze({
+    validationLevel: "head-and-latest-record-presence",
+    rootIdentityDigest: request.root.identityDigest,
+    registryDigest: request.registry.digest,
+    entriesObserved: 0,
+    headFilesObserved: 0,
+    recordFilesObserved: 0,
+    heads: Object.freeze([]),
+  });
+}
+
+const EMPTY_WORKFLOW_CHECKPOINT_INVENTORY: WorkflowCheckpointStoreInventory =
+  Object.freeze({
+    entries: Object.freeze([]),
+    headFiles: Object.freeze([]),
+    recordFiles: Object.freeze([]),
+  });
+
+function retainWorkflowCheckpointQuery(
+  query: WorkflowCheckpointHeadQuery,
+  metadata: WorkflowCheckpointHeadQueryMetadata,
+): WorkflowCheckpointHeadQuery {
+  queriedHeadMetadata.set(query, Object.freeze(metadata));
+  return query;
+}
+
+function assertHeadMatchesLatestCheckpoint(
+  head: WorkflowCheckpointHead,
+  checkpoint: WorkflowCheckpointRecord,
+  recordFile: SafeTextFile,
+  path: string,
+): void {
+  if (
+    head.runId !== checkpoint.identity.runId ||
+    head.checkpointId !== checkpoint.checkpointId ||
+    head.sequence !== checkpoint.sequence ||
+    head.checkpointDigest !== checkpoint.checkpointDigest ||
+    head.recordDigest !== recordFile.digest ||
+    head.registryDigest !== checkpoint.identity.registryDigest ||
+    head.projectIdentityDigest !== checkpoint.identity.projectIdentityDigest ||
+    head.updatedAt !== checkpoint.updatedAt
+  ) {
+    throw storeError(
+      "workflow-checkpoint-store-corrupt",
+      path,
+      "checkpoint head contradicts its latest record",
+    );
+  }
+}
+
+function checkpointHeadSummary(
+  root: CanonicalProjectRoot,
+  registry: ValidatedRegistry,
+  head: WorkflowCheckpointHead,
+  checkpoint: WorkflowCheckpointRecord,
+): WorkflowCheckpointHeadSummary {
+  const rootDigest = checkpoint.identity.projectRootIdentityDigest;
+  const inFlight = checkpoint.inFlight;
+  return Object.freeze({
+    runId: head.runId,
+    checkpointId: head.checkpointId,
+    sequence: head.sequence,
+    checkpointDigest: head.checkpointDigest,
+    status: checkpoint.status,
+    projectId: checkpoint.identity.projectId,
+    projectIdentityDigest: checkpoint.identity.projectIdentityDigest,
+    ...(rootDigest === undefined
+      ? {}
+      : { projectRootIdentityDigest: rootDigest }),
+    projectAuthority:
+      rootDigest === undefined
+        ? "unbound"
+        : rootDigest === root.identityDigest
+          ? "current"
+          : "foreign",
+    projectStage: checkpoint.identity.projectStage,
+    registryDigest: checkpoint.identity.registryDigest,
+    registryAuthority:
+      checkpoint.identity.registryDigest === registry.digest
+        ? "current"
+        : "stale",
+    workflowId: checkpoint.identity.workflow.id,
+    workflowVersion: checkpoint.identity.workflow.version,
+    resolvedPlanDigest: checkpoint.identity.workflow.resolvedPlanDigest,
+    inputDigest: checkpoint.identity.inputDigest,
+    ...(checkpoint.identity.featureId === undefined
+      ? {}
+      : {
+          featureId: checkpoint.identity.featureId,
+          featureContractDigest: checkpoint.identity.featureContractDigest,
+        }),
+    ...(checkpoint.receiptChainHead === undefined
+      ? {}
+      : { receiptChainHead: checkpoint.receiptChainHead }),
+    ...(inFlight === undefined
+      ? {}
+      : {
+          inFlight: Object.freeze({
+            phase: inFlight.phase,
+            sideEffect: inFlight.sideEffect,
+          }),
+        }),
+    updatedAt: checkpoint.updatedAt,
+    headDigest: head.headDigest,
+  });
+}
+
+export async function queryWorkflowCheckpointHeads(
+  value: QueryWorkflowCheckpointHeadsRequest,
+): Promise<WorkflowCheckpointHeadQuery> {
+  const request = normalizeQueryRequest(value);
+  await assertProjectRootIdentity(request.root);
+  const firstDirectory = await resolveOptionalWorkflowStore(request.root);
+  if (firstDirectory === undefined) {
+    const secondDirectory = await resolveOptionalWorkflowStore(request.root);
+    if (secondDirectory !== undefined) {
+      throw storeError(
+        "workflow-checkpoint-store-conflict",
+        WORKFLOW_CHECKPOINT_STORE_PATH,
+        "checkpoint store appeared during query",
+      );
+    }
+    await assertProjectRootIdentity(request.root);
+    return retainWorkflowCheckpointQuery(emptyWorkflowCheckpointQuery(request), {
+      request,
+      inventory: EMPTY_WORKFLOW_CHECKPOINT_INVENTORY,
+      heads: new Map(),
+    });
+  }
+  const firstInventory = await enumerateWorkflowCheckpointStore(
+    firstDirectory.absolutePath,
+    request,
+  );
+  const recordFiles = new Set(firstInventory.recordFiles);
+  const summaries: WorkflowCheckpointHeadSummary[] = [];
+  const witnesses = new Map<string, QueriedWorkflowCheckpointHeadWitness>();
+  let totalHeadBytes = 0;
+  for (const filename of firstInventory.headFiles) {
+    const match = HEAD_FILE_PATTERN.exec(filename);
+    const filenameRunId = match?.[1];
+    if (filenameRunId === undefined) {
+      throw storeError(
+        "workflow-checkpoint-store-corrupt",
+        `${WORKFLOW_CHECKPOINT_STORE_PATH}/${filename}`,
+        "checkpoint head filename is not canonical",
+      );
+    }
+    const checkpointHeadPath = `${WORKFLOW_CHECKPOINT_STORE_PATH}/${filename}`;
+    const headFile = await readProjectTextFile(
+      request.root,
+      checkpointHeadPath,
+      WORKFLOW_CHECKPOINT_MAX_HEAD_BYTES,
+    );
+    if (headFile === undefined) {
+      throw storeError(
+        "workflow-checkpoint-store-conflict",
+        checkpointHeadPath,
+        "checkpoint head disappeared during query",
+      );
+    }
+    totalHeadBytes += headFile.bytes;
+    if (totalHeadBytes > request.maxTotalHeadBytes) {
+      throw storeError(
+        "workflow-checkpoint-store-budget-exceeded",
+        WORKFLOW_CHECKPOINT_STORE_PATH,
+        "aggregate checkpoint head byte budget was exceeded",
+      );
+    }
+    const head = parseHead(
+      parseCanonicalJson(headFile.text, checkpointHeadPath),
+      checkpointHeadPath,
+    );
+    if (head.runId !== filenameRunId) {
+      throw storeError(
+        "workflow-checkpoint-store-corrupt",
+        checkpointHeadPath,
+        "checkpoint head run identity differs from its filename",
+      );
+    }
+    const latestRecordPath = recordPath({
+      identity: { runId: head.runId },
+      sequence: head.sequence,
+      checkpointDigest: head.checkpointDigest,
+    });
+    const latestFilename = latestRecordPath.slice(
+      `${WORKFLOW_CHECKPOINT_STORE_PATH}/`.length,
+    );
+    if (!recordFiles.has(latestFilename)) {
+      throw storeError(
+        "workflow-checkpoint-store-corrupt",
+        latestRecordPath,
+        "checkpoint head latest record is missing from the store inventory",
+      );
+    }
+    const recordFile = await readProjectTextFile(
+      request.root,
+      latestRecordPath,
+      WORKFLOW_CHECKPOINT_MAX_RECORD_BYTES,
+    );
+    if (recordFile === undefined) {
+      throw storeError(
+        "workflow-checkpoint-store-conflict",
+        latestRecordPath,
+        "checkpoint latest record disappeared during query",
+      );
+    }
+    const checkpoint = checkpointFromFile(
+      request.registry,
+      recordFile,
+      latestRecordPath,
+    );
+    assertHeadMatchesLatestCheckpoint(
+      head,
+      checkpoint,
+      recordFile,
+      checkpointHeadPath,
+    );
+    summaries.push(
+      checkpointHeadSummary(request.root, request.registry, head, checkpoint),
+    );
+    witnesses.set(head.runId, {
+      head,
+      headFileDigest: headFile.digest,
+      latestCheckpoint: checkpoint,
+      recordPath: latestRecordPath,
+      recordFileDigest: recordFile.digest,
+    });
+  }
+  for (const [runId, witness] of witnesses) {
+    const headFile = await readProjectTextFile(
+      request.root,
+      headPath(runId),
+      WORKFLOW_CHECKPOINT_MAX_HEAD_BYTES,
+    );
+    const recordFile = await readProjectTextFile(
+      request.root,
+      witness.recordPath,
+      WORKFLOW_CHECKPOINT_MAX_RECORD_BYTES,
+    );
+    if (
+      headFile?.digest !== witness.headFileDigest ||
+      recordFile?.digest !== witness.recordFileDigest
+    ) {
+      throw storeError(
+        "workflow-checkpoint-store-conflict",
+        headPath(runId),
+        "checkpoint head or latest record changed during query",
+      );
+    }
+  }
+  const secondDirectory = await resolveOptionalWorkflowStore(request.root);
+  if (
+    secondDirectory === undefined ||
+    !sameStoreDirectory(firstDirectory, secondDirectory)
+  ) {
+    throw storeError(
+      "workflow-checkpoint-store-conflict",
+      WORKFLOW_CHECKPOINT_STORE_PATH,
+      "checkpoint store directory changed during query",
+    );
+  }
+  const secondInventory = await enumerateWorkflowCheckpointStore(
+    secondDirectory.absolutePath,
+    request,
+  );
+  if (!sameInventory(firstInventory, secondInventory)) {
+    throw storeError(
+      "workflow-checkpoint-store-conflict",
+      WORKFLOW_CHECKPOINT_STORE_PATH,
+      "checkpoint store inventory changed during query",
+    );
+  }
+  await assertProjectRootIdentity(request.root);
+  const query: WorkflowCheckpointHeadQuery = Object.freeze({
+    validationLevel: "head-and-latest-record-presence",
+    rootIdentityDigest: request.root.identityDigest,
+    registryDigest: request.registry.digest,
+    entriesObserved: firstInventory.entries.length,
+    headFilesObserved: firstInventory.headFiles.length,
+    recordFilesObserved: firstInventory.recordFiles.length,
+    heads: Object.freeze(
+      summaries.sort((left, right) =>
+        compareCanonicalText(left.runId, right.runId),
+      ),
+    ),
+  });
+  return retainWorkflowCheckpointQuery(query, {
+    request,
+    directory: firstDirectory,
+    inventory: firstInventory,
+    heads: witnesses,
+  });
+}
+
+function normalizeQueriedLoadRequest(
+  value: LoadQueriedWorkflowCheckpointRequest,
+): {
+  readonly metadata: WorkflowCheckpointHeadQueryMetadata;
+  readonly witness: QueriedWorkflowCheckpointHeadWitness;
+  readonly runId: string;
+} {
+  const request = dataRecord(value, "$request");
+  exactKeys(request, ["query", "runId"], ["query", "runId"], "$request");
+  const query = request["query"];
+  if (query === null || typeof query !== "object") {
+    throw storeError(
+      "invalid-workflow-checkpoint-store-request",
+      "$request.query",
+      "query must be issued by this runtime",
+    );
+  }
+  const metadata = queriedHeadMetadata.get(query);
+  if (metadata === undefined) {
+    throw storeError(
+      "invalid-workflow-checkpoint-store-request",
+      "$request.query",
+      "query must be issued by this runtime",
+    );
+  }
+  const runId = request["runId"];
+  if (typeof runId !== "string" || !UUID_PATTERN.test(runId)) {
+    throw storeError(
+      "invalid-workflow-checkpoint-store-request",
+      "$request.runId",
+      "run ID must be a canonical UUID",
+    );
+  }
+  const witness = metadata.heads.get(runId);
+  if (witness === undefined) {
+    throw storeError(
+      "workflow-checkpoint-store-not-found",
+      headPath(runId),
+      "queried checkpoint run does not exist",
+    );
+  }
+  return Object.freeze({ metadata, witness, runId });
+}
+
+async function assertWorkflowCheckpointQueryCurrent(
+  metadata: WorkflowCheckpointHeadQueryMetadata,
+): Promise<void> {
+  const { request, directory, inventory } = metadata;
+  await assertProjectRootIdentity(request.root);
+  const currentDirectory = await resolveOptionalWorkflowStore(request.root);
+  if (
+    directory === undefined ||
+    currentDirectory === undefined ||
+    !sameStoreDirectory(directory, currentDirectory)
+  ) {
+    throw storeError(
+      "workflow-checkpoint-store-conflict",
+      WORKFLOW_CHECKPOINT_STORE_PATH,
+      "checkpoint store directory changed after query",
+    );
+  }
+  const currentInventory = await enumerateWorkflowCheckpointStore(
+    currentDirectory.absolutePath,
+    request,
+  );
+  if (!sameInventory(inventory, currentInventory)) {
+    throw storeError(
+      "workflow-checkpoint-store-conflict",
+      WORKFLOW_CHECKPOINT_STORE_PATH,
+      "checkpoint store inventory changed after query",
+    );
+  }
+  for (const [runId, witness] of metadata.heads) {
+    const currentHead = await readProjectTextFile(
+      request.root,
+      headPath(runId),
+      WORKFLOW_CHECKPOINT_MAX_HEAD_BYTES,
+    );
+    const currentRecord = await readProjectTextFile(
+      request.root,
+      witness.recordPath,
+      WORKFLOW_CHECKPOINT_MAX_RECORD_BYTES,
+    );
+    if (
+      currentHead?.digest !== witness.headFileDigest ||
+      currentRecord?.digest !== witness.recordFileDigest
+    ) {
+      throw storeError(
+        "workflow-checkpoint-store-conflict",
+        headPath(runId),
+        "checkpoint query witness is stale",
+      );
+    }
+  }
+  await assertProjectRootIdentity(request.root);
+}
+
+export async function loadQueriedWorkflowCheckpoint(
+  value: LoadQueriedWorkflowCheckpointRequest,
+): Promise<StoredWorkflowCheckpoint> {
+  const { metadata, witness, runId } = normalizeQueriedLoadRequest(value);
+  const { request } = metadata;
+  const checkpoint = witness.latestCheckpoint;
+  if (
+    witness.head.registryDigest !== request.registry.digest ||
+    checkpoint.identity.registryDigest !== request.registry.digest ||
+    checkpoint.identity.projectRootIdentityDigest === undefined ||
+    checkpoint.identity.projectRootIdentityDigest !== request.root.identityDigest
+  ) {
+    throw storeError(
+      "workflow-checkpoint-store-mismatch",
+      headPath(runId),
+      "queried checkpoint is outside the current project or registry authority",
+    );
+  }
+  await assertWorkflowCheckpointQueryCurrent(metadata);
+  const loaded = await loadWorkflowCheckpoint({
+    root: request.root,
+    registry: request.registry,
+    runId,
+    project: {
+      id: checkpoint.identity.projectId,
+      identityDigest: checkpoint.identity.projectIdentityDigest,
+      rootIdentityDigest: checkpoint.identity.projectRootIdentityDigest,
+      stage: checkpoint.identity.projectStage,
+    },
+    inputDigest: checkpoint.identity.inputDigest,
+    ...(checkpoint.identity.featureId === undefined
+      ? {}
+      : {
+          feature: {
+            id: checkpoint.identity.featureId,
+            contractDigest:
+              checkpoint.identity.featureContractDigest as Sha256Digest,
+          },
+        }),
+    ...(checkpoint.dirtyStateDigest === undefined
+      ? {}
+      : { dirtyStateDigest: checkpoint.dirtyStateDigest }),
+    ...(checkpoint.sessionIdentityDigest === undefined
+      ? {}
+      : { sessionIdentityDigest: checkpoint.sessionIdentityDigest }),
+  });
+  if (loaded.headDigest !== witness.head.headDigest) {
+    throw storeError(
+      "workflow-checkpoint-store-conflict",
+      headPath(runId),
+      "checkpoint head advanced beyond the queried witness",
+    );
+  }
+  await assertWorkflowCheckpointQueryCurrent(metadata);
+  return loaded;
 }
 
 async function writeImmutableRecord(

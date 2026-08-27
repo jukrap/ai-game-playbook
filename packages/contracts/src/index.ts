@@ -124,6 +124,33 @@ export type {
   ProjectInitializationReportError,
 } from "./project-initialization-command-contracts.js";
 export {
+  PROJECT_INITIALIZATION_RECOVERY_ASSESS_COMMAND_ID,
+  PROJECT_INITIALIZATION_RECOVERY_DISPOSITIONS,
+  PROJECT_INITIALIZATION_RECOVERY_MAX_CANDIDATES,
+  PROJECT_INITIALIZATION_RECOVERY_MAX_ISSUES,
+  PROJECT_INITIALIZATION_RECOVERY_STATUSES,
+  assertProjectInitializationRecoveryReportSemantics,
+  assertProjectInitializationRecoveryRequestSemantics,
+  computeProjectInitializationRecoveryReportDigest,
+  projectInitializationRecoveryReportSchema,
+  projectInitializationRecoveryRequestSchema,
+} from "./project-initialization-recovery-contracts.js";
+export type {
+  ProjectInitializationRecoveryCandidate,
+  ProjectInitializationRecoveryControlStateStatus,
+  ProjectInitializationRecoveryDisposition,
+  ProjectInitializationRecoveryIssue,
+  ProjectInitializationRecoveryReceiptStatus,
+  ProjectInitializationRecoveryReport,
+  ProjectInitializationRecoveryReportDigestInput,
+  ProjectInitializationRecoveryRequest,
+  ProjectInitializationRecoverySelected,
+  ProjectInitializationRecoverySelectionStatus,
+  ProjectInitializationRecoveryStatus,
+  ProjectInitializationRecoveryStoreStatus,
+  ProjectInitializationRecoveryValidationLevel,
+} from "./project-initialization-recovery-contracts.js";
+export {
   INIT_PLAN_MAX_ISSUES,
   INIT_PLAN_MAX_TARGETS,
   INIT_PLAN_TARGET_ACTIONS,

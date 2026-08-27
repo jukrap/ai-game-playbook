@@ -89,6 +89,10 @@ import {
   projectInitializationCommandInputSchema,
   projectInitializationReportSchema,
 } from "./project-initialization-command-contracts.js";
+import {
+  projectInitializationRecoveryReportSchema,
+  projectInitializationRecoveryRequestSchema,
+} from "./project-initialization-recovery-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -139,6 +143,10 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "project-initialization-command-input":
       projectInitializationCommandInputSchema,
     "project-initialization-report": projectInitializationReportSchema,
+    "project-initialization-recovery-report":
+      projectInitializationRecoveryReportSchema,
+    "project-initialization-recovery-request":
+      projectInitializationRecoveryRequestSchema,
     "skill-check-report": skillCheckReportSchema,
     "skill-check-request": skillCheckRequestSchema,
     "skill-list-report": skillListReportSchema,

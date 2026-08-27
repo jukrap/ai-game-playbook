@@ -96,6 +96,7 @@ export type CoreBoundaryErrorCode =
   | "workflow-checkpoint-resume-unsafe"
   | "workflow-checkpoint-state-invalid"
   | "workflow-checkpoint-store-conflict"
+  | "workflow-checkpoint-store-budget-exceeded"
   | "workflow-checkpoint-store-corrupt"
   | "workflow-checkpoint-store-mismatch"
   | "workflow-checkpoint-store-not-found"

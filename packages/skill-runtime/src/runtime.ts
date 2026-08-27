@@ -267,6 +267,12 @@ function stateFor(plan: ProjectSkillPlan): ProjectSkillPlanState {
   return state;
 }
 
+export function projectRootForSkillPlan(
+  plan: ProjectSkillPlan,
+): CanonicalProjectRoot {
+  return stateFor(plan).root;
+}
+
 export function assertProjectSkillPlan(plan: ProjectSkillPlan): void {
   stateFor(plan);
 }
@@ -302,6 +308,13 @@ async function assertRuntimeState(
       "Project, registry, or packaged skill identity changed after planning.",
     );
   }
+}
+
+export async function assertProjectSkillPlanRuntimeCurrent(
+  plan: ProjectSkillPlan,
+): Promise<void> {
+  const state = stateFor(plan);
+  await assertRuntimeState(plan, state);
 }
 
 function parentPaths(path: string): readonly string[] {

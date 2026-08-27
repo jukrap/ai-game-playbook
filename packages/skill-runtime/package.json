@@ -2,7 +2,7 @@
   "name": "@ai-game-playbook/skill-runtime",
   "version": "0.0.0",
   "private": true,
-  "description": "Registry-bound read-only skill catalog and project target runtime.",
+  "description": "Registry-bound read-only skill catalog, target inspection, and materialization preparation runtime.",
   "license": "UNLICENSED",
   "type": "module",
   "exports": {

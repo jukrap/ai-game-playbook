@@ -1,6 +1,10 @@
 export type SkillRuntimeBoundaryErrorCode =
   | "skill-runtime-artifact-invalid"
   | "skill-runtime-options-invalid"
+  | "skill-runtime-materialization-budget-exceeded"
+  | "skill-runtime-materialization-drift"
+  | "skill-runtime-materialization-plan-invalid"
+  | "skill-runtime-materialization-request-invalid"
   | "skill-runtime-plan-invalid"
   | "skill-runtime-project-boundary"
   | "skill-runtime-registry-drift"

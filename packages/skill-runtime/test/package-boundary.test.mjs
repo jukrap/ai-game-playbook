@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { BUILTIN_REGISTRY_SURFACES } from "../../registry/dist/index.js";
+import * as skillRuntime from "../dist/index.js";
 
 const readJson = async (url) => JSON.parse(await readFile(url, "utf8"));
 
@@ -30,6 +31,21 @@ test("the skill runtime is private and keeps a one-way workspace boundary", asyn
     root.references.some(({ path }) => path === "./packages/skill-runtime"),
     true,
   );
+});
+
+test("the skill runtime exposes preparation but no materialization executor", () => {
+  assert.deepEqual(Object.keys(skillRuntime).sort(), [
+    "SKILL_MATERIALIZATION_MAX_DURATION_MS",
+    "SKILL_MATERIALIZATION_MAX_OUTPUT_BYTES",
+    "SkillRuntimeBoundaryError",
+    "assertPreparedProjectSkillMaterialization",
+    "assertProjectSkillPlan",
+    "createProjectSkillPlan",
+    "inspectProjectSkillTargets",
+    "prepareProjectSkillMaterialization",
+  ]);
+  assert.equal("executeProjectSkillMaterialization" in skillRuntime, false);
+  assert.equal("installProjectSkills" in skillRuntime, false);
 });
 
 test("the packaged skill bytes match every generated registry route", async () => {

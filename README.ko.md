@@ -1,6 +1,6 @@
 ---
 source: README.md
-source_sha256: 1289b5b57a09b3b401ba469697b40316801161db4851a4064bbbae65af4f6457
+source_sha256: 14445691e6723daa02e78281d2acfe3eb97023006cd70edf0991188d52574df7
 translated_at: 2026-08-27
 ---
 
@@ -25,7 +25,7 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine을 사용하는 개인과 
 - 원본 version report, exact project/executable identity, 유한한 registered workflow 하나, 고정 startup argument, core가 만든 containment witness, 세 번째 signed approval을 bind하는 internal-only Godot headless-preflight admission. Closed provider catalog에는 현재 validated provider가 없으므로 assessment는 `block`만 반환합니다. Adapter는 그 digest를 authorization, report, receipt evidence에 bind하고 engine process를 시작하지 않으며 lease를 명확한 실패로 정산하고 support를 `planned`로 유지합니다.
 - 실험적 private CLI package와 repository-local `agpb` entry point. 구현된 명령은 plan-only `agpb init`, read-only `agpb doctor`, `agpb project inspect`, `agpb pack list`, `agpb pack doctor`, `agpb skill list`, `agpb skill check`, static read-only `agpb engine status --engine godot`와 `agpb engine capabilities --engine godot`입니다.
 - 명시적으로 enable한 registry-generated read-only tool만 modern STDIO로 노출하는 실험적 private MCP package. Project identity 하나를 bind하고 exact input/output schema와 transport/result byte limit을 강제하며 network access나 project mutation을 수행하지 않습니다.
-- Asset lifecycle, build/export readiness, engine change safety, evidence support review, feature-contract planning, gameplay vertical slice, performance budget review, deterministic playtest, project inspection, save/load integrity, game UI QA로 구성된 deterministic capability-first skill artifact 열한 개를 generated registry에 bind하는 private skill runtime과 Codex adapter. 열한 project target을 inspect하고 project inspection에서만 적격한 static Godot capability report로 route하며 machine-specific local-only MCP configuration 하나를 render/inspect합니다. 이러한 target을 write하거나 merge하지 않고 project skill을 materialize하지 않습니다.
+- Asset lifecycle, build/export readiness, engine change safety, evidence support review, feature-contract planning, gameplay vertical slice, performance budget review, deterministic playtest, project inspection, save/load integrity, game UI QA로 구성된 deterministic capability-first skill artifact 열한 개를 generated registry에 bind하는 private skill runtime과 Codex adapter. 열한 project target을 inspect하고 project inspection에서만 적격한 static Godot capability report로 route하며 machine-specific local-only MCP configuration 하나를 render/inspect합니다. Skill runtime은 고정된 directory 13개와 file 11개에 대해 create/retain/conflict 분류, freshness digest, rollback 고려 budget을 가진 same-process two-observation write-free materialization plan도 준비할 수 있지만 source path나 원하는 file content는 반환하지 않습니다. Executor나 지원되는 install command는 없으며 이 경로들은 project skill을 생성, write, merge, materialize하지 않습니다.
 - Bounded pack inspection과 두 static Godot engine command를 available로 표시하되 pack mutation, mutating skill command와 모든 live-engine capability 및 support grade를 planned로 유지하는 digest 결합 공개 surface.
 - 영어 공개 문서와 한국어 mirror, Windows/Linux conformance check.
 

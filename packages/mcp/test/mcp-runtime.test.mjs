@@ -253,6 +253,63 @@ test("engine status MCP tool is project-bound and cannot read a host executable"
   });
 });
 
+test("engine capabilities MCP tool reports planned operations without authority", async () => {
+  await withProject(async (root) => {
+    await writeFile(
+      join(root, "project.godot"),
+      'config_version=5\nconfig/features=PackedStringArray("4.7")\n',
+      "utf8",
+    );
+    const before = await readdir(root);
+    const plan = await createMcpRuntimePlan({
+      projectRoot: root,
+      enabledTools: ["agpb_engine__capabilities"],
+      allowHostDisclosure: true,
+    });
+
+    const result = await invokeMcpTool(plan, {
+      name: "agpb_engine__capabilities",
+      arguments: {
+        schemaVersion: "1.0.0",
+        projectRoot: root,
+        engine: "godot",
+      },
+    });
+    assert.equal(result.isError, undefined);
+    assert.equal(result.structuredContent?.commandId, "engine.capabilities");
+    assert.equal(result.structuredContent?.containment.providerCount, 0);
+    assert.equal(result.structuredContent?.containment.launchAvailable, false);
+    assert.equal(
+      result.structuredContent?.capabilityReport.capabilities.length,
+      14,
+    );
+    assert.equal(result.structuredContent?.externalProcessStarted, false);
+    assert.deepEqual(await readdir(root), before);
+    assert.deepEqual(
+      JSON.parse(result.content[0]?.text ?? ""),
+      result.structuredContent,
+    );
+
+    for (const extra of [
+      { executablePath: process.execPath },
+      { providerDescriptor: {} },
+      { selfTestReport: {} },
+    ]) {
+      const denied = await invokeMcpTool(plan, {
+        name: "agpb_engine__capabilities",
+        arguments: {
+          schemaVersion: "1.0.0",
+          projectRoot: root,
+          engine: "godot",
+          ...extra,
+        },
+      });
+      assert.equal(denied.isError, true);
+      assert.match(denied.content[0]?.text ?? "", /mcp-command-input-invalid/u);
+    }
+  });
+});
+
 test(
   "modern stdio transport lists only enabled tools and calls the registered handler",
   { timeout: 20_000 },

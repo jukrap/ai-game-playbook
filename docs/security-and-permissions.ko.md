@@ -1,12 +1,12 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: 80a7ba31ab0883c3126b87722e959ee11e034e894fcfcefb7a10122b9bac2199
+source_sha256: 8c9b9d76da2922e05696d231bf605a7ecb9dbeed2a6aa31f063ae1a561207421
 translated_at: 2026-08-27
 ---
 
 # 보안과 권한
 
-> 상태: private admission, workflow checkpoint, durable receipt/artifact record, bounded private receipt-head query, managed-pack transaction, closed-world process-containment assessment와 strict provider/self-test protocol, static Godot status를 포함한 write-free CLI command 여섯 개, private permission-bound Godot executable discovery와 version probe, fail-closed Godot headless-preflight admission, read-only STDIO MCP 경계, write-free skill-target/Codex configuration planning이 구현된 계획 permission policy입니다. General mutation dispatch와 contained engine execution은 아직 없습니다.
+> 상태: private admission, workflow checkpoint, durable receipt/artifact record, bounded private receipt-head query, managed-pack transaction, closed-world process-containment assessment와 strict provider/self-test protocol, static Godot status/capability report를 포함한 write-free CLI command 일곱 개, private permission-bound Godot executable discovery와 version probe, fail-closed Godot headless-preflight admission, read-only STDIO MCP 경계, write-free skill-target/Codex configuration planning이 구현된 계획 permission policy입니다. General mutation dispatch와 contained engine execution은 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
@@ -16,7 +16,7 @@ translated_at: 2026-08-27
 
 Authorization 자체는 execution이 아닙니다. Broker는 general mutation dispatcher나 engine bridge와 연결되지 않았습니다. Private Godot operation 세 개가 exact broker decision을 직접 소비합니다. Executable discovery는 process를 시작하지 않고 signed single-use host-tool inspection lease를 정산하고, version probe는 bounded process 하나를 둘러싼 별도 lease를 정산하며, headless-preflight admission은 exact containment witness가 `block`을 반환할 때 project process를 시작하지 않고 workflow-bound lease를 실패로 정산한 뒤 blocked receipt를 보존합니다. 현재 MCP runtime은 generated metadata와 registered descriptor가 read-only, closed-world, non-mutating임을 증명하는 command만 노출하며 broker의 elevated permission path를 갖지 않습니다. 좁은 pack executor와 stable-state recovery finalizer는 각각 same-process plan, exact `install` decision, attest된 project-write lease를 요구합니다. Grant reservation과 active lease는 memory-only이며 restart 뒤 유지되지 않습니다.
 
-현재 CLI는 plan-only `init`, read-only `doctor`, static `project inspect`, `skill list`, `skill check`, static read-only `engine status --engine godot`를 dispatch합니다. 여섯 descriptor 모두 `read-project`, side effect 없음, `parallel-read` lane, changed-file/changed-byte budget 0을 선언합니다. 어느 명령도 elevated authority를 요청하거나 repair를 호출하거나 skill을 materialize하거나 mutation lane에 진입할 수 없습니다.
+현재 CLI는 plan-only `init`, read-only `doctor`, static `project inspect`, `skill list`, `skill check`, static read-only `engine status --engine godot`와 `engine capabilities --engine godot`를 dispatch합니다. 일곱 descriptor 모두 `read-project`, side effect 없음, `parallel-read` lane, changed-file/changed-byte budget 0을 선언합니다. 어느 명령도 elevated authority를 요청하거나 repair를 호출하거나 skill을 materialize하거나 mutation lane에 진입할 수 없습니다.
 
 MCP startup에는 bounded project root 하나, explicit generated tool name 하나 이상, 선택한 project diagnostic이 active host에 disclose될 수 있다는 acknowledgement가 필요합니다. Runtime은 canonical path와 filesystem identity를 bind하고 모든 command input을 그 exact project에 다시 bind하며 duplicated, unknown, write-capable, destructive, open-world tool을 거부합니다. 최대 1 MiB인 modern STDIO message만 받고 registered input/output schema와 command deadline을 강제하며 bounded canonical result를 출력하고 HTTP/network access를 노출하지 않습니다. Host approval UI는 host 책임이며 이 acknowledgement는 evidence export나 telemetry consent가 아닙니다.
 
@@ -24,7 +24,7 @@ Shared skill runtime과 Codex setup planner는 caller가 선택한 script/skill 
 
 Static project inspection은 local root 하나를 bind하고 directory observation과 file byte를 제한하며 unsafe link와 case ambiguity를 거부하고 read 전후 identity를 다시 확인합니다. `.git` marker는 Git 실행 permission을 부여하지 않으며 Editor lock은 process, session, liveness, connection, mutation authority를 부여하지 않습니다. Report는 mutation, process launch, network access가 없음을 명시합니다. Invalid profile과 ambiguous engine candidate는 그럴듯한 target을 선택하지 않고 이후 authority를 차단합니다.
 
-Static Godot status는 그 exact project 경계를 상속합니다. 공개 request는 선택한 project와 literal `godot` engine identity만 받습니다. Executable path를 전달하거나 host tool을 검색하거나 bound project 밖 file을 읽거나 process를 launch하거나 Editor를 제어하거나 support를 승격할 수 없습니다.
+Static Godot status와 capability report는 그 exact project 경계를 상속합니다. 공개 request는 선택한 project와 literal `godot` engine identity만 받습니다. Capability report는 status를 재사용하고 immutable compiled containment catalog를 검사한 뒤 고정된 planned operation contract 14개만 출력합니다. Executable, provider, self-test, launch input을 전달하거나 host tool을 검색하거나 bound project 밖 file을 읽거나 process를 launch하거나 Editor를 제어하거나 receipt를 만들거나 support를 승격할 수 없습니다.
 
 Private host-tool inspection은 자동 승인되지 않는 별도 `host-tool-inspection` permission class를 사용합니다. Discovery 준비는 project-only read만 수행하고 configured path 최대 8개와 선택한 PATH directory 최대 32개의 digest 하나를 bind합니다. Broker challenge는 그 digest를 exact object scope로 노출하고 signed single-use grant 하나를 요구합니다. 그 뒤에만 discovery가 configured candidate와 고정 direct name `godot`/`godot4` 또는 `godot.exe`/`godot4.exe`를 검사할 수 있습니다. Recursive scan, ambient PATH state read, process launch, software install, network access를 수행하지 않고 source path도 반환하지 않습니다. 결과 report는 execution authority를 부여하지 않으며 생성한 process 안에서만 사용할 수 있습니다. Version 준비는 그 원본 report 뒤에 보존된 candidate만 받고, dispatch에는 선택한 content/filesystem-identity digest에 scope한 또 하나의 signed single-use grant가 필요합니다. 각 경계 전후에 project/executable identity를 확인하며 active lease는 성공과 실패 모두에서 정산합니다.
 

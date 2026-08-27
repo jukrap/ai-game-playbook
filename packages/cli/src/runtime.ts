@@ -4,7 +4,10 @@ import {
   BUILTIN_REGISTRY_SURFACES,
   validateRegisteredContractValue,
 } from "@ai-game-playbook/registry";
-import { runGodotEngineStatus } from "@ai-game-playbook/godot-adapter";
+import {
+  runGodotEngineCapabilities,
+  runGodotEngineStatus,
+} from "@ai-game-playbook/godot-adapter";
 import { isAbsolute, resolve } from "node:path";
 
 import { runDoctor } from "./doctor.js";
@@ -155,6 +158,23 @@ function engineStatusHelpText(): string {
   ].join("\n");
 }
 
+function engineCapabilitiesHelpText(): string {
+  return [
+    "Usage: agpb engine capabilities --engine godot [--project <path>] [--json]",
+    "",
+    "Report identity-bound planned Godot operations and containment gaps without engine execution.",
+    "",
+    "Options:",
+    "  --engine godot   Select the implemented static Godot adapter",
+    "  --project <path> Select a project root; defaults to the current directory",
+    "  --json           Emit the registered engine capabilities report as canonical JSON",
+    "  -h, --help       Show command help",
+    "",
+    "This command does not discover executables, run containment self-tests, launch Godot, or raise support above planned.",
+    "",
+  ].join("\n");
+}
+
 function skillListHelpText(): string {
   return [
     "Usage: agpb skill list [--project <path>] [--json]",
@@ -194,6 +214,13 @@ interface ParsedDoctorArguments {
 }
 
 interface ParsedEngineStatusArguments {
+  readonly json: boolean;
+  readonly projectRoot: string;
+  readonly engine: "godot";
+  readonly help: boolean;
+}
+
+interface ParsedEngineCapabilitiesArguments {
   readonly json: boolean;
   readonly projectRoot: string;
   readonly engine: "godot";
@@ -449,6 +476,87 @@ function parseEngineStatusArguments(
   return Object.freeze({ json, projectRoot, engine: "godot", help });
 }
 
+function parseEngineCapabilitiesArguments(
+  args: readonly string[],
+  cwd: string,
+): ParsedEngineCapabilitiesArguments | CliRunResult {
+  let json = false;
+  let help = false;
+  let projectValue: string | undefined;
+  let engineValue: string | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (value === "--json") {
+      if (json) {
+        return result(CLI_EXIT_CODES.usage, "", "Option --json was repeated.\n");
+      }
+      json = true;
+      continue;
+    }
+    if (value === "-h" || value === "--help") {
+      help = true;
+      continue;
+    }
+    if (value === "--project" || value === "--engine") {
+      const next = args[index + 1];
+      if (next === undefined || next.startsWith("-")) {
+        return result(
+          CLI_EXIT_CODES.usage,
+          "",
+          `Option ${value} requires one value.\n`,
+        );
+      }
+      if (value === "--project") {
+        if (projectValue !== undefined) {
+          return result(
+            CLI_EXIT_CODES.usage,
+            "",
+            "Option --project was repeated.\n",
+          );
+        }
+        projectValue = next;
+      } else {
+        if (engineValue !== undefined) {
+          return result(
+            CLI_EXIT_CODES.usage,
+            "",
+            "Option --engine was repeated.\n",
+          );
+        }
+        engineValue = next;
+      }
+      index += 1;
+      continue;
+    }
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Unknown engine capabilities option.\n${engineCapabilitiesHelpText()}`,
+    );
+  }
+  if (!help && engineValue === undefined) {
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Option --engine godot is required.\n${engineCapabilitiesHelpText()}`,
+    );
+  }
+  if (engineValue !== undefined && engineValue !== "godot") {
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Only --engine godot is implemented.\n${engineCapabilitiesHelpText()}`,
+    );
+  }
+  const projectRoot =
+    projectValue === undefined
+      ? cwd
+      : isAbsolute(projectValue)
+        ? projectValue
+        : resolve(cwd, projectValue);
+  return Object.freeze({ json, projectRoot, engine: "godot", help });
+}
+
 function parseSkillArguments(
   args: readonly string[],
   cwd: string,
@@ -607,6 +715,42 @@ function humanEngineStatusReport(
     "",
     `Status digest: ${report.statusDigest}`,
     "Static project inspection only: no host executable read, process launch, Editor control, or support-grade promotion.",
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+function humanEngineCapabilitiesReport(
+  report: Awaited<ReturnType<typeof runGodotEngineCapabilities>>,
+): string {
+  const capabilities = report.capabilityReport?.capabilities ?? [];
+  const lines = [
+    "AI Game Playbook engine capabilities",
+    `Status: ${report.status}`,
+    "Files changed: 0",
+    `Engine: ${report.engine}`,
+    `Project: ${report.project.canonicalPath ?? report.project.requestedPath}`,
+    `Project state: ${report.project.status}`,
+    `Identity-bound operations: ${capabilities.length}`,
+    `Containment providers: ${report.containment.providerCount}`,
+    `Containment: ${report.containment.status} (launch ${report.containment.launchAvailable ? "available" : "blocked"})`,
+    `Support ceiling: ${report.supportGradeCeiling}`,
+  ];
+  for (const capability of capabilities) {
+    lines.push(
+      `  ${capability.operation.padEnd(14)} ${capability.support.padEnd(8)} ${capability.execution}`,
+    );
+  }
+  for (const issue of report.issues) {
+    lines.push(
+      "",
+      `${issue.severity.toUpperCase().padEnd(9)} ${issue.code}  ${issue.message}`,
+      `          Next: ${issue.nextAction}`,
+    );
+  }
+  lines.push(
+    "",
+    `Report digest: ${report.reportDigest}`,
+    "Static reporting only: no executable discovery, containment self-test, engine process, Editor control, or support-grade promotion.",
   );
   return `${lines.join("\n")}\n`;
 }
@@ -924,6 +1068,71 @@ async function dispatchEngineStatus(
   }
 }
 
+async function dispatchEngineCapabilities(
+  args: readonly string[],
+  options: CliRuntimeOptions,
+): Promise<CliRunResult> {
+  const parsed = parseEngineCapabilitiesArguments(
+    args,
+    options.cwd ?? process.cwd(),
+  );
+  if ("exitCode" in parsed) return parsed;
+  if (parsed.help) {
+    return result(CLI_EXIT_CODES.success, engineCapabilitiesHelpText());
+  }
+
+  const descriptor = BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "engine.capabilities",
+  );
+  if (descriptor === undefined) {
+    return result(
+      CLI_EXIT_CODES.failure,
+      "",
+      "The engine capabilities command is unavailable in the runtime registry.\n",
+    );
+  }
+  let input: ReturnType<typeof validateRegisteredContractValue>;
+  try {
+    input = validateRegisteredContractValue(
+      BUILTIN_REGISTRY,
+      descriptor.input,
+      {
+        schemaVersion: "1.0.0",
+        projectRoot: parsed.projectRoot,
+        engine: parsed.engine,
+      },
+    );
+  } catch {
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      "Engine capabilities input is outside the registered argument contract.\n",
+    );
+  }
+  try {
+    const report = await runWithDeadline(
+      () => runGodotEngineCapabilities(input),
+      descriptor.timeoutMs,
+    );
+    return result(
+      report.status === "blocked"
+        ? CLI_EXIT_CODES.blocked
+        : CLI_EXIT_CODES.success,
+      parsed.json
+        ? `${canonicalizeJson(report)}\n`
+        : humanEngineCapabilitiesReport(report),
+    );
+  } catch (error) {
+    return result(
+      CLI_EXIT_CODES.failure,
+      "",
+      error instanceof CliDeadlineError
+        ? "Engine capabilities exceeded its registered deadline without producing a report.\n"
+        : "Engine capabilities failed before it could produce a validated report.\n",
+    );
+  }
+}
+
 async function dispatchSkillList(
   args: readonly string[],
   options: CliRuntimeOptions,
@@ -1054,13 +1263,16 @@ export async function runCli(
     return dispatchInit(args.slice(1), options);
   }
   if (args[0] === "engine") {
+    if (args[1] === "capabilities") {
+      return dispatchEngineCapabilities(args.slice(2), options);
+    }
     if (args[1] === "status") {
       return dispatchEngineStatus(args.slice(2), options);
     }
     return result(
       CLI_EXIT_CODES.usage,
       "",
-      `Unknown engine command.\n${engineStatusHelpText()}`,
+      `Unknown engine command.\n${engineCapabilitiesHelpText()}${engineStatusHelpText()}`,
     );
   }
   if (args[0] === "project") {

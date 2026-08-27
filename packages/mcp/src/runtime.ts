@@ -14,7 +14,10 @@ import {
   runSkillCheck,
   runSkillList,
 } from "@ai-game-playbook/cli";
-import { runGodotEngineStatus } from "@ai-game-playbook/godot-adapter";
+import {
+  runGodotEngineCapabilities,
+  runGodotEngineStatus,
+} from "@ai-game-playbook/godot-adapter";
 import { runProjectInspect } from "@ai-game-playbook/project-runtime";
 import {
   assertValidatedRegistry,
@@ -82,6 +85,7 @@ interface HandlerBinding {
     | "@ai-game-playbook/project-runtime";
   readonly exportName:
     | "runDoctor"
+    | "runGodotEngineCapabilities"
     | "runGodotEngineStatus"
     | "runInit"
     | "runProjectInspect"
@@ -115,6 +119,15 @@ const HANDLERS: ReadonlyMap<string, HandlerBinding> = new Map<
       packageName: "@ai-game-playbook/cli",
       exportName: "runDoctor",
       invoke: (input: unknown): Promise<unknown> => runDoctor(input),
+    }),
+  ],
+  [
+    "engine.capabilities",
+    Object.freeze({
+      packageName: "@ai-game-playbook/godot-adapter",
+      exportName: "runGodotEngineCapabilities",
+      invoke: (input: unknown): Promise<unknown> =>
+        runGodotEngineCapabilities(input),
     }),
   ],
   [

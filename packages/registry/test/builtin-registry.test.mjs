@@ -13,6 +13,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     registry.BUILTIN_REGISTRY.commands.map(({ id }) => id),
     [
       "doctor",
+      "engine.capabilities",
       "engine.executable-discovery",
       "engine.headless-preflight",
       "engine.status",
@@ -37,6 +38,46 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.equal(doctor.handler.package, "@ai-game-playbook/cli");
   assert.equal(doctor.handler.export, "runDoctor");
   assert.match(doctor.handler.digest, digestPattern);
+
+  const engineCapabilities = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "engine.capabilities",
+  );
+  assert.notEqual(engineCapabilities, undefined);
+  assert.deepEqual(engineCapabilities.cli, {
+    path: ["engine", "capabilities"],
+    aliases: [],
+  });
+  assert.deepEqual(engineCapabilities.capabilities, ["engine.capabilities"]);
+  assert.deepEqual(engineCapabilities.permissions, ["read-project"]);
+  assert.deepEqual(engineCapabilities.sideEffects, [
+    {
+      kind: "none",
+      scope: "godot-static-capabilities",
+      boundary: "local",
+    },
+  ]);
+  assert.equal(engineCapabilities.lane, "parallel-read");
+  assert.equal(engineCapabilities.timeoutMs, 10_000);
+  assert.deepEqual(engineCapabilities.retry, { mode: "never", maxAttempts: 1 });
+  assert.equal(engineCapabilities.budgets.maxChangedFiles, 0);
+  assert.equal(engineCapabilities.budgets.maxChangedBytes, 0);
+  assert.equal(
+    engineCapabilities.input.schemaId,
+    contracts.engineCapabilitiesRequestSchema.schemaId,
+  );
+  assert.equal(
+    engineCapabilities.output.schemaId,
+    contracts.engineCapabilitiesReportSchema.schemaId,
+  );
+  assert.equal(
+    engineCapabilities.handler.package,
+    "@ai-game-playbook/godot-adapter",
+  );
+  assert.equal(
+    engineCapabilities.handler.export,
+    "runGodotEngineCapabilities",
+  );
+  assert.match(engineCapabilities.handler.digest, digestPattern);
 
   const engineStatus = registry.BUILTIN_REGISTRY.commands.find(
     ({ id }) => id === "engine.status",
@@ -336,6 +377,7 @@ test("builtin generated surfaces preserve implemented schema and command identit
   assert.equal(surfaces.registryDigest, registry.BUILTIN_REGISTRY.digest);
   assert.deepEqual(surfaces.cli.data.commands.map(({ id }) => id), [
     "doctor",
+    "engine.capabilities",
     "engine.status",
     "init",
     "project.inspect",
@@ -344,6 +386,7 @@ test("builtin generated surfaces preserve implemented schema and command identit
   ]);
   assert.deepEqual(surfaces.docs.data.commands.map(({ id }) => id), [
     "doctor",
+    "engine.capabilities",
     "engine.status",
     "init",
     "project.inspect",
@@ -352,18 +395,17 @@ test("builtin generated surfaces preserve implemented schema and command identit
   ]);
   assert.deepEqual(surfaces.mcp.data.tools.map(({ commandId }) => commandId), [
     "doctor",
+    "engine.capabilities",
     "engine.status",
     "init",
     "project.inspect",
     "skill.check",
     "skill.list",
   ]);
-  assert.equal(surfaces.mcp.data.tools[0].enabledByDefault, false);
-  assert.equal(surfaces.mcp.data.tools[1].enabledByDefault, false);
-  assert.equal(surfaces.mcp.data.tools[2].enabledByDefault, false);
-  assert.equal(surfaces.mcp.data.tools[3].enabledByDefault, false);
-  assert.equal(surfaces.mcp.data.tools[4].enabledByDefault, false);
-  assert.equal(surfaces.mcp.data.tools[5].enabledByDefault, false);
+  assert.equal(
+    surfaces.mcp.data.tools.every(({ enabledByDefault }) => !enabledByDefault),
+    true,
+  );
   assert.equal(
     surfaces.mcp.data.tools[0].outputSchemaId,
     contracts.doctorReportSchema.schemaId,
@@ -379,7 +421,10 @@ test("the builtin registry routes one bounded project inspection skill", () => {
   const skill = registry.BUILTIN_REGISTRY.skills[0];
   assert.equal(skill.lifecycle, "stable");
   assert.equal(skill.invocation, "model");
-  assert.deepEqual(skill.capabilities, ["project.inspect"]);
+  assert.deepEqual(skill.capabilities, [
+    "engine.capabilities",
+    "project.inspect",
+  ]);
   assert.deepEqual(skill.requiredPermissions, ["read-project"]);
   assert.equal(skill.body.path, "skills/project-inspection/SKILL.md");
   assert.match(skill.body.digest, digestPattern);

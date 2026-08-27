@@ -45,6 +45,10 @@ test("project skill plans bind one packaged registry artifact without writes", a
   assert.equal(plan.catalog.length, 1);
   assert.equal(plan.catalog[0].id, "project.inspection");
   assert.equal(plan.catalog[0].name, "project-inspection");
+  assert.deepEqual(plan.catalog[0].capabilities, [
+    "engine.capabilities",
+    "project.inspect",
+  ]);
   assert.equal(
     plan.catalog[0].targetPath,
     ".agents/skills/project-inspection/SKILL.md",
@@ -55,6 +59,7 @@ test("project skill plans bind one packaged registry artifact without writes", a
   assert.equal(plan.targets[0].content.startsWith("---\nname: project-inspection\n"), true);
   assert.equal(plan.targets[0].content.includes("\r"), false);
   assert.equal(plan.targets[0].content.endsWith("\n"), true);
+  assert.match(plan.targets[0].content, /engine\.capabilities/u);
   assert.equal(plan.targets[0].maxBytes, 65_536);
   assert.equal(plan.targets[0].materialization, "plan-only");
   assert.equal(plan.mutationPerformed, false);

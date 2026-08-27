@@ -1,12 +1,12 @@
 ---
 source: docs/concepts.md
-source_sha256: 1b9ca1e37d75e9c2178858f605d844e29ef1b6b5af1b4640999b75081e90905a
+source_sha256: a6d71d79606cf33d99da0cb9c8dac931fcbdf298541a85e3fa2c121f0d1b609e
 translated_at: 2026-08-27
 ---
 
 # 핵심 개념과 공개 타입
 
-> 상태: versioned schema, semantic validator, 결정적 workflow-plan 해석, 초기 private permission, workflow-state, checkpoint, receipt consumer를 구현했습니다. 대부분의 실행 가능한 제품 surface와 engine capability는 아직 계획 단계입니다.
+> 상태: versioned schema, semantic validator, 결정적 workflow-plan 해석, 초기 private permission, workflow-state, checkpoint, receipt consumer와 static Godot status/capability report를 구현했습니다. Engine execution과 대부분의 product surface는 아직 계획 단계입니다.
 
 [English](concepts.md) · [문서](README.ko.md)
 
@@ -22,7 +22,7 @@ adapter는 지원하지 않는 단계를 보고할 수 있습니다. 필수 단�
 
 ## 공개 계약 타입
 
-현재 기반은 이 계약을 versioned JSON schema와 TypeScript 정의 및 fail-closed semantic check로 구현합니다. registry는 검증된 descriptor에서 하나의 immutable workflow plan을 파생할 수 있지만 이것만으로 CLI command, workflow, engine operation을 실행할 수 있는 것은 아닙니다.
+현재 기반은 이 계약을 versioned JSON schema와 TypeScript 정의 및 fail-closed semantic check로 구현합니다. Registry는 검증된 descriptor에서 하나의 immutable workflow plan을 파생할 수 있습니다. Available로 명시된 command만 source-built dispatch path를 가지며 generated workflow나 engine-operation metadata만으로 해당 operation을 실행할 수 있는 것은 아닙니다.
 
 | 타입 | 책임 |
 | --- | --- |
@@ -31,6 +31,7 @@ adapter는 지원하지 않는 단계를 보고할 수 있습니다. 필수 단�
 | `GameProjectProfile` | engine, version, project identity, development stage, target platform, 선언한 quality/change budget |
 | `EngineCapabilityReport` | 현재 환경에서 탐지한 operation, limitation, identity, support grade |
 | `EngineStatusReport` | Explicit executable/evidence gap을 포함한 static engine/project compatibility observation 하나. `planned`보다 높은 support grade를 확립할 수 없음 |
+| `EngineCapabilitiesReport` | Static Godot project observation 하나와 고정 14-operation contract, containment gap, effect, report digest. 현재 모든 operation은 `planned`와 `documented`를 유지 |
 | `FeatureContract` | 플레이어가 볼 결과, 허용 변경 범위, 완료 조건, 위험, budget, rollback plan |
 | `ApprovalGrant` | exact project, command, request, scope, budget, expiration, 필요한 경우 feature/workflow/Editor session identity에 결합된 단일 signed permission |
 | `ResolvedWorkflowPlan` | 실행 전 exact registry, workflow, stage, command와 handler authority, lane, permission, budget, transition, evidence duty에 결합된 하나의 유한 DAG |

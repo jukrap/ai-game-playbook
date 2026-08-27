@@ -91,6 +91,30 @@ export type {
   EngineStatusVersionPrecision,
 } from "./engine-status-contracts.js";
 export {
+  ENGINE_CAPABILITIES_MAX_ISSUES,
+  assertEngineCapabilitiesReportSemantics,
+  assertEngineCapabilitiesRequestSemantics,
+  computeEngineCapabilitiesEnvironmentDigest,
+  computeEngineCapabilitiesReportDigest,
+  computeEngineCapabilitiesReportId,
+  computeEngineCapabilitiesStatus,
+  computeStaticEngineCapabilitiesProjectId,
+  engineCapabilitiesReportSchema,
+  engineCapabilitiesRequestSchema,
+} from "./engine-capabilities-contracts.js";
+export type {
+  EngineCapabilitiesContainmentSummary,
+  EngineCapabilitiesDigestInput,
+  EngineCapabilitiesEnvironmentDigestInput,
+  EngineCapabilitiesIssue,
+  EngineCapabilitiesIssueSeverity,
+  EngineCapabilitiesProjectObservation,
+  EngineCapabilitiesReport,
+  EngineCapabilitiesReportIdInput,
+  EngineCapabilitiesRequest,
+  EngineCapabilitiesStatus,
+} from "./engine-capabilities-contracts.js";
+export {
   GODOT_EXECUTABLE_DISCOVERY_MAX_CANDIDATES,
   GODOT_EXECUTABLE_DISCOVERY_MAX_CONFIGURED_PATHS,
   GODOT_EXECUTABLE_DISCOVERY_MAX_CONSIDERED_PATHS,

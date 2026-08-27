@@ -49,6 +49,7 @@ test("the packaged skill bytes match the only generated registry route", async (
     content,
     /^---\nname: project-inspection\ndescription: Use when [^\n]+\n---\n/u,
   );
+  assert.match(content, /engine\.capabilities/u);
   assert.equal(content.includes("\r"), false);
   assert.equal(content.endsWith("\n"), true);
 });

@@ -12,6 +12,8 @@ const expectedIds = [
   "build-artifact-evidence",
   "doctor-report",
   "doctor-request",
+  "engine-capabilities-report",
+  "engine-capabilities-request",
   "engine-diagnostic",
   "engine-operation-request",
   "engine-operation-result",
@@ -160,6 +162,32 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
         const { nonceDigest: _, ...withoutNonce } =
           fixtures["engine-session-identity"];
         return withoutNonce;
+      })(),
+    ],
+    [
+      "engine-capabilities-request",
+      {
+        ...fixtures["engine-capabilities-request"],
+        executablePath: "D:\\tools\\Godot.exe",
+      },
+    ],
+    [
+      "engine-capabilities-report",
+      {
+        ...fixtures["engine-capabilities-report"],
+        externalProcessStarted: true,
+      },
+    ],
+    [
+      "engine-capabilities-report",
+      (() => {
+        const fixture = structuredClone(fixtures["engine-capabilities-report"]);
+        fixture.capabilityReport.capabilities[0].support = "detected";
+        fixture.capabilityReport.capabilities[0].evidenceGrade =
+          "locally-executed";
+        fixture.capabilityReport.capabilities[0].latestReceiptDigest =
+          fixture.registryDigest;
+        return fixture;
       })(),
     ],
     [

@@ -3,6 +3,8 @@ import {
   assetProvenanceSchema,
   doctorReportSchema,
   doctorRequestSchema,
+  engineCapabilitiesReportSchema,
+  engineCapabilitiesRequestSchema,
   engineStatusReportSchema,
   engineStatusRequestSchema,
   GODOT_HEADLESS_PREFLIGHT_COMMAND_TIMEOUT_MS,
@@ -149,6 +151,58 @@ const doctorCommand: CommandDescriptor = Object.freeze({
     export: "runDoctor",
     digest: parseSha256Digest(
       "sha256:5f20c0ba5af33d5c7ac4048fde16550f621fbdd1407d56df24c83a30162111d4",
+    ),
+  }),
+});
+
+const engineCapabilitiesCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("engine.capabilities"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "experimental",
+  summary:
+    "Report planned Godot operations and containment gaps without engine execution.",
+  cli: Object.freeze({
+    path: Object.freeze(["engine", "capabilities"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: engineCapabilitiesRequestSchema.schemaId,
+    digest: engineCapabilitiesRequestSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: engineCapabilitiesReportSchema.schemaId,
+    digest: engineCapabilitiesReportSchema.digest,
+  }),
+  capabilities: Object.freeze([parseStableId("engine.capabilities")]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "none",
+      scope: "godot-static-capabilities",
+      boundary: "local",
+    }),
+  ]),
+  lane: "parallel-read",
+  timeoutMs: 10_000,
+  cancellation: Object.freeze({ mode: "not-applicable", graceMs: 0 }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: 10_000,
+    maxOutputBytes: 1_048_576,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([
+    parseStableId("engine-capabilities-report"),
+  ]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/godot-adapter",
+    export: "runGodotEngineCapabilities",
+    digest: parseSha256Digest(
+      "sha256:e9ee71502455014efe1f51a97de3e7994b9eea130a6767b822b7a4c48e561570",
     ),
   }),
 });
@@ -524,31 +578,37 @@ const projectInspectionSkill: SkillDescriptor = Object.freeze({
   lifecycle: "stable",
   invocation: "model",
   summary:
-    "Inspect one local game project's static identity before choosing later work.",
+    "Inspect one local game project's static identity and documented Godot capability gaps before choosing later work.",
   triggers: Object.freeze([
     "Use when a local Godot, Unity, or Unreal project must be identified before planning changes.",
     "Use when engine, project profile, or static Editor marker evidence is missing or ambiguous.",
+    "Use when a compatible Godot project's planned operation gaps must be reported without launching an engine.",
   ]),
   exclusions: Object.freeze([
     "Do not use for live Editor control, process discovery, builds, playtests, mutation, or support verification.",
   ]),
-  capabilities: Object.freeze([parseStableId("project.inspect")]),
+  capabilities: Object.freeze([
+    parseStableId("engine.capabilities"),
+    parseStableId("project.inspect"),
+  ]),
   supportedStages: supportedStages(),
   requiredPermissions: Object.freeze<PermissionClass[]>(["read-project"]),
   body: Object.freeze({
     path: "skills/project-inspection/SKILL.md",
     digest: parseSha256Digest(
-      "sha256:690277cd4d7862e3057f93d58f01a8415e84b5c63c853df68c06ac47605f954b",
+      "sha256:badbdb3400143e660674bb578e0821473a8f8379b31aa04c40601163d4a1cacf",
     ),
     maxTokens: 800,
   }),
   references: Object.freeze([]),
   completionCriteria: Object.freeze([
     "Report the bound project and observed engine candidate state without mutation.",
+    "For a compatible Godot project, report each planned operation's limitations, permissions, evidence needs, and containment launch gap.",
     "Preserve every unknown, attention, blocked, and unverified result.",
   ]),
   evidenceDuties: Object.freeze([
-    "Use the registered project inspection report as the complete evidence boundary for this step.",
+    "Use the registered project inspection report and any eligible static Godot capability report as the complete evidence boundary for this step.",
+    "Treat the empty compiled provider catalog and skipped self-test as unavailable execution authority.",
     "State that no live Editor, runtime frame, build, or engine support grade was verified.",
   ]),
 });
@@ -602,6 +662,8 @@ const definition: RegistryDefinition = Object.freeze({
     assetProvenanceSchema,
     doctorRequestSchema,
     doctorReportSchema,
+    engineCapabilitiesRequestSchema,
+    engineCapabilitiesReportSchema,
     engineStatusRequestSchema,
     engineStatusReportSchema,
     godotExecutableDiscoveryRequestSchema,
@@ -625,6 +687,7 @@ const definition: RegistryDefinition = Object.freeze({
   ]),
   commands: Object.freeze([
     doctorCommand,
+    engineCapabilitiesCommand,
     engineExecutableDiscoveryCommand,
     engineHeadlessPreflightCommand,
     engineStatusCommand,

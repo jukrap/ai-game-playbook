@@ -54,6 +54,10 @@ import {
   engineStatusRequestSchema,
 } from "./engine-status-contracts.js";
 import {
+  engineCapabilitiesReportSchema,
+  engineCapabilitiesRequestSchema,
+} from "./engine-capabilities-contracts.js";
+import {
   godotExecutableDiscoveryReportSchema,
   godotExecutableDiscoveryRequestSchema,
 } from "./godot-executable-discovery-contracts.js";
@@ -102,6 +106,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "build-artifact-evidence": buildArtifactEvidenceSchema,
     "doctor-report": doctorReportSchema,
     "doctor-request": doctorRequestSchema,
+    "engine-capabilities-report": engineCapabilitiesReportSchema,
+    "engine-capabilities-request": engineCapabilitiesRequestSchema,
     "engine-status-report": engineStatusReportSchema,
     "engine-status-request": engineStatusRequestSchema,
     "godot-executable-discovery-report": godotExecutableDiscoveryReportSchema,

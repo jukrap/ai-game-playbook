@@ -8,6 +8,7 @@ import { BUILTIN_REGISTRY } from "../packages/registry/dist/index.js";
 test("runtime command handler metadata attests each exact compiled module", async () => {
   for (const [commandId, packageDirectory, moduleName] of [
     ["doctor", "cli", "doctor.js"],
+    ["engine.capabilities", "godot-adapter", "capabilities.js"],
     [
       "engine.executable-discovery",
       "godot-adapter",

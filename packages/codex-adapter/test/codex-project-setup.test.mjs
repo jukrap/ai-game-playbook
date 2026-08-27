@@ -46,7 +46,11 @@ async function fixture(t) {
 async function createPlan(project) {
   return createCodexProjectSetupPlan({
     projectRoot: project,
-    enabledTools: ["agpb_project__inspect", "agpb_doctor"],
+    enabledTools: [
+      "agpb_project__inspect",
+      "agpb_engine__capabilities",
+      "agpb_doctor",
+    ],
     allowHostDisclosure: true,
   });
 }
@@ -76,6 +80,7 @@ test("setup planning emits one deterministic local-only config without writing",
   assert.equal(plan.mutationPerformed, false);
   assert.deepEqual(plan.host.enabledTools, [
     "agpb_doctor",
+    "agpb_engine__capabilities",
     "agpb_project__inspect",
   ]);
   assert.equal(plan.host.defaultToolsApprovalMode, "prompt");
@@ -87,7 +92,10 @@ test("setup planning emits one deterministic local-only config without writing",
   assert.match(plan.target.content, /\[mcp_servers\.ai_game_playbook\]/u);
   assert.match(plan.target.content, /default_tools_approval_mode = "prompt"/u);
   assert.match(plan.target.content, /--allow-host-disclosure/u);
-  assert.match(plan.target.content, /enabled_tools = \["agpb_doctor", "agpb_project__inspect"\]/u);
+  assert.match(
+    plan.target.content,
+    /enabled_tools = \["agpb_doctor", "agpb_engine__capabilities", "agpb_project__inspect"\]/u,
+  );
   assert.equal(plan.skillTargets.length, 1);
   const skillTarget = plan.skillTargets[0];
   assert.equal(skillTarget.id, "project.inspection");
@@ -103,6 +111,7 @@ test("setup planning emits one deterministic local-only config without writing",
   assert.equal(skillTarget.content.startsWith("---\nname: project-inspection\n"), true);
   assert.equal(skillTarget.content.includes("\r"), false);
   assert.equal(skillTarget.content.endsWith("\n"), true);
+  assert.match(skillTarget.content, /engine\.capabilities/u);
   assert.deepEqual(
     plan.skillTargets.map(({ id }) => id),
     BUILTIN_REGISTRY_SURFACES.skills.data.routes.map(({ id }) => id),

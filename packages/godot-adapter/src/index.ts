@@ -1,4 +1,5 @@
 export { GodotAdapterBoundaryError } from "./errors.js";
+export { runGodotEngineCapabilities } from "./capabilities.js";
 export {
   GODOT_EXECUTABLE_DISCOVERY_COMMAND_ID,
   GODOT_EXECUTABLE_DISCOVERY_COMMAND_TIMEOUT_MS,

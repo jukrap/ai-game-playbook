@@ -1,6 +1,6 @@
 # Core Concepts and Public Types
 
-> Status: versioned schemas, semantic validators, deterministic workflow-plan resolution, and early private permission, workflow-state, checkpoint, and receipt consumers are implemented. Most executable product surfaces and engine capability remain planned.
+> Status: versioned schemas, semantic validators, deterministic workflow-plan resolution, early private permission, workflow-state, checkpoint, and receipt consumers, and static Godot status/capability reporting are implemented. Engine execution and most product surfaces remain planned.
 
 [한국어](concepts.ko.md) · [Documentation](README.md)
 
@@ -16,7 +16,7 @@ An adapter may report a step as unsupported. It must not silently skip a require
 
 ## Public contract types
 
-The current foundation implements these contracts as versioned JSON schemas and TypeScript definitions with fail-closed semantic checks. The registry can derive one immutable workflow plan from validated descriptors, but this does not make any CLI command, workflow, or engine operation executable.
+The current foundation implements these contracts as versioned JSON schemas and TypeScript definitions with fail-closed semantic checks. The registry can derive one immutable workflow plan from validated descriptors. Only commands explicitly listed as available have a source-built dispatch path; generated workflow or engine-operation metadata does not make those operations executable.
 
 | Type | Responsibility |
 | --- | --- |
@@ -25,6 +25,7 @@ The current foundation implements these contracts as versioned JSON schemas and 
 | `GameProjectProfile` | Engine, version, project identity, development stage, target platform, and declared quality/change budgets |
 | `EngineCapabilityReport` | Detected operations, limitations, identity, and support grade for the current environment |
 | `EngineStatusReport` | One static engine/project compatibility observation with explicit executable and evidence gaps; it cannot establish a support grade above `planned` |
+| `EngineCapabilitiesReport` | One static Godot project observation plus the fixed 14-operation contract, containment gaps, effects, and report digest; all current operations remain `planned` and `documented` |
 | `FeatureContract` | Player-visible outcome, allowed change scope, completion conditions, risks, budgets, and rollback plan |
 | `ApprovalGrant` | One signed permission bound to exact project, command, request, scope, budget, expiration, and optional feature, workflow, or editor session identity |
 | `ResolvedWorkflowPlan` | One finite DAG bound to exact registry, workflow, stage, command and handler authority, lanes, permissions, budgets, transitions, and evidence duties before execution |

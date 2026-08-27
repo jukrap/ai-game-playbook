@@ -17,6 +17,7 @@ import {
   invokeMcpTool,
   parseMcpRuntimeArguments,
 } from "../dist/index.js";
+import { MCP_STDIO_MAX_SESSION_MESSAGES } from "../dist/session-transport.js";
 
 const serverEntryPoint = fileURLToPath(new URL("../dist/bin.js", import.meta.url));
 
@@ -835,6 +836,80 @@ test(
       });
 
       child.stdin.write(Buffer.alloc(MCP_STDIO_MAX_BUFFER_BYTES + 1, 0x78));
+      const outcome = await waitForChildExit(child);
+
+      assert.deepEqual(outcome, { code: 1, signal: null });
+      assert.equal(stderr, "agpb-mcp: transport error\n");
+    });
+  },
+);
+
+test(
+  "stdio session accepts the exact message boundary and clean EOF",
+  { timeout: 10_000 },
+  async () => {
+    await withProject(async (root) => {
+      const child = spawn(
+        process.execPath,
+        [
+          serverEntryPoint,
+          "--project-root",
+          root,
+          "--enable-tool",
+          "agpb_doctor",
+          "--allow-host-disclosure",
+        ],
+        { stdio: ["pipe", "pipe", "pipe"] },
+      );
+      let stderr = "";
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+
+      const notification = `${JSON.stringify({
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
+      })}\n`;
+      child.stdin.end(notification.repeat(MCP_STDIO_MAX_SESSION_MESSAGES));
+      const outcome = await waitForChildExit(child);
+
+      assert.deepEqual(outcome, { code: 0, signal: null });
+      assert.equal(stderr, "");
+    });
+  },
+);
+
+test(
+  "stdio session message overflow terminates instead of accumulating work",
+  { timeout: 10_000 },
+  async () => {
+    await withProject(async (root) => {
+      const child = spawn(
+        process.execPath,
+        [
+          serverEntryPoint,
+          "--project-root",
+          root,
+          "--enable-tool",
+          "agpb_doctor",
+          "--allow-host-disclosure",
+        ],
+        { stdio: ["pipe", "pipe", "pipe"] },
+      );
+      let stderr = "";
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+
+      const notification = `${JSON.stringify({
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
+      })}\n`;
+      child.stdin.write(
+        notification.repeat(MCP_STDIO_MAX_SESSION_MESSAGES + 1),
+      );
       const outcome = await waitForChildExit(child);
 
       assert.deepEqual(outcome, { code: 1, signal: null });

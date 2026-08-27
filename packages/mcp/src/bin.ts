@@ -12,6 +12,7 @@ import {
   createMcpServer,
   MCP_STDIO_MAX_BUFFER_BYTES,
 } from "./server.js";
+import { BoundedMcpSessionTransport } from "./session-transport.js";
 
 async function main(): Promise<void> {
   const options = parseMcpRuntimeArguments(process.argv.slice(2));
@@ -38,10 +39,15 @@ async function main(): Promise<void> {
 
   handle = serveStdio(() => createMcpServer(plan), {
     legacy: "reject",
-    transport: new StdioServerTransport(process.stdin, process.stdout, {
-      maxBufferSize: MCP_STDIO_MAX_BUFFER_BYTES,
-    }),
+    transport: new BoundedMcpSessionTransport(
+      new StdioServerTransport(process.stdin, process.stdout, {
+        maxBufferSize: MCP_STDIO_MAX_BUFFER_BYTES,
+      }),
+    ),
     onerror: (): void => {
+      if (closing) {
+        return;
+      }
       console.error("agpb-mcp: transport error");
       close(1);
     },

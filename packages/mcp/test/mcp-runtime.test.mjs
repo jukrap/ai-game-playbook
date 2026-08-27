@@ -124,6 +124,21 @@ test("runtime arguments reject hidden array state and accessors without invoking
         error.code === "mcp-arguments-invalid",
     );
   }
+
+  let proxyTrapCalled = false;
+  const proxiedArguments = new Proxy([...valid], {
+    getPrototypeOf(target) {
+      proxyTrapCalled = true;
+      return Reflect.getPrototypeOf(target);
+    },
+  });
+  assert.throws(
+    () => parseMcpRuntimeArguments(proxiedArguments),
+    (error) =>
+      error instanceof McpRuntimeBoundaryError &&
+      error.code === "mcp-arguments-invalid",
+  );
+  assert.equal(proxyTrapCalled, false);
 });
 
 test("runtime plans bind explicit generated read-only tools to one project identity", async () => {
@@ -217,6 +232,28 @@ test("runtime plan options reject hidden fields and accessors without invoking t
           error.code === "mcp-tool-selection-invalid",
       );
     }
+
+    let proxyTrapCalled = false;
+    const proxiedOptions = new Proxy(
+      {
+        projectRoot: root,
+        enabledTools: ["agpb_doctor"],
+        allowHostDisclosure: true,
+      },
+      {
+        getPrototypeOf(target) {
+          proxyTrapCalled = true;
+          return Reflect.getPrototypeOf(target);
+        },
+      },
+    );
+    await assert.rejects(
+      createMcpRuntimePlan(proxiedOptions),
+      (error) =>
+        error instanceof McpRuntimeBoundaryError &&
+        error.code === "mcp-tool-selection-invalid",
+    );
+    assert.equal(proxyTrapCalled, false);
 
     getterCalled = false;
     const accessorTools = [];
@@ -336,6 +373,24 @@ test("direct invocation rejects hidden fields and accessors without invoking the
         /mcp-command-input-invalid/u,
       );
     }
+
+    let proxyTrapCalled = false;
+    const proxiedRequest = new Proxy(
+      { name: "agpb_doctor", arguments: arguments_ },
+      {
+        getPrototypeOf(target) {
+          proxyTrapCalled = true;
+          return Reflect.getPrototypeOf(target);
+        },
+      },
+    );
+    const proxyResult = await invokeMcpTool(plan, proxiedRequest);
+    assert.equal(proxyResult.isError, true);
+    assert.match(
+      proxyResult.content[0]?.text ?? "",
+      /mcp-command-input-invalid/u,
+    );
+    assert.equal(proxyTrapCalled, false);
 
     getterCalled = false;
     const accessorArgumentsRequest = { name: "agpb_doctor" };

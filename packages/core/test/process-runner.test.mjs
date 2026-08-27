@@ -204,6 +204,47 @@ test("process executable binding rejects hidden fields and accessors without inv
   assert.equal(getterCalled, false);
 });
 
+test("process executable binding rejects proxies without invoking traps", async () => {
+  let requestTrapCalled = false;
+  const proxiedRequest = new Proxy(
+    {
+      path: process.execPath,
+      maxBytes: 512 * 1024 * 1024,
+      allowedEnvironmentKeys: [],
+    },
+    {
+      getPrototypeOf(target) {
+        requestTrapCalled = true;
+        return Reflect.getPrototypeOf(target);
+      },
+    },
+  );
+  await assert.rejects(
+    core.bindProcessExecutable(proxiedRequest),
+    expectCoreError("invalid-process-executable", false),
+  );
+  assert.equal(requestTrapCalled, false);
+});
+
+test("process executable binding rejects proxied allowlists without invoking traps", async () => {
+  let allowlistTrapCalled = false;
+  const proxiedAllowlist = new Proxy([], {
+    getPrototypeOf(target) {
+      allowlistTrapCalled = true;
+      return Reflect.getPrototypeOf(target);
+    },
+  });
+  await assert.rejects(
+    core.bindProcessExecutable({
+      path: process.execPath,
+      maxBytes: 512 * 1024 * 1024,
+      allowedEnvironmentKeys: proxiedAllowlist,
+    }),
+    expectCoreError("invalid-process-executable", false),
+  );
+  assert.equal(allowlistTrapCalled, false);
+});
+
 test("bounded process requests reject hidden fields and accessors without invoking them", async (t) => {
   const { root } = await fixture(t);
   const base = await request(root, ["--version"]);

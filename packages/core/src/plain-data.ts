@@ -1,3 +1,5 @@
+import { isProxy } from "node:util/types";
+
 type DataRecord = Readonly<Record<string, unknown>>;
 
 function hasAllowedPrototype(
@@ -18,6 +20,7 @@ export function snapshotEnumerableDataRecord(
   if (
     value === null ||
     typeof value !== "object" ||
+    isProxy(value) ||
     Array.isArray(value) ||
     !hasAllowedPrototype(value, allowNullPrototype) ||
     Object.getOwnPropertySymbols(value).length !== 0
@@ -61,6 +64,7 @@ export function snapshotDenseDataArray(
   maximumLength: number,
 ): readonly unknown[] | undefined {
   if (
+    isProxy(value) ||
     !Array.isArray(value) ||
     Object.getPrototypeOf(value) !== Array.prototype ||
     Object.getOwnPropertySymbols(value).length !== 0

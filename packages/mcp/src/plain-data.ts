@@ -1,3 +1,5 @@
+import { isProxy } from "node:util/types";
+
 export function snapshotExactDataRecord<const Key extends string>(
   value: unknown,
   expected: readonly Key[],
@@ -5,6 +7,7 @@ export function snapshotExactDataRecord<const Key extends string>(
   if (
     value === null ||
     typeof value !== "object" ||
+    isProxy(value) ||
     Array.isArray(value) ||
     Object.getPrototypeOf(value) !== Object.prototype ||
     Object.getOwnPropertySymbols(value).length !== 0
@@ -40,6 +43,7 @@ export function snapshotDenseDataArray(
   maximumLength: number,
 ): readonly unknown[] | undefined {
   if (
+    isProxy(value) ||
     !Array.isArray(value) ||
     Object.getPrototypeOf(value) !== Array.prototype ||
     Object.getOwnPropertySymbols(value).length !== 0

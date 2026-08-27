@@ -5,6 +5,8 @@ export type SkillRuntimeBoundaryErrorCode =
   | "skill-runtime-materialization-drift"
   | "skill-runtime-materialization-plan-invalid"
   | "skill-runtime-materialization-request-invalid"
+  | "skill-runtime-managed-install-plan-invalid"
+  | "skill-runtime-managed-install-request-invalid"
   | "skill-runtime-plan-invalid"
   | "skill-runtime-project-boundary"
   | "skill-runtime-registry-drift"

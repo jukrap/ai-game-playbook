@@ -16,6 +16,10 @@ export type {
   ProjectSkillMaterializationAction,
   ProjectSkillMaterializationConflict,
 } from "./materialization.js";
+export { prepareManagedProjectSkillInstallation } from "./managed-installation.js";
+export type {
+  PrepareManagedProjectSkillInstallationRequest,
+} from "./managed-installation.js";
 export {
   assertProjectSkillPlan,
   createProjectSkillPlan,

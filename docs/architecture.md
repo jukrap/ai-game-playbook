@@ -35,8 +35,8 @@ A generated surface is descriptive until a matching handler and runtime boundary
 | `registry` | Descriptor validation, deterministic routing, generation, and digests |
 | `core` | Project identity, safe paths, compare-and-swap writes, process bounds, permission, workflow, receipts, and artifact foundations |
 | `project-runtime` | Static project inspection and private initialization foundations |
-| `pack-runtime` | Read-only pack inspection plus private transaction and recovery foundations |
-| `skill-runtime` | Packaged skill validation, listing, target inspection, and write-free materialization plans |
+| `pack-runtime` | Read-only pack inspection plus private ownership, transaction, and recovery foundations |
+| `skill-runtime` | Packaged skill validation, target inspection, and write-free managed-pack preflight |
 | `evidence` | Process and test outcome normalization plus limited retained-artifact assessment |
 | `cli` | Nine source-built plan-only, read-only, or static commands |
 | `mcp` | Opt-in project-bound read-only STDIO tools selected from registry metadata |
@@ -44,6 +44,8 @@ A generated surface is descriptive until a matching handler and runtime boundary
 | `godot-adapter` | Static public Godot reports and private fail-closed host-tool preflight foundations |
 
 Unity and Unreal adapters and all project bridges remain planned.
+
+The registry now binds all twelve packaged skills to one digest-bound experimental pack. An internal preflight can ask the pack runtime to evaluate an `add` operation against project identity, installed state, exact file digests, and direct skill-directory ownership. It refuses missing shared parents and unmanaged existing targets, performs no writes, and is not connected to a public command, approval flow, lane, or executor.
 
 ## Current read path
 

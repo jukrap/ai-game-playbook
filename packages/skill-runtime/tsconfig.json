@@ -8,7 +8,8 @@
   "references": [
     { "path": "../contracts" },
     { "path": "../registry" },
-    { "path": "../core" }
+    { "path": "../core" },
+    { "path": "../pack-runtime" }
   ],
   "include": ["src/**/*.ts"]
 }

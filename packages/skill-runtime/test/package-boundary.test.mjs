@@ -19,6 +19,7 @@ test("the skill runtime is private and keeps a one-way workspace boundary", asyn
   assert.deepEqual(packageJson.dependencies, {
     "@ai-game-playbook/contracts": "workspace:*",
     "@ai-game-playbook/core": "workspace:*",
+    "@ai-game-playbook/pack-runtime": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
   });
   assert.deepEqual(packageJson.files, ["dist", "skills"]);
@@ -26,6 +27,7 @@ test("the skill runtime is private and keeps a one-way workspace boundary", asyn
     { path: "../contracts" },
     { path: "../registry" },
     { path: "../core" },
+    { path: "../pack-runtime" },
   ]);
   assert.equal(
     root.references.some(({ path }) => path === "./packages/skill-runtime"),
@@ -42,9 +44,11 @@ test("the skill runtime exposes preparation but no materialization executor", ()
     "assertProjectSkillPlan",
     "createProjectSkillPlan",
     "inspectProjectSkillTargets",
+    "prepareManagedProjectSkillInstallation",
     "prepareProjectSkillMaterialization",
   ]);
   assert.equal("executeProjectSkillMaterialization" in skillRuntime, false);
+  assert.equal("executeManagedProjectSkillInstallation" in skillRuntime, false);
   assert.equal("installProjectSkills" in skillRuntime, false);
 });
 

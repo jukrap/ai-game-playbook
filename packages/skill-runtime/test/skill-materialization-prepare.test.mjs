@@ -86,7 +86,7 @@ test("prepares a bounded write-free materialization plan for missing skill targe
     conflicts: 0,
   });
   assert.deepEqual(prepared.budgets, {
-    maxChangedFiles: expectedTargetCount,
+    maxChangedFiles: expectedDirectoryCount + expectedTargetCount,
     maxChangedBytes: expectedBytes * 2,
     maxDurationMs: 30_000,
     maxOutputBytes: 1_048_576,

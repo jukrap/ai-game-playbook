@@ -1,6 +1,6 @@
 # Skills
 
-> Status: twelve capability-first skills are packaged and registry-bound. They provide guidance only; public installation and execution authority are unavailable.
+> Status: twelve capability-first skills are packaged, registry-bound, and attested by one experimental managed pack. They provide guidance only; public installation and execution authority are unavailable.
 
 [한국어](skills.ko.md) · [Documentation](README.md)
 
@@ -51,6 +51,8 @@ pnpm run agpb -- skill check --project <project-path>
 
 ## Installation status
 
-The runtime and host adapter can prepare a deterministic, write-free materialization plan for `.agents/skills/*/SKILL.md` and project-local MCP configuration. They classify targets and preserve content digests, but they do not create directories or files.
+The runtime can prepare two deterministic, write-free views of `.agents/skills/*/SKILL.md`. The first classifies candidate directories and files. The second is an internal managed-pack preflight that binds the packaged artifact digests, project identity, installed state, direct skill-directory ownership, and fixed inspection limits. Neither view creates, replaces, or removes anything.
 
-`agpb skill install` is planned. The command still needs explicit install approval, a project-write lane, compare-and-swap writes, receipts, and rollback. Until then, the planner is not an installer.
+The managed preflight does not claim the shared `.agents` or `.agents/skills` directories. That shared parent must already exist. A missing parent is a conflict, and an existing skill file without managed ownership is also a conflict even when its bytes match the packaged artifact. Matching bytes are never treated as permission to adopt or overwrite a user-owned file.
+
+`agpb skill install` is still planned. The command needs an approved shared-parent bootstrap, explicit install approval, a project-write lane, durable workflow dispatch, compare-and-swap writes, receipts, and recovery entry points. Until those pieces are connected, the managed preflight is not an installer and has no public execution route.

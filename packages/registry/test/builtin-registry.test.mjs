@@ -697,6 +697,62 @@ test("the builtin registry routes a bounded capability-first game skill catalog"
   }
 });
 
+test("the builtin registry binds packaged project skills to one managed pack", () => {
+  assert.equal(registry.BUILTIN_REGISTRY.packs.length, 1);
+  const pack = registry.BUILTIN_REGISTRY.packs[0];
+  const skills = registry.BUILTIN_REGISTRY.skills;
+  const expectedCapabilities = [
+    ...new Set(skills.flatMap(({ capabilities }) => capabilities)),
+  ].sort();
+  const expectedArtifacts = skills.map((skill) => {
+    const name = skill.body.path.split("/")[1];
+    return {
+      source: skill.body.path,
+      target: `.agents/skills/${name}/SKILL.md`,
+      digest: skill.body.digest,
+      mode: "file",
+    };
+  });
+  const expectedOwnedPaths = expectedArtifacts.flatMap((artifact) => [
+    {
+      path: artifact.target.slice(0, -"/SKILL.md".length),
+      kind: "directory",
+    },
+    {
+      path: artifact.target,
+      kind: "file",
+      digest: artifact.digest,
+    },
+  ]);
+
+  assert.equal(pack.id, "pack.project-skills");
+  assert.equal(pack.version, "1.0.0");
+  assert.equal(pack.kind, "skill");
+  assert.equal(pack.lifecycle, "experimental");
+  assert.deepEqual(pack.compatibility, {
+    controlPlane: { minimum: "0.0.0", maximumExclusive: "1.0.0" },
+    operatingSystems: ["windows", "linux", "macos"],
+    engines: [],
+    hosts: [],
+  });
+  assert.deepEqual(pack.provides, {
+    commands: [],
+    skills: skills.map(({ id }) => id),
+    workflows: [],
+    capabilities: expectedCapabilities,
+    schemas: [],
+  });
+  assert.deepEqual(pack.dependencies, []);
+  assert.deepEqual(pack.permissions, ["read-project", "install"]);
+  assert.deepEqual(pack.network, { required: false, destinations: [] });
+  assert.deepEqual(pack.artifacts, expectedArtifacts);
+  assert.deepEqual(pack.ownedPaths, expectedOwnedPaths);
+  assert.deepEqual(pack.lifecycleHooks, {});
+  assert.deepEqual(pack.license, { status: "unresolved" });
+  assert.equal(contracts.isPackManifestDigestValid(pack), true);
+  assert.match(pack.digest, digestPattern);
+});
+
 test("builtin registry validates implemented input and output values", () => {
   const doctor = registry.BUILTIN_REGISTRY.commands[0];
   const request = registry.validateRegisteredContractValue(

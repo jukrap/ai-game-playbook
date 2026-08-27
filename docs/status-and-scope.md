@@ -19,7 +19,7 @@ The repository builds a private pnpm workspace and an `agpb` executable from sou
 
 All nine commands avoid project writes, engine launch, editor control, network access, and software installation. Human and JSON output share the same validated result and exit category.
 
-The repository also contains typed contracts, one validated registry, and bounded project, process, permission, and workflow primitives. Receipt, artifact, managed-pack, MCP, and host-setup foundations are present too. These pieces are foundations unless a public command above exposes them.
+The repository also contains typed contracts, one validated registry, and bounded project, process, permission, and workflow primitives. Receipt, artifact, managed-pack, MCP, and host-setup foundations are present too. The twelve packaged skills are bound to one digest-checked experimental pack, and an internal preflight can evaluate ownership conflicts without writing. These pieces are foundations unless a public command above exposes them.
 
 ## What is not available
 

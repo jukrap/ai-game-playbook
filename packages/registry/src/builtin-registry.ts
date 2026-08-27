@@ -1,6 +1,7 @@
 import {
   approvalGrantSchema,
   assetProvenanceSchema,
+  computePackManifestDigest,
   doctorReportSchema,
   doctorRequestSchema,
   engineCapabilitiesReportSchema,
@@ -47,6 +48,7 @@ import {
   skillListRequestSchema,
   workflowCheckpointSchema,
   type CommandDescriptor,
+  type PackManifest,
   type PermissionClass,
   type ProjectStage,
   type SkillDescriptor,
@@ -1323,6 +1325,112 @@ const gameUiQaSkill: SkillDescriptor = Object.freeze({
   ]),
 });
 
+const builtinSkills: readonly SkillDescriptor[] = Object.freeze([
+  assetLifecycleSkill,
+  deterministicBalanceReviewSkill,
+  buildExportReadinessSkill,
+  engineChangeSafetySkill,
+  evidenceSupportReviewSkill,
+  featureContractPlanningSkill,
+  gameplayVerticalSliceSkill,
+  performanceBudgetReviewSkill,
+  deterministicPlaytestSkill,
+  projectInspectionSkill,
+  saveLoadIntegritySkill,
+  gameUiQaSkill,
+]);
+
+function skillTargetName(skill: SkillDescriptor): string {
+  const match = /^skills\/([a-z0-9]+(?:-[a-z0-9]+)*)\/SKILL\.md$/u.exec(
+    skill.body.path,
+  );
+  if (match?.[1] === undefined) {
+    throw new TypeError("Builtin skill path cannot be mapped to a project target.");
+  }
+  return match[1];
+}
+
+function createProjectSkillsPack(
+  skills: readonly SkillDescriptor[],
+): PackManifest {
+  const artifacts = Object.freeze(
+    skills.map((skill) => {
+      const name = skillTargetName(skill);
+      return Object.freeze({
+        source: skill.body.path,
+        target: `.agents/skills/${name}/SKILL.md`,
+        digest: skill.body.digest,
+        mode: "file" as const,
+      });
+    }),
+  );
+  const ownedPaths = Object.freeze(
+    artifacts.flatMap((artifact) =>
+      Object.freeze([
+        Object.freeze({
+          path: artifact.target.slice(0, -"/SKILL.md".length),
+          kind: "directory" as const,
+        }),
+        Object.freeze({
+          path: artifact.target,
+          kind: "file" as const,
+          digest: artifact.digest,
+        }),
+      ]),
+    ),
+  );
+  const capabilities = Object.freeze(
+    [...new Set(skills.flatMap(({ capabilities: values }) => values))].sort(),
+  );
+  const manifestBody: Omit<PackManifest, "digest" | "signature"> =
+    Object.freeze({
+      schemaVersion: parseSemanticVersion("1.0.0").value,
+      id: parseStableId("pack.project-skills"),
+      version: parseSemanticVersion("1.0.0").value,
+      kind: "skill",
+      lifecycle: "experimental",
+      compatibility: Object.freeze({
+        controlPlane: Object.freeze({
+          minimum: parseSemanticVersion("0.0.0").value,
+          maximumExclusive: parseSemanticVersion("1.0.0").value,
+        }),
+        operatingSystems: Object.freeze([
+          "windows",
+          "linux",
+          "macos",
+        ] as const),
+        engines: Object.freeze([]),
+        hosts: Object.freeze([]),
+      }),
+      provides: Object.freeze({
+        commands: Object.freeze([]),
+        skills: Object.freeze(skills.map(({ id }) => id)),
+        workflows: Object.freeze([]),
+        capabilities,
+        schemas: Object.freeze([]),
+      }),
+      dependencies: Object.freeze([]),
+      permissions: Object.freeze<PermissionClass[]>([
+        "read-project",
+        "install",
+      ]),
+      network: Object.freeze({
+        required: false,
+        destinations: Object.freeze([]),
+      }),
+      artifacts,
+      ownedPaths,
+      lifecycleHooks: Object.freeze({}),
+      license: Object.freeze({ status: "unresolved" as const }),
+    });
+  return Object.freeze({
+    ...manifestBody,
+    digest: computePackManifestDigest(manifestBody),
+  });
+}
+
+const projectSkillsPack = createProjectSkillsPack(builtinSkills);
+
 const godotHeadlessPreflightWorkflow: WorkflowDescriptor = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   id: parseStableId("workflow.godot-headless-preflight"),
@@ -1458,26 +1566,13 @@ const definition: RegistryDefinition = Object.freeze({
     skillCheckCommand,
     skillListCommand,
   ]),
-  skills: Object.freeze([
-    assetLifecycleSkill,
-    deterministicBalanceReviewSkill,
-    buildExportReadinessSkill,
-    engineChangeSafetySkill,
-    evidenceSupportReviewSkill,
-    featureContractPlanningSkill,
-    gameplayVerticalSliceSkill,
-    performanceBudgetReviewSkill,
-    deterministicPlaytestSkill,
-    projectInspectionSkill,
-    saveLoadIntegritySkill,
-    gameUiQaSkill,
-  ]),
+  skills: builtinSkills,
   roleLenses: Object.freeze([]),
   workflows: Object.freeze([
     godotHeadlessPreflightWorkflow,
     projectInitializationWorkflow,
   ]),
-  packs: Object.freeze([]),
+  packs: Object.freeze([projectSkillsPack]),
 });
 
 export const BUILTIN_REGISTRY: ValidatedRegistry = validateRegistry(definition);

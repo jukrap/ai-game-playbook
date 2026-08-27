@@ -81,6 +81,7 @@ test("workspace packages stay private and follow the foundation dependency direc
   assert.deepEqual(skillRuntime.dependencies, {
     "@ai-game-playbook/contracts": "workspace:*",
     "@ai-game-playbook/core": "workspace:*",
+    "@ai-game-playbook/pack-runtime": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
   });
   assert.equal(projectRuntime.private, true);

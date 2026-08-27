@@ -67,6 +67,7 @@ export interface ProjectSkillInspection {
 
 interface ProjectSkillPlanState {
   readonly root: CanonicalProjectRoot;
+  readonly sourceRoot: CanonicalProjectRoot;
   readonly artifacts: readonly SkillArtifactSnapshot[];
 }
 
@@ -225,6 +226,17 @@ export async function createProjectSkillPlan(
       "Skill runtime could not bind the selected project root.",
     );
   }
+  let sourceRoot: CanonicalProjectRoot;
+  try {
+    sourceRoot = await canonicalizeProjectRoot(
+      fileURLToPath(new URL("../", import.meta.url)),
+    );
+  } catch {
+    throw new SkillRuntimeBoundaryError(
+      "skill-runtime-artifact-invalid",
+      "Skill runtime could not bind the packaged skill source root.",
+    );
+  }
   const generated = await createCatalogAndTargets();
   await assertProjectRootIdentity(root);
   const fields = deepFreeze({
@@ -245,7 +257,7 @@ export async function createProjectSkillPlan(
   });
   planStates.set(
     plan,
-    Object.freeze({ root, artifacts: generated.artifacts }),
+    Object.freeze({ root, sourceRoot, artifacts: generated.artifacts }),
   );
   return plan;
 }
@@ -273,6 +285,12 @@ export function projectRootForSkillPlan(
   return stateFor(plan).root;
 }
 
+export function packageSourceRootForSkillPlan(
+  plan: ProjectSkillPlan,
+): CanonicalProjectRoot {
+  return stateFor(plan).sourceRoot;
+}
+
 export function assertProjectSkillPlan(plan: ProjectSkillPlan): void {
   stateFor(plan);
 }
@@ -291,6 +309,7 @@ async function assertRuntimeState(
       throw new Error("plan identity drift");
     }
     await assertProjectRootIdentity(state.root);
+    await assertProjectRootIdentity(state.sourceRoot);
     for (const artifact of state.artifacts) {
       const current = await snapshotSkillArtifact({
         path: artifact.canonicalPath,

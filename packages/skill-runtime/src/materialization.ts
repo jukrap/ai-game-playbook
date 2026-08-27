@@ -19,6 +19,7 @@ import { SkillRuntimeBoundaryError } from "./errors.js";
 import {
   assertProjectSkillPlanRuntimeCurrent,
   inspectProjectSkillTargets,
+  packageSourceRootForSkillPlan,
   projectRootForSkillPlan,
   type ProjectSkillPlan,
   type ProjectSkillTarget,
@@ -492,6 +493,28 @@ export function assertPreparedProjectSkillMaterialization(
   }
 }
 
+export function internalsForPreparedProjectSkillMaterialization(
+  value: PreparedProjectSkillMaterialization,
+): {
+  readonly plan: ProjectSkillPlan;
+  readonly targetRoot: CanonicalProjectRoot;
+  readonly sourceRoot: CanonicalProjectRoot;
+} {
+  assertPreparedProjectSkillMaterialization(value);
+  const state = preparedStates.get(value);
+  if (state === undefined) {
+    fail(
+      "skill-runtime-materialization-plan-invalid",
+      "Skill materialization requires a same-process prepared plan.",
+    );
+  }
+  return Object.freeze({
+    plan: state.plan,
+    targetRoot: state.root,
+    sourceRoot: packageSourceRootForSkillPlan(state.plan),
+  });
+}
+
 export async function prepareProjectSkillMaterialization(
   value: PrepareProjectSkillMaterializationRequest,
 ): Promise<PreparedProjectSkillMaterialization> {
@@ -537,7 +560,7 @@ export async function prepareProjectSkillMaterialization(
     );
   }
   const budgets: ExecutionBudgets = Object.freeze({
-    maxChangedFiles: summary.createFiles,
+    maxChangedFiles: summary.createDirectories + summary.createFiles,
     maxChangedBytes: rollbackByteBudget,
     maxDurationMs: SKILL_MATERIALIZATION_MAX_DURATION_MS,
     maxOutputBytes: SKILL_MATERIALIZATION_MAX_OUTPUT_BYTES,

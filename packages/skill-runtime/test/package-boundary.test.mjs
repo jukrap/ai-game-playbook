@@ -54,6 +54,7 @@ test("the packaged skill bytes match every generated registry route", async () =
     routes.map(({ id }) => id),
     [
       "asset.lifecycle",
+      "balance.deterministic-review",
       "build.export-readiness",
       "engine.change-safety",
       "evidence.support-review",

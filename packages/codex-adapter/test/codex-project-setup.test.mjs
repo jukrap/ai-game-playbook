@@ -96,7 +96,6 @@ test("setup planning emits one deterministic local-only config without writing",
     plan.target.content,
     /enabled_tools = \["agpb_doctor", "agpb_engine__capabilities", "agpb_project__inspect"\]/u,
   );
-  assert.equal(plan.skillTargets.length, 11);
   const skillTarget = plan.skillTargets.find(
     ({ id }) => id === "project.inspection",
   );
@@ -118,6 +117,18 @@ test("setup planning emits one deterministic local-only config without writing",
   assert.deepEqual(
     plan.skillTargets.map(({ id }) => id),
     BUILTIN_REGISTRY_SURFACES.skills.data.routes.map(({ id }) => id),
+  );
+  const balanceTarget = plan.skillTargets.find(
+    ({ id }) => id === "balance.deterministic-review",
+  );
+  assert.notEqual(balanceTarget, undefined);
+  assert.equal(
+    balanceTarget.path,
+    ".agents/skills/deterministic-balance-review/SKILL.md",
+  );
+  assert.equal(
+    balanceTarget.sourcePath,
+    "skills/deterministic-balance-review/SKILL.md",
   );
 });
 
@@ -239,7 +250,10 @@ test("skill targets are planned and inspected without mutation", async (t) => {
   assert.notEqual(skillPlan, undefined);
 
   const missing = await inspectCodexProjectSetup(plan);
-  assert.equal(missing.skillTargets.length, 11);
+  assert.deepEqual(
+    missing.skillTargets.map(({ id }) => id),
+    plan.skillTargets.map(({ id }) => id),
+  );
   const missingSkill = missing.skillTargets.find(
     ({ id }) => id === "project.inspection",
   );

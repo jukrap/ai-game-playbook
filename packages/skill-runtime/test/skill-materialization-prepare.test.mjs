@@ -53,6 +53,8 @@ test("prepares a bounded write-free materialization plan for missing skill targe
     (total, target) => total + Buffer.byteLength(target.content, "utf8"),
     0,
   );
+  const expectedTargetCount = sourcePlan.targets.length;
+  const expectedDirectoryCount = expectedTargetCount + 2;
 
   const prepared = await prepareProjectSkillMaterialization({
     plan: sourcePlan,
@@ -67,8 +69,8 @@ test("prepares a bounded write-free materialization plan for missing skill targe
     sourcePlan.project.identityDigest,
   );
   assert.equal(prepared.disposition, "ready");
-  assert.equal(prepared.directories.length, 13);
-  assert.equal(prepared.targets.length, 11);
+  assert.equal(prepared.directories.length, expectedDirectoryCount);
+  assert.equal(prepared.targets.length, expectedTargetCount);
   assert.deepEqual(prepared.directories.map(({ path }) => path), [
     ".agents",
     ".agents/skills",
@@ -77,14 +79,14 @@ test("prepares a bounded write-free materialization plan for missing skill targe
   assert.equal(prepared.directories.every(({ action }) => action === "create"), true);
   assert.equal(prepared.targets.every(({ action }) => action === "create"), true);
   assert.deepEqual(prepared.summary, {
-    createDirectories: 13,
+    createDirectories: expectedDirectoryCount,
     retainDirectories: 0,
-    createFiles: 11,
+    createFiles: expectedTargetCount,
     retainFiles: 0,
     conflicts: 0,
   });
   assert.deepEqual(prepared.budgets, {
-    maxChangedFiles: 11,
+    maxChangedFiles: expectedTargetCount,
     maxChangedBytes: expectedBytes * 2,
     maxDurationMs: 30_000,
     maxOutputBytes: 1_048_576,
@@ -119,6 +121,8 @@ test("preparation reports an exact installation as a zero-budget no-op", async (
   const { project } = await fixture(t);
   const sourcePlan = await createProjectSkillPlan({ projectRoot: project });
   await installFixtureSkills(project, sourcePlan);
+  const expectedTargetCount = sourcePlan.targets.length;
+  const expectedDirectoryCount = expectedTargetCount + 2;
 
   const prepared = await prepareProjectSkillMaterialization({
     plan: sourcePlan,
@@ -126,15 +130,15 @@ test("preparation reports an exact installation as a zero-budget no-op", async (
   });
 
   assert.equal(prepared.disposition, "no-op");
-  assert.equal(prepared.directories.length, 13);
-  assert.equal(prepared.targets.length, 11);
+  assert.equal(prepared.directories.length, expectedDirectoryCount);
+  assert.equal(prepared.targets.length, expectedTargetCount);
   assert.equal(prepared.directories.every(({ action }) => action === "retain"), true);
   assert.equal(prepared.targets.every(({ action }) => action === "retain"), true);
   assert.deepEqual(prepared.summary, {
     createDirectories: 0,
-    retainDirectories: 13,
+    retainDirectories: expectedDirectoryCount,
     createFiles: 0,
-    retainFiles: 11,
+    retainFiles: expectedTargetCount,
     conflicts: 0,
   });
   assert.equal(prepared.budgets.maxChangedFiles, 0);

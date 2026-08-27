@@ -13,6 +13,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { BUILTIN_REGISTRY_SURFACES } from "@ai-game-playbook/registry";
+
 import {
   runSkillCheck,
   runSkillList,
@@ -44,10 +46,16 @@ test("skill list exposes a bounded registry catalog without artifact bodies or w
   const before = await readdir(project);
 
   const report = await runSkillList(request(project));
+  const registrySkillIds = BUILTIN_REGISTRY_SURFACES.skills.data.routes.map(
+    ({ id }) => id,
+  );
 
   assert.equal(report.commandId, "skill.list");
   assert.equal(report.status, "ready");
-  assert.equal(report.entries.length, 11);
+  assert.deepEqual(
+    report.entries.map(({ id }) => id),
+    registrySkillIds,
+  );
   const projectInspection = report.entries.find(
     ({ id }) => id === "project.inspection",
   );
@@ -61,8 +69,8 @@ test("skill list exposes a bounded registry catalog without artifact bodies or w
   assert.equal("sourcePath" in projectInspection, false);
   assert.match(report.catalogDigest, /^sha256:[0-9a-f]{64}$/u);
   assert.deepEqual(report.summary, {
-    registered: 11,
-    modelInvoked: 11,
+    registered: registrySkillIds.length,
+    modelInvoked: registrySkillIds.length,
     userInvoked: 0,
   });
   assert.equal(report.materializationAvailable, false);

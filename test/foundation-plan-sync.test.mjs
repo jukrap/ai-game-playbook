@@ -104,6 +104,31 @@ test("foundation plan generation refuses to synthesize an invalid public surface
   assert.equal(await readFile(planPath, "utf8"), "preserve plan\n");
 });
 
+test("foundation plan generation rejects an oversized valid public surface before writing", async (t) => {
+  const root = await mkdtemp(
+    join(tmpdir(), "agpb-foundation-plan-oversized-"),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, "generated"));
+  await mkdir(join(root, "docs"));
+  const planPath = join(root, "generated", "foundation-plan.json");
+  const publicSurfacePath = join(root, "docs", "planned-surface.json");
+  await writeFile(planPath, "preserve oversized plan\n");
+  const oversizedSurface = `${JSON.stringify({
+    schemaVersion: "1",
+    artifact: "ai-game-playbook-planned-surface",
+    runtimeRegistryDigest: `sha256:${"0".repeat(64)}`,
+    padding: "x".repeat(1024 * 1024),
+  })}\n`;
+  await writeFile(publicSurfacePath, oversizedSurface);
+
+  const result = runGenerator("--write", root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /byte limit/u);
+  assert.equal(await readFile(planPath, "utf8"), "preserve oversized plan\n");
+  assert.equal(await readFile(publicSurfacePath, "utf8"), oversizedSurface);
+});
+
 test("foundation plan generation rejects linked output directories without escaping its root", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "agpb-foundation-plan-linked-"));
   const outside = await mkdtemp(

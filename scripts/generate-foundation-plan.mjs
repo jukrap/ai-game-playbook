@@ -8,6 +8,7 @@ import {
 } from "../packages/registry/dist/index.js";
 
 const defaultRoot = fileURLToPath(new URL("../", import.meta.url));
+const MAX_INPUT_BYTES = 1024 * 1024;
 
 function parseArguments(values) {
   let mode;
@@ -70,6 +71,9 @@ async function readRequired(path, label) {
   }
   if (stats.isSymbolicLink() || !stats.isFile()) {
     throw new Error(`${label} must be a regular file`);
+  }
+  if (stats.size > MAX_INPUT_BYTES) {
+    throw new Error(`${label} exceeds byte limit`);
   }
   return readFile(path, "utf8");
 }

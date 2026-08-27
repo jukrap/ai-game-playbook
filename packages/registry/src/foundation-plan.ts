@@ -262,6 +262,12 @@ const skills: readonly PlannedSkillSurface[] = [
     mode: "general",
   },
   {
+    id: "balance.deterministic-review",
+    capability: "balance.review",
+    availability: skillAvailability("balance.deterministic-review"),
+    mode: "general",
+  },
+  {
     id: "asset.lifecycle",
     capability: "asset.provenance",
     availability: skillAvailability("asset.lifecycle"),

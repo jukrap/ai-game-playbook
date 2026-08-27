@@ -20,6 +20,21 @@ import {
   inspectProjectSkillTargets,
 } from "../dist/index.js";
 
+const expectedSkillCatalog = [
+  ["asset.lifecycle", "asset-lifecycle"],
+  ["balance.deterministic-review", "deterministic-balance-review"],
+  ["build.export-readiness", "build-export-readiness"],
+  ["engine.change-safety", "engine-change-safety"],
+  ["evidence.support-review", "evidence-support-review"],
+  ["feature.contract-planning", "feature-contract-planning"],
+  ["gameplay.vertical-slice", "gameplay-vertical-slice"],
+  ["performance.budget-review", "performance-budget-review"],
+  ["playtest.deterministic", "deterministic-playtest"],
+  ["project.inspection", "project-inspection"],
+  ["save-load.integrity", "save-load-integrity"],
+  ["ui.game-qa", "game-ui-qa"],
+];
+
 async function fixture(t) {
   const created = await mkdtemp(join(tmpdir(), "agpb-skill-runtime-"));
   const sandbox = await realpath(created);
@@ -43,20 +58,8 @@ test("project skill plans bind the capability-first packaged catalog without wri
   assert.equal(plan.project.canonicalPath, await realpath(project));
   assert.match(plan.project.identityDigest, /^sha256:[0-9a-f]{64}$/u);
   assert.deepEqual(
-    plan.catalog.map(({ id }) => id),
-    [
-      "asset.lifecycle",
-      "build.export-readiness",
-      "engine.change-safety",
-      "evidence.support-review",
-      "feature.contract-planning",
-      "gameplay.vertical-slice",
-      "performance.budget-review",
-      "playtest.deterministic",
-      "project.inspection",
-      "save-load.integrity",
-      "ui.game-qa",
-    ],
+    plan.catalog.map(({ id, name }) => [id, name]),
+    expectedSkillCatalog,
   );
   const projectInspection = plan.catalog.find(
     ({ id }) => id === "project.inspection",
@@ -91,6 +94,23 @@ test("project skill plans bind the capability-first packaged catalog without wri
       error.code === "skill-runtime-plan-invalid",
   );
 });
+
+test("packaged skill directories exactly match stable catalog targets", async () => {
+  const entries = await readdir(new URL("../skills/", import.meta.url), {
+    withFileTypes: true,
+  });
+  const directories = entries
+    .filter((entry) => entry.isDirectory())
+    .map(({ name }) => name)
+    .sort();
+  const expectedDirectories = expectedSkillCatalog
+    .map(([, name]) => name)
+    .sort();
+
+  assert.deepEqual(directories, expectedDirectories);
+  assert.equal(new Set(directories).size, expectedSkillCatalog.length);
+});
+
 test("target inspection distinguishes missing, current, and conflicts without mutation", async (t) => {
   const { project } = await fixture(t);
   const plan = await createProjectSkillPlan({ projectRoot: project });

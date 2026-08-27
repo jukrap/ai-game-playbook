@@ -841,6 +841,50 @@ const assetLifecycleSkill: SkillDescriptor = Object.freeze({
   ]),
 });
 
+const deterministicBalanceReviewSkill: SkillDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("balance.deterministic-review"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "stable",
+  invocation: "model",
+  summary:
+    "Review game balance through explicit models, reproducible scenarios, distributions, sensitivity checks, and predeclared decisions.",
+  triggers: Object.freeze([
+    "Use when combat, economy, progression, reward, difficulty, spawn, drop, or cooldown values need design or review.",
+    "Use when a baseline and candidate must be compared from the same initial state, ruleset, seed policy, and stopping condition.",
+    "Use when averages may hide harmful tails, player-state segments, dominant strategies, exploits, or dead-end states.",
+  ]),
+  exclusions: Object.freeze([
+    "Do not treat deterministic simulation as proof of player experience, accessibility, retention, or fun.",
+    "Do not mutate production tuning data, invent missing assumptions, or widen the review scope without an approved change contract.",
+  ]),
+  capabilities: Object.freeze([
+    parseStableId("balance.model"),
+    parseStableId("balance.simulate"),
+    parseStableId("balance.review"),
+  ]),
+  supportedStages: supportedStages(),
+  requiredPermissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  body: Object.freeze({
+    path: "skills/deterministic-balance-review/SKILL.md",
+    digest: parseSha256Digest(
+      "sha256:d33b51c343cc9400521edd532a6b51aef8c9a286c66f709b60b10db893ddb4a2",
+    ),
+    maxTokens: 800,
+  }),
+  references: Object.freeze([]),
+  completionCriteria: Object.freeze([
+    "Define the player-facing question, decision, model inputs, units, ranges, sources, assumptions, invariants, and failure states.",
+    "Bind baseline and candidate scenarios to the same initial state, ruleset, seed set, simulation step, horizon, stopping condition, and sample policy.",
+    "Compare distributions and player-state segments, perform one-factor and relevant interaction sensitivity checks, and apply predeclared acceptance criteria.",
+  ]),
+  evidenceDuties: Object.freeze([
+    "Report model and ruleset identity, inputs and units, assumptions, invariants, scenarios, initial state, seeds, sample count, and distributions.",
+    "Preserve baseline and candidate deltas, failure rates, tails, sensitivity cliffs, unstable loops, exploit paths, and subgroup outcomes.",
+    "Classify the candidate as accept, reject, revise, blocked, or unverified and keep simulation conclusions separate from playtest evidence.",
+  ]),
+});
+
 const buildExportReadinessSkill: SkillDescriptor = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   id: parseStableId("build.export-readiness"),
@@ -1416,6 +1460,7 @@ const definition: RegistryDefinition = Object.freeze({
   ]),
   skills: Object.freeze([
     assetLifecycleSkill,
+    deterministicBalanceReviewSkill,
     buildExportReadinessSkill,
     engineChangeSafetySkill,
     evidenceSupportReviewSkill,

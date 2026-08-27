@@ -610,6 +610,7 @@ test("builtin generated surfaces preserve implemented schema and command identit
 test("the builtin registry routes a bounded capability-first game skill catalog", () => {
   const expectedSkillIds = [
     "asset.lifecycle",
+    "balance.deterministic-review",
     "build.export-readiness",
     "engine.change-safety",
     "evidence.support-review",
@@ -654,6 +655,33 @@ test("the builtin registry routes a bounded capability-first game skill catalog"
   assert.equal(
     projectInspection.body.path,
     "skills/project-inspection/SKILL.md",
+  );
+
+  const balanceReview = registry.BUILTIN_REGISTRY.skills.find(
+    ({ id }) => id === "balance.deterministic-review",
+  );
+  assert.notEqual(balanceReview, undefined);
+  assert.deepEqual(balanceReview.capabilities, [
+    "balance.model",
+    "balance.simulate",
+    "balance.review",
+  ]);
+  assert.deepEqual(balanceReview.requiredPermissions, ["read-project"]);
+  assert.equal(
+    balanceReview.body.path,
+    "skills/deterministic-balance-review/SKILL.md",
+  );
+  assert.equal(
+    balanceReview.triggers.some((trigger) =>
+      trigger.includes("combat, economy, progression, reward, difficulty"),
+    ),
+    true,
+  );
+  assert.equal(
+    balanceReview.completionCriteria.some((criterion) =>
+      criterion.includes("sensitivity"),
+    ),
+    true,
   );
 
   assert.deepEqual(

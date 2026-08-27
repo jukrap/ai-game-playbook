@@ -23,7 +23,7 @@ test("foundation plan separates available and planned command surfaces", () => {
   assert.equal(artifact.data.package.npm, "ai-game-playbook");
   assert.equal(artifact.data.package.executable, "agpb");
   assert.equal(artifact.data.commands.length, 20);
-  assert.equal(artifact.data.skills.length, 14);
+  assert.equal(artifact.data.skills.length, 15);
 
   assert.equal(
     new Set(artifact.data.commands.map(({ id }) => id)).size,
@@ -48,6 +48,20 @@ test("foundation plan separates available and planned command surfaces", () => {
     registry.BUILTIN_REGISTRY_SURFACES.cli.data.commands
       .map(({ id }) => id)
       .sort(),
+  );
+  assert.equal(
+    artifact.data.skills.filter(({ availability }) => availability === "available")
+      .length,
+    12,
+  );
+  assert.deepEqual(
+    artifact.data.skills.find(({ id }) => id === "balance.deterministic-review"),
+    {
+      id: "balance.deterministic-review",
+      capability: "balance.review",
+      availability: "available",
+      mode: "general",
+    },
   );
   for (const skill of artifact.data.skills) {
     assert.equal(contracts.isStableId(skill.id), true);

@@ -5,6 +5,7 @@ import {
   mkdtemp,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -101,4 +102,69 @@ test("foundation plan generation refuses to synthesize an invalid public surface
   assert.equal(invalid.status, 1);
   assert.equal(await readFile(publicSurfacePath, "utf8"), "{}\n");
   assert.equal(await readFile(planPath, "utf8"), "preserve plan\n");
+});
+
+test("foundation plan generation rejects linked output directories without escaping its root", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "agpb-foundation-plan-linked-"));
+  const outside = await mkdtemp(
+    join(tmpdir(), "agpb-foundation-plan-outside-"),
+  );
+  t.after(() =>
+    Promise.all([
+      rm(root, { recursive: true, force: true }),
+      rm(outside, { recursive: true, force: true }),
+    ]),
+  );
+
+  const outsideDocs = join(outside, "docs");
+  await mkdir(outsideDocs);
+  const outsideSurfacePath = join(outsideDocs, "planned-surface.json");
+  const outsideSurface = `${JSON.stringify(
+    {
+      schemaVersion: "1",
+      artifact: "ai-game-playbook-planned-surface",
+      runtimeRegistryDigest: `sha256:${"0".repeat(64)}`,
+    },
+    null,
+    2,
+  )}\n`;
+  await writeFile(outsideSurfacePath, outsideSurface);
+  await mkdir(join(root, "generated"));
+  const planPath = join(root, "generated", "foundation-plan.json");
+  await writeFile(planPath, "preserve linked-docs plan\n");
+  await symlink(
+    outsideDocs,
+    join(root, "docs"),
+    process.platform === "win32" ? "junction" : "dir",
+  );
+
+  const linkedDocs = runGenerator("--write", root);
+  assert.equal(linkedDocs.status, 1);
+  assert.equal(await readFile(planPath, "utf8"), "preserve linked-docs plan\n");
+  assert.equal(await readFile(outsideSurfacePath, "utf8"), outsideSurface);
+
+  await rm(join(root, "docs"), { force: true });
+  await mkdir(join(root, "docs"));
+  await writeFile(join(root, "docs", "planned-surface.json"), outsideSurface);
+  await rm(join(root, "generated"), { recursive: true, force: true });
+  const outsideGenerated = join(outside, "generated");
+  await mkdir(outsideGenerated);
+  const outsidePlanPath = join(outsideGenerated, "foundation-plan.json");
+  await writeFile(outsidePlanPath, "preserve linked-generated plan\n");
+  await symlink(
+    outsideGenerated,
+    join(root, "generated"),
+    process.platform === "win32" ? "junction" : "dir",
+  );
+
+  const linkedGenerated = runGenerator("--write", root);
+  assert.equal(linkedGenerated.status, 1);
+  assert.equal(
+    await readFile(outsidePlanPath, "utf8"),
+    "preserve linked-generated plan\n",
+  );
+  assert.equal(
+    await readFile(join(root, "docs", "planned-surface.json"), "utf8"),
+    outsideSurface,
+  );
 });

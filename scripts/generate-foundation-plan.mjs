@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -59,21 +59,74 @@ function synchronizePublicSurface(text) {
 }
 
 async function readRequired(path, label) {
+  let stats;
   try {
-    return await readFile(path, "utf8");
+    stats = await lstat(path);
   } catch (error) {
     if (error?.code === "ENOENT") {
       throw new Error(`${label} is missing`);
     }
     throw error;
   }
+  if (stats.isSymbolicLink() || !stats.isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readFile(path, "utf8");
+}
+
+async function assertDirectory(path, label) {
+  let stats;
+  try {
+    stats = await lstat(path);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw new Error(`${label} is missing`);
+    }
+    throw error;
+  }
+  if (stats.isSymbolicLink() || !stats.isDirectory()) {
+    throw new Error(`${label} must be a regular directory`);
+  }
+}
+
+async function ensureDirectory(path, label) {
+  try {
+    await assertDirectory(path, label);
+    return;
+  } catch (error) {
+    if (error?.message !== `${label} is missing`) throw error;
+  }
+  await mkdir(path);
+  await assertDirectory(path, label);
+}
+
+async function assertWritableTarget(path, label) {
+  let stats;
+  try {
+    stats = await lstat(path);
+  } catch (error) {
+    if (error?.code === "ENOENT") return;
+    throw error;
+  }
+  if (stats.isSymbolicLink() || !stats.isFile()) {
+    throw new Error(`${label} must be a regular file or missing`);
+  }
 }
 
 async function run() {
   const { mode, root } = parseArguments(process.argv.slice(2));
-  const planPath = join(root, "generated", "foundation-plan.json");
-  const publicSurfacePath = join(root, "docs", "planned-surface.json");
+  const generatedDirectory = join(root, "generated");
+  const docsDirectory = join(root, "docs");
+  const planPath = join(generatedDirectory, "foundation-plan.json");
+  const publicSurfacePath = join(docsDirectory, "planned-surface.json");
   const expectedPlan = serializeFoundationPlanArtifact();
+  await assertDirectory(root, "Repository root");
+  await assertDirectory(docsDirectory, "Public docs directory");
+  if (mode === "--write") {
+    await ensureDirectory(generatedDirectory, "Generated output directory");
+  } else {
+    await assertDirectory(generatedDirectory, "Generated output directory");
+  }
   const publicSurface = await readRequired(
     publicSurfacePath,
     "Public planned surface",
@@ -81,8 +134,12 @@ async function run() {
   const expectedPublicSurface = synchronizePublicSurface(publicSurface);
 
   if (mode === "--write") {
-    await mkdir(join(root, "generated"), { recursive: true });
+    await assertWritableTarget(planPath, "Tracked foundation plan");
+    await assertDirectory(generatedDirectory, "Generated output directory");
+    await assertDirectory(docsDirectory, "Public docs directory");
     await writeFile(planPath, expectedPlan, "utf8");
+    await readRequired(planPath, "Tracked foundation plan");
+    await readRequired(publicSurfacePath, "Public planned surface");
     await writeFile(publicSurfacePath, expectedPublicSurface, "utf8");
     process.stdout.write("Foundation plan and public surface generated.\n");
     return;

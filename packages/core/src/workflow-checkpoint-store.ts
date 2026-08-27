@@ -290,7 +290,7 @@ function projectBinding(value: unknown): WorkflowCheckpointProject {
   const record = dataRecord(value, "$request.project");
   exactKeys(
     record,
-    ["id", "identityDigest", "stage"],
+    ["id", "identityDigest", "rootIdentityDigest", "stage"],
     ["id", "identityDigest", "stage"],
     "$request.project",
   );
@@ -310,6 +310,14 @@ function projectBinding(value: unknown): WorkflowCheckpointProject {
       record["identityDigest"],
       "$request.project.identityDigest",
     ),
+    ...(record["rootIdentityDigest"] === undefined
+      ? {}
+      : {
+          rootIdentityDigest: digest(
+            record["rootIdentityDigest"],
+            "$request.project.rootIdentityDigest",
+          ),
+        }),
     stage: record["stage"] as ProjectStage,
   });
 }
@@ -696,12 +704,17 @@ function assertPlanBinding(
     const step = plan.steps[inFlight.ordinal];
     const expected =
       inFlight.phase === "rollback" ? step?.rollbackCommand : step?.command;
-    const expectedAttempt =
-      checkpoint.attempts.filter(
-        (attempt) =>
-          attempt.ordinal === inFlight.ordinal &&
-          attempt.phase === inFlight.phase,
-      ).length + 1;
+    const matchingAttempts = checkpoint.attempts.filter(
+      (attempt) =>
+        attempt.ordinal === inFlight.ordinal &&
+        attempt.phase === inFlight.phase,
+    );
+    const currentAttemptRecorded = matchingAttempts.some(
+      (attempt) => attempt.attempt === inFlight.attempt,
+    );
+    const expectedAttempt = currentAttemptRecorded
+      ? matchingAttempts.length
+      : matchingAttempts.length + 1;
     if (
       step === undefined ||
       step.id !== inFlight.stepId ||
@@ -1226,6 +1239,16 @@ export async function persistWorkflowCheckpoint(
   const checkpoint = assertWorkflowCheckpointRuntimeInstance(
     record["checkpoint"],
   );
+  if (
+    checkpoint.identity.projectRootIdentityDigest !== undefined &&
+    checkpoint.identity.projectRootIdentityDigest !== value.root.identityDigest
+  ) {
+    throw storeError(
+      "workflow-checkpoint-store-mismatch",
+      "$request.checkpoint.identity.projectRootIdentityDigest",
+      "checkpoint root identity differs from the bound project root",
+    );
+  }
   const plan = assertPlanBinding(value.registry, checkpoint);
   const checkpointText = serializePersisted(checkpoint);
   if (Buffer.byteLength(checkpointText, "utf8") > WORKFLOW_CHECKPOINT_MAX_RECORD_BYTES) {
@@ -1426,6 +1449,8 @@ function assertExpectedIdentity(
     checkpoint.identity.projectId !== request.project.id ||
     checkpoint.identity.projectIdentityDigest !==
       request.project.identityDigest ||
+    checkpoint.identity.projectRootIdentityDigest !==
+      request.project.rootIdentityDigest ||
     checkpoint.identity.projectStage !== request.project.stage ||
     checkpoint.identity.inputDigest !== request.inputDigest ||
     checkpoint.identity.featureId !== expectedFeatureId ||

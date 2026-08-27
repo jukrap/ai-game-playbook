@@ -29,6 +29,12 @@ import {
   parseStableId,
   processContainmentAssessmentReportSchema,
   processContainmentAssessmentRequestSchema,
+  PROJECT_INITIALIZATION_COMMAND_MAX_DURATION_MS,
+  PROJECT_INITIALIZATION_COMMAND_MAX_MUTATION_BYTES,
+  PROJECT_INITIALIZATION_COMMAND_MAX_OUTPUT_BYTES,
+  PROJECT_INITIALIZATION_COMMAND_TARGET_COUNT,
+  projectInitializationCommandInputSchema,
+  projectInitializationReportSchema,
   projectInspectReportSchema,
   projectInspectRequestSchema,
   runReceiptSchema,
@@ -36,6 +42,7 @@ import {
   skillCheckRequestSchema,
   skillListReportSchema,
   skillListRequestSchema,
+  workflowCheckpointSchema,
   type CommandDescriptor,
   type PermissionClass,
   type ProjectStage,
@@ -575,6 +582,60 @@ const projectInspectCommand: CommandDescriptor = Object.freeze({
   }),
 });
 
+const projectInitializationCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("project.initialize"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Execute one approved, identity-bound, fixed-layout project initialization.",
+  cli: Object.freeze({
+    path: Object.freeze(["internal", "project", "initialize"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: projectInitializationCommandInputSchema.schemaId,
+    digest: projectInitializationCommandInputSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: projectInitializationReportSchema.schemaId,
+    digest: projectInitializationReportSchema.digest,
+  }),
+  capabilities: Object.freeze([parseStableId("project.initialize")]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>(["write-project-metadata"]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "filesystem",
+      scope: "bounded-project-initialization",
+      boundary: "local",
+    }),
+  ]),
+  lane: "project-write",
+  timeoutMs: PROJECT_INITIALIZATION_COMMAND_MAX_DURATION_MS,
+  cancellation: Object.freeze({ mode: "cooperative", graceMs: 1_000 }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: PROJECT_INITIALIZATION_COMMAND_TARGET_COUNT,
+    maxChangedBytes: PROJECT_INITIALIZATION_COMMAND_MAX_MUTATION_BYTES,
+    maxDurationMs: PROJECT_INITIALIZATION_COMMAND_MAX_DURATION_MS,
+    maxOutputBytes: PROJECT_INITIALIZATION_COMMAND_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([
+    parseStableId("project-initialization-report"),
+    parseStableId("run-receipt"),
+    parseStableId("workflow-checkpoint"),
+  ]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/project-runtime",
+    export: "executePreparedProjectInitialization",
+    digest: parseSha256Digest(
+      "sha256:dac154b84a25d543b6c5e795767961e1562c7972683ae7f189e8c76748b55d4d",
+    ),
+  }),
+});
+
 const skillCheckCommand: CommandDescriptor = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   id: parseStableId("skill.check"),
@@ -756,6 +817,44 @@ const godotHeadlessPreflightWorkflow: WorkflowDescriptor = Object.freeze({
   ]),
 });
 
+const projectInitializationWorkflow: WorkflowDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("workflow.project-initialization"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Execute and retain evidence for one approved fixed-layout project initialization.",
+  input: Object.freeze({
+    schemaId: projectInitializationCommandInputSchema.schemaId,
+    digest: projectInitializationCommandInputSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: projectInitializationReportSchema.schemaId,
+    digest: projectInitializationReportSchema.digest,
+  }),
+  supportedStages: supportedStages(),
+  steps: Object.freeze([
+    Object.freeze({
+      id: parseStableId("step.project-initialize"),
+      commandId: parseStableId("project.initialize"),
+      dependsOn: Object.freeze([]),
+      onFailure: "stop" as const,
+      approvalCheckpoint: true,
+    }),
+  ]),
+  budgets: Object.freeze({
+    maxChangedFiles: PROJECT_INITIALIZATION_COMMAND_TARGET_COUNT,
+    maxChangedBytes: PROJECT_INITIALIZATION_COMMAND_MAX_MUTATION_BYTES,
+    maxDurationMs: PROJECT_INITIALIZATION_COMMAND_MAX_DURATION_MS,
+    maxOutputBytes: PROJECT_INITIALIZATION_COMMAND_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  resumePolicy: "never",
+  terminalOracle:
+    "The exact prepared targets are committed and verified, or every confirmed target mutation is rolled back; uncertainty retains the in-flight workflow checkpoint.",
+  requiredEvidence: Object.freeze([parseStableId("run-receipt")]),
+});
+
 const definition: RegistryDefinition = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   controlPlaneVersion: parseSemanticVersion("0.0.0").value,
@@ -783,6 +882,8 @@ const definition: RegistryDefinition = Object.freeze({
     packListReportSchema,
     processContainmentAssessmentRequestSchema,
     processContainmentAssessmentReportSchema,
+    projectInitializationCommandInputSchema,
+    projectInitializationReportSchema,
     projectInspectRequestSchema,
     projectInspectReportSchema,
     runReceiptSchema,
@@ -790,6 +891,7 @@ const definition: RegistryDefinition = Object.freeze({
     skillCheckReportSchema,
     skillListRequestSchema,
     skillListReportSchema,
+    workflowCheckpointSchema,
   ]),
   commands: Object.freeze([
     doctorCommand,
@@ -801,13 +903,17 @@ const definition: RegistryDefinition = Object.freeze({
     initCommand,
     packDoctorCommand,
     packListCommand,
+    projectInitializationCommand,
     projectInspectCommand,
     skillCheckCommand,
     skillListCommand,
   ]),
   skills: Object.freeze([projectInspectionSkill]),
   roleLenses: Object.freeze([]),
-  workflows: Object.freeze([godotHeadlessPreflightWorkflow]),
+  workflows: Object.freeze([
+    godotHeadlessPreflightWorkflow,
+    projectInitializationWorkflow,
+  ]),
   packs: Object.freeze([]),
 });
 

@@ -21,6 +21,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
       "init",
       "pack.doctor",
       "pack.list",
+      "project.initialize",
       "project.inspect",
       "skill.check",
       "skill.list",
@@ -268,6 +269,41 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.equal(init.handler.export, "runInit");
   assert.match(init.handler.digest, digestPattern);
 
+  const initialize = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "project.initialize",
+  );
+  assert.notEqual(initialize, undefined);
+  assert.equal(initialize.lifecycle, "internal");
+  assert.deepEqual(initialize.cli, {
+    path: ["internal", "project", "initialize"],
+    aliases: [],
+  });
+  assert.deepEqual(initialize.permissions, ["write-project-metadata"]);
+  assert.deepEqual(initialize.sideEffects, [
+    {
+      kind: "filesystem",
+      scope: "bounded-project-initialization",
+      boundary: "local",
+    },
+  ]);
+  assert.equal(initialize.lane, "project-write");
+  assert.equal(initialize.retry.mode, "never");
+  assert.equal(initialize.retry.maxAttempts, 1);
+  assert.equal(
+    initialize.input.schemaId,
+    contracts.projectInitializationCommandInputSchema.schemaId,
+  );
+  assert.equal(
+    initialize.output.schemaId,
+    contracts.projectInitializationReportSchema.schemaId,
+  );
+  assert.equal(initialize.handler.package, "@ai-game-playbook/project-runtime");
+  assert.equal(
+    initialize.handler.export,
+    "executePreparedProjectInitialization",
+  );
+  assert.match(initialize.handler.digest, digestPattern);
+
   for (const [id, inputSchema, outputSchema, exportName, scope] of [
     [
       "pack.doctor",
@@ -368,12 +404,15 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   }
 });
 
-test("the builtin registry binds headless preflight to one finite workflow step", () => {
+test("the builtin registry binds internal operations to finite workflow steps", () => {
   assert.deepEqual(
     registry.BUILTIN_REGISTRY.workflows.map(({ id }) => id),
-    ["workflow.godot-headless-preflight"],
+    ["workflow.godot-headless-preflight", "workflow.project-initialization"],
   );
-  const workflow = registry.BUILTIN_REGISTRY.workflows[0];
+  const workflow = registry.BUILTIN_REGISTRY.workflows.find(
+    ({ id }) => id === "workflow.godot-headless-preflight",
+  );
+  assert.notEqual(workflow, undefined);
   assert.equal(workflow.lifecycle, "internal");
   assert.equal(
     workflow.input.schemaId,
@@ -407,6 +446,42 @@ test("the builtin registry binds headless preflight to one finite workflow step"
   assert.equal(plan.steps[0].command.lane, "build-bound");
   assert.equal(
     contracts.isResolvedWorkflowPlanDigestValid(plan),
+    true,
+  );
+
+  const initialization = registry.BUILTIN_REGISTRY.workflows.find(
+    ({ id }) => id === "workflow.project-initialization",
+  );
+  assert.notEqual(initialization, undefined);
+  assert.equal(initialization.lifecycle, "internal");
+  assert.equal(
+    initialization.input.schemaId,
+    contracts.projectInitializationCommandInputSchema.schemaId,
+  );
+  assert.equal(
+    initialization.output.schemaId,
+    contracts.projectInitializationReportSchema.schemaId,
+  );
+  assert.deepEqual(initialization.steps, [
+    {
+      id: "step.project-initialize",
+      commandId: "project.initialize",
+      dependsOn: [],
+      onFailure: "stop",
+      approvalCheckpoint: true,
+    },
+  ]);
+  assert.deepEqual(initialization.requiredEvidence, ["run-receipt"]);
+  const initializationPlan = registry.resolveWorkflowPlan(
+    registry.BUILTIN_REGISTRY,
+    initialization.id,
+    "vertical-slice",
+  );
+  assert.equal(initializationPlan.steps.length, 1);
+  assert.equal(initializationPlan.steps[0].command.id, "project.initialize");
+  assert.equal(initializationPlan.steps[0].command.lane, "project-write");
+  assert.equal(
+    contracts.isResolvedWorkflowPlanDigestValid(initializationPlan),
     true,
   );
 });

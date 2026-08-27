@@ -93,6 +93,7 @@ export interface WorkflowCheckpointRecord {
     readonly runId: string;
     readonly projectId: StableId;
     readonly projectIdentityDigest: Sha256Digest;
+    readonly projectRootIdentityDigest?: Sha256Digest;
     readonly projectStage: ProjectStage;
     readonly featureId?: StableId;
     readonly featureContractDigest?: Sha256Digest;
@@ -165,6 +166,7 @@ const checkpointIdentity = closedObject(
     runId: reference("uuid"),
     projectId: reference("stableId"),
     projectIdentityDigest: reference("sha256Digest"),
+    projectRootIdentityDigest: reference("sha256Digest"),
     projectStage: reference("projectStage"),
     featureId: reference("stableId"),
     featureContractDigest: reference("sha256Digest"),

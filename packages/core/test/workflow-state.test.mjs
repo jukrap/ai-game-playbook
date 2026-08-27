@@ -430,6 +430,132 @@ test("workflow step settlement advances the cursor and appends an exact receipt 
   assert.equal(contracts.isWorkflowCheckpointDigestValid(advanced), true);
 });
 
+test("a retained run receipt satisfies an explicit run-receipt evidence duty", () => {
+  const validated = oneStepRegistry({ requiredEvidence: ["run-receipt"] });
+  const initial = core.createWorkflowCheckpoint(executionRequest(validated));
+  const authorization = authorizeInspect(validated, initial);
+  const admitted = core.beginWorkflowStep({
+    registry: validated,
+    checkpoint: initial,
+    authorization,
+    now: () => now,
+  });
+  const started = core.markWorkflowStepStarted({
+    registry: validated,
+    checkpoint: admitted,
+    now: () => now,
+  });
+  const receipt = receiptFor(started);
+  const settlement = authorization.lease.settle({
+    outcome: "succeeded",
+    mutationUncertain: false,
+    actual: actualEffects(),
+  });
+
+  const completed = core.settleWorkflowStep({
+    registry: validated,
+    checkpoint: started,
+    receipt,
+    settlement,
+    now: () => now,
+  });
+
+  assert.equal(completed.status, "succeeded");
+  assert.deepEqual(completed.evidenceKinds, ["run-receipt"]);
+});
+
+test("receipt filesystem identity remains independent from logical workflow identity", () => {
+  const validated = oneStepRegistry({ requiredEvidence: ["run-receipt"] });
+  const rootIdentityDigest = `sha256:${"6".repeat(64)}`;
+  const initial = core.createWorkflowCheckpoint({
+    ...executionRequest(validated),
+    project: {
+      ...executionRequest(validated).project,
+      rootIdentityDigest,
+    },
+  });
+  const authorization = authorizeInspect(validated, initial);
+  const admitted = core.beginWorkflowStep({
+    registry: validated,
+    checkpoint: initial,
+    authorization,
+    now: () => now,
+  });
+  const started = core.markWorkflowStepStarted({
+    registry: validated,
+    checkpoint: admitted,
+    now: () => now,
+  });
+  const receipt = receiptFor(started, {
+    environment: {
+      platform: "windows",
+      architecture: "x64",
+      nodeVersion: "22.22.0",
+      projectIdentityDigest: rootIdentityDigest,
+    },
+  });
+  const settlement = authorization.lease.settle({
+    outcome: "succeeded",
+    mutationUncertain: false,
+    actual: actualEffects(),
+  });
+
+  const completed = core.settleWorkflowStep({
+    registry: validated,
+    checkpoint: started,
+    receipt,
+    settlement,
+    now: () => now,
+  });
+
+  assert.equal(completed.status, "succeeded");
+  assert.equal(completed.identity.projectIdentityDigest, projectIdentityDigest);
+  assert.equal(
+    completed.identity.projectRootIdentityDigest,
+    rootIdentityDigest,
+  );
+});
+
+test("a root-bound checkpoint rejects a receipt that substitutes logical identity", () => {
+  const validated = oneStepRegistry({ requiredEvidence: ["run-receipt"] });
+  const initial = core.createWorkflowCheckpoint({
+    ...executionRequest(validated),
+    project: {
+      ...executionRequest(validated).project,
+      rootIdentityDigest: `sha256:${"6".repeat(64)}`,
+    },
+  });
+  const authorization = authorizeInspect(validated, initial);
+  const admitted = core.beginWorkflowStep({
+    registry: validated,
+    checkpoint: initial,
+    authorization,
+    now: () => now,
+  });
+  const started = core.markWorkflowStepStarted({
+    registry: validated,
+    checkpoint: admitted,
+    now: () => now,
+  });
+  const settlement = authorization.lease.settle({
+    outcome: "succeeded",
+    mutationUncertain: false,
+    actual: actualEffects(),
+  });
+
+  assert.throws(
+    () =>
+      core.settleWorkflowStep({
+        registry: validated,
+        checkpoint: started,
+        receipt: receiptFor(started),
+        settlement,
+        now: () => now,
+      }),
+    expectCoreError("workflow-checkpoint-receipt-invalid"),
+  );
+});
+
 test("workflow settlement rejects copied broker settlement and mismatched receipt authority", () => {
   const validated = executionRegistry();
   const initial = core.createWorkflowCheckpoint(executionRequest(validated));
@@ -618,7 +744,9 @@ test("a successful terminal step requires complete declared evidence", () => {
     assert.equal(completed.nextOrdinal, 1);
     assert.deepEqual(
       completed.evidenceKinds,
-      expectedStatus === "succeeded" ? ["project-profile"] : [],
+      expectedStatus === "succeeded"
+        ? ["project-profile", "run-receipt"]
+        : ["run-receipt"],
     );
   }
 });
@@ -722,7 +850,7 @@ test("a declared rollback runs as a separately authorized phase and ends recover
       { phase: "rollback", outcome: "rolled-back" },
     ],
   );
-  assert.deepEqual(recovered.evidenceKinds, ["rollback-state"]);
+  assert.deepEqual(recovered.evidenceKinds, ["rollback-state", "run-receipt"]);
 });
 
 test("a checkpoint cannot create a second successor in the same runtime", () => {

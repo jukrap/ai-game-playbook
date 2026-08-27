@@ -558,7 +558,10 @@ test("a settled rollback chain reloads without promoting the recovered failure",
   assert.equal(head.chainLength, 7);
   assert.equal(loaded.chainLength, 7);
   assert.equal(loaded.checkpoint.status, "failed");
-  assert.deepEqual(loaded.checkpoint.evidenceKinds, ["rollback-state"]);
+  assert.deepEqual(loaded.checkpoint.evidenceKinds, [
+    "rollback-state",
+    "run-receipt",
+  ]);
   assert.deepEqual(
     loaded.checkpoint.attempts.map(({ phase, outcome }) => ({ phase, outcome })),
     [
@@ -827,6 +830,26 @@ test("store requests require same-process handles and exact declared identity", 
   const { root } = await fixture(t);
   const validated = validatedRegistry();
   const { checkpoint, stored } = await persistInitial(root, validated);
+
+  const wrongRootCheckpoint = core.createWorkflowCheckpoint(
+    checkpointRequest(validated, {
+      runId: "723e4567-e89b-42d3-a456-426614174000",
+      project: {
+        id: "project.graybox",
+        identityDigest: projectIdentityDigest,
+        rootIdentityDigest: `sha256:${"6".repeat(64)}`,
+        stage: "vertical-slice",
+      },
+    }),
+  );
+  await assert.rejects(
+    core.persistWorkflowCheckpoint({
+      root,
+      registry: validated,
+      checkpoint: wrongRootCheckpoint,
+    }),
+    expectCoreError("workflow-checkpoint-store-mismatch"),
+  );
 
   await assert.rejects(
     core.persistWorkflowCheckpoint({

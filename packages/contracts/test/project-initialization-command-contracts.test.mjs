@@ -361,6 +361,34 @@ test("successful reports bind settlement, effects, durable evidence, and digest"
       }),
     /control-plane/,
   );
+
+  const controlOnlyBody = {
+    ...report,
+    effects: {
+      changedPaths: [],
+      changedBytes: 0,
+      appliedPaths: [],
+      rolledBackPaths: [],
+      controlPlaneState: {
+        changedPaths: [
+          ".ai-game-playbook",
+          ".ai-game-playbook/locks",
+          ...report.effects.controlPlaneState.changedPaths,
+        ],
+        changedFiles: report.effects.controlPlaneState.changedFiles + 2,
+        changedBytes: report.effects.controlPlaneState.changedBytes,
+      },
+    },
+  };
+  delete controlOnlyBody.reportDigest;
+  const controlOnlyReport = {
+    ...controlOnlyBody,
+    reportDigest:
+      contracts.computeProjectInitializationReportDigest(controlOnlyBody),
+  };
+  assert.doesNotThrow(() =>
+    contracts.assertProjectInitializationReportSemantics(controlOnlyReport),
+  );
 });
 
 test("recovery-required reports retain the marker and cannot claim success", () => {

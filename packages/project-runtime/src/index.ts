@@ -12,4 +12,12 @@ export type {
   PreparedProjectInitializationTarget,
   ProjectInitializationConflict,
 } from "./project-initialization.js";
+export {
+  createProjectInitializationAuthorizationRequest,
+  executePreparedProjectInitialization,
+} from "./project-initialization-execute.js";
+export type {
+  CreateProjectInitializationAuthorizationRequest,
+  ExecutePreparedProjectInitializationRequest,
+} from "./project-initialization-execute.js";
 export { runProjectInspect } from "./project-inspect.js";

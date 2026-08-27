@@ -1,11 +1,17 @@
 export type ProjectRuntimeErrorCode =
   | "invalid-project-initialization-request"
+  | "invalid-project-initialization-execution-request"
+  | "project-initialization-authorization-invalid"
   | "project-initialization-budget-exceeded"
+  | "project-initialization-evidence-failed"
+  | "project-initialization-execution-failed"
+  | "project-initialization-lane-failed"
   | "project-initialization-metadata-invalid"
   | "project-initialization-plan-stale"
   | "project-initialization-plan-not-ready"
   | "project-initialization-plan-untrusted"
-  | "project-initialization-profile-invalid";
+  | "project-initialization-profile-invalid"
+  | "project-initialization-recovery-required";
 
 export class ProjectRuntimeError extends Error {
   readonly code: ProjectRuntimeErrorCode;

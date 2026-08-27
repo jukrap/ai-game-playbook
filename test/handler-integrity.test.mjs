@@ -20,6 +20,7 @@ test("runtime command handler metadata attests each exact compiled module", asyn
     ["init", "cli", "init.js"],
     ["pack.doctor", "pack-runtime", "inspection.js"],
     ["pack.list", "pack-runtime", "inspection.js"],
+    ["project.initialize", "project-runtime", "project-initialization-execute.js"],
     ["project.inspect", "project-runtime", "project-inspect.js"],
     ["skill.check", "cli", "skill-check.js"],
     ["skill.list", "cli", "skill-list.js"],

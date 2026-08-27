@@ -43,7 +43,7 @@ export const PROJECT_INITIALIZATION_COMMAND_MAX_DURATION_MS: number = 30_000;
 export const PROJECT_INITIALIZATION_COMMAND_MAX_OUTPUT_BYTES: number =
   1024 * 1024;
 export const PROJECT_INITIALIZATION_CONTROL_STATE_MAX_CHANGED_FILES: number =
-  16;
+  32;
 export const PROJECT_INITIALIZATION_CONTROL_STATE_MAX_CHANGED_BYTES: number =
   8 * 1024 * 1024;
 
@@ -70,6 +70,19 @@ const TARGET_CONTENTS = new Set<InitPlanTargetContent>([
   "ignore-policy",
 ]);
 const TARGET_ACTIONS = new Set<InitPlanTargetAction>(["create", "retain"]);
+const CONTROL_STATE_DIRECTORY_PATHS = new Set<string>([
+  ".ai-game-playbook",
+  ".ai-game-playbook/evidence",
+  ".ai-game-playbook/evidence/artifacts",
+  ".ai-game-playbook/evidence/artifacts/manifests",
+  ".ai-game-playbook/evidence/artifacts/objects",
+  ".ai-game-playbook/evidence/receipts",
+  ".ai-game-playbook/locks",
+  ".ai-game-playbook/state",
+  ".ai-game-playbook/state/packs",
+  ".ai-game-playbook/state/packs/transactions",
+  ".ai-game-playbook/state/workflows",
+]);
 
 type DataRecord = Record<string, unknown>;
 
@@ -332,6 +345,14 @@ function portablePaths(
 function parentPath(path: string): string {
   const separator = path.lastIndexOf("/");
   return separator === -1 ? "." : path.slice(0, separator);
+}
+
+function isProjectInitializationControlStatePath(path: string): boolean {
+  return (
+    CONTROL_STATE_DIRECTORY_PATHS.has(path) ||
+    path.startsWith(".ai-game-playbook/evidence/receipts/") ||
+    path.startsWith(".ai-game-playbook/state/workflows/")
+  );
 }
 
 function validateProject(value: unknown): ProjectInitializationPreparedPlanDigestInput["project"] {
@@ -734,11 +755,7 @@ function validateReportBody(
   );
   if (
     controlStatePaths.length < 1 ||
-    controlStatePaths.some(
-      (path) =>
-        !path.startsWith(".ai-game-playbook/evidence/receipts/") &&
-        !path.startsWith(".ai-game-playbook/state/workflows/"),
-    ) ||
+    controlStatePaths.some((path) => !isProjectInitializationControlStatePath(path)) ||
     !boundedInteger(
       controlState["changedFiles"],
       1,
@@ -851,7 +868,6 @@ function validateReportBody(
     (status === "succeeded" &&
       (report["mutationAttempted"] !== true ||
         authorization["status"] !== "succeeded" ||
-        changedPaths.length < 1 ||
         !sameValues(changedPaths, appliedPaths) ||
         rolledBackPaths.length !== 0)) ||
     (status === "failed" &&

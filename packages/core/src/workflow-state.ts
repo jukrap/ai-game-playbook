@@ -63,6 +63,7 @@ type DataRecord = Record<string, unknown>;
 export interface WorkflowCheckpointProject {
   readonly id: StableId;
   readonly identityDigest: Sha256Digest;
+  readonly rootIdentityDigest?: Sha256Digest;
   readonly stage: ProjectStage;
 }
 
@@ -189,7 +190,7 @@ function project(value: unknown): WorkflowCheckpointProject {
   const record = dataRecord(value, "$request.project");
   exactKeys(
     record,
-    ["id", "identityDigest", "stage"],
+    ["id", "identityDigest", "rootIdentityDigest", "stage"],
     ["id", "identityDigest", "stage"],
     "$request.project",
   );
@@ -205,6 +206,14 @@ function project(value: unknown): WorkflowCheckpointProject {
       record["identityDigest"],
       "$request.project.identityDigest",
     ),
+    ...(record["rootIdentityDigest"] === undefined
+      ? {}
+      : {
+          rootIdentityDigest: digest(
+            record["rootIdentityDigest"],
+            "$request.project.rootIdentityDigest",
+          ),
+        }),
     stage: record["stage"] as ProjectStage,
   };
 }
@@ -546,7 +555,8 @@ function assertReceiptBinding(
     !sameStringArray(receipt.authority.approvalIds, inFlight.approvalIds) ||
     !sameStringArray(receipt.authority.packDigests, expectedPackDigests) ||
     receipt.environment.projectIdentityDigest !==
-      checkpoint.identity.projectIdentityDigest ||
+      (checkpoint.identity.projectRootIdentityDigest ??
+        checkpoint.identity.projectIdentityDigest) ||
     receipt.environment.sessionIdentityDigest !==
       checkpoint.sessionIdentityDigest ||
     !previousMatches
@@ -984,6 +994,9 @@ export function createWorkflowCheckpoint(
       runId,
       projectId: projectBinding.id,
       projectIdentityDigest: projectBinding.identityDigest,
+      ...(projectBinding.rootIdentityDigest === undefined
+        ? {}
+        : { projectRootIdentityDigest: projectBinding.rootIdentityDigest }),
       projectStage: projectBinding.stage,
       ...(featureBinding === undefined
         ? {}
@@ -1259,7 +1272,12 @@ export function settleWorkflowStep(
       : [];
   const evidenceKinds = mergeCanonical(
     checkpoint.evidenceKinds,
-    acceptedArtifacts.map(({ kind }) => kind),
+    receipt.status === "succeeded" && settlement.status === "succeeded"
+      ? [
+          "run-receipt" as StableId,
+          ...acceptedArtifacts.map(({ kind }) => kind),
+        ]
+      : [],
   );
   const artifactDigests = mergeCanonical(
     checkpoint.artifactDigests,

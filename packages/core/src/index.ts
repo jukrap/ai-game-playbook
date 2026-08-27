@@ -120,6 +120,14 @@ export type {
   ProcessTerminationReport,
 } from "./process-runner.js";
 export {
+  PROCESS_CONTAINMENT_PROVIDER_CATALOG_DIGEST,
+  assessProcessContainment,
+  assertProcessContainmentAssessmentWitness,
+} from "./process-containment.js";
+export type {
+  AssessProcessContainmentRequest,
+} from "./process-containment.js";
+export {
   assertProjectRootIdentity,
   canonicalizeProjectRoot,
   resolveProjectPath,

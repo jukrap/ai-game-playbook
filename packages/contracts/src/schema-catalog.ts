@@ -65,6 +65,10 @@ import {
   godotHeadlessPreflightReportSchema,
   godotHeadlessPreflightRequestSchema,
 } from "./godot-headless-preflight-contracts.js";
+import {
+  processContainmentAssessmentReportSchema,
+  processContainmentAssessmentRequestSchema,
+} from "./process-containment-assessment-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -115,8 +119,12 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "engine-project-identity": engineProjectIdentitySchema,
     "engine-session-identity": engineSessionIdentitySchema,
     "input-replay-trace": inputReplayTraceSchema,
-  "resolved-workflow-plan": resolvedWorkflowPlanSchema,
-  "workflow-checkpoint": workflowCheckpointSchema,
+    "process-containment-assessment-report":
+      processContainmentAssessmentReportSchema,
+    "process-containment-assessment-request":
+      processContainmentAssessmentRequestSchema,
+    "resolved-workflow-plan": resolvedWorkflowPlanSchema,
+    "workflow-checkpoint": workflowCheckpointSchema,
     "run-handle": runHandleSchema,
     "runtime-frame-evidence": runtimeFrameEvidenceSchema,
     "task-routing-selection": taskRoutingSelectionSchema,

@@ -28,6 +28,8 @@ const expectedIds = [
   "init-report",
   "init-request",
   "input-replay-trace",
+  "process-containment-assessment-report",
+  "process-containment-assessment-request",
   "project-inspect-report",
   "project-inspect-request",
   "resolved-workflow-plan",
@@ -377,6 +379,23 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
         startup: {
           ...fixtures["build-artifact-evidence"].startup,
           exitCode: 17,
+        },
+      },
+    ],
+    [
+      "process-containment-assessment-report",
+      {
+        ...fixtures["process-containment-assessment-report"],
+        decision: "allow",
+      },
+    ],
+    [
+      "process-containment-assessment-report",
+      {
+        ...fixtures["process-containment-assessment-report"],
+        provider: {
+          ...fixtures["process-containment-assessment-report"].provider,
+          path: "C:\\tools\\sandbox.exe",
         },
       },
     ],

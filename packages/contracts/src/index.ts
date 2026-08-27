@@ -162,6 +162,26 @@ export type {
   GodotHeadlessPreflightReceiptPointer,
   GodotHeadlessPreflightReport,
 } from "./godot-headless-preflight-contracts.js";
+export {
+  PROCESS_CONTAINMENT_POLICY_DIGEST,
+  PROCESS_CONTAINMENT_REQUIREMENTS,
+  assertProcessContainmentAssessmentReportSemantics,
+  assertProcessContainmentAssessmentRequestSemantics,
+  computeProcessContainmentAssessmentDigest,
+  computeProcessContainmentRequestDigest,
+  processContainmentAssessmentReportSchema,
+  processContainmentAssessmentRequestSchema,
+} from "./process-containment-assessment-contracts.js";
+export type {
+  ProcessContainmentAssessmentDigestInput,
+  ProcessContainmentAssessmentProbe,
+  ProcessContainmentAssessmentReport,
+  ProcessContainmentAssessmentRequest,
+  ProcessContainmentProviderUnavailable,
+  ProcessContainmentRequirements,
+  ProcessContainmentUnavailableControl,
+  ProcessContainmentUnavailableControls,
+} from "./process-containment-assessment-contracts.js";
 export type {
   SkillCatalogDigestInput,
   SkillCatalogEntry,

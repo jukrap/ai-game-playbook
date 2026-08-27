@@ -1,4 +1,7 @@
-import { GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST } from "@ai-game-playbook/contracts";
+import {
+  GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+  PROCESS_CONTAINMENT_POLICY_DIGEST,
+} from "@ai-game-playbook/contracts";
 
 const digest = `sha256:${"a".repeat(64)}`;
 const secondDigest = `sha256:${"b".repeat(64)}`;
@@ -326,6 +329,55 @@ export const validFoundationProtocolFixtures = {
     externalProcessStarted: false,
     networkAccessPerformed: false,
     preflightDigest: secondDigest,
+  },
+  "process-containment-assessment-request": {
+    schemaVersion: "1.0.0",
+    workload: "engine-project-process",
+    projectRootIdentityDigest: digest,
+    policyDigest: PROCESS_CONTAINMENT_POLICY_DIGEST,
+    requirements: {
+      filesystem: "deny-project-writes",
+      network: "deny",
+      childProcesses: "deny",
+    },
+  },
+  "process-containment-assessment-report": {
+    schemaVersion: "1.0.0",
+    assessmentId: "018f6f35-2c9e-7d1a-8a4b-123456789ac0",
+    requestDigest: secondDigest,
+    projectRootIdentityDigest: digest,
+    workload: "engine-project-process",
+    policyDigest: PROCESS_CONTAINMENT_POLICY_DIGEST,
+    requirements: {
+      filesystem: "deny-project-writes",
+      network: "deny",
+      childProcesses: "deny",
+    },
+    platform: "windows",
+    architecture: "x64",
+    provider: {
+      catalogDigest: secondDigest,
+      status: "unavailable",
+      code: "process-containment-provider-unavailable",
+    },
+    controls: {
+      filesystem: {
+        requirement: "deny-project-writes",
+        status: "unavailable",
+      },
+      network: { requirement: "deny", status: "unavailable" },
+      childProcesses: { requirement: "deny", status: "unavailable" },
+    },
+    probe: {
+      status: "not-run",
+      externalProcessStarted: false,
+      mutationPerformed: false,
+      networkAccessPerformed: false,
+    },
+    decision: "block",
+    checkedAt: startedAt,
+    evidenceGrade: "implemented",
+    assessmentDigest: digest,
   },
   "init-request": {
     schemaVersion: "1.0.0",

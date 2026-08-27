@@ -39,6 +39,8 @@ const expectedIds = [
   "process-containment-provider-descriptor",
   "process-containment-self-test-report",
   "process-containment-self-test-request",
+  "project-initialization-command-input",
+  "project-initialization-report",
   "project-inspect-report",
   "project-inspect-request",
   "resolved-workflow-plan",
@@ -122,6 +124,20 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       {
         ...fixtures["pack-list-report"],
         artifactContentExposed: true,
+      },
+    ],
+    [
+      "project-initialization-command-input",
+      {
+        ...fixtures["project-initialization-command-input"],
+        disposition: "blocked",
+      },
+    ],
+    [
+      "project-initialization-report",
+      {
+        ...fixtures["project-initialization-report"],
+        externalProcessStarted: true,
       },
     ],
     [

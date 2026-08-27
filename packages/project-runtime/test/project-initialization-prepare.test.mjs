@@ -154,6 +154,12 @@ test("fresh initialization preparation is write-free, exact, and same-process", 
   assert.doesNotThrow(() =>
     projectRuntime.assertPreparedProjectInitialization(prepared),
   );
+  const commandInput =
+    projectRuntime.createProjectInitializationCommandInput(prepared);
+  assert.equal(commandInput, prepared);
+  assert.doesNotThrow(() =>
+    contracts.assertProjectInitializationCommandInputSemantics(commandInput),
+  );
   assert.throws(
     () =>
       projectRuntime.assertPreparedProjectInitialization(
@@ -179,6 +185,12 @@ test("exact existing metadata prepares a write-free no-op", async (t) => {
   assert.equal(prepared.summary.retain, 20);
   assert.equal(prepared.budgets.maxChangedFiles, 0);
   assert.equal(prepared.budgets.maxChangedBytes, 0);
+  assert.throws(
+    () => projectRuntime.createProjectInitializationCommandInput(prepared),
+    (error) =>
+      error?.name === "ProjectRuntimeError" &&
+      error?.code === "project-initialization-plan-not-ready",
+  );
   assert.deepEqual(
     await readdir(native(project, ".ai-game-playbook")),
     before,

@@ -1,4 +1,5 @@
 import {
+  assertProjectInitializationCommandInputSemantics,
   assertProjectPackLockSemantics,
   canonicalizeJson,
   computeGameProjectIdentityDigest,
@@ -17,6 +18,7 @@ import {
   type InitPlanTargetKind,
   type InitPlanTargetPolicy,
   type ProjectPackLock,
+  type ProjectInitializationCommandInput,
   type ProjectStage,
   type Sha256Digest,
   type StableId,
@@ -496,6 +498,31 @@ export function assertPreparedProjectInitialization(
       "project initialization requires a same-process prepared plan",
     );
   }
+}
+
+export function createProjectInitializationCommandInput(
+  value: PreparedProjectInitialization,
+): ProjectInitializationCommandInput {
+  assertPreparedProjectInitialization(value);
+  if (value.disposition !== "ready") {
+    throw new ProjectRuntimeError(
+      "project-initialization-plan-not-ready",
+      "$plan.disposition",
+      "project initialization execution requires one conflict-free plan with at least one planned write",
+    );
+  }
+  try {
+    assertProjectInitializationCommandInputSemantics(
+      value as unknown as ProjectInitializationCommandInput,
+    );
+  } catch {
+    throw new ProjectRuntimeError(
+      "project-initialization-plan-untrusted",
+      "$plan",
+      "same-process project initialization data does not satisfy the execution contract",
+    );
+  }
+  return value as unknown as ProjectInitializationCommandInput;
 }
 
 export function internalsForPreparedProjectInitialization(

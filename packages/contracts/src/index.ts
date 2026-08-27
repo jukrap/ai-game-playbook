@@ -94,6 +94,36 @@ export type {
   ProjectPackLockEntry,
 } from "./project-pack-lock-contracts.js";
 export {
+  PROJECT_INITIALIZATION_COMMAND_ID,
+  PROJECT_INITIALIZATION_COMMAND_MAX_DURATION_MS,
+  PROJECT_INITIALIZATION_COMMAND_MAX_METADATA_BYTES,
+  PROJECT_INITIALIZATION_COMMAND_MAX_MUTATION_BYTES,
+  PROJECT_INITIALIZATION_COMMAND_MAX_OUTPUT_BYTES,
+  PROJECT_INITIALIZATION_COMMAND_MAX_PROJECT_BYTES,
+  PROJECT_INITIALIZATION_COMMAND_TARGET_COUNT,
+  PROJECT_INITIALIZATION_CONTROL_STATE_MAX_CHANGED_BYTES,
+  PROJECT_INITIALIZATION_CONTROL_STATE_MAX_CHANGED_FILES,
+  assertProjectInitializationCommandInputSemantics,
+  assertProjectInitializationReportSemantics,
+  computeProjectInitializationPreparedPlanDigest,
+  computeProjectInitializationReportDigest,
+  projectInitializationCommandInputSchema,
+  projectInitializationReportSchema,
+} from "./project-initialization-command-contracts.js";
+export type {
+  ProjectInitializationAuthorizationSettlement,
+  ProjectInitializationCheckpointPointer,
+  ProjectInitializationCommandInput,
+  ProjectInitializationCommandTarget,
+  ProjectInitializationExecutionEffects,
+  ProjectInitializationExecutionStatus,
+  ProjectInitializationPreparedPlanDigestInput,
+  ProjectInitializationReceiptPointer,
+  ProjectInitializationReport,
+  ProjectInitializationReportDigestInput,
+  ProjectInitializationReportError,
+} from "./project-initialization-command-contracts.js";
+export {
   INIT_PLAN_MAX_ISSUES,
   INIT_PLAN_MAX_TARGETS,
   INIT_PLAN_TARGET_ACTIONS,

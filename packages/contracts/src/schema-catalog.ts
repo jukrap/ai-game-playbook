@@ -85,6 +85,10 @@ import {
   packListRequestSchema,
 } from "./pack-inspection-contracts.js";
 import { projectPackLockSchema } from "./project-pack-lock-contracts.js";
+import {
+  projectInitializationCommandInputSchema,
+  projectInitializationReportSchema,
+} from "./project-initialization-command-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -132,6 +136,9 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "pack-list-request": packListRequestSchema,
     "project-inspect-report": projectInspectReportSchema,
     "project-inspect-request": projectInspectRequestSchema,
+    "project-initialization-command-input":
+      projectInitializationCommandInputSchema,
+    "project-initialization-report": projectInitializationReportSchema,
     "skill-check-report": skillCheckReportSchema,
     "skill-check-request": skillCheckRequestSchema,
     "skill-list-report": skillListReportSchema,

@@ -3,6 +3,7 @@ export type ProjectRuntimeErrorCode =
   | "project-initialization-budget-exceeded"
   | "project-initialization-metadata-invalid"
   | "project-initialization-plan-stale"
+  | "project-initialization-plan-not-ready"
   | "project-initialization-plan-untrusted"
   | "project-initialization-profile-invalid";
 

@@ -3,6 +3,7 @@ export type { ProjectRuntimeErrorCode } from "./errors.js";
 export {
   PROJECT_INITIALIZATION_IGNORE_POLICY,
   assertPreparedProjectInitialization,
+  createProjectInitializationCommandInput,
   prepareProjectInitialization,
 } from "./project-initialization.js";
 export type {

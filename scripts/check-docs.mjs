@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const root = resolve(scriptDir, "..");
 const failures = [];
+const ROOT_README_MAX_BYTES = 9_000;
+const MAX_PROSE_PARAGRAPH_CHARACTERS = 1_000;
+const MAX_STATUS_BANNER_CHARACTERS = 320;
 const reviewDesignSurface = {
   package: {
     npm: "ai-game-playbook",
@@ -79,6 +82,23 @@ function readText(relativePath) {
   return readBytes(relativePath).toString("utf8");
 }
 
+function namedCommandBlock(relativePath, text, label) {
+  const pattern = new RegExp(
+    "```text " + label + "\\r?\\n([\\s\\S]*?)\\r?\\n```",
+    "u"
+  );
+  const match = text.match(pattern);
+  if (!match) {
+    fail(`${relativePath}: missing ${label} command block`);
+    return null;
+  }
+
+  return match[1]
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 function sha256(buffer) {
   return createHash("sha256").update(buffer).digest("hex");
 }
@@ -139,6 +159,46 @@ function markdownShape(relativePath, text) {
 
   if (openFence !== null) fail(`${relativePath}: unclosed code fence`);
   return { headings, fences };
+}
+
+function proseParagraphs(text) {
+  const normalized = text
+    .replaceAll("\r\n", "\n")
+    .replace(/^---\n[\s\S]*?\n---\n/u, "");
+  const paragraphs = [];
+  let current = [];
+  let openFence = null;
+
+  function flush() {
+    if (current.length > 0) paragraphs.push(current.join(" "));
+    current = [];
+  }
+
+  for (const line of normalized.split("\n")) {
+    const fence = line.match(/^\s*(```|~~~)/u);
+    if (fence) {
+      flush();
+      if (openFence === null) openFence = fence[1];
+      else if (fence[1] === openFence) openFence = null;
+      continue;
+    }
+    if (openFence !== null) continue;
+
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      flush();
+      continue;
+    }
+    if (
+      /^(?:#{1,6}\s|>|[-*+]\s|\d+[.)]\s|\||---$|<!--)/u.test(trimmed)
+    ) {
+      flush();
+      continue;
+    }
+    current.push(trimmed);
+  }
+  flush();
+  return paragraphs;
 }
 
 function sameArray(left, right) {
@@ -209,6 +269,15 @@ const koreanDocs = ["README.ko.md", ...listMarkdown("docs")]
   .filter((path) => path.endsWith(".ko.md"))
   .sort();
 
+for (const readmePath of ["README.md", "README.ko.md"]) {
+  if (
+    existsSync(rootPath(readmePath)) &&
+    readBytes(readmePath).byteLength > ROOT_README_MAX_BYTES
+  ) {
+    fail(`${readmePath}: exceeds the README byte limit of ${ROOT_README_MAX_BYTES}`);
+  }
+}
+
 for (const englishPath of englishDocs) {
   const koreanPath = mirrorFor(englishPath);
   if (!existsSync(rootPath(koreanPath))) {
@@ -228,6 +297,25 @@ for (const englishPath of englishDocs) {
   }
   if (!/^> 상태:/m.test(koreanOpening)) {
     fail(`${koreanPath}: missing Status banner near the top of the document`);
+  }
+
+  const englishStatus = englishOpening.match(/^> Status:[^\r\n]*$/m)?.[0];
+  const koreanStatus = koreanOpening.match(/^> 상태:[^\r\n]*$/m)?.[0];
+  if (
+    englishStatus !== undefined &&
+    englishStatus.length > MAX_STATUS_BANNER_CHARACTERS
+  ) {
+    fail(
+      `${englishPath}: status banner exceeds ${MAX_STATUS_BANNER_CHARACTERS} characters`,
+    );
+  }
+  if (
+    koreanStatus !== undefined &&
+    koreanStatus.length > MAX_STATUS_BANNER_CHARACTERS
+  ) {
+    fail(
+      `${koreanPath}: status banner exceeds ${MAX_STATUS_BANNER_CHARACTERS} characters`,
+    );
   }
 
   if (metadata.source !== englishPath) {
@@ -271,6 +359,14 @@ const forbiddenPublicPatterns = [
 
 for (const markdownPath of publicMarkdown) {
   const text = readText(markdownPath);
+  for (const paragraph of proseParagraphs(text)) {
+    if (paragraph.length > MAX_PROSE_PARAGRAPH_CHARACTERS) {
+      fail(
+        `${markdownPath}: prose paragraph exceeds ${MAX_PROSE_PARAGRAPH_CHARACTERS} characters`,
+      );
+      break;
+    }
+  }
   for (const [pattern, label] of forbiddenPublicPatterns) {
     if (pattern.test(text)) fail(`${markdownPath}: contains ${label}`);
   }
@@ -310,6 +406,23 @@ for (const markdownPath of publicMarkdown) {
         fail(`${markdownPath}: missing heading anchor: ${target}`);
       }
     }
+  }
+}
+
+for (const requiredPath of [
+  "docs/cli.md",
+  "docs/cli.ko.md",
+  "docs/skills.md",
+  "docs/skills.ko.md",
+]) {
+  if (!existsSync(rootPath(requiredPath))) {
+    fail(`${requiredPath}: required public guide is missing`);
+  }
+}
+
+for (const legacyPath of ["docs/planned-cli.md", "docs/planned-cli.ko.md"]) {
+  if (existsSync(rootPath(legacyPath))) {
+    fail(`${legacyPath}: legacy CLI document path must be removed`);
   }
 }
 
@@ -388,18 +501,28 @@ if (plannedSurface) {
   }
 
   if (Array.isArray(plannedSurface.commands)) {
-    for (const cliPath of ["docs/planned-cli.md", "docs/planned-cli.ko.md"]) {
-      const textBlock = readText(cliPath).match(/```text\r?\n([\s\S]*?)\r?\n```/);
-      if (!textBlock) {
-        fail(`${cliPath}: missing text command block`);
+    const availableCommands = Array.isArray(plannedSurface.availableCommands)
+      ? plannedSurface.availableCommands
+      : [];
+    const plannedCommands = plannedSurface.commands.filter(
+      (command) => !availableCommands.includes(command)
+    );
+    for (const cliPath of ["docs/cli.md", "docs/cli.ko.md"]) {
+      if (!existsSync(rootPath(cliPath))) {
+        fail(`${cliPath}: command guide is missing`);
         continue;
       }
-      const documentedCommands = textBlock[1]
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean);
-      if (!sameArray(documentedCommands, plannedSurface.commands)) {
-        fail(`${cliPath}: command block differs from docs/planned-surface.json`);
+      const cliText = readText(cliPath);
+      const documentedAvailable = namedCommandBlock(cliPath, cliText, "available");
+      const documentedPlanned = namedCommandBlock(cliPath, cliText, "planned");
+      if (
+        documentedAvailable &&
+        !sameArray(documentedAvailable, availableCommands)
+      ) {
+        fail(`${cliPath}: available command block differs from docs/planned-surface.json`);
+      }
+      if (documentedPlanned && !sameArray(documentedPlanned, plannedCommands)) {
+        fail(`${cliPath}: planned command block differs from docs/planned-surface.json`);
       }
     }
   }
@@ -435,6 +558,18 @@ if (plannedSurface) {
     if (!sameArray(availableCommands, plannedSurface.availableCommands)) {
       fail("generated/foundation-plan.json: available command set differs from the public surface");
     }
+
+    const availableSkills = (generatedPlan.data?.skills ?? [])
+      .filter(({ availability }) => availability === "available")
+      .map(({ id }) => id);
+    for (const skillPath of ["docs/skills.md", "docs/skills.ko.md"]) {
+      if (!existsSync(rootPath(skillPath))) continue;
+      const documentedSkills = [...readText(skillPath).matchAll(/^\|\s*`([a-z0-9]+(?:[.-][a-z0-9]+)*)`\s*\|/gmu)]
+        .map((match) => match[1]);
+      if (!sameArray(documentedSkills, availableSkills)) {
+        fail(`${skillPath}: stable skill catalog differs from generated/foundation-plan.json`);
+      }
+    }
   } catch (error) {
     fail(`generated/foundation-plan.json: invalid JSON (${error.message})`);
   }
@@ -442,11 +577,32 @@ if (plannedSurface) {
 }
 
 const readme = readText("README.md");
+const koreanReadme = readText("README.ko.md");
 const statusDoc = readText("docs/status-and-scope.md");
+for (const requiredLink of [
+  "docs/status-and-scope.md",
+  "docs/cli.md",
+  "docs/skills.md",
+  "docs/roadmap.md",
+]) {
+  if (!readme.includes(requiredLink)) {
+    fail(`README.md: missing primary documentation link ${requiredLink}`);
+  }
+}
+for (const requiredLink of [
+  "docs/status-and-scope.ko.md",
+  "docs/cli.ko.md",
+  "docs/skills.ko.md",
+  "docs/roadmap.ko.md",
+]) {
+  if (!koreanReadme.includes(requiredLink)) {
+    fail(`README.ko.md: missing primary documentation link ${requiredLink}`);
+  }
+}
 if (
-  !readme.includes("No installable package") ||
-  !readme.includes("The implemented commands are plan-only `agpb init`; read-only `agpb doctor`, `agpb project inspect`, `agpb pack list`, `agpb pack doctor`, `agpb skill list`, and `agpb skill check`; and static read-only `agpb engine status --engine godot` and `agpb engine capabilities --engine godot`") ||
-  !readme.includes("all live-engine capabilities and support grades planned")
+  !readme.includes("No installable package is published.") ||
+  !readme.includes("Nine write-free CLI commands") ||
+  !readme.includes("All live-engine capabilities and support grades remain planned.")
 ) {
   fail("README.md: executable availability limits must remain explicit");
 }

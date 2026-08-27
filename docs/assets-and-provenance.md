@@ -1,57 +1,60 @@
 # Assets and Provenance
 
-> Status: planned asset policy with a registered provenance contract and limited private assessment. No asset pipeline or provider integration exists yet.
+> Status: the asset policy and `AssetProvenance` contract exist. Automated generation providers and engine-backed asset QA are not available.
 
 [한국어](assets-and-provenance.ko.md) · [Documentation](README.md)
 
-## Default lifecycle
+## Lifecycle
 
-The planned production path is:
+Every asset follows the same promotion path:
 
-`typed placeholder → user/licensed asset → candidate → QA → approved → production`
+`typed placeholder → user or licensed asset → candidate → QA → approved → production`
 
-Every gameplay or UI asset begins as a typed slot with purpose, expected dimensions or scale, format, collision or interaction needs, performance budget, and fallback behavior. A placeholder remains valid until a candidate proves it satisfies that slot.
+An asset may stop at any stage. Generation, conversion, file decode, or engine import success does not skip rights review, visual or audio review, runtime QA, performance checks, or approval.
 
-No downloaded, converted, or generated file is production-ready merely because creation succeeded.
+## Provenance record
 
-## `AssetProvenance`
+`AssetProvenance` records the information needed to understand and reproduce an asset decision:
 
-The registered contract can carry the following candidate metadata; production-pipeline integration remains planned:
+- source type, lineage, original and current file hashes;
+- license, rights status, restrictions, and approval;
+- transformations and tools;
+- provider, model, checkpoint, prompt inputs, and seed when applicable;
+- external transmission and cost;
+- technical, aesthetic, runtime, performance, and production QA state.
 
-- Stable asset and slot identities.
-- Original source category, lineage, and source file hash.
-- Declared license or rights status and any attribution obligations.
-- Transformation steps, tool versions, input hashes, and output hashes.
-- Provider, model, checkpoint, prompt digest, seed, and settings when generation is used.
-- Estimated and actual cost, external-transmission approval, and reviewer approval.
-- Engine import settings, dependencies, QA results, promotion state, and rollback target.
+Unknown fields remain unknown. The harness does not infer ownership or grant rights.
 
-Unknown rights or missing lineage blocks promotion to production. The system does not infer ownership from file availability.
+## First-alpha sources
 
-The current private assessor validates an `AssetProvenance` value against the exact in-process registry, checks semantic invariants, and requires one declared current-file path, SHA-256 digest, and byte count to match the assessed artifact. It returns bounded identity, lifecycle, QA-count, rights-summary, and issue-code metadata. Passing this check does not approve rights, import an asset, advance its lifecycle, establish engine-backed QA, or make it production-ready, and the result is not yet persisted.
+The first alpha fully supports deterministic typed placeholders and user-provided assets. Placeholders should make asset role, scale, collision, orientation, pivot, and replacement boundary explicit.
 
-## Supported first-version inputs
+User assets enter as candidates until provenance and applicable QA are complete. The harness preserves a fallback so a rejected candidate does not block gameplay work.
 
-The first version is planned to fully support deterministic placeholders and user-provided or licensed assets. Placeholders should be engine-native, reproducible, inexpensive to rebuild, visually distinguishable by role, and suitable for gameplay testing.
+Blender and local image workflows may be optional tools, but the harness does not install them automatically. Local tools still require exact executable identity, bounded paths, outputs, and receipts when they become executable features.
 
-Optional local Blender, image, or ML tools may be detected and configured by the user, but they are never installed automatically. Their outputs follow the same candidate, provenance, QA, and approval path.
+## QA gates
 
-## Hosted provider boundary
+Applicable checks include:
 
-Hosted providers are disabled by default. At most one image-provider pack may be active in the first version. Before each call, the user must see and approve the destination, transmitted data, provider/model, expected cost, rights assumptions, and retention caveat.
+| Gate | Examples |
+| --- | --- |
+| File integrity | Format, decode, dimensions, channels, duration, hash |
+| Engine import | Import settings, warnings, scale, orientation, materials, animation |
+| Runtime | Correct scene, camera, lighting, playback, collision, interaction |
+| Performance | Texture and mesh budgets, memory, draw calls, shader cost, audio size |
+| Product | Style fit, readability, accessibility, content policy, approval |
 
-Installing a provider pack does not approve later network access. A response is quarantined as a candidate until its content, dimensions, format, rights metadata, file hash, and engine import are checked.
+Passing one gate does not imply another. A decoded PNG is not runtime evidence, and an imported mesh is not production approval.
 
-3D and audio generation are deferred to later packs. Cinematic and video generation are outside the first-version scope.
+## Hosted providers
 
-## QA and promotion
+Hosted providers are disabled by default. The first optional provider pack may support at most one image provider.
 
-Asset QA is type-specific and engine-backed where relevant. It may include dimensions, color space, alpha, compression, mesh topology, scale, pivots, UVs, materials, animation, collision, memory, import warnings, visual state coverage, and runtime performance.
+Before a call, the user must see and approve the destination, transmitted data, model or checkpoint, expected cost, rights terms, and output handling. Network permission, external-transfer permission, and paid-call permission are separate decisions.
 
-Promotion is a staged operation. It validates the candidate, records approvals, updates stable bindings, imports or compiles, runs affected gameplay/UI checks, captures evidence, and retains a rollback path. Failure leaves the existing production asset unchanged whenever possible.
+Provider output enters the lifecycle as a candidate. It never moves directly to production.
 
-## UI assets
+## Deferred scope
 
-HUD and menu assets use stable element and asset IDs, parent-relative hierarchy, safe-area behavior, and appropriate atlas or nine-slice rules. Visual similarity, interaction/focus, and gameplay-state binding are evaluated separately across viewport, state, input-modality, and locale combinations.
-
-A rendered frame is not proof that editable hierarchy, interaction, accessibility, or gameplay binding is correct. The receipt links editable source, imported asset, scene hierarchy, runtime state, and capture by hash.
+Generated 3D and audio assets are later packs. Computer-generated video is outside the first version. Mobile, console, XR, and platform-store asset requirements are also deferred.

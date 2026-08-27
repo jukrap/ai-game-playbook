@@ -1,57 +1,54 @@
 ---
 source: docs/README.md
-source_sha256: be0e06eaf5369a2cf0906d1666ece1d1e50f38e2ad04b22685dcc95b72ccecbf
-translated_at: 2026-08-27
+source_sha256: f76b6b72177d8098caff3389f8e8e7e1e687a400735206b3ecec7aa85e87a7a0
+translated_at: 2026-08-28
 ---
+# 문서 안내
 
-# 문서
-
-> 상태: 2026-08-27에 검토한 공개 설계 및 구현 상태 문서 묶음입니다. Control plane 기반과 source-built write-free CLI 명령 아홉 개를 구현하고 있습니다.
+> 상태: 현재 소스 기반과 제품이 지향하는 경계를 설명합니다. 아직 출시하지 않은 엔진 자동화를 제공한다고 표현하지 않습니다.
 
 [English](README.md) · [프로젝트 소개](../README.ko.md)
 
-## 독자와 목적
+궁금한 내용에 맞는 문서를 골라 읽으세요.
 
-이 문서 묶음은 제품 경계와 현재 capability를 이해해야 하는 잠재 사용자, 기여자, 유지관리자를 위한 것입니다. 구현된 기반, source-built command, 계획된 runtime 동작, release 기능을 구분합니다.
+## 먼저 읽을 문서
 
-## 문서 구성
-
-| 문서 | 목적 |
+| 질문 | 문서 |
 | --- | --- |
-| [상태와 범위](status-and-scope.ko.md) | 현재 저장소 상태, 초기 사용자, 포함 작업과 제외 범위 |
-| [개념](concepts.ko.md) | 공통 lifecycle, 공개 type, support grade와 run outcome |
-| [CLI 상태](planned-cli.ko.md) | 사용 가능한 `agpb init`, `agpb doctor`, `agpb project inspect`, `agpb skill list`, `agpb skill check`, static Godot `agpb engine status`와 `agpb engine capabilities` 동작 및 나머지 계획 명령군 |
-| [아키텍처](architecture.ko.md) | Control plane, adapter, bridge, project state와 generated surface |
-| [엔진 지원](engine-support.ko.md) | 공통 engine contract와 엔진별 검증 임계값 |
-| [보안과 권한](security-and-permissions.ko.md) | 승인 class, stop condition, isolation과 data movement |
-| [자산과 출처](assets-and-provenance.ko.md) | Placeholder-first asset lifecycle, 권리 metadata, QA와 provider |
-| [증거와 검증](evidence-and-verification.ko.md) | Receipt, evidence grade, deterministic playtest와 golden task |
-| [로드맵](roadmap.ko.md) | 구현 순서와 release 기준 |
+| 지금 무엇을 쓸 수 있나요? | [현재 상태와 범위](status-and-scope.ko.md) |
+| 어떤 명령을 실행할 수 있나요? | [CLI 안내](cli.ko.md) |
+| 어떤 게임 개발 스킬이 들어 있나요? | [스킬](skills.ko.md) |
+| 다음에는 무엇을 구현하나요? | [로드맵](roadmap.ko.md) |
 
-[planned-surface.json](planned-surface.json)은 수동 관리하는 공개 상태 data입니다. 생성된 [foundation plan](../generated/foundation-plan.json)은 available/planned command를 분리하고 runtime-registry digest를 기록하는 digest 결합 projection입니다. 어느 파일도 executable configuration이 아니며 source-built CLI는 validated runtime registry를 직접 사용합니다.
+## 안전하게 사용하기
 
-## 상태 용어
+| 주제 | 문서 |
+| --- | --- |
+| 엔진 탐지와 검증 단계 | [엔진 지원](engine-support.ko.md) |
+| 권한, 중단 규칙, 데이터 이동 | [보안과 권한](security-and-permissions.ko.md) |
+| 실행 영수증, 증거 등급, 결정적 검사 | [증거와 검증](evidence-and-verification.ko.md) |
+| 임시 자산, 권리 정보, 제작 자산 승격 | [자산과 출처 정보](assets-and-provenance.ko.md) |
 
-- **Current**는 artifact가 저장소에 존재하고 검사할 수 있다는 뜻입니다.
-- **Implemented foundation**은 code와 test가 있지만 사용자용 runtime capability를 의미하지 않습니다.
-- **Available command**는 source-built executable이 해당 exact registry command를 dispatch한다는 뜻이며 published package나 engine 지원을 의미하지 않습니다.
-- **Planned**는 사용 가능한 runtime capability가 아직 성립하지 않았다는 뜻입니다.
-- **Detected**, **headless**, **editor-preview**, **verified**는 점점 강한 runtime evidence가 필요한 engine support grade입니다.
-- Roadmap milestone은 availability를 의미하지 않습니다.
+## 설계 이해하기
 
-## 문서 경계
+| 주제 | 문서 |
+| --- | --- |
+| 공통 용어, 공개 타입, 지원 등급 | [핵심 개념](concepts.ko.md) |
+| 제어 계층, 패키지, 어댑터, 프로젝트 상태 | [아키텍처](architecture.ko.md) |
+| 기계가 읽는 공개 상태 | [예정 기능 표면](planned-surface.json) |
+| 레지스트리에서 파생한 상태 스냅샷 | [기반 계획](../generated/foundation-plan.json) |
 
-여기에는 오래 유지할 공개 설명, 현재와 계획 interface, 제한, 위험, 유지관리 규칙을 포함합니다. Private planning note, raw investigation record, local machine path, secret, log, capture, runtime evidence는 제외합니다.
+두 JSON 파일은 상태 보고용이며 실행 설정이 아닙니다. CLI는 검증된 런타임 레지스트리에 등록된 명령만 실행합니다.
 
-## 유지관리
+## 상태 표현
 
-영어 문서가 원본입니다. 각 한국어 mirror는 영어 파일 경로, SHA-256 digest, 번역 기준일을 기록합니다. 공개 문서 변경은 두 언어를 같은 change에서 갱신하고 pair, digest, link, heading, code fence, command/type parity, runtime-registry drift, private-path leak 검사를 통과해야 합니다.
+- **사용 가능**: 소스에서 빌드한 실행 파일이 해당 명령을 실제로 전달합니다.
+- **기반 구현**: 코드와 테스트는 있지만 공개 워크플로나 엔진 기능을 제공한다는 뜻은 아닙니다.
+- **계획**: 계약이나 로드맵만 있으며 실제 런타임 지원은 없습니다.
+- **검증 완료**: 해당 기능과 환경에 필요한 엔진, 플레이, 대상 빌드 증거가 모두 있습니다.
 
-구현 상태, 공개 command, support grade, permission default, engine target, release scope가 바뀌면 이 문서 묶음을 검토합니다.
+## 언어와 관리 방식
 
-## 주의사항
+영문을 관리 원본으로 사용합니다. 각 한국어판에는 원본 경로, SHA-256 해시, 번역일을 기록합니다. 자동 검사는 한영 문서 쌍, 제목 단계, 코드 블록, 명령, 공개 타입, 링크, 스킬 목록, 상태 문장의 간결성을 확인합니다.
 
-- 이 제품의 live engine loop는 아직 검증하지 않았습니다.
-- 각 adapter 구현 전에 exact engine patch를 pin합니다.
-- 첫 release 전까지 package 이름과 공개 interface는 provisional입니다.
-- 외부 code adoption이나 package publish 전에 project license를 선택해야 합니다.
+공개 문서에는 제품 사실, 제한, 사용 안내만 둡니다. 개발 이력, 로컬 경로, 원시 진단 결과, 비밀 정보, 컴퓨터별 증거는 포함하지 않습니다.

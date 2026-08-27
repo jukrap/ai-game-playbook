@@ -1,63 +1,65 @@
 ---
 source: docs/assets-and-provenance.md
-source_sha256: 86e0a5cbd41579ab8b379094e98730a837eb9b7ed35e0cf83f25cf9674484f10
-translated_at: 2026-08-26
+source_sha256: c65fbefb32e865337cdca200bc736e6bf08bb0e17efcf4c1446364ec83c535fa
+translated_at: 2026-08-28
 ---
+# 자산과 출처 정보
 
-# 자산과 Provenance
+> 상태: 자산 정책과 `AssetProvenance` 계약은 있습니다. 자동 생성 제공자와 엔진을 이용한 자산 QA는 아직 사용할 수 없습니다.
 
-> 상태: 등록된 provenance contract와 제한된 private assessment가 있는 계획된 자산 정책입니다. Asset pipeline이나 provider integration은 아직 없습니다.
+[English](assets-and-provenance.md) · [문서 안내](README.ko.md)
 
-[English](assets-and-provenance.md) · [문서](README.ko.md)
+## 수명주기
 
-## 기본 생명주기
+모든 자산은 같은 승격 단계를 따릅니다.
 
-계획된 production 경로는 다음과 같습니다.
+`typed placeholder → user or licensed asset → candidate → QA → approved → production`
 
-`typed placeholder → user/licensed asset → candidate → QA → approved → production`
+어느 단계에서든 멈출 수 있습니다. 생성, 변환, 파일 해석, 엔진 가져오기가 성공해도 권리 검토, 시각·음향 검토, 실행 QA, 성능 검사, 승인을 건너뛸 수 없습니다.
 
-모든 gameplay 또는 UI asset은 purpose, 예상 dimension 또는 scale, format, collision/interaction 필요, performance budget, fallback behavior를 가진 typed slot에서 시작합니다. candidate가 slot을 만족함을 증명할 때까지 placeholder는 유효합니다.
+## 출처 기록
 
-download, conversion, generation이 성공했다는 이유만으로 file이 production-ready가 되지 않습니다.
+`AssetProvenance`는 자산 결정을 이해하고 재현하는 데 필요한 정보를 기록합니다.
 
-## `AssetProvenance`
+- 원본 종류, 계보, 원본·현재 파일 해시
+- 라이선스, 권리 상태, 제한, 승인
+- 변환 과정과 도구
+- 해당하는 경우 제공자, 모델, 체크포인트, 프롬프트 입력, seed
+- 외부 전송과 비용
+- 기술, 미감, 실행, 성능, 제작 QA 상태
 
-등록된 contract는 다음 candidate metadata를 담을 수 있으며 production-pipeline integration은 계획 단계입니다.
+알 수 없는 필드는 그대로 둡니다. 하네스가 소유권을 추정하거나 권리를 부여하지 않습니다.
 
-- 안정적인 asset과 slot identity.
-- original source category, lineage, source file hash.
-- 선언한 license 또는 rights status와 attribution obligation.
-- transformation step, tool version, input hash, output hash.
-- generation 사용 시 provider, model, checkpoint, prompt digest, seed, setting.
-- estimated/actual cost, external-transmission approval, reviewer approval.
-- engine import setting, dependency, QA result, promotion state, rollback target.
+## 첫 알파의 자산 원본
 
-권리를 알 수 없거나 lineage가 없으면 production 승격을 차단합니다. 시스템은 file을 사용할 수 있다는 사실로 ownership을 추론하지 않습니다.
+첫 알파는 결정적으로 만들 수 있는 타입이 있는 임시 자산과 사용자가 제공한 자산을 완전히 지원합니다. 임시 자산에는 역할, 크기, 충돌, 방향, pivot, 교체 경계를 분명히 표시해야 합니다.
 
-현재 private assessor는 `AssetProvenance` 값을 exact in-process registry에 대해 검증하고 semantic invariant를 확인하며 선언된 current-file path, SHA-256 digest, byte count 하나가 평가한 artifact와 일치하도록 요구합니다. Bounded identity, lifecycle, QA count, rights summary, issue-code metadata를 반환합니다. 이 검사를 통과해도 권리를 승인하거나 asset을 import하거나 lifecycle을 진행하거나 engine-backed QA를 확립하거나 production-ready로 만들지 않으며 결과도 아직 영속화하지 않습니다.
+사용자 자산은 출처 정보와 필요한 QA를 마칠 때까지 후보로 둡니다. 후보를 거부해도 게임플레이 작업이 막히지 않도록 대체 자산을 보존합니다.
 
-## 첫 버전 지원 입력
+Blender와 로컬 이미지 워크플로는 선택 도구가 될 수 있지만 하네스가 자동으로 설치하지 않습니다. 나중에 실행 기능을 열 때는 로컬 도구도 정확한 실행 파일 식별 정보, 제한된 경로·출력, 영수증이 필요합니다.
 
-첫 버전은 deterministic placeholder와 user-provided 또는 licensed asset을 완전히 지원할 계획입니다. placeholder는 engine-native이고 재현 가능하며 다시 만들기 저렴하고 역할별로 시각 구분되며 gameplay test에 적합해야 합니다.
+## QA 단계
 
-선택적 local Blender, image, ML tool은 사용자가 탐지하고 설정할 수 있지만 자동 설치하지 않습니다. 출력은 같은 candidate, provenance, QA, approval 경로를 따릅니다.
+상황에 따라 다음 항목을 검사합니다.
 
-## Hosted provider 경계
+| 단계 | 예시 |
+| --- | --- |
+| 파일 무결성 | 형식, 해석, 크기, 채널, 재생 시간, 해시 |
+| 엔진 가져오기 | 가져오기 설정, 경고, 크기, 방향, 재질, 애니메이션 |
+| 실행 | 올바른 씬, 카메라, 조명, 재생, 충돌, 상호작용 |
+| 성능 | 텍스처·메시 예산, 메모리, draw call, shader 비용, 오디오 크기 |
+| 제품 | 스타일 적합성, 가독성, 접근성, 콘텐츠 정책, 승인 |
 
-hosted provider는 기본 disabled입니다. 첫 버전에는 image-provider pack 최대 하나를 활성화할 수 있습니다. 각 호출 전에 destination, transmitted data, provider/model, expected cost, rights assumption, retention caveat를 보여주고 승인받아야 합니다.
+한 단계를 통과해도 다른 단계까지 통과한 것은 아닙니다. PNG를 읽었다는 사실은 실행 증거가 아니며 메시를 가져왔다고 제작 승인이 생기지도 않습니다.
 
-provider pack 설치는 이후 network access를 승인하지 않습니다. response는 content, dimension, format, rights metadata, file hash, engine import를 검사할 때까지 candidate로 격리합니다.
+## 외부 제공자
 
-3D와 audio generation은 후속 pack으로 연기합니다. cinematic과 video generation은 첫 버전 범위 밖입니다.
+외부 제공자는 기본으로 끕니다. 첫 선택 팩은 이미지 제공자 하나만 허용합니다.
 
-## QA와 승격
+호출 전에 목적지, 전송 데이터, 모델·체크포인트, 예상 비용, 권리 조건, 출력 처리 방식을 보여주고 승인을 받아야 합니다. 네트워크 권한, 외부 전송 권한, 유료 호출 권한은 서로 다른 결정입니다.
 
-asset QA는 type별로 수행하고 필요한 경우 engine-backed입니다. dimension, color space, alpha, compression, mesh topology, scale, pivot, UV, material, animation, collision, memory, import warning, visual state coverage, runtime performance를 포함할 수 있습니다.
+제공자 출력은 후보 단계로 들어옵니다. 바로 제작 자산으로 승격하지 않습니다.
 
-promotion은 staged operation입니다. candidate 검증, approval 기록, stable binding 갱신, import/compile, 영향받는 gameplay/UI 검사, evidence capture, rollback path 보존을 수행합니다. 가능하면 실패해도 기존 production asset을 바꾸지 않습니다.
+## 나중 범위
 
-## UI 자산
-
-HUD와 menu asset은 stable element/asset ID, parent-relative hierarchy, safe-area behavior, 적합한 atlas 또는 nine-slice rule을 사용합니다. viewport, state, input modality, locale 조합에서 visual similarity, interaction/focus, gameplay-state binding을 따로 평가합니다.
-
-rendered frame은 editable hierarchy, interaction, accessibility, gameplay binding이 옳다는 증거가 아닙니다. receipt는 editable source, imported asset, scene hierarchy, runtime state, capture를 hash로 연결합니다.
+3D·오디오 생성은 후속 팩으로 둡니다. 컴퓨터 생성 비디오는 첫 버전 범위 밖입니다. 모바일, 콘솔, XR, 플랫폼 스토어별 자산 요구사항도 나중에 다룹니다.

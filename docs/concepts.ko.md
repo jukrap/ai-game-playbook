@@ -1,75 +1,67 @@
 ---
 source: docs/concepts.md
-source_sha256: f036f75612073674801ba670674609a509670829f9886b361083a7ab6c5331b6
-translated_at: 2026-08-27
+source_sha256: ea353fe2cafcb4ae85eb1a13d67332886258f6468f9254fce07e5d1352e5fc87
+translated_at: 2026-08-28
 ---
+# 핵심 개념
 
-# 핵심 개념과 공개 타입
+> 상태: 핵심 스키마와 레지스트리 계약은 구현했습니다. 프로젝트를 변경하는 대부분의 워크플로와 모든 실엔진 기능은 아직 계획 단계입니다.
 
-> 상태: versioned schema, semantic validator, 결정적 workflow-plan 해석, 초기 private permission, workflow-state, checkpoint, receipt consumer와 static Godot status/capability report를 구현했습니다. Engine execution과 대부분의 product surface는 아직 계획 단계입니다.
+[English](concepts.md) · [문서 안내](README.ko.md)
 
-[English](concepts.md) · [문서](README.ko.md)
+## 동작 모델
 
-## 운영 모델
+AI Game Playbook은 게임 개발을 범위가 제한된 작업의 연속으로 다룹니다.
 
-AI Game Playbook은 계약 중심 control plane으로 계획하고 있습니다. 실행은 프로젝트와 사용 가능한 capability를 식별하는 것부터 시작하며, 승인된 feature, budget, engine instance, execution lane에 작업을 결합합니다. 중요한 모든 행동은 증거를 만들고, 증거는 process exit status와 별도로 평가합니다.
+`detect → negotiate → inspect → mutate → save → compile/import → test → play → replay input → collect logs → capture → profile → build/export → rollback`
 
-공통 생명주기는 다음과 같습니다.
+엔진 어댑터는 지원하지 않는 작업을 그대로 보고합니다. 필수 단계를 조용히 건너뛰거나 더 약한 자료로 필수 증거를 대신하면 안 됩니다.
 
-`detect → negotiate → inspect → mutate → save → compile/import → test → play → deterministic input → logs → capture → profile → build/export → rollback`
+## 공개 계약
 
-adapter는 지원하지 않는 단계를 보고할 수 있습니다. 필수 단계를 조용히 건너뛰거나 더 약한 증거로 대체할 수 없습니다.
-
-## 공개 계약 타입
-
-현재 기반은 이 계약을 versioned JSON schema와 TypeScript 정의 및 fail-closed semantic check로 구현합니다. Registry는 검증된 descriptor에서 하나의 immutable workflow plan을 파생할 수 있습니다. Available로 명시된 command만 source-built dispatch path를 가지며 generated workflow나 engine-operation metadata만으로 해당 operation을 실행할 수 있는 것은 아닙니다.
-
-| 타입 | 책임 |
+| 타입 | 목적 |
 | --- | --- |
-| `CommandDescriptor` | 한 operation의 input/output schema, required capability, permission, side effect, lane, timeout, retry, budget, required evidence |
-| `PackManifest` | pack version, 호환 engine, 제공 skill/command, dependency, digest, owned path, install/update/remove lifecycle |
-| `ProjectPackLock` | Canonical project-bound installed-pack identity, exact dependency binding, manifest digest, self-attested lock digest |
-| `GameProjectProfile` | engine, version, project identity, development stage, target platform, 선언한 quality/change budget |
-| `EngineCapabilityReport` | 현재 환경에서 탐지한 operation, limitation, identity, support grade |
-| `EngineStatusReport` | Explicit executable/evidence gap을 포함한 static engine/project compatibility observation 하나. `planned`보다 높은 support grade를 확립할 수 없음 |
-| `EngineCapabilitiesReport` | Static Godot project observation 하나와 고정 14-operation contract, containment gap, effect, report digest. 현재 모든 operation은 `planned`와 `documented`를 유지 |
-| `FeatureContract` | 플레이어가 볼 결과, 허용 변경 범위, 완료 조건, 위험, budget, rollback plan |
-| `ApprovalGrant` | exact project, command, request, scope, budget, expiration, 필요한 경우 feature/workflow/Editor session identity에 결합된 단일 signed permission |
-| `ResolvedWorkflowPlan` | 실행 전 exact registry, workflow, stage, command와 handler authority, lane, permission, budget, transition, evidence duty에 결합된 하나의 유한 DAG |
-| `WorkflowCheckpointRecord` | immutable sequence, exact resolved-plan 및 project authority, in-flight authorization, attempt, 누적 budget, evidence, receipt-chain head, TTL, parent digest |
-| `RunReceipt` | run, feature, plan, command descriptor, handler, input, authorization identity와 timing, outer/inner result, artifact, changed file, recovery result |
-| `AssetProvenance` | asset source와 lineage, 권리, transform, 필요 시 provider/model/checkpoint/seed, cost/approval, file hash, QA state |
+| `CommandDescriptor` | 스키마, 기능, 권한, 부작용, 실행 차선, 제한 시간, 재시도, 예산, 증거, 처리기 식별 정보 선언 |
+| `PackManifest` | 팩 호환성, 의존성, 제공 기능, 해시, 소유 경로, 수명주기 선언 |
+| `ProjectPackLock` | 설치 팩 버전, 의존성, manifest, 잠금 식별 정보를 한 프로젝트에 결합 |
+| `GameProjectProfile` | 엔진, 프로젝트, 개발 단계, 대상, 선언한 예산 식별 |
+| `EngineCapabilityReport` | 지원 작업, 제한, 식별 정보, 기능 저하, 지원 등급 보고 |
+| `FeatureContract` | 플레이어 결과, 허용 변경, 완료 검사, 위험, 예산, 롤백 정의 |
+| `RunReceipt` | 실행 식별 정보, 명령 권한, 결과, 산출물, 변경 파일, 복구 결과 기록 |
+| `AssetProvenance` | 자산 계보, 권리, 변환, 제공자 정보, 비용, 승인, 해시, QA 상태 기록 |
 
-schema identifier와 command identifier는 안정적인 machine name입니다. 사람이 읽는 help와 translation은 대체 command identity를 만들지 않습니다.
+승인, 확정된 워크플로 계획, 체크포인트, 정적 엔진 보고서, 프로세스 격리, 세부 결과에는 별도 내부 계약을 사용합니다. 스키마에 맞는 데이터라고 해서 권한이 생기지는 않습니다. 실제 실행에는 최신 식별 정보와 승인된 작업이 함께 필요합니다.
 
-## 프로젝트와 feature identity
+## 식별 정보와 권한
 
-`GameProjectProfile`은 실행 identity의 루트입니다. process name이나 port가 그럴듯하다는 이유만으로 command가 Editor 또는 project에 붙는 것을 막습니다. `FeatureContract`는 그 project 안에서 허가된 결과와 변경 표면을 좁힙니다.
+프로젝트 경로, PID, 포트, 프로세스 이름, 창 제목만으로 작업을 허가하지 않습니다. 필요한 경우 정규화된 프로젝트 루트, 프로필, 명령, 처리기, 레지스트리, 프로세스 시작 정보, 에디터 세션, 씬·월드, 기능·워크플로 식별 정보를 함께 묶습니다.
 
-mutation 전, Editor reload/restart 후, evidence 승격 전에 identity를 검사합니다. project root, engine build, process, session, scene/world가 바뀌거나 예상하지 않은 dirty file이 있으면 실행을 중단합니다.
+작업 직전, 다시 불러오거나 재시작한 뒤, 증거를 승격하기 전에 식별 정보를 확인합니다. 루트, 실행 파일, 세션, 씬, 예상하지 않은 변경 파일, 레지스트리, 처리기가 달라지면 작업을 멈춥니다.
 
-## Skill, role, workflow
+승인은 좁은 범위에만 적용되고 만료됩니다. 복사한 계획, 보고서, 영수증, JSON 객체를 권한처럼 다시 사용할 수 없습니다.
 
-- **skill**은 trigger, exclusion, required capability, verification criteria를 갖고 점진적으로 불러오는 작업 방법입니다. 권한을 부여할 수 없습니다.
-- **role lens**는 판단 질문과 evidence 책임을 가진 검토 관점이며 가상 직원이나 독립 executor가 아닙니다.
-- **workflow**는 checkpoint, budget, stop condition을 갖춘 등록 command의 제한된 순서입니다. 실행 전에 descriptor를 결정적인 위상 순서와 exact implementation authority를 가진 domain-separated plan으로 해석합니다.
+## 스킬과 워크플로
 
-기본 계획은 작업마다 skill 1~5개와 role lens 최대 3개를 선택합니다. 하나의 executor가 mutation을 소유하고 병렬 작업은 안전한 read와 독립 분석으로 제한합니다. private state machine은 이제 resolved plan을 소비하고 authorization과 dispatch 경계를 분리하며 exact permission settlement와 receipt를 검증하고 선언된 failure/rollback transition을 진행하며 uncertainty나 누적 budget 초과를 차단합니다. append-only checkpoint store는 제한된 parent chain을 검증하고 stale authorization을 복원하지 않는 restart hydration을 지원합니다. dispatch하지 않은 admission은 재승인이 필요하고 dispatch 후 정산하지 못한 step은 reconciliation이 필요합니다. 별도 private store는 canonical receipt body를 compare-and-swap head 뒤에 영속화하고 complete artifact snapshot을 producer-bound manifest가 있는 immutable SHA-256 object로 승격합니다. Private assessor는 보존된 complete artifact 하나를 다시 검증하고 bounded UTF-8, canonical JSON, non-interlaced PNG, 선택적 current-registry `AssetProvenance` 검사를 수행할 수 있지만 결과를 영속화하거나 engine evidence를 확립하지 않습니다. Command dispatch, durable approval, 더 넓은 artifact format QA, retention/export, uncertainty 해제, engine 실행은 아직 구현하지 않았습니다.
+**스킬**은 사용 조건, 제외 조건, 완료 기준, 증거 책임을 담고 필요할 때만 불러오는 지침입니다. 권한을 줄 수는 없습니다.
+
+**검토 관점**은 분야마다 확인할 질문을 제시합니다. 따로 실행하는 에이전트가 아닙니다. 한 작업에는 3개까지만 씁니다.
+
+**워크플로**는 등록된 명령, 예산, 상태 전이, 체크포인트, 종료 조건으로 이루어진 유한 그래프입니다. 변경 작업은 한 실행자가 맡습니다. 병렬 작업은 서로 독립적인 읽기와 분석에만 사용합니다.
 
 ## 실행 결과
 
-process exit, command result, test, gameplay assertion, capture quality, performance, build result는 별도 outcome입니다. 따라서 실행은 더 구체적인 component result를 잃지 않고 `succeeded`, `failed`, `blocked`, `cancelled`, `uncertain` 같은 상태로 끝날 수 있습니다.
+프로세스 종료, 명령 결과, 테스트, 게임플레이 단언, 캡처 품질, 성능, 빌드, 롤백 결과를 각각 기록합니다. 전체 실행은 `succeeded`, `failed`, `blocked`, `cancelled`, `uncertain` 중 하나로 끝나더라도 세부 결과의 원인을 잃지 않습니다.
 
-불확실한 mutation은 자동으로 재시도하지 않습니다. 복구 전에 pre-change receipt와 project/engine state를 대조해야 합니다.
+결과가 불확실한 변경은 자동으로 다시 시도하지 않습니다. 먼저 마지막 영속 체크포인트와 비교해 프로젝트와 엔진 상태를 확인해야 합니다.
 
 ## 지원 등급
 
 | 등급 | 의미 |
 | --- | --- |
-| `planned` | 계약은 있지만 runtime capability를 확립하지 않음 |
-| `detected` | 호환 project와 tool identity를 찾음 |
-| `headless` | 필수 non-editor 검사가 성공함 |
-| `editor-preview` | Editor-bound behavior와 preview evidence가 성공함 |
-| `verified` | 필수 실제 gameplay와 target build/export scenario가 완전한 receipt와 함께 통과함 |
+| `planned` | 계약은 있지만 쓸 수 있는 런타임 기능은 확인하지 못함 |
+| `detected` | 호환 프로젝트와 도구의 식별 정보를 확인함 |
+| `headless` | 에디터가 필요 없는 필수 검사를 실행하고 증거를 보존함 |
+| `editor-preview` | 에디터 안에서 필요한 동작과 미리보기 증거를 확인함 |
+| `verified` | 필수 게임플레이와 대상 빌드·내보내기 시나리오가 완전한 영수증과 함께 통과함 |
 
-지원 등급은 엔진 이름 전체가 아니라 capability와 environment별로 적용합니다. screenshot, 생성된 file, 성공한 process만으로는 `verified` 지원을 확립할 수 없습니다.
+등급은 특정 환경의 특정 기능에 적용합니다. 생성된 파일, 화면 캡처, 성공한 프로세스, 정적 프로젝트 표식 하나만으로 `verified`를 부여할 수 없습니다.

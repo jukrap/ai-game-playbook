@@ -1,87 +1,81 @@
 ---
 source: docs/roadmap.md
-source_sha256: 356d0f6d7c4740fe4792d0429283517e8797efb2ad4e0a29b08da8a368b7f2e8
-translated_at: 2026-08-27
+source_sha256: d83ddd23d2302cce5b67a6b57ee12dc510326649738487a228e67538ebfec173
+translated_at: 2026-08-28
 ---
-
 # 로드맵
 
-> 상태: 공통 기반과 Stage 2 안전 primitive를 구현하고 있습니다. 이후 단계, 날짜, availability는 약속이 아닙니다.
+> 상태: 소스에서 실행하는 제어 계층 기반을 개발하고 있습니다. 엔진 어댑터, 공개 변경 기능, 배포 패키지, 검증된 골든 프로젝트는 아직 남아 있습니다.
 
-[English](roadmap.md) · [문서](README.ko.md)
+[English](roadmap.md) · [문서 안내](README.ko.md)
 
 ## 현재 체크포인트
 
-완료된 기반에는 versioned contract, strict registry validation, generated surface, deterministic workflow plan, canonical project/path handling, compare-and-swap filesystem operation, bounded process, project mutation lease, explicit host-tool inspection을 포함한 signed scoped permission admission, workflow checkpoint, durable private receipt record, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, recovery boundary가 있는 managed-pack transaction, project-bound read-only STDIO MCP runtime, shared read-only runtime을 둔 registry-derived capability-first skill artifact 열한 개, private write-free skill-materialization 준비, write-free Codex project-configuration/skill-target planning이 포함됩니다.
+현재 저장소에는 다음 기반이 있습니다.
 
-현재 Stage 2 product slice에는 다음이 추가됐습니다.
+- 버전이 있는 계약과 검증된 단일 레지스트리를 사용하는 pnpm·TypeScript workspace
+- 사람용 출력과 JSON 출력을 제공하는 변경 없는 CLI 명령 9개
+- 프로젝트, 팩, 스킬, 정적 Godot 검사
+- 역량 중심 패키지 스킬 12개
+- 제한된 읽기 전용 MCP 실행부와 쓰기 없는 호스트 설정 계획
+- 비공개 권한, 워크플로, 체크포인트, 영수증, 산출물, 팩 트랜잭션, 초기화, Godot 사전 검사 기반
+- 구조 검사가 있는 영문·한국어 공개 문서 쌍
 
-- stable help, version, parsing, output, exit behavior를 가진 executable repository-local CLI;
-- implemented command만 노출하는 exact runtime registry;
-- `InitRequest`, `InitReport`, `DoctorRequest`, `DoctorReport`, `ProjectInspectRequest`, `ProjectInspectReport`, pack-list, pack-doctor, skill-list, skill-check, static engine-status/engine-capabilities schema;
-- 고정된 project-local target 20개를 분류하는 write-free `agpb init`;
-- runtime, registry, project state, installed-pack state, active marker를 검사하는 read-only `agpb doctor`;
-- bounded engine marker, canonical profile compatibility, marker-only dirty state, unbound Editor signal을 검사하는 static read-only `agpb project inspect`;
-- content 노출, repair, finalization 없이 bounded installed identity, ownership count, artifact/directory integrity, active recovery summary를 제공하는 read-only `agpb pack list`와 `agpb pack doctor`;
-- bounded registry catalog와 materialization 없는 missing/current/conflicting/oversized/unsafe project-target observation을 제공하는 read-only `agpb skill list`와 `agpb skill check`;
-- complete Godot project candidate 하나, `4.7.2` major/minor compatibility, explicit evidence gap을 보고하고 host executable path나 process launch를 허용하지 않는 static read-only `agpb engine status --engine godot`;
-- compatible identity 하나에 공통 operation 14개를 모두 `planned`/`documented`로 유지하고 explicit containment gap을 보고하며 executable/provider input이나 process launch를 허용하지 않는 static read-only `agpb engine capabilities --engine godot`;
-- project-only preparation, bounded exact source, signed single-use 승인, recursive search/process launch 없음, identity recheck, authority settlement, source-path 없는 result field를 가진 private Godot executable discovery;
-- 원본 same-process discovery candidate만 받고 두 번째 exact 승인을 요구하며 bounded `--version` process 하나를 실행하고 support를 승격하지 않은 채 isolation gap을 보존하는 private Godot exact-version probe;
-- exact runtime/registry authority, compare-and-swap head, redaction check, complete project-local artifact-locator 검증을 포함한 canonical append-only run-receipt persistence;
-- 고정 entry/head/byte limit, explicit summary validation level, same-process detailed-load witness를 포함한 private whole-directory receipt-head query;
-- complete artifact snapshot을 receipt가 증명하는 canonical manifest와 함께 immutable SHA-256 object로 승격하는 private promotion;
-- bounded process와 structured test-report observation을 immutable component outcome으로 바꾸는 private fail-closed normalization;
-- 보존된 UTF-8, canonical JSON, non-interlaced PNG와 선택적 current-registry asset-provenance evidence를 평가하는 private fail-closed assessment;
-- exact project/schema binding 아래 explicit enabled generated read-only tool을 노출하는 private modern STDIO runtime;
-- apply나 execution 경로 없이 deterministic Codex project configuration과 capability-first skill target 열한 개를 계획하고 create/retain/conflict를 검사하며 fixed path, freshness digest, rollback 고려 budget을 가진 same-process two-observation materialization plan을 준비하는 private 경계;
-- compiled-handler digest attestation;
-- generated/public availability parity.
+아직 설치 가능한 패키지나 실엔진 전체 흐름은 없습니다.
 
-이는 package를 installable하게 만들지 않으며 어떤 engine capability도 `planned`보다 높이지 않습니다.
+## 1단계: 안전한 공개 실행
 
-## 남은 Stage 2 작업
+- 승인된 초기화와 스킬 설치를 공통 실행기에 연결
+- 최신 계획, 명시적 승인, 프로젝트 쓰기 차선, 비교 후 교체 쓰기, 영속 체크포인트, 영수증, 롤백 요구
+- 같은 수명주기가 충돌·중단 테스트를 통과한 뒤 관리 팩 추가·갱신·제거·복구 공개
+- 가림 처리와 보존 규칙이 있는 공개 증거 목록·조회·명시적 내보내기 설계
 
-다음 control-plane 작업은 다음과 같습니다.
+알 수 없는 효과를 안전하게 확인할 수 있을 때까지 공개 변경 기능을 닫아 둡니다.
 
-1. 기존 write-plan-only `init` 뒤의 mutation을 explicit project-metadata authority, fresh plan validation, staged write, rollback에 결합합니다.
-2. 기존 plan, approval, lane, CAS, journal, rollback 요구를 약화하지 않고 approved pack add/update/remove와 recovery finalization을 general dispatcher에 연결합니다.
-3. Approval interaction과 stable error envelope를 추가한 뒤 command deadline과 settlement를 durable receipt store에 연결합니다.
-4. Executable surface에서 clean install, reinstall, update, conflict, interruption, rollback, recovery, uninstall을 검증합니다.
+## 2단계: Godot 알파
 
-Private library function이 있다는 이유만으로 command를 available로 표시하지 않습니다.
+- 운영체제 격리 제공자를 구현하고 검증
+- 정확한 Godot 실행 파일과 프로젝트 식별 정보 승인
+- 얇은 GDScript 브리지와 제한된 명령 스키마 추가
+- 이동, 카메라, 충돌, 수집물, HUD, 저장·불러오기, 승리 상태가 있는 공통 3D 회색 상자 제작
+- 스크립트 검사, 테스트, 결정적 입력, 로그, 실행 화면 캡처, 재시작, Windows 내보내기 실행
+- 완전한 영수증을 보존하고 일치하는 증거로만 각 기능 등급 승격
 
-## Stage 3 — evidence, MCP, Codex integration
+이 단계를 통과하면 `0.1.0-alpha`를 붙일 수 있습니다. Unity와 Unreal은 계속 `planned`입니다.
 
-Process/test normalization, 제한된 artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, registry-derived capability-first skill artifact 열한 개, public read-only pack list/doctor와 skill list/check command, static Godot status/capability command, private Godot executable discovery/exact-version probe, write-free skill-materialization 준비, plan-only Codex project-configuration/skill-target 기반은 구현했습니다. 더 넓은 engine process/report parser, required-test selection, gameplay/capture/performance/build normalizer, 더 넓은 artifact format, runtime-frame provenance, assessment persistence, runtime-to-receipt integration은 계획 단계입니다. 그 밖에 filtered/persistent evidence indexing, receipt-history migration/forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export command, 승인된 Codex configuration apply와 skill-materialization execution, approved mutating skill lifecycle을 계획합니다.
+## 3단계: Unity 어댑터
 
-CLI, MCP, 문서, skill routing은 동일한 command ID, schema digest, permission, handler identity를 유지해야 합니다. MCP annotation은 hint이며 permission broker를 override할 수 없습니다. Background upload나 telemetry path는 계획하지 않습니다.
+- 정확한 프로젝트와 Editor 인스턴스를 묶고 에디터 작업 직렬화
+- domain reload 복구가 있는 소스·에디터 변경 흐름 구현
+- 실제 EditMode·PlayMode 결과 사용
+- Game View 실행 화면과 공통 회색 상자 동작 검증
+- 영수증과 함께 Windows x64 Development Build 생성·시작
 
-## Stage 4 — Godot alpha
+Unity 지원은 엔진 전체에 한 번에 붙이지 않고 기능별로 올립니다.
 
-Godot에는 첫 static status/capability adapter, private executable identity/version 경계, fail-closed headless-preflight admission이 생겼고 첫 live engine adapter 계획 대상인 점은 그대로입니다. 다음 engine checkpoint는 validated containment provider와 retained receipt를 포함한 실제 permission-bound preflight run이며 실제 Godot executable을 목격하기 전에는 support를 승격하지 않습니다. 이후 공통 3D graybox에서 movement, camera, collision, collectible, HUD count, process restart를 포함한 save/load, failure/restart 처리, win state, actual runtime frame, Windows export, exported-player startup을 증명해야 합니다.
+## 4단계: Unreal 어댑터
 
-Required Godot capability가 `verified`에 도달하고 pack lifecycle/recovery가 안정화되며 clean external installation, license, release authority가 해결된 뒤에만 `0.1.0-alpha`를 허용합니다. 그 시점에도 Unity와 Unreal은 planned입니다.
+- 정확한 프로젝트, 에디터 프로세스, 월드, 트랜잭션 식별 정보 결합
+- 제한된 에디터 자동화로 Blueprint·C++ 변경 경로 지원
+- Automation Framework 결과를 사용하고 뷰포트, PIE, cook, package, 패키지 시작을 구분
+- 공통 회색 상자, 롤백, Windows package 검증
 
-## Stage 5 — Unity
+되돌릴 수 있는 트랜잭션이 없으면 자산과 actor 삭제를 허용하지 않습니다.
 
-Unity 작업은 official command-line/automation path, exact Editor/project identity, EditMode/PlayMode report, domain-reload reconciliation, actual Game View evidence, Windows x64 Development Build, packaged startup을 우선합니다. Community fallback은 선택 사항이며 같은 authentication, schema, identity, timeout, output, recovery, evidence gate를 통과해야 합니다.
+## 5단계: 제작 워크플로
 
-## Stage 6 — Unreal
+- UI 재구성과 더 넓은 게임 UI QA
+- 결정적 밸런스 시뮬레이션과 튜닝 비교
+- Blender 기반 자산 QA
+- 비용·전송·권리 승인이 있는 선택형 이미지 제공자 팩 하나
+- 빌드·출시 강화, 풍부한 증거 조회, 행동 평가
 
-Unreal 작업은 headless path에 UBT/UAT와 commandlet을 사용하고 editor-bound 작업에는 constrained Editor operation을 사용합니다. PIE, Editor viewport, Automation, cook/package, packaged execution evidence를 구분합니다. Global process termination, active worktree switch, broad asset deletion, unbounded arbitrary Python은 허용 경계 밖입니다.
+대시보드, 데스크톱 UI, 3D·오디오 생성, macOS 검증, 추가 플랫폼은 더 나중에 다룹니다.
 
-## Stage 7 — 안정화와 1.0
+## 출시 조건
 
-`1.0`은 세 엔진이 required verified capability에 도달하고 common Windows x64 packaged scenario, stable install/update/recovery/uninstall, schema/pack migration, behavior eval, current live-engine evidence, release provenance를 통과하며 unresolved critical security/license blocker가 없어야 합니다.
+`0.1.0-alpha`는 Godot 전체 흐름이 필요합니다. 이후 알파에 Unity와 Unreal을 추가하려면 각 기능이 같은 증거 규칙을 충족해야 합니다.
 
-## 후속 확장
+`1.0.0`은 Windows x64의 선언된 골든 프로젝트에서 세 엔진 모두 `verified`여야 합니다. 설치, 갱신, 충돌, 롤백, 제거, 권한, 중단 복구, 증거 보존, 행동 평가도 안정화해야 합니다.
 
-UI reconstruction, deterministic balance simulation, optional Blender QA, hosted image-provider pack 최대 하나는 core loop 뒤에 진행합니다. Dashboard/desktop UI, 3D/audio generation, macOS validation은 이후 작업입니다. 추가 engine은 public adapter contract 뒤의 community pack으로 둡니다.
-
-## 릴리스 규칙
-
-- 이 단계에서 저장소는 private package/`UNLICENSED` 상태이며 npm에 publish하지 않습니다.
-- Source-built command는 release가 아닙니다.
-- Engine support는 roadmap 위치가 아니라 witnessed capability evidence를 따릅니다.
-- Status claim을 바꾸기 전에 영문/한국어 공개 문서, generated surface, handler digest, test, Windows/Linux CI가 일치해야 합니다.
+패키지를 출시하기 전에 프로젝트 라이선스와 정확한 지원 엔진 patch를 고정합니다. 출시 산출물은 깨끗한 상태로 Windows·Linux CI를 통과해야 합니다. 실에디터 검사가 필요하면 통제된 Windows 실행기에서 확인합니다.

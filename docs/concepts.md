@@ -1,69 +1,62 @@
-# Core Concepts and Public Types
+# Core Concepts
 
-> Status: versioned schemas, semantic validators, deterministic workflow-plan resolution, early private permission, workflow-state, checkpoint, and receipt consumers, and static Godot status/capability reporting are implemented. Engine execution and most product surfaces remain planned.
+> Status: the core schemas and registry contracts exist. Most mutating workflows and every live-engine capability remain planned.
 
 [한국어](concepts.ko.md) · [Documentation](README.md)
 
 ## Operating model
 
-AI Game Playbook is planned as a contract-driven control plane. A run starts by identifying the project and available capabilities, then binds work to an approved feature, budget, engine instance, and execution lane. Every material action produces evidence that is evaluated separately from process exit status.
+AI Game Playbook treats game development as a bounded sequence of operations:
 
-The common lifecycle is:
+`detect → negotiate → inspect → mutate → save → compile/import → test → play → replay input → collect logs → capture → profile → build/export → rollback`
 
-`detect → negotiate → inspect → mutate → save → compile/import → test → play → deterministic input → logs → capture → profile → build/export → rollback`
+An engine adapter may report an operation as unsupported. It must not silently skip a required step or replace required evidence with a weaker artifact.
 
-An adapter may report a step as unsupported. It must not silently skip a required step or substitute weaker evidence.
+## Public contracts
 
-## Public contract types
-
-The current foundation implements these contracts as versioned JSON schemas and TypeScript definitions with fail-closed semantic checks. The registry can derive one immutable workflow plan from validated descriptors. Only commands explicitly listed as available have a source-built dispatch path; generated workflow or engine-operation metadata does not make those operations executable.
-
-| Type | Responsibility |
+| Type | Purpose |
 | --- | --- |
-| `CommandDescriptor` | Input/output schemas, required capabilities, permissions, side effects, lane, timeout, retry, budgets, and required evidence for one operation |
-| `PackManifest` | Pack version, compatible engines, supplied skills and commands, dependencies, digest, owned paths, and install/update/remove lifecycle |
-| `ProjectPackLock` | Canonical project-bound installed-pack identities, exact dependency bindings, manifest digests, and a self-attested lock digest |
-| `GameProjectProfile` | Engine, version, project identity, development stage, target platform, and declared quality/change budgets |
-| `EngineCapabilityReport` | Detected operations, limitations, identity, and support grade for the current environment |
-| `EngineStatusReport` | One static engine/project compatibility observation with explicit executable and evidence gaps; it cannot establish a support grade above `planned` |
-| `EngineCapabilitiesReport` | One static Godot project observation plus the fixed 14-operation contract, containment gaps, effects, and report digest; all current operations remain `planned` and `documented` |
-| `FeatureContract` | Player-visible outcome, allowed change scope, completion conditions, risks, budgets, and rollback plan |
-| `ApprovalGrant` | One signed permission bound to exact project, command, request, scope, budget, expiration, and optional feature, workflow, or editor session identity |
-| `ResolvedWorkflowPlan` | One finite DAG bound to exact registry, workflow, stage, command and handler authority, lanes, permissions, budgets, transitions, and evidence duties before execution |
-| `WorkflowCheckpointRecord` | Immutable sequence, exact resolved-plan and project authority, in-flight authorization, attempts, cumulative budgets, evidence, receipt-chain head, TTL, and parent digest |
-| `RunReceipt` | Run, feature, plan, command descriptor, handler, input, and authorization identity; timing, outer and inner results, artifacts, changed files, and recovery result |
-| `AssetProvenance` | Asset source and lineage, rights, transformations, provider/model/checkpoint/seed when applicable, cost and approvals, file hashes, and QA state |
+| `CommandDescriptor` | Declares schemas, capabilities, permissions, side effects, lane, timeout, retry, budgets, evidence, and handler identity |
+| `PackManifest` | Declares pack compatibility, dependencies, provided surfaces, digests, owned paths, and lifecycle |
+| `ProjectPackLock` | Binds installed pack versions, dependencies, manifests, and lock identity to one project |
+| `GameProjectProfile` | Identifies the engine, project, stage, target, and declared budgets |
+| `EngineCapabilityReport` | Reports supported operations, limits, identity, degradation, and support grade |
+| `FeatureContract` | Defines the player outcome, allowed changes, completion checks, risks, budgets, and rollback |
+| `RunReceipt` | Records the run identity, command authority, results, artifacts, changed files, and recovery result |
+| `AssetProvenance` | Records asset lineage, rights, transformations, provider details, cost, approval, hashes, and QA state |
 
-Schema identifiers and command identifiers are stable machine names. Human-readable help and translations do not create alternate command identities.
+Additional internal contracts cover approvals, resolved workflow plans, checkpoints, static engine reports, process containment, and component outcomes. A valid schema instance is data, not authority. Runtime authority also requires fresh identity and an admitted operation.
 
-## Project and feature identity
+## Identity and authority
 
-A `GameProjectProfile` is the root of execution identity. It prevents a command from attaching to an editor or project merely because a process name or port looks plausible. A `FeatureContract` narrows the authorized outcome and change surface within that project.
+A project path, PID, port, process name, or window title is not enough to authorize work. Each operation binds the identities it needs. These can include the canonical project root, profile, command, handler, registry, process start, editor session, scene or world, and feature or workflow.
 
-Identity is checked before mutation, after editor reload or restart, and before evidence is promoted. A changed project root, engine build, process, session, scene/world, or unexpected dirty file stops the run.
+Identity is checked before an effect, after reload or restart, and before evidence is promoted. An unexpected root, executable, session, scene, dirty file, registry, or handler change stops the operation.
 
-## Skills, roles, and workflows
+Approval is narrow and expires. A copied plan, report, receipt, or JSON object cannot be replayed as permission.
 
-- A **skill** is a progressively loaded method with triggers, exclusions, required capabilities, and verification criteria. It cannot grant permission.
-- A **role lens** is a review perspective with decision questions and evidence duties, not a virtual employee or an independent executor.
-- A **workflow** is a bounded sequence of registered commands with checkpoints, budgets, and stop conditions. Before execution, its descriptor is resolved into a domain-separated plan with deterministic topological order and exact implementation authority.
+## Skills and workflows
 
-The default plan selects one to five skills and no more than three role lenses for a task. One executor owns mutations; parallel work is limited to safe reads and independent analysis. The private state machine now consumes a resolved plan, separates authorization from the dispatch boundary, verifies exact permission settlement and receipts, advances declared failure and rollback transitions, and blocks uncertainty or cumulative budget overrun. Its append-only checkpoint store validates a bounded parent chain and supports restart hydration without restoring stale authorization: undispatched admission requires reauthorization, while a dispatched unsettled step requires reconciliation. Separate private stores persist canonical receipt bodies behind a compare-and-swap head and promote complete artifact snapshots into immutable SHA-256 objects with producer-bound manifests. A private assessor can revalidate one retained complete artifact and perform bounded UTF-8, canonical JSON, non-interlaced PNG, and optional current-registry `AssetProvenance` checks, but does not persist its result or establish engine evidence. Command dispatch, durable approval, broader artifact format QA, retention/export, uncertainty resolution, and engine execution are not implemented yet.
+A **skill** is progressively loaded guidance with triggers, exclusions, completion criteria, and evidence duties. It cannot grant permission.
 
-## Run outcomes
+A **review perspective** asks domain-specific decision questions. It is not a separate executor. A task should use no more than three perspectives.
 
-Process exit, command result, tests, gameplay assertions, capture quality, performance, and build result are separate outcomes. A run can therefore finish with states such as `succeeded`, `failed`, `blocked`, `cancelled`, or `uncertain` without losing the more specific component results.
+A **workflow** is a finite graph of registered commands with budgets, transitions, checkpoints, and terminal conditions. One executor owns mutations. Parallel work is limited to independent reads and analysis.
 
-An uncertain mutation is never retried automatically. Recovery must first reconcile project and engine state against the pre-change receipt.
+## Outcomes
+
+Process exit, command result, tests, gameplay assertions, capture quality, performance, build result, and rollback are separate outcomes. A run can be `succeeded`, `failed`, `blocked`, `cancelled`, or `uncertain` while preserving the reason for each component.
+
+An uncertain mutation is never retried automatically. The project and engine state must be reconciled against the last durable checkpoint first.
 
 ## Support grades
 
 | Grade | Meaning |
 | --- | --- |
-| `planned` | Contract exists, but no runtime capability is established |
-| `detected` | Compatible project and tool identity are found |
-| `headless` | Required non-editor checks run successfully |
-| `editor-preview` | Editor-bound behavior and preview evidence run successfully |
-| `verified` | Required actual gameplay and target build/export scenarios pass with complete receipts |
+| `planned` | A contract exists, but usable runtime capability has not been established |
+| `detected` | Compatible project and tool identity are established |
+| `headless` | Required non-editor checks pass with retained evidence |
+| `editor-preview` | Required editor-bound behavior and preview evidence pass |
+| `verified` | Required gameplay and target build or export scenarios pass with complete receipts |
 
-Support grades apply per capability and environment, not only per engine name. A screenshot, generated file, or successful process alone cannot establish `verified` support.
+Grades apply to one capability in one environment. A generated file, screenshot, successful process, or static project marker cannot establish `verified` support by itself.

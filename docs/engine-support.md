@@ -1,56 +1,61 @@
-# Engine Support Model
+# Engine Support
 
-> Status: all engine support is `planned`. No engine has been verified by this product.
+> Status: Godot, Unity, and Unreal Engine are planned first-party adapters. No live-engine capability has advanced beyond `planned`.
 
 [한국어](engine-support.ko.md) · [Documentation](README.md)
 
-## Common engine contract
+## Current matrix
 
-Each first-party adapter is planned to expose the same lifecycle where the engine permits it:
+| Engine | Static project inspection | Engine-specific public report | Live editor or runtime | Current grade |
+| --- | --- | --- | --- | --- |
+| Godot | Markers, profile, and version hint | Status and fourteen planned operation entries | Unavailable | `planned` |
+| Unity | Markers, profile, and lockfile signal | Unavailable | Unavailable | `planned` |
+| Unreal Engine | Markers and profile | Unavailable | Unavailable | `planned` |
+
+Static inspection can identify a candidate project and report gaps. It does not establish an installed executable, a running editor, a playable frame, or a target build.
+
+## Common contract
+
+Each adapter is expected to support or explicitly reject these operations:
 
 `detect → negotiate → inspect → mutate → save → compile/import → test → play → deterministic input → logs → capture → profile → build/export → rollback`
 
-Every operation declares whether it is offline, headless, editor-bound, runtime-bound, or build-bound. An unsupported operation returns an explicit degradation reason. The adapter cannot replace actual gameplay input with teleportation, runtime capture with an editor viewport, or a complete test result with process success.
+Every operation reports its execution kind, required permissions, possible effects, limitations, missing evidence, and support grade. Unsupported work degrades visibly instead of disappearing from the workflow.
 
-## Current support matrix
+## Evidence thresholds
 
-| Capability family | Godot | Unity | Unreal Engine |
-| --- | --- | --- | --- |
-| Project detection | `planned` | `planned` | `planned` |
-| Static/headless validation | `planned` | `planned` | `planned` |
-| Editor connection and mutation | `planned` | `planned` | `planned` |
-| Deterministic runtime input and state | `planned` | `planned` | `planned` |
-| Actual runtime capture | `planned` | `planned` | `planned` |
-| Windows x64 build/export startup | `planned` | `planned` | `planned` |
+| Grade | Minimum expectation |
+| --- | --- |
+| `planned` | Operation contract and known gaps |
+| `detected` | Exact project, engine executable, version, and compatible environment identity |
+| `headless` | Required non-editor validation and tests run with bounded logs and retained receipts |
+| `editor-preview` | One exact editor session performs the operation and produces editor-bound evidence |
+| `verified` | Deterministic gameplay and target build or export pass with runtime-frame and artifact provenance |
 
-Grades are evaluated per environment and capability. Detecting an installed editor does not establish adapter support.
+The grade belongs to a capability and environment. An adapter can be `headless` for script validation while remaining `planned` for input replay or runtime capture.
 
-The source-built `agpb engine status --engine godot` command is a control-plane observation, not a support grade. It validates one static Godot project candidate and compares its major/minor hint with the pinned `4.7.2` target. It accepts no executable path, performs no host-tool discovery or version probe, starts no process, and leaves every matrix cell `planned`.
+## Godot
 
-The source-built `agpb engine capabilities --engine godot` command is also static control-plane metadata. For one compatible, unambiguous Godot project, it binds the fixed common 14-operation catalog to a derived static project identity and reports each operation's execution kind, components, limitations, degradation reason, permissions, and required evidence. Every operation remains `planned` and `documented`. The report records an empty compiled containment-provider catalog, no provider self-test, and unavailable launch authority; it accepts no executable or provider input and performs no process, network, project write, Editor control, or support promotion.
+The current public path checks one Godot project candidate and compares its major and minor version hint with the pinned `4.7.2` target. It reports the common operation catalog, but every operation remains planned.
 
-An internal-only follow-up now separates discovery from execution. Project-only preparation binds bounded explicit source counts and a source digest without reading host candidates. A signed single-use `host-tool-inspection` grant is required before discovery reads exact configured files or fixed direct names in selected PATH directories. Discovery is nonrecursive, starts no process, returns no source paths or execution authority, and retains candidates only behind its original same-process report. Version preparation accepts only one selected retained candidate, and a second signed grant bound to its content and filesystem-identity digests is required before the bounded runner invokes only `--version`. The probe rejects drift before dispatch, rechecks identities after execution, settles the authorization, and emits normalized process and output digests without raw paths or output. A third workflow-bound admission accepts only that original completed report, binds fixed headless startup arguments, and obtains a core-produced containment assessment for the exact project root. It retains the original same-process witness and binds assessment and provider-catalog digests into approval, report, and receipt evidence. The provider catalog is currently empty, so the only valid decision is `block`; no project process starts. This is fail-closed admission, not an implemented sandbox. These components have automated local witnesses but no retained execution from an actual Godot binary, are not exposed through CLI or MCP, and do not change the matrix.
+Private foundations can discover bounded executable candidates and probe an exact version only with narrow host-tool permission. Project startup admission remains blocked because no containment provider is registered. This code is not a live adapter.
 
-Provider descriptor and bounded self-test schemas now define the exact evidence shape a later OS implementation must satisfy. They require a fixed ordered probe suite and allow `verified` only for a nonzero clean run with every denial and cleanup probe passed. No provider descriptor is compiled, no self-test has run, and no same-process launch witness exists, so these contracts do not raise Godot or any other engine grade.
+The first alpha must run the full loop on the shared graybox project. It covers script validation, headless tests, actual game startup, and deterministic input. It also preserves logs, runtime capture, save and load results, win-state verification, and a Windows export.
 
-## Godot direction
+## Unity
 
-Godot has the first static status and capability-reporting adapter boundary and an assessment-bound fail-closed preflight admission, and remains the first planned live adapter. Static identity and operation-contract reporting, static scene inspection, typed containment refusal, and blocked admission stay separate from contained engine-backed preflight and runtime play. Script and batch validation, exact project/editor identity, deterministic input through real input mappings, gameplay state assertions, actual runtime frames, logs, and Windows export startup are required for the first alpha.
+Current project inspection recognizes Unity markers, profile data, and a static `Temp/UnityLockfile` signal. It does not infer process liveness or choose an editor instance.
 
-A project bridge must be authenticated, fail closed, support Windows, preserve schema parity, serialize editor mutation, bound requests and output, recover locks, and prove real runtime frame/input behavior. If no candidate meets every hard gate, a minimal GDScript bridge will be built.
+The planned adapter must bind the exact project and Editor version and use one editor lane. It must recover after domain reload, consume real EditMode and PlayMode results, capture the Game View, and start a Windows x64 Development Build. A viewport image or outer tool success is not enough.
 
-## Unity direction
+## Unreal Engine
 
-Unity automation is planned to prefer official command-line and MCP paths, with a community bridge considered only as a verified fallback. The adapter must bind the exact project, package state, Editor version, process, and session; respect `UnityLockfile`; and recover coherently across domain reload.
+Current project inspection recognizes Unreal project markers and profile data. It does not open the editor, attach to a process, or inspect assets.
 
-Test success requires a completed Test Runner XML report with a nonzero test count. EditMode and PlayMode evidence remain separate. Scene View, actual Game View, and Development Build frames have distinct grades. Windows x64 Development Build startup is required before Unity reaches `verified`.
+The planned adapter uses project-bound editor automation, Python where appropriate, Automation Framework results, and UAT or UBT for build work. It must distinguish editor viewport, PIE, cook, package, and packaged startup evidence. Asset or actor deletion requires recoverable transactions.
 
-## Unreal direction
+## Degradation and stop rules
 
-Unreal automation is planned around official MCP, Editor Python, the Automation Framework, UAT, and UBT. Editor-bound operations use a serialized lane with exact project, engine build, process, socket, session, world, and transaction identity.
+An adapter stops when project, executable, process, editor session, scene or world identity is missing or changes. It also stops on unexpected dirty files, unavailable permissions, exceeded budgets, schema mismatch, or uncertain mutation.
 
-Automation reports must be complete and nonempty. Editor viewport, PIE gameplay, and packaged startup are distinct evidence classes. Actor and asset mutations require lookup, scoped transaction, compare-and-swap state, save/reload/requery, and bounded rollback. Active worktree switching, global Unreal process termination, and unrecoverable deletion are not supported behaviors.
-
-## Verification threshold
-
-An engine reaches `verified` only when the common graybox scenario passes in actual gameplay and the target Windows player starts successfully. Receipts must include engine/version, renderer, scene or world, camera, seed, input trace, state assertions, logs, tests, capture hashes, build artifact hashes, and recovery outcome. Missing environment or budget data leaves performance `unverified`.
+The runtime does not choose among multiple matching editors by guesswork. It does not kill unrelated engine processes, switch an active checkout, or retry an uncertain mutation automatically.

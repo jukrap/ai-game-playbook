@@ -1,81 +1,76 @@
 # Roadmap
 
-> Status: common foundations and Stage 2 safety primitives are in progress. Later stages, dates, and availability are not promises.
+> Status: the source-built control-plane foundation is active. Engine adapters, public mutation, release packaging, and verified golden projects remain ahead.
 
 [한국어](roadmap.ko.md) · [Documentation](README.md)
 
 ## Current checkpoint
 
-Completed foundations include versioned contracts, strict registry validation, generated surfaces, deterministic workflow plans, canonical project/path handling, compare-and-swap filesystem operations, bounded processes, project mutation leases, signed scoped permission admission including explicit host-tool inspection, workflow checkpoints, durable private receipt records, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions with recovery boundaries, a project-bound read-only STDIO MCP runtime, eleven registry-derived capability-first skill artifacts with a shared read-only runtime, private write-free skill-materialization preparation, and write-free Codex project-configuration and skill-target planning.
+The repository now has:
 
-The current Stage 2 product slice adds:
+- a pnpm and TypeScript workspace with versioned contracts and one validated registry;
+- nine write-free CLI commands with human and JSON output;
+- project, pack, skill, and static Godot inspection;
+- twelve packaged capability-first skills;
+- a bounded read-only MCP runtime and write-free host setup planning;
+- private permission, workflow, checkpoint, receipt, artifact, pack transaction, initialization, and Godot preflight foundations;
+- paired English and Korean public documentation with structural checks.
 
-- an executable repository-local CLI with stable help, version, parsing, output, and exit behavior;
-- an exact runtime registry that exposes only implemented commands;
-- `InitRequest`, `InitReport`, `DoctorRequest`, `DoctorReport`, `ProjectInspectRequest`, `ProjectInspectReport`, pack-list, pack-doctor, skill-list, skill-check, static engine-status, and static engine-capabilities schemas;
-- write-free `agpb init` classification for a fixed 20-target project-local layout;
-- read-only `agpb doctor` checks for runtime, registry, project-state, installed-pack-state, and active-marker safety;
-- static read-only `agpb project inspect` for bounded engine markers, canonical profile compatibility, marker-only dirty state, and unbound Editor signals;
-- read-only `agpb pack list` and `agpb pack doctor` for bounded installed identity, ownership counts, artifact and directory integrity, and active recovery summaries without content disclosure, repair, or finalization;
-- read-only `agpb skill list` and `agpb skill check` for a bounded registry catalog and missing/current/conflicting/oversized/unsafe project-target observations without materialization;
-- static read-only `agpb engine status --engine godot` for one complete Godot project candidate, `4.7.2` major/minor compatibility, explicit evidence gaps, and no host executable path or process launch;
-- static read-only `agpb engine capabilities --engine godot` for one compatible identity, all 14 common operations held at `planned`/`documented`, explicit containment gaps, and no executable/provider input or process launch;
-- private Godot executable discovery with project-only preparation, bounded exact sources, signed single-use approval, no recursive search or process launch, identity rechecks, settled authority, and no source-path result fields;
-- private Godot exact-version probing that accepts only an original same-process discovery candidate, requires a second exact approval, runs one bounded `--version` process, and retains explicit isolation gaps without promoting support;
-- canonical append-only run-receipt persistence with exact runtime and registry authority, compare-and-swap heads, redaction checks, and complete project-local artifact-locator verification;
-- private whole-directory receipt-head query with fixed entry/head/byte limits, explicit summary validation level, and same-process detailed-load witnesses;
-- private promotion of complete artifact snapshots into immutable SHA-256 objects with receipt-attested canonical manifests;
-- private fail-closed normalization of bounded process and structured test-report observations into immutable component outcomes;
-- private fail-closed assessment of retained UTF-8, canonical JSON, non-interlaced PNG, and optional current-registry asset-provenance evidence;
-- private modern STDIO exposure of explicitly enabled generated read-only tools with exact project and schema binding;
-- private deterministic Codex project-configuration and eleven capability-first skill-target plans, create/retain/conflict inspection, and same-process two-observation materialization preparation with fixed paths, freshness digests, and rollback-aware budgets but no apply or execution path;
-- compiled-handler digest attestation; and
-- generated/public availability parity.
+This checkpoint does not include an installable package or a live engine loop.
 
-This does not make the package installable and does not raise any engine capability above `planned`.
+## Stage 1: safe public execution
 
-## Stage 2 remaining work
+- connect approved initialization and skill materialization to a common dispatcher;
+- require fresh plans, explicit approval, project-write lanes, compare-and-swap writes, durable checkpoints, receipts, and rollback;
+- expose managed pack add, update, remove, and recovery only after the same lifecycle passes conflict and interruption tests;
+- design public evidence list, show, and explicit export with redaction and retention rules.
 
-The next control-plane work is:
+Public mutation stays closed until unknown effects can be reconciled safely.
 
-1. Bind mutation behind the existing write-plan-only `init` to explicit project-metadata authority, fresh plan validation, staged writes, and rollback.
-2. Connect approved pack add/update/remove and recovery finalization through a general dispatcher without weakening the existing plan, approval, lane, CAS, journal, or rollback requirements.
-3. Add approval interaction and stable error envelopes, then connect command deadlines and settlements to the durable receipt store.
-4. Verify clean install, reinstall, update, conflict, interruption, rollback, recovery, and uninstall behavior from the executable surface.
+## Stage 2: Godot alpha
 
-No command may be marked available merely because a private library function exists.
+- implement and verify an operating-system containment provider;
+- admit exact Godot executable and project identities;
+- add the thin GDScript bridge and bounded command schema;
+- build the shared 3D graybox with movement, camera, collision, collectible, HUD, save and load, and win state;
+- run script checks, tests, deterministic input, logs, runtime capture, restart, and Windows export;
+- retain complete receipts and promote each required capability only from matching evidence.
 
-## Stage 3 — evidence, MCP, and Codex integration
+Passing this stage allows `0.1.0-alpha`. Unity and Unreal remain `planned`.
 
-The process/test normalization, limited artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, eleven registry-derived capability-first skill artifacts, public read-only pack list/doctor and skill list/check commands, static Godot status/capability commands, private Godot executable discovery and exact-version probing, write-free skill-materialization preparation, and plan-only Codex project-configuration and skill-target foundations are implemented. Broader engine process/report parsers, required-test selection, gameplay/capture/performance/build normalizers, broader artifact formats, runtime-frame provenance, assessment persistence, and runtime-to-receipt integration remain planned. Other planned work includes filtered and persistent evidence indexing, receipt-history migration and forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export commands, approved Codex configuration apply and skill-materialization execution, and an approved mutating skill lifecycle.
+## Stage 3: Unity adapter
 
-CLI, MCP, documentation, and skill routing must preserve identical command IDs, schema digests, permissions, and handler identities. MCP annotations remain hints and can never override the permission broker. No background upload or telemetry path is planned.
+- bind exact project and Editor instances and serialize editor work;
+- implement source and editor change flows with domain-reload recovery;
+- consume real EditMode and PlayMode results;
+- verify Game View runtime capture and the shared graybox behavior;
+- produce and start a Windows x64 Development Build with receipts.
 
-## Stage 4 — Godot alpha
+Unity support advances per capability, not as one blanket engine label.
 
-Godot has the first static status/capability adapter, private executable identity/version boundary, and fail-closed headless-preflight admission, and remains the first planned live engine adapter. The next engine checkpoint is a validated containment provider and an actual permission-bound preflight run with retained receipts; it must not promote support until an actual Godot executable is witnessed. The common 3D graybox must then prove movement, camera behavior, collision, a collectible, HUD count, save/load across process restart, failure/restart handling, win state, actual runtime frames, Windows export, and exported-player startup.
+## Stage 4: Unreal adapter
 
-`0.1.0-alpha` is allowed only after the required Godot capabilities reach `verified`, pack lifecycle and recovery are stable, clean external installation passes, and licensing and release authority are resolved. Unity and Unreal remain planned at that point.
+- bind exact project, editor process, world, and transaction identity;
+- support Blueprint and C++ change paths through bounded editor automation;
+- consume Automation Framework results and distinguish viewport, PIE, cook, package, and packaged startup;
+- verify the shared graybox, rollback, and Windows package.
 
-## Stage 5 — Unity
+Asset and actor deletion remains unavailable without a recoverable transaction.
 
-Unity work will prioritize official command-line and automation paths, exact Editor/project identity, EditMode and PlayMode reports, domain-reload reconciliation, actual Game View evidence, Windows x64 Development Build, and packaged startup. Community fallback paths remain optional and must pass the same authentication, schema, identity, timeout, output, recovery, and evidence gates.
+## Stage 5: production workflows
 
-## Stage 6 — Unreal
+- UI reconstruction and broader game UI QA;
+- deterministic balance simulation and tuning comparison;
+- Blender-based asset QA;
+- one optional image-provider pack with cost, transmission, and rights approval;
+- build and release hardening, richer evidence queries, and behavior evaluation.
 
-Unreal work will use UBT/UAT and commandlets for headless paths and constrained editor operations for editor-bound work. PIE, editor viewport, Automation, cook/package, and packaged execution evidence remain distinct. Global process termination, active worktree switching, broad asset deletion, and unbounded arbitrary Python are outside the accepted boundary.
+A dashboard, desktop UI, generated 3D or audio, macOS verification, and additional platforms remain later work.
 
-## Stage 7 — stabilization and 1.0
+## Release gates
 
-`1.0` requires all three engines to reach the required verified capabilities, a common Windows x64 packaged scenario, stable install/update/recovery/uninstall behavior, schema and pack migration, behavior evaluations, current live-engine evidence, release provenance, and no unresolved critical security or licensing blocker.
+`0.1.0-alpha` requires the complete Godot loop. Later alpha releases may add Unity and Unreal only after their capabilities meet the same evidence rules.
 
-## Later extensions
+`1.0.0` requires all three engines to be `verified` for the declared golden project on Windows x64. Install, update, conflict, rollback, uninstall, permission, interruption recovery, evidence retention, and behavior evaluation must also be stable.
 
-UI reconstruction, deterministic balance simulation, optional Blender QA, and at most one optional hosted image-provider pack follow the core loops. Dashboard/desktop UI, 3D and audio generation, and macOS validation are later work. Additional engines remain community packs behind the public adapter contract.
-
-## Release rules
-
-- The repository remains private-package/`UNLICENSED` during this phase and is not published to npm.
-- A source-built command is not a release.
-- Engine support follows witnessed capability evidence, not roadmap position.
-- English and Korean public docs, generated surfaces, handler digests, tests, and Windows/Linux CI must agree before a status claim changes.
+Before any package release, the project must select a license and pin exact supported engine patches. Release artifacts must be clean and pass Windows and Linux CI. Live editor checks may use a controlled Windows runner.

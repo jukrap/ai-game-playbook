@@ -1,88 +1,81 @@
 ---
 source: docs/evidence-and-verification.md
-source_sha256: bde1d7ce5a4f03289c062e252202cab82e7099bec7a8810037292589b81c7a98
-translated_at: 2026-08-27
+source_sha256: 6d263af4ee45f64d3ef6b2ffd6b99b7d8cabd4f21aebcc1e31e80b3907fc1b46
+translated_at: 2026-08-28
 ---
-
 # 증거와 검증
 
-> 상태: receipt/checkpoint 계약, settlement 경계, durable checkpoint chain, private durable receipt record, bounded private receipt-head query, private content-addressed artifact payload, pure process/test result normalizer, 제한된 private artifact format/provenance assessment를 구현했습니다. Evidence command, engine report parser, export, 영속화된 artifact QA, engine evidence는 아직 없습니다.
+> 상태: 영수증, 산출물, 결과 정규화 기반은 구현했습니다. 공개 증거 조회·내보내기와 실엔진 검증은 아직 계획 단계입니다.
 
-[English](evidence-and-verification.md) · [문서](README.ko.md)
+[English](evidence-and-verification.md) · [문서 안내](README.ko.md)
 
 ## 증거 등급
 
-| 등급 | 확립하는 내용 |
+증거 강도는 엔진 지원 등급과 따로 기록합니다.
+
+| 등급 | 의미 |
 | --- | --- |
-| `documented` | 검토한 문서에 behavior가 명시됨 |
-| `implemented` | 해당 implementation의 위치를 찾고 검사할 수 있음 |
-| `test-witnessed` | 관련 automated test와 결과를 목격함 |
-| `locally-executed` | behavior를 local에서 완전한 result와 함께 실행함 |
-| `engine-verified` | 의도한 engine/runtime environment에서 required behavior를 complete evidence와 함께 실행함 |
+| `documented` | 계약이나 예상 동작을 문서로 정의함 |
+| `implemented` | 해당 코드가 있고 구조 검사를 통과함 |
+| `test-witnessed` | 자동 테스트가 동작을 실제로 관찰함 |
+| `locally-executed` | 실제 로컬 도구나 프로세스가 결과를 만들고 보존함 |
+| `engine-verified` | 정확한 엔진 시나리오가 완전한 식별·실행 증거와 함께 동작함 |
 
-등급에는 순서가 있지만 서로 바꿀 수 없습니다. document, code path, fixture, screenshot, successful process는 필요한 witness 없이 더 강한 evidence로 승격할 수 없습니다.
+런타임은 증거 등급을 자동으로 올리지 않습니다. 스키마에 맞는 보고서라도 주장을 뒷받침할 근거가 약하면 현재 등급을 유지합니다.
 
-## `RunReceipt`
+## 실행 영수증
 
-구현된 receipt 계약은 다음을 하나의 run identity에 결합합니다.
+`RunReceipt`는 실행 하나를 프로젝트, 기능, 확정 워크플로, 명령 설명자, 처리기, 레지스트리, 입력, 권한, 시간, 결과, 산출물, 변경 파일, 복구 결과와 묶습니다.
 
-- project, exact feature contract, resolved workflow plan, step/phase/attempt, Editor session, 선택적 engine, environment identity.
-- registry, command descriptor, handler, input, authorization request, approval, 선택적 pack digest.
-- start/end time, timeout/cancellation state, outer exit, inner operation result, component outcome.
-- log, complete test report, gameplay assertion, input trace, state snapshot, capture, profile, build, export, artifact hash.
-- changed file, before/after hash, dirty-state reconciliation, rollback attempt, recovery result.
-- 필요 시 approval, network destination, transmitted data class, provider/model information, cost.
+영수증은 해시로 연결된 추가 전용 기록입니다. 현재 구현은 제한된 비공개 체인을 저장하고 다시 읽습니다. 승격한 산출물 객체도 보존합니다. 이 API는 아직 `agpb evidence` 명령으로 공개하지 않았습니다.
 
-private workflow state machine은 immutable checkpoint를 가로질러 domain-separated hash-linked receipt chain을 만들고 성공적으로 정산된 complete artifact만 수용합니다. canonical checkpoint record는 compare-and-swap head와 함께 append-only로 유지됩니다. load는 제한된 parent chain, transition 적법성, record/head digest, 현재 registry plan, project identity, input, feature, dirty-state, session binding을 검증합니다. malformed state를 대체하지 않고 그대로 보존한 채 거부합니다. safe hydration은 직렬화된 authorization을 되살리지 않습니다. dispatch하지 않은 admission은 authorization checkpoint로 돌아가고 dispatch 후 정산하지 못한 action은 `uncertain`이 됩니다.
+바깥 응답 성공과 내부 결과 성공을 별도 필드로 기록합니다. 취소, 종료 불확실, 롤백, 결과 뒤 실패도 그대로 남습니다.
 
-Private promotion API는 complete artifact source를 stable project-local regular-file snapshot으로 검증하고 선언한 byte count와 SHA-256 digest를 확인한 뒤 immutable digest-addressed object를 기록합니다. Promoted receipt는 original portable source path와 canonical manifest digest를 직접 증명합니다. Create-only manifest는 해당 source와 retained object를 receipt 실행 context, project/runtime identity, registry, command descriptor, handler, input, authorization, pack, approval에 결합합니다. 같은 receipt/artifact identity를 다른 byte나 authority에 재사용하면 거부하며 동일한 동시 promotion은 수렴합니다. Partial failure는 receipt head를 전진시키지 않지만 후속 retention 분석 대상인 unreachable immutable byte가 남을 수 있습니다.
+## 세부 결과
 
-Private receipt store는 promoted `RunReceipt` body를 run별 compare-and-swap head 뒤의 canonical immutable record로 영속화합니다. Persistence는 같은 canonical project root, runtime, registry, command, workflow plan, 선택적 feature contract를 결합합니다. Diagnostic에는 explicit redaction marker가 필요하고 명백한 credential-shaped text와 absolute private-machine path pattern을 거부하며 record, chain, artifact count, artifact byte에 고정 budget을 적용합니다. 모든 complete artifact는 exact CAS object path와 일치하는 manifest를 사용해야 하며 load는 둘을 두 번 다시 엽니다. Promotion 뒤 source file은 evidence authority가 아닙니다. Missing, malformed, noncanonical, tampered, relocated, rebound, stale, competing state는 repair하거나 조용히 교체하지 않고 그대로 보존한 채 거부합니다.
+결과 모델은 다음 상황을 구분합니다.
 
-Bounded private head query는 caller가 선택하되 entry 16,384개, head 1,024개, aggregate head data 16 MiB를 넘을 수 없는 limit 아래에서 fixed receipt directory 전체를 검사합니다. Canonical regular-file name만 허용하고 모든 head를 bounded canonical JSON으로 parse하며 filename identity와 latest record 존재를 맞춘 다음, head를 다시 열고 inventory를 다시 관찰한 뒤 run ID 순서의 frozen summary를 반환합니다. Summary validation level은 명시적으로 `head-and-latest-record-presence`입니다. 이 단계에서는 record body, predecessor reachability, artifact, engine evidence를 검증하지 않습니다. Current head가 없는 canonical record file은 reachable 또는 orphan이라고 표시하지 않고 수량만 셉니다.
+- 프로세스 시작·종료 실패
+- 테스트 보고서 없음 또는 불일치
+- 발견한 테스트 0개
+- 모든 테스트 건너뜀
+- 단언 실패
+- 필수 테스트 ID 누락
+- 통과 보고 뒤 프로세스 충돌
+- 게임플레이, 캡처, 성능, 빌드, 롤백 결과
 
-상세 load는 원본 same-process query witness만 받습니다. Foreign-project 또는 registry가 일치하지 않는 head를 거부하고 query 뒤 선택한 head가 전진하면 거부한 다음 기존 bounded full-chain/artifact verification에 위임합니다. Summary를 복사해도 load authority가 생기지 않습니다. 이는 private discovery 경계이며 `agpb evidence` command, MCP tool, export path, persistent index, cursor, historical-registry archive, retention mechanism이 아닙니다.
+테스트 0개를 성공으로 보지 않습니다. 통과 보고서가 있어도 뒤에 발생한 프로세스 실패를 지우지 않습니다.
 
-현재 receipt/object slice는 검증하는 receipt chain 하나에서 complete artifact 최대 256개, 총 64 MiB, manifest 128 KiB로 제한됩니다. 별도 private assessment는 최대 16 MiB의 promoted complete artifact 하나를 받아 보존 byte를 읽기 전후에 receipt, object, manifest를 다시 검증하고 raw content 없는 bounded metadata를 반환합니다. BOM 없는 UTF-8 decode, depth/node limit을 적용한 exact canonical JSON parse, PNG chunk·CRC·dimension·bounded inflate output·non-interlaced scanline 검증을 수행할 수 있습니다. Interlaced PNG는 구조를 검사하지만 `unverified`로 남습니다. 선택적 `AssetProvenance` validation은 exact current registry를 사용하며 선언된 current-file path, digest, byte count가 평가한 artifact와 일치해야 합니다. Assessment는 영속화하지 않으며 runtime-frame origin, engine import state, 더 넓은 image semantics, production readiness를 증명하지 않습니다. 다른 format, engine report parsing, retention cleanup/reachable-head GC, CLI/MCP list/show/export operation, record encryption, 다른 registry authority 아래의 과거 chain load는 제공하지 않습니다. Approval reservation과 uncertainty를 해제하는 action도 아직 durable하지 않습니다.
+## 결정적 게임플레이 증거
 
-## Test 판정 기준
+재현 가능한 실행에는 프로젝트, 엔진과 버전, 빌드, 렌더러, 씬·맵, 카메라, 초기 상태, seed, 시간 기준, 고정 단계 입력, 예상 상태 판정이 필요합니다.
 
-구현된 private normalizer는 bounded process result와, test의 경우 이미 구조화된 report observation을 받습니다. Process result를 다시 검증하고 zero/nonzero exit, spawn failure, timeout, idle timeout, output limit, cancellation, unconfirmed termination을 고정 outcome으로 매핑합니다. Normalized output은 bounded digest와 counter를 유지하지만 raw stdout/stderr는 포함하지 않습니다.
+실행 화면을 캡처할 때도 실행, 입력, 상태, 엔진, 렌더러, 씬, 카메라, 파일 해시를 기록합니다. 에디터 뷰포트, 직접 상태 주입, 정적 이미지는 실제 플레이와 따로 표시합니다.
 
-Test outcome은 report 이전 process failure, missing/incomplete/unparseable report, 일치하지 않는 count, assertion failure, all-skipped execution, zero discovered test, missing required test ID, post-result process failure/cancellation/uncertainty, success를 구분합니다. Success에는 complete report, 0보다 큰 executed test count, 모든 required test ID, passing assertion, clean process result가 필요합니다. Count가 일치하지 않는 report는 receipt-compatible test summary로 투영하지 않습니다. Retry는 첫 failure를 보존하며 deterministic divergence를 숨길 수 없습니다.
+공통 회색 상자에는 성공, 실패, 재시작, 저장, 불러오기, 승리 상태 시나리오가 필요합니다. 같은 초기 상태와 입력을 반복했을 때 결과가 같아야 하며 다르면 차이를 보고합니다.
 
-이 계층은 XML/JSON report를 parse하거나 engine/test process를 실행하거나 required test ID를 선택하거나 receipt를 기록하거나 command를 노출하지 않습니다. Engine adapter가 bounded report parser를 제공하고 normalized outcome을 같은 run authority에 결합해야 verification에서 사용할 수 있습니다.
+## 산출물 무결성
 
-gameplay outcome, capture outcome, performance outcome, build outcome은 test outcome과 분리합니다. unit suite 통과만으로 collectible, HUD binding, save/load, packaged startup의 동작을 증명할 수 없습니다.
+비공개 산출물 기반은 완성된 프로젝트 내부 파일을 콘텐츠 주소 객체로 복제하고 manifest와 영수증에 묶습니다. 다시 읽을 때 객체, manifest, 체인, 식별 정보, 바이트 예산을 검사합니다.
 
-## 결정적 playtest
+제한된 검사기는 UTF-8, 정규 JSON, non-interlaced PNG를 확인하고 선택적으로 `AssetProvenance`와 대조합니다. PNG가 실제 실행 화면인지, 엔진이 자산을 올바르게 가져왔는지, 제작에 쓸 준비가 됐는지는 증명하지 못합니다.
 
-playtest는 engine의 실제 input mapping을 통해 fixed 또는 physics tick에 예약한 relative input을 사용합니다. teleport와 direct state mutation은 diagnostic action이며 player input이 아닙니다. 각 scenario는 seed, initial state, input trace, state oracle, required artifact, budget을 고정합니다.
+보존 기간, 정리, 과거 레지스트리 이전, 더 많은 형식, 공개 목록·조회·내보내기 명령은 아직 계획 단계입니다.
 
-determinism은 선언한 gameplay observation이 명시한 environment와 tolerance 안에서 반복됨을 뜻합니다. 서로 다른 hardware, driver, renderer, physics build, model version에서 bitwise identity를 뜻하지 않습니다.
+## 성능 증거
 
-## Runtime capture
+성능 주장에는 선언한 예산과 비교 가능한 기준선이 필요합니다. 대상 하드웨어, 운영체제, 엔진, 렌더러, 설정, 해상도, 빌드 종류, 씬, 카메라, 입력, seed, 준비 실행, 프로파일러, 표본 방식, 허용 오차를 기록합니다.
 
-실제 play에서 capture한 frame만 runtime visual evidence가 될 수 있습니다. Editor preview, scene thumbnail, imported image는 다른 evidence class입니다. Private assessor가 PNG decode에 성공해도 보존 file의 bounded structure만 증명하며 engine이 play 중 frame을 만들었다는 뜻은 아닙니다. 향후 runtime capture 수용에는 file completion, dimension, capture provenance, engine/session/state identity, hash 검증도 필요합니다.
+에디터와 패키지 실행 결과를 같은 값처럼 비교하지 않습니다. 필요한 경우 평균, 백분위수, 지속 최악 구간, 급등, 메모리, 할당, 불러오기 시간, 멈춤을 보고합니다. 같은 환경이나 예산이 없으면 결과는 `unverified`입니다.
 
-visual score는 advisory입니다. gameplay-state failure, missing interaction, critical visual finding, mismatched baseline identity를 덮을 수 없습니다.
+## 골든 작업
 
-## 공통 golden task
+공통 3D 회색 상자가 첫 엔진 공통 동작 목표입니다. 이동, 카메라, 충돌, 수집물, HUD 개수, 저장·불러오기, 승리 상태를 포함합니다.
 
-1. deterministic 3D graybox를 reset합니다.
-2. 실제 player input으로 이동합니다.
-3. camera behavior와 collision을 검증합니다.
-4. item을 수집합니다.
-5. gameplay score와 HUD counter 증가를 검증합니다.
-6. save한 뒤 process 또는 session을 restart합니다.
-7. load하고 world와 score 복원을 검증합니다.
-8. failure와 restart 경로를 실행합니다.
-9. 나머지를 수집하고 win state를 검증합니다.
-10. 실제 runtime frame을 capture하고 clean exit합니다.
-11. Windows target build 또는 export에서 핵심 behavior를 반복합니다.
+각 어댑터는 같은 플레이어 시나리오를 실행하면서 엔진별 빌드·테스트 증거를 보존해야 합니다. 정적 씬, 컴파일 성공, 에디터 화면 캡처만으로 작업을 완료할 수 없습니다.
 
-## Performance와 지원 주장
+## 지원 판정
 
-performance는 project가 선언한 budget과 hardware, driver, engine, renderer, setting, scene, workload가 같은 baseline으로 판단합니다. budget 또는 비교 가능한 environment identity가 없으면 result는 `unverified`입니다.
+특정 기능에 필요한 모든 증거가 요구 등급으로 존재할 때만 지원을 올립니다. 식별 정보 누락, 불완전한 테스트, 실행 화면이 아닌 캡처, 빌드 시작 확인 불가, 롤백 누락은 명시적인 미충족 조건으로 남깁니다.
 
-required golden scenario, recovery behavior, target build/export evidence가 통과한 뒤에만 engine capability가 `verified`에 도달합니다. missing artifact, partial run, dependency-blocked run, timeout, zero-test execution은 절대 success로 보고하지 않습니다.
+현재 공개 Godot 보고에는 `documented` 작업 항목과 정적 프로젝트 관찰만 있습니다. 실엔진 증거는 성립하지 않습니다.

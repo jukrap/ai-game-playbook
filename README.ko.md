@@ -1,108 +1,78 @@
 ---
 source: README.md
-source_sha256: 14445691e6723daa02e78281d2acfe3eb97023006cd70edf0991188d52574df7
-translated_at: 2026-08-27
+source_sha256: 73636dc8fc2c4795b74a9fcdd8b7b4e35f4ee9bc9f86b3009aa53bc77938207d
+translated_at: 2026-08-28
 ---
-
 # AI Game Playbook
 
-> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction, durable private receipt와 artifact byte, bounded private receipt-head query, 제한된 private artifact assessment, closed-world process-containment assessment와 provider/self-test protocol, bounded pack inspection을 포함한 소스 빌드 방식의 실험적 write-free command 아홉 개, static Godot status/capability adapter, private permission-bound Godot executable discovery와 version probe, fail-closed Godot headless-preflight admission, project-bound modern STDIO MCP runtime, registry-derived capability-first skill artifact 열한 개, write-free Codex setup planner를 구현하고 있습니다. 설치 가능한 package와 live engine bridge는 아직 없습니다.
+> 상태: 소스에서 실행하는 제어 계층 기반을 개발 중입니다. 프로젝트를 변경하지 않는 CLI 명령 9개와 스킬 12개가 있으며, 배포 패키지와 실엔진 어댑터는 아직 없습니다.
 
 [English](README.md)
 
-AI Game Playbook은 Godot, Unity 또는 Unreal Engine을 사용하는 개인과 소규모 팀을 위한 AI 보조 게임 개발 control plane입니다. 코드 생성만이 아니라 범위가 제한된 workflow, 명시적 authority, 재현 가능한 evidence와 실제 엔진 동작을 중시합니다.
+AI Game Playbook은 Godot, Unity, Unreal Engine 게임 프로젝트를 위한 안전 중심 개발 하네스입니다. 코딩 에이전트가 정확한 프로젝트를 식별하고, 필요한 권한만 사용하며, 재현 가능한 절차와 검증 가능한 증거를 남기도록 돕는 것이 목표입니다. 단순히 “명령이 성공했다”는 결과만으로 작업 완료를 판단하지 않습니다.
 
-## 현재 존재하는 것
+첫 제품 목표는 개인 또는 5명 이하 팀이 Windows x64용 오프라인 싱글플레이 3D 버티컬 슬라이스를 완성하는 것입니다.
 
-- versioned schema, semantic validation과 결정적 digest를 포함한 private pnpm/TypeScript workspace.
-- command, skill, workflow, role lens, schema, pack descriptor를 검증하고 서로 일치하는 CLI, MCP, 문서, skill routing metadata를 생성하는 typed registry.
-- canonical project identity, link-safe path resolution, bounded file read, staged compare-and-swap write/delete, bounded direct process execution, same-process witness가 있는 closed-world fail-closed containment assessment, project mutation lease, scoped signed approval, workflow state, durable checkpoint, append-only run receipt, receipt-attested manifest가 있는 immutable content-addressed artifact object 안전 primitive.
-- 고정 negative probe, canonical digest binding, verified-outcome 일관성을 강제하는 strict path-free containment-provider descriptor와 bounded self-test request/report protocol. Compiled provider catalog는 비어 있고 self-test runner나 launch authority는 없습니다.
-- 고정 limit 안에서 canonical receipt head를 조회하고, bounded process와 structured test observation을 정규화하며, raw content를 반환하지 않으면서 보존된 UTF-8 text, canonical JSON, non-interlaced PNG byte와 등록된 asset provenance를 평가하는 private evidence 경계.
-- write-free preflight, exact ownership, add/update/remove transaction, append-only journal, active-transaction barrier, 명확한 실패 뒤 rollback, marker 결합 directory ownership, 별도 승인 recovery finalization을 제공하는 private managed-pack runtime.
-- project-only evidence에서 준비하고 exact configured candidate 또는 선택한 PATH directory의 고정 direct name을 읽기 전에 signed single-use `host-tool-inspection` 승인을 요구하며 recursive search나 process launch 없이 source path를 제외한 identity digest를 반환하는 internal-only Godot executable discovery 경계.
-- 원본 same-process discovery report의 candidate만 받고 두 번째 exact host-tool 승인을 요구하며 고정 process-tree, time, idle, environment, output limit으로 `--version`만 실행하고 effect를 정산한 뒤 raw path/process output 없이 digest attestation을 반환하는 internal-only Godot version probe.
-- 원본 version report, exact project/executable identity, 유한한 registered workflow 하나, 고정 startup argument, core가 만든 containment witness, 세 번째 signed approval을 bind하는 internal-only Godot headless-preflight admission. Closed provider catalog에는 현재 validated provider가 없으므로 assessment는 `block`만 반환합니다. Adapter는 그 digest를 authorization, report, receipt evidence에 bind하고 engine process를 시작하지 않으며 lease를 명확한 실패로 정산하고 support를 `planned`로 유지합니다.
-- 실험적 private CLI package와 repository-local `agpb` entry point. 구현된 명령은 plan-only `agpb init`, read-only `agpb doctor`, `agpb project inspect`, `agpb pack list`, `agpb pack doctor`, `agpb skill list`, `agpb skill check`, static read-only `agpb engine status --engine godot`와 `agpb engine capabilities --engine godot`입니다.
-- 명시적으로 enable한 registry-generated read-only tool만 modern STDIO로 노출하는 실험적 private MCP package. Project identity 하나를 bind하고 exact input/output schema와 transport/result byte limit을 강제하며 network access나 project mutation을 수행하지 않습니다.
-- Asset lifecycle, build/export readiness, engine change safety, evidence support review, feature-contract planning, gameplay vertical slice, performance budget review, deterministic playtest, project inspection, save/load integrity, game UI QA로 구성된 deterministic capability-first skill artifact 열한 개를 generated registry에 bind하는 private skill runtime과 Codex adapter. 열한 project target을 inspect하고 project inspection에서만 적격한 static Godot capability report로 route하며 machine-specific local-only MCP configuration 하나를 render/inspect합니다. Skill runtime은 고정된 directory 13개와 file 11개에 대해 create/retain/conflict 분류, freshness digest, rollback 고려 budget을 가진 same-process two-observation write-free materialization plan도 준비할 수 있지만 source path나 원하는 file content는 반환하지 않습니다. Executor나 지원되는 install command는 없으며 이 경로들은 project skill을 생성, write, merge, materialize하지 않습니다.
-- Bounded pack inspection과 두 static Godot engine command를 available로 표시하되 pack mutation, mutating skill command와 모든 live-engine capability 및 support grade를 planned로 유지하는 digest 결합 공개 surface.
-- 영어 공개 문서와 한국어 mirror, Windows/Linux conformance check.
+## 지금 제공하는 것
 
-현재 CLI slice는 고정된 20개 `.ai-game-playbook/` target layout을 계획하고, 지원 Node.js 범위, runtime-registry parity, project state, installed-pack state, active transaction marker를 진단하며, bounded Godot/Unity/Unreal project marker와 canonical committed project profile을 검사합니다. 또한 artifact content나 source location 없이 installed-pack identity와 bounded ownership count를 나열하고, repair/finalization 없이 owned artifact·directory integrity와 active recovery state를 검사하며, bounded registry skill catalog를 나열·검사합니다. 탐지된 Godot project version hint 하나를 pin된 `4.7.2` status target과 비교하고 같은 static identity에 공통 Godot operation contract 14개를 결합해 보고합니다. Project inspection은 `.git` marker만 관찰하면 dirty state를 unknown으로 유지하고 static lock을 process나 선택 가능한 Editor session으로 간주하지 않습니다. 두 engine command는 `--engine godot`만 받고 host executable/provider input을 받지 않습니다. 보고하는 모든 operation은 `planned`와 `documented`를 유지하고 compiled containment-provider catalog는 비어 있으며 provider self-test와 launch는 수행하거나 사용할 수 없습니다. 아홉 명령 모두 간결한 human output 또는 등록된 canonical JSON을 출력하며 write, process launch, network access, Editor control을 수행하지 않습니다.
+이 저장소에는 초기 제어 계층이 들어 있습니다. 아직 완성된 게임 개발 제품은 아닙니다.
 
-공개 pack inspection은 read-only이며 pack add, update, remove, repair, transaction finalization은 사용할 수 없습니다.
+| 영역 | 현재 소스에서 사용할 수 있는 기능 |
+| --- | --- |
+| CLI | 계획 확인, 읽기 전용 검사, 정적 검사 명령 9개 |
+| 프로젝트 검사 | Godot, Unity, Unreal의 표식과 프로필을 제한된 범위에서 확인 |
+| Godot | 정적 프로젝트 상태와 예정 작업 목록 확인. 엔진은 실행하지 않음 |
+| 스킬 | 게임 개발 역량별로 나눈 패키지 스킬 12개 |
+| MCP | 선택한 도구만 노출하는 프로젝트 단위의 읽기 전용 STDIO 실행부 |
+| 안전 기반 | 타입이 있는 계약, 검증된 레지스트리, 권한·식별·실행 한도, 영수증과 설치 수명주기 기반 |
 
-대부분의 runtime component는 여전히 private library입니다. Pack mutation에는 exact same-process plan, broker가 발급한 `install` authorization, attest된 project-write lease가 필요합니다. Godot executable discovery, version probe, headless-preflight admission은 CLI/MCP tool이 아닙니다. Discovery는 bounded explicit source만 받고 source path나 transferable execution authority를 노출하지 않으며 signed single-use host-tool 승인을 정산합니다. Version 준비는 원본 same-process discovery report만 받고 process dispatch에는 선택한 executable digest에 결합된 별도 승인이 필요합니다. Preflight는 그 원본 completed report와 exact registered workflow authority만 받고 exact project root에 대한 path-free containment assessment를 얻은 뒤 admission 직전에 원본 assessment witness를 다시 검증합니다. 복사한 JSON report는 authority를 부여하지 않습니다. 현재 provider catalog는 비어 있고 process layer는 filesystem, network, child-process containment를 강제하지 않으므로 preflight는 project process를 시작하지 않으며 input과 diagnostic이 assessment/provider-catalog digest를 증명하는 permission-bound blocked receipt만 보존합니다. 이 경로들에는 local automated witness가 있지만 실제 Godot executable의 retained run은 없으므로 engine support를 `planned`보다 높이지 않습니다. Recovery finalizer는 bounded inspector가 이미 분류한 stable state만 닫을 수 있으며 pack artifact를 repair하거나 mixed state를 해결할 수 없습니다. Private promotion API는 complete project-local artifact마다 stable snapshot을 immutable SHA-256 object로 저장합니다. Receipt는 각 canonical manifest digest와 원본 source path를 직접 증명하고, 각 manifest는 보존 object와 source를 receipt 실행 context, project, runtime, registry, command, handler에 결합합니다. Receipt persistence와 reload는 해당 byte와 manifest가 exact하게 유지될 것을 요구합니다. Bounded private query는 caller가 선택한 cap 안에서 fixed receipt-directory inventory, canonical head, latest-record 존재를 검증합니다. Frozen summary를 반환하고 기존 full-chain loader가 선택한 run을 읽기 전에 원본 same-process witness를 요구하며, malformed record content를 summary에서 검증된 것으로 취급하지 않습니다. 별도 private assessment는 target 하나를 읽기 전후에 receipt, 보존 object, manifest를 다시 검증한 뒤 bounded UTF-8, canonical JSON 또는 non-interlaced PNG inspection과 선택적 current-registry `AssetProvenance` 일치를 평가합니다. 결과는 영속화하지 않습니다. Interlaced PNG, 다른 format, runtime-frame provenance, engine-backed QA, retention/cleanup, CLI 또는 MCP list/show/export operation, migration-ready historical access는 아직 없습니다. Approval reservation과 active lease는 memory-only이고 general mutation dispatcher나 approval UI는 없습니다.
+아직 설치 가능한 패키지는 배포하지 않았습니다. 현재 CLI는 게임 프로젝트를 고치거나 스킬을 설치하지 않습니다. 에디터 제어, 게임 실행, 빌드 생성, 증거 내보내기도 지원하지 않습니다. 실엔진 기능과 지원 등급은 모두 계획 단계입니다.
 
-## 현재 CLI 실행
+정확한 경계는 [현재 상태와 범위](docs/status-and-scope.ko.md)에 정리했습니다.
 
-배포된 package는 없습니다. pin된 Node.js와 pnpm을 사용하는 source checkout에서 다음을 실행합니다.
+## 소스에서 실행하기
 
-```text
+필요한 환경:
+
+- Node.js `>=22.22.0 <23`
+- pnpm `>=11.4.0 <12`
+- 검사할 로컬 Godot, Unity 또는 Unreal 프로젝트
+
+```bash
 pnpm install --frozen-lockfile
 pnpm build
-pnpm run agpb -- init --project <project-path>
-pnpm run agpb -- init --project <project-path> --json
-pnpm run agpb -- doctor --project <project-path>
-pnpm run agpb -- doctor --project <project-path> --json
+pnpm run agpb -- --help
 pnpm run agpb -- project inspect --project <project-path>
-pnpm run agpb -- project inspect --project <project-path> --json
-pnpm run agpb -- pack list --project <project-path>
-pnpm run agpb -- pack list --project <project-path> --json
-pnpm run agpb -- pack doctor --project <project-path>
-pnpm run agpb -- pack doctor --project <project-path> --json
 pnpm run agpb -- skill list --project <project-path>
-pnpm run agpb -- skill list --project <project-path> --json
-pnpm run agpb -- skill check --project <project-path>
-pnpm run agpb -- skill check --project <project-path> --json
 pnpm run agpb -- engine status --engine godot --project <project-path>
-pnpm run agpb -- engine status --engine godot --project <project-path> --json
-pnpm run agpb -- engine capabilities --engine godot --project <project-path>
-pnpm run agpb -- engine capabilities --engine godot --project <project-path> --json
 ```
 
-`init`은 write-free layout plan에 path conflict가 없으면 exit code `0`, 선택한 root나 계획 target이 blocked이면 `3`을 반환합니다. `doctor`는 project state 미초기화 같은 attention-level warning을 포함해 blocking finding 없이 진단을 마치면 `0`, blocking finding이 있으면 `3`을 반환합니다. `project inspect`는 nonblocking unknown을 포함한 validated static report에 `0`, unavailable root, invalid/mismatched profile, ambiguous engine selection에 `3`을 반환합니다. `pack list`는 bounded stable listing 또는 uninitialized project에 `0`, unavailable/incomplete/malformed/transaction-active state에 `3`을 반환합니다. `pack doctor`는 healthy/attention-level integrity finding에 `0`, unsafe state, drift, recovery-required transaction에 `3`을 반환하며 repair나 finalization을 수행하지 않습니다. `skill list`는 bound catalog에 `0`, unavailable project에 `3`을 반환합니다. `skill check`는 missing/current target에 `0`, conflict, unsafe path, oversized target, unavailable project에 `3`을 반환합니다. `engine status`는 attention-level gap이 남은 compatible static Godot observation에 `0`, unavailable/ambiguous/incompatible project evidence에 `3`을 반환합니다. `engine capabilities`는 identity-bound static Godot operation catalog와 명시적 attention gap에 `0`, compatible하고 모호하지 않은 project identity를 확립할 수 없으면 `3`을 반환합니다. 아홉 명령 모두 잘못된 CLI 사용은 `2`, validated report를 만들지 못한 내부 실패는 `1`입니다.
+구현된 명령에 `--json`을 붙이면 정규화된 JSON 결과를 받을 수 있습니다. 잘못된 사용법, 작업을 막는 진단, 취소, 결과 불확실, 내부 실패는 서로 다른 0이 아닌 종료 코드로 구분합니다. 전체 명령 목록은 [CLI 안내](docs/cli.ko.md)에 있습니다.
 
-## 제품 방향
+## 엔진 지원
 
-첫 완성 제품 목표는 개인 또는 최대 5인 팀이 만드는 Windows x64용 offline single-player 3D vertical slice입니다. 의도한 흐름은 다음과 같습니다.
+| 엔진 | 현재 공개 기능 | 지원 등급 |
+| --- | --- | --- |
+| Godot | 정적 프로젝트 상태와 예정 작업의 미충족 조건 보고 | `planned` |
+| Unity | 정적 프로젝트 표식과 프로필 검사 | `planned` |
+| Unreal Engine | 정적 프로젝트 표식과 프로필 검사 | `planned` |
 
-1. Project를 inspect하고 사용 가능한 engine capability를 negotiate합니다.
-2. 범위가 제한된 feature contract와 permission budget을 정의합니다.
-3. Project-scoped execution lane 하나를 통해 source 또는 Editor state를 변경합니다.
-4. Compile/import, test, play, deterministic input replay와 실제 runtime evidence capture를 수행합니다.
-5. Build/export하고 receipt를 기록하며 필요할 때 안전하게 rollback합니다.
+프로젝트를 찾았다는 사실만으로 엔진 연동을 검증했다고 판단하지 않습니다. 필수 headless 검사, 에디터 미리보기, 실제 플레이, 대상 빌드 증거가 모두 있어야 지원 등급을 올립니다. 자세한 기준은 [엔진 지원](docs/engine-support.ko.md)에 있습니다.
 
-Godot, Unity, Unreal Engine만 first-party engine으로 계획합니다. Web game framework, multiplayer, mobile, console, XR, macOS 검증은 첫 alpha 범위 밖입니다.
+## 문서
 
-## 설계 약속
+- [문서 안내](docs/README.ko.md): 궁금한 내용에 맞는 문서를 찾습니다.
+- [현재 상태와 범위](docs/status-and-scope.ko.md): 지금 되는 일과 안 되는 일을 구분합니다.
+- [CLI 안내](docs/cli.ko.md): 현재 명령, 출력, 종료 코드를 설명합니다.
+- [스킬](docs/skills.ko.md): 선택 원칙과 패키지 스킬 12개를 소개합니다.
+- [아키텍처](docs/architecture.ko.md): 제어 계층과 엔진 어댑터의 경계를 설명합니다.
+- [보안과 권한](docs/security-and-permissions.ko.md): 승인, 격리, 중단 규칙을 설명합니다.
+- [로드맵](docs/roadmap.ko.md): 구현 순서와 출시 조건을 정리합니다.
 
-- 하나의 typed registry가 노출된 모든 command를 정의합니다. CLI help와 dispatch는 같은 validated descriptor와 schema identity를 사용합니다.
-- 지원하지 않는 capability는 명시적으로 degrade하며 낮은 evidence를 `verified`로 표시하지 않습니다.
-- Editor mutation은 project별로 직렬화하고 identity 또는 dirty-file state가 모호하면 중단합니다.
-- Installation, network, external transmission, paid call, destructive action, publish는 각각 별도 승인이 필요합니다.
-- Telemetry는 계획하지 않습니다. Evidence는 explicit export action으로만 local project 밖으로 나갑니다.
-- Engine, Editor, Blender와 다른 system tool은 탐지하되 자동 설치하지 않습니다.
-- Uncertain mutation은 자동 재시도하지 않습니다.
+모든 영문 공개 문서에는 한국어판이 있습니다. 영문을 원본으로 관리하며, 자동 검사로 문서 쌍 누락, 번역 갱신 누락, 깨진 링크, 구조 차이, 과장된 기능 설명을 찾습니다.
 
-## 설계 문서
+## 범위
 
-- [문서 인덱스](docs/README.ko.md)
-- [현재 상태와 범위](docs/status-and-scope.ko.md)
-- [핵심 개념과 공개 타입](docs/concepts.ko.md)
-- [명령줄 인터페이스 상태](docs/planned-cli.ko.md)
-- [목표 아키텍처](docs/architecture.ko.md)
-- [엔진 지원 모델](docs/engine-support.ko.md)
-- [보안과 권한](docs/security-and-permissions.ko.md)
-- [자산과 출처](docs/assets-and-provenance.ko.md)
-- [증거와 검증](docs/evidence-and-verification.ko.md)
-- [로드맵](docs/roadmap.ko.md)
+Godot, Unity, Unreal Engine만 공식 지원 대상으로 계획합니다. 웹 게임 프레임워크, 멀티플레이, 모바일, 콘솔, XR, macOS 검증, 외부 3D·오디오 생성, 엔진 자동 설치는 첫 알파 범위에 포함하지 않습니다.
 
-## 설치와 릴리스
-
-Repository-local executable은 설치 가능한 product package가 아닙니다. 이 프로젝트라고 기대하며 비슷한 이름의 package를 설치하지 마십시오. Non-owned file을 건드리지 않는 clean install, same-version reinstall, update, conflict, rollback, uninstall 검증을 통과한 뒤 package 설치 문서를 추가합니다.
-
-## 프로젝트 상태와 라이선스
-
-구현 중 interface가 바뀔 수 있습니다. 프로젝트 license를 아직 선택하지 않았으므로 license file이 추가되기 전에는 재배포 권리를 가정하지 마십시오. 해당 결정과 검증 gate를 통과하기 전에는 package publish나 release를 계획하지 않습니다.
+현재 패키지 표시는 `UNLICENSED`이며 소스 내부 패키지도 비공개 상태입니다. 외부 패키지를 배포하기 전에 프로젝트 라이선스와 출시 구성을 확정해야 합니다.

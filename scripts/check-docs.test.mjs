@@ -73,13 +73,13 @@ const scenarios = [
     name: "valid English heading anchor",
     shouldPass: true,
     mutate: (root) =>
-      updateFile(root, "README.ko.md", (text) => `${text}\n[대상](docs/README.md#audience-and-purpose)\n`)
+      updateFile(root, "README.ko.md", (text) => `${text}\n[대상](docs/README.md#start-here)\n`)
   },
   {
     name: "valid Korean same-file heading anchor",
     shouldPass: true,
     mutate: (root) =>
-      updateFile(root, "docs/README.ko.md", (text) => `${text}\n[대상](#독자와-목적)\n`)
+      updateFile(root, "docs/README.ko.md", (text) => `${text}\n[대상](#먼저-읽을-문서)\n`)
   },
   {
     name: "external heading anchor",
@@ -129,7 +129,7 @@ const scenarios = [
     shouldPass: false,
     diagnostic: "heading levels differ",
     mutate: (root) =>
-      updateFile(root, "docs/architecture.ko.md", (text) => text.replace("# 목표 아키텍처", "## 목표 아키텍처"))
+      updateFile(root, "docs/architecture.ko.md", (text) => text.replace("# 아키텍처", "## 아키텍처"))
   },
   {
     name: "code fence drift",
@@ -165,11 +165,11 @@ const scenarios = [
         surface.commands = surface.commands.filter((command) => command !== "agpb docs check");
         return `${JSON.stringify(surface, null, 2)}\n`;
       });
-      updateFile(root, "docs/planned-cli.md", (text) => text.replace("agpb docs check\n", ""));
+      updateFile(root, "docs/cli.md", (text) => text.replace("agpb docs check\n", ""));
       const englishDigest = createHash("sha256")
-        .update(readFileSync(join(root, "docs", "planned-cli.md")))
+        .update(readFileSync(join(root, "docs", "cli.md")))
         .digest("hex");
-      updateFile(root, "docs/planned-cli.ko.md", (text) =>
+      updateFile(root, "docs/cli.ko.md", (text) =>
         text
           .replace("agpb docs check\n", "")
           .replace(/^source_sha256: [0-9a-f]{64}$/m, `source_sha256: ${englishDigest}`)
@@ -206,6 +206,25 @@ const scenarios = [
       })
   },
   {
+    name: "planned command presented as available",
+    shouldPass: false,
+    diagnostic: "available command block differs",
+    mutate: (root) => {
+      updateFile(root, "docs/cli.md", (text) =>
+        text.replace(
+          "agpb engine capabilities\n```",
+          "agpb engine capabilities\nagpb pack add\n```"
+        )
+      );
+      const englishDigest = createHash("sha256")
+        .update(readFileSync(join(root, "docs", "cli.md")))
+        .digest("hex");
+      updateFile(root, "docs/cli.ko.md", (text) =>
+        text.replace(/^source_sha256: [0-9a-f]{64}$/m, `source_sha256: ${englishDigest}`)
+      );
+    }
+  },
+  {
     name: "runtime registry digest drift",
     shouldPass: false,
     diagnostic: "runtime registry digest differs",
@@ -238,6 +257,74 @@ const scenarios = [
     shouldPass: false,
     diagnostic: "orphaned Korean mirror",
     mutate: (root) => writeFileSync(join(root, "docs", "orphan.ko.md"), "# 고아 문서\n", "utf8")
+  },
+  {
+    name: "oversized root README",
+    shouldPass: false,
+    diagnostic: "exceeds the README byte limit",
+    mutate: (root) =>
+      updateFile(root, "README.ko.md", (text) => `${text}\n${"가".repeat(4_000)}\n`)
+  },
+  {
+    name: "oversized prose paragraph",
+    shouldPass: false,
+    diagnostic: "prose paragraph exceeds",
+    mutate: (root) =>
+      updateFile(root, "README.ko.md", (text) => `${text}\n\n${"가".repeat(1_300)}\n`)
+  },
+  {
+    name: "oversized status banner",
+    shouldPass: false,
+    diagnostic: "status banner exceeds",
+    mutate: (root) => {
+      updateFile(root, "docs/assets-and-provenance.md", (text) =>
+        text.replace(/^> Status:[^\r\n]*$/m, `> Status: ${"x".repeat(500)}`)
+      );
+      const englishDigest = createHash("sha256")
+        .update(readFileSync(join(root, "docs", "assets-and-provenance.md")))
+        .digest("hex");
+      updateFile(root, "docs/assets-and-provenance.ko.md", (text) =>
+        text.replace(/^source_sha256: [0-9a-f]{64}$/m, `source_sha256: ${englishDigest}`)
+      );
+    }
+  },
+  {
+    name: "missing skills guide",
+    shouldPass: false,
+    diagnostic: "required public guide is missing",
+    mutate: (root) => {
+      rmSync(join(root, "docs", "skills.md"));
+      rmSync(join(root, "docs", "skills.ko.md"));
+    }
+  },
+  {
+    name: "legacy CLI guide restored",
+    shouldPass: false,
+    diagnostic: "legacy CLI document path must be removed",
+    mutate: (root) => {
+      writeFileSync(join(root, "docs", "planned-cli.md"), "# Old CLI\n\n> Status: old.\n", "utf8");
+      writeFileSync(
+        join(root, "docs", "planned-cli.ko.md"),
+        "---\nsource: docs/planned-cli.md\nsource_sha256: 0000000000000000000000000000000000000000000000000000000000000000\ntranslated_at: 2026-08-28\n---\n# 이전 CLI\n\n> 상태: 이전 문서.\n",
+        "utf8"
+      );
+    }
+  },
+  {
+    name: "stable skill omitted",
+    shouldPass: false,
+    diagnostic: "stable skill catalog differs",
+    mutate: (root) => {
+      updateFile(root, "docs/skills.md", (text) =>
+        text.replace(/^\| `balance\.deterministic-review`[^\r\n]*\r?\n/m, "")
+      );
+      const englishDigest = createHash("sha256")
+        .update(readFileSync(join(root, "docs", "skills.md")))
+        .digest("hex");
+      updateFile(root, "docs/skills.ko.md", (text) =>
+        text.replace(/^source_sha256: [0-9a-f]{64}$/m, `source_sha256: ${englishDigest}`)
+      );
+    }
   }
 ];
 

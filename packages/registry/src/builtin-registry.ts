@@ -797,6 +797,358 @@ const skillListCommand: CommandDescriptor = Object.freeze({
   }),
 });
 
+const assetLifecycleSkill: SkillDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("asset.lifecycle"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "stable",
+  invocation: "model",
+  summary:
+    "Guide a game asset from typed placeholder or reviewed input through provenance, QA, approval, and reversible production promotion.",
+  triggers: Object.freeze([
+    "Use when a game asset is introduced, generated, transformed, imported, reviewed, or promoted.",
+    "Use when asset provenance, rights, external transmission, cost, QA, or production readiness is unclear.",
+    "Use when a deterministic placeholder or safe rollback path is needed before asset integration.",
+  ]),
+  exclusions: Object.freeze([
+    "Do not use as authority to call a hosted provider, transmit project data, incur cost, infer rights, or bypass approval.",
+    "Do not treat generation, conversion, decode, or import success alone as production readiness.",
+  ]),
+  capabilities: Object.freeze([
+    parseStableId("asset.lifecycle"),
+    parseStableId("asset.provenance"),
+    parseStableId("asset.qa"),
+  ]),
+  supportedStages: supportedStages(),
+  requiredPermissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  body: Object.freeze({
+    path: "skills/asset-lifecycle/SKILL.md",
+    digest: parseSha256Digest(
+      "sha256:ad424ae56022552ab2588da337f72dc8f82420d5488571c9c5134e77f2b69a65",
+    ),
+    maxTokens: 800,
+  }),
+  references: Object.freeze([]),
+  completionCriteria: Object.freeze([
+    "Classify the asset's current lifecycle state and required next gate without mutating it.",
+    "Identify provenance, rights, approval, QA, performance, integration, and rollback requirements that apply.",
+    "Preserve unknown or unverified fields instead of promoting the asset by inference.",
+  ]),
+  evidenceDuties: Object.freeze([
+    "Report source lineage, rights status, transformations, file digest, approval, cost, and external transmission when applicable.",
+    "Distinguish technical import evidence, visual or audio review, runtime evidence, and production approval.",
+    "State the current asset state, fallback, completed gates, and remaining limitations.",
+  ]),
+});
+
+const buildExportReadinessSkill: SkillDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("build.export-readiness"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "stable",
+  invocation: "model",
+  summary:
+    "Review a local game build or export from exact toolchain and target identity through structured build results and packaged startup.",
+  triggers: Object.freeze([
+    "Use when preparing, diagnosing, or reviewing a local game build or export without publishing it.",
+    "Use when build configuration, output ownership, required tests, artifact identity, or packaged startup evidence is unclear.",
+    "Use when an Editor run or successful build report must be distinguished from the produced player's behavior.",
+  ]),
+  exclusions: Object.freeze([
+    "Do not use as authority to install toolchains, sign, upload, publish, release, or delete an uncertain output directory.",
+    "Do not treat file existence, Editor play, or a successful outer build response as packaged startup evidence.",
+  ]),
+  capabilities: Object.freeze([
+    parseStableId("build.export"),
+    parseStableId("build.startup"),
+    parseStableId("release.readiness"),
+  ]),
+  supportedStages: supportedStages(),
+  requiredPermissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  body: Object.freeze({
+    path: "skills/build-export-readiness/SKILL.md",
+    digest: parseSha256Digest(
+      "sha256:636c280eae05b3421e9f52347be0cb0587dac3fa894953d715fa3187e81beeda",
+    ),
+    maxTokens: 800,
+  }),
+  references: Object.freeze([]),
+  completionCriteria: Object.freeze([
+    "Bind the proposed build to exact project, engine, toolchain, target, configuration, output root, required content, and budgets.",
+    "Define nonempty test, structured build, artifact-inventory, packaged-startup, logging, controlled-input, and shutdown gates that apply.",
+    "Keep signing, upload, publication, release, and unavailable platform checks outside the granted scope.",
+  ]),
+  evidenceDuties: Object.freeze([
+    "Report phase outcomes, exact tools, test counts, bounded logs, warnings, produced inventory, artifact digests, and byte counts.",
+    "Distinguish compile, import, cook, package, export, signing, process startup, initial scene, runtime frame, and shutdown evidence.",
+    "State target environment, budgets, reproducibility limits, and every unavailable or unverified gate.",
+  ]),
+});
+
+const engineChangeSafetySkill: SkillDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("engine.change-safety"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "stable",
+  invocation: "model",
+  summary:
+    "Plan Unity, Unreal, or Godot changes around exact identity, least authority, serialized Editor work, verification, and rollback.",
+  triggers: Object.freeze([
+    "Use when source, command-line automation, an Editor session, or a runtime bridge may change a game project.",
+    "Use when project, engine, process, Editor, runtime session, or capability identity is uncertain.",
+    "Use when a game-engine effect needs bounded authority, runtime evidence, or a recoverable preimage.",
+  ]),
+  exclusions: Object.freeze([
+    "Do not use as execution authority or as a substitute for command admission, containment, permission, identity, or capability checks.",
+    "Do not promote preview, outer success, zero-test, or artifact-only evidence to verified gameplay.",
+  ]),
+  capabilities: Object.freeze([
+    parseStableId("engine.change-safety"),
+    parseStableId("engine.inspect"),
+    parseStableId("engine.verify"),
+  ]),
+  supportedStages: supportedStages(),
+  requiredPermissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  body: Object.freeze({
+    path: "skills/engine-change-safety/SKILL.md",
+    digest: parseSha256Digest(
+      "sha256:63d1057c90fa7c052c97289203fbde1b141cfeb6ad8a3bc291384417286eb756",
+    ),
+    maxTokens: 800,
+  }),
+  references: Object.freeze([]),
+  completionCriteria: Object.freeze([
+    "Bind the proposed work to one project, engine, executable, process, and Editor or runtime session identity.",
+    "State admitted capabilities, required permissions, lane, budgets, stop conditions, verification oracle, and rollback boundary.",
+    "Stop at unavailable containment or uncertain effects rather than inventing authority or replaying a mutation.",
+  ]),
+  evidenceDuties: Object.freeze([
+    "Report exact identities, invoked commands or tools, effects, changed paths, tests, logs, captures, artifacts, and rollback outcome.",
+    "Keep static inspection, compile or import, Editor preview, runtime play, capture, build, and rollback evidence grades distinct.",
+    "Preserve unavailable, ambiguous, blocked, failed, and unverified states.",
+  ]),
+});
+
+const evidenceSupportReviewSkill: SkillDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("evidence.support-review"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "stable",
+  invocation: "model",
+  summary:
+    "Decide whether retained game-development evidence supports a bounded feature, capability, quality, performance, build, or release claim.",
+  triggers: Object.freeze([
+    "Use when deciding whether game-development evidence supports a feature, engine capability, quality, performance, build, or release claim.",
+    "Use when evidence grade, locator integrity, provenance, freshness, test count, runtime origin, or claim scope is uncertain.",
+    "Use when the cheapest missing witness must be identified without executing, exporting, or repairing evidence.",
+  ]),
+  exclusions: Object.freeze([
+    "Do not use as authority to export evidence, reveal secrets, repair retained records, rerun tools, or promote engine support.",
+    "Do not infer production readiness, performance, rights, rollback, or gameplay from unrelated or lower-grade evidence.",
+  ]),
+  capabilities: Object.freeze([
+    parseStableId("evidence.integrity"),
+    parseStableId("evidence.review"),
+    parseStableId("support.grade"),
+  ]),
+  supportedStages: supportedStages(),
+  requiredPermissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  body: Object.freeze({
+    path: "skills/evidence-support-review/SKILL.md",
+    digest: parseSha256Digest(
+      "sha256:61072df1bc26f989a3f486cc34523a0b9cfd04d09a5cb1b516211e42aec6e96f",
+    ),
+    maxTokens: 800,
+  }),
+  references: Object.freeze([]),
+  completionCriteria: Object.freeze([
+    "State each exact claim, required grade, acceptance oracle, project and run identity, and freshness requirement.",
+    "Map every claim to bounded locators with validated producer, provenance, schema, counts, environment, and digest where applicable.",
+    "Return supported, unsupported, blocked, or unverified per claim and identify the cheapest material missing witness.",
+  ]),
+  evidenceDuties: Object.freeze([
+    "Keep documentation, implementation, tests, local execution, Editor preview, runtime play, capture, profile, build, startup, and rollback grades distinct.",
+    "Report contradictions, zero or skipped tests, process failures, stale or cloned records, state injection, missing provenance, and environment mismatch.",
+    "Preserve locator identity, redaction status, final decision, and residual uncertainty without returning protected content.",
+  ]),
+});
+
+const featureContractPlanningSkill: SkillDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("feature.contract-planning"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "stable",
+  invocation: "model",
+  summary:
+    "Turn one game idea, mechanic, fix, or milestone into a bounded player-outcome contract with observable completion oracles.",
+  triggers: Object.freeze([
+    "Use when a game idea, mechanic, bug fix, or vertical-slice milestone needs an implementable boundary.",
+    "Use when acceptance criteria are subjective, implementation-led, too broad, or missing restart and failure behavior.",
+    "Use when an unproven design assumption needs the cheapest discriminating prototype.",
+  ]),
+  exclusions: Object.freeze([
+    "Do not invent engine support, performance budgets, save compatibility, asset rights, or test availability.",
+    "Do not combine independent risky outcomes or unrelated cleanup when they can be contracted and verified separately.",
+  ]),
+  capabilities: Object.freeze([
+    parseStableId("feature.contract"),
+    parseStableId("production.milestone"),
+    parseStableId("prototype.validate"),
+  ]),
+  supportedStages: supportedStages(),
+  requiredPermissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  body: Object.freeze({
+    path: "skills/feature-contract-planning/SKILL.md",
+    digest: parseSha256Digest(
+      "sha256:bb8316451ebd078e02767e49e4b3baeb55e193e7bca51eed55ec6054e2f6d54e",
+    ),
+    maxTokens: 800,
+  }),
+  references: Object.freeze([]),
+  completionCriteria: Object.freeze([
+    "State one player-visible outcome, its core-loop purpose, and its allowed and excluded change scope.",
+    "Define observable initial, input, transition, result, persistence or restart, and failure oracles that apply.",
+    "Declare budgets, risks, rollback policy, required evidence, assumptions, and unresolved decisions.",
+  ]),
+  evidenceDuties: Object.freeze([
+    "Keep design intent, assumptions, proposed acceptance oracles, and observed implementation evidence separate.",
+    "Report the project stage, engine, target, declared budgets, and every unknown used to bound the contract.",
+    "Classify prototype results as supported, refuted, or inconclusive rather than as implementation completion.",
+  ]),
+});
+
+const gameplayVerticalSliceSkill: SkillDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("gameplay.vertical-slice"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "stable",
+  invocation: "model",
+  summary:
+    "Shape one small playable core loop with explicit state ownership, risk-first placeholders, failure, restart, and runtime proof.",
+  triggers: Object.freeze([
+    "Use when shaping or reviewing a small playable game loop, gameplay architecture, or vertical-slice milestone.",
+    "Use when core-loop scope, authoritative state, system ownership, dependency direction, restart behavior, or playability evidence is unclear.",
+    "Use when a risky player-experience assumption needs a deterministic placeholder and discriminating prototype.",
+  ]),
+  exclusions: Object.freeze([
+    "Do not expand a vertical slice into a full content plan, speculative framework, or unrelated production-polish pass.",
+    "Do not claim playability from static scene construction, debug state injection, or isolated component tests alone.",
+  ]),
+  capabilities: Object.freeze([
+    parseStableId("gameplay.architecture"),
+    parseStableId("gameplay.core-loop"),
+    parseStableId("gameplay.vertical-slice"),
+  ]),
+  supportedStages: supportedStages(),
+  requiredPermissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  body: Object.freeze({
+    path: "skills/gameplay-vertical-slice/SKILL.md",
+    digest: parseSha256Digest(
+      "sha256:2e1f4eed040f3f70620d01b98e2978e940ef11ab3fd7d673ac4a814c392d7cec",
+    ),
+    maxTokens: 800,
+  }),
+  references: Object.freeze([]),
+  completionCriteria: Object.freeze([
+    "Bound one player fantasy and core action, failure and retry, terminal state, target session, and riskiest assumption.",
+    "Assign authoritative state and narrow directional interfaces across input, simulation, presentation, persistence, UI, and engine integration.",
+    "Define controlled-input runtime oracles for success, failure, interruption, restart, and completion while deferring unproved expansion.",
+  ]),
+  evidenceDuties: Object.freeze([
+    "Report the bounded loop, system ownership, dependency boundaries, placeholders, input trace, state transitions, and runtime result.",
+    "Record failure, restart, terminal-state, feedback, HUD, persistence, and integration evidence that the slice requires.",
+    "Classify design assumptions as supported, refuted, or inconclusive and list deferred scope separately.",
+  ]),
+});
+
+const performanceBudgetReviewSkill: SkillDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("performance.budget-review"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "stable",
+  invocation: "model",
+  summary:
+    "Define and review comparable game performance measurements against explicit runtime, resource, and content budgets.",
+  triggers: Object.freeze([
+    "Use when defining, measuring, comparing, or reviewing a game's runtime performance and resource budgets.",
+    "Use when target hardware, renderer, build kind, scenario, warm-up, baseline, samples, profiler, or tolerance is missing.",
+    "Use when an Editor diagnostic must be distinguished from comparable packaged-player or release evidence.",
+  ]),
+  exclusions: Object.freeze([
+    "Do not claim a pass without an explicit budget, comparable baseline, bound environment, and sufficient sample.",
+    "Do not optimize by silently disabling required gameplay, visual, accessibility, or evidence behavior.",
+  ]),
+  capabilities: Object.freeze([
+    parseStableId("performance.budget"),
+    parseStableId("performance.profile"),
+    parseStableId("performance.review"),
+  ]),
+  supportedStages: supportedStages(),
+  requiredPermissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  body: Object.freeze({
+    path: "skills/performance-budget-review/SKILL.md",
+    digest: parseSha256Digest(
+      "sha256:9555bd8e129847d1b30f117290c386fd7cf17bbdf51ef0684f2ba014b063dfaa",
+    ),
+    maxTokens: 800,
+  }),
+  references: Object.freeze([]),
+  completionCriteria: Object.freeze([
+    "Bind target hardware, OS, engine, renderer, settings, resolution, build, scene, camera, input, seed, and warm-up policy.",
+    "Declare applicable frame, CPU, GPU, memory, allocation, load, stall, and content budgets before measurement.",
+    "Define a same-environment baseline, profiler, sample method, aggregation, tolerance, and pass, fail, blocked, or unverified rules.",
+  ]),
+  evidenceDuties: Object.freeze([
+    "Report environment and run identities, deterministic scenario, budgets, baseline, profiler artifacts and digests, and sample method.",
+    "Preserve average, percentile, sustained worst window, spikes, changed factors, regression attribution, and confidence limits where applicable.",
+    "Label results as diagnostic, baseline-comparable, or release-representative and keep Editor and packaged evidence separate.",
+  ]),
+});
+
+const deterministicPlaytestSkill: SkillDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("playtest.deterministic"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "stable",
+  invocation: "model",
+  summary:
+    "Define and judge reproducible gameplay runs with fixed input, seed, state oracles, nonempty tests, and runtime-frame provenance.",
+  triggers: Object.freeze([
+    "Use when gameplay behavior, restart or save behavior, a game bug, or a build comparison needs reproducible verification.",
+    "Use when input, seed, initial state, timing, camera, runtime frame, test count, or artifact provenance is missing.",
+    "Use when deterministic divergence or a performance claim must be separated from visual similarity.",
+  ]),
+  exclusions: Object.freeze([
+    "Do not call an Editor preview, viewport, state injection, zero-test run, or unbound capture a runtime playthrough.",
+    "Do not claim a performance pass without both a declared budget and a comparable environment baseline.",
+  ]),
+  capabilities: Object.freeze([
+    parseStableId("evidence.capture"),
+    parseStableId("feature.verify"),
+    parseStableId("playtest.deterministic"),
+  ]),
+  supportedStages: supportedStages(),
+  requiredPermissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  body: Object.freeze({
+    path: "skills/deterministic-playtest/SKILL.md",
+    digest: parseSha256Digest(
+      "sha256:f99dbe341267fa108c0b9146e596a772f9b63f2260cb0ec334de2c2f0eaa656c",
+    ),
+    maxTokens: 800,
+  }),
+  references: Object.freeze([]),
+  completionCriteria: Object.freeze([
+    "Bind the run to project, engine, build, renderer, scene, camera, initial state, seed, timing origin, and fixed-tick input.",
+    "Define state and runtime-frame oracles, tolerances, required nonempty tests, and performance budget when applicable.",
+    "Report success, failure, restart, save or load, and terminal-state outcomes separately, including divergence.",
+  ]),
+  evidenceDuties: Object.freeze([
+    "Retain run identity, exact input trace, state hashes, test counts, logs, captures, environment, and artifact digests.",
+    "Separate process failure, unavailable report, zero tests, all skipped, assertion failure, missing required tests, and post-result crash.",
+    "Label direct state injection, preview-only evidence, missing provenance, and missing baselines without promotion.",
+  ]),
+});
+
 const projectInspectionSkill: SkillDescriptor = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   id: parseStableId("project.inspection"),
@@ -836,6 +1188,94 @@ const projectInspectionSkill: SkillDescriptor = Object.freeze({
     "Use the registered project inspection report and any eligible static Godot capability report as the complete evidence boundary for this step.",
     "Treat the empty compiled provider catalog and skipped self-test as unavailable execution authority.",
     "State that no live Editor, runtime frame, build, or engine support grade was verified.",
+  ]),
+});
+
+const saveLoadIntegritySkill: SkillDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("save-load.integrity"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "stable",
+  invocation: "model",
+  summary:
+    "Design and review versioned game persistence across atomic writes, migration, corruption, recovery, process restart, and gameplay state.",
+  triggers: Object.freeze([
+    "Use when designing, changing, testing, migrating, or diagnosing game save data and progression state.",
+    "Use when authoritative state, schema version, slot identity, compatibility, atomic replacement, corruption, or restart behavior is unclear.",
+    "Use when serialization success must be distinguished from verified post-load gameplay and UI state.",
+  ]),
+  exclusions: Object.freeze([
+    "Do not invent backward compatibility, cloud behavior, encryption, platform storage, privacy, or retention policy.",
+    "Do not silently reset, overwrite, or migrate an unknown or corrupt save without an approved recoverable decision.",
+  ]),
+  capabilities: Object.freeze([
+    parseStableId("gameplay.save-load"),
+    parseStableId("save.integrity"),
+    parseStableId("save.migration"),
+  ]),
+  supportedStages: supportedStages(),
+  requiredPermissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  body: Object.freeze({
+    path: "skills/save-load-integrity/SKILL.md",
+    digest: parseSha256Digest(
+      "sha256:e7f19734a52ae410975e8796f56b5067b972aac4e1c11f96a599476eb3d74172",
+    ),
+    maxTokens: 800,
+  }),
+  references: Object.freeze([]),
+  completionCriteria: Object.freeze([
+    "Define authoritative persistent state, transient state, slot and storage identity, schema version, compatibility, and size or privacy constraints.",
+    "Specify canonical serialization, validation, defaults, migration, atomic replacement, backup, interruption recovery, and corruption behavior.",
+    "Cover new game, same-process load, full restart, slots, missing or invalid data, every supported migration, recovery, and terminal progression.",
+  ]),
+  evidenceDuties: Object.freeze([
+    "Report schema and slot identity, state boundary, fixtures, migrations, file digests, replacement method, backup, and corruption outcomes.",
+    "Retain nonempty test counts, process-restart identity, controlled-input gameplay and UI oracles, failure recovery, and unsupported versions.",
+    "Label debug state injection separately and never promote it to persisted restart evidence.",
+  ]),
+});
+
+const gameUiQaSkill: SkillDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("ui.game-qa"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "stable",
+  invocation: "model",
+  summary:
+    "Review game HUD and UI as responsive, localized, accessible interaction state with editable and runtime evidence.",
+  triggers: Object.freeze([
+    "Use when designing, implementing, reconstructing, or reviewing HUD, menu, dialogue, inventory, settings, or in-game UI.",
+    "Use when viewport, safe-area, locale, focus, input, accessibility, state coverage, or game-state binding is unclear.",
+    "Use when a visual match must be distinguished from actual runtime interaction correctness.",
+  ]),
+  exclusions: Object.freeze([
+    "Do not infer focus, navigation, input, state binding, accessibility, or gameplay correctness from a static mockup or Editor preview.",
+    "Do not silently replace project style, input conventions, localization rules, or accessibility policy with generic defaults.",
+  ]),
+  capabilities: Object.freeze([
+    parseStableId("evidence.visual"),
+    parseStableId("ui.accessibility"),
+    parseStableId("ui.qa"),
+  ]),
+  supportedStages: supportedStages(),
+  requiredPermissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  body: Object.freeze({
+    path: "skills/game-ui-qa/SKILL.md",
+    digest: parseSha256Digest(
+      "sha256:30d3d677918fe22da387a97eebf5a9d74f51e107faf280e6fa57d290fe42ee88",
+    ),
+    maxTokens: 800,
+  }),
+  references: Object.freeze([]),
+  completionCriteria: Object.freeze([
+    "Inventory applicable screens, gameplay overlays, states, viewports, locales, input modes, focus rules, and accessibility needs.",
+    "Verify layout and readable state plus supported keyboard, mouse, controller, remapped input, focus recovery, and back behavior.",
+    "Distinguish editable structure, rendered output, and actual runtime interaction evidence while preserving unresolved gaps.",
+  ]),
+  evidenceDuties: Object.freeze([
+    "Report exact viewport, safe area, locale, input mode, UI state, gameplay state, editable artifact, and rendered capture.",
+    "Record runtime interaction results, text expansion, focus and navigation, contrast, scale, motion, overflow, occlusion, and HUD readability.",
+    "State whether each conclusion is structural, static visual, Editor preview, or runtime evidence.",
   ]),
 });
 
@@ -974,7 +1414,19 @@ const definition: RegistryDefinition = Object.freeze({
     skillCheckCommand,
     skillListCommand,
   ]),
-  skills: Object.freeze([projectInspectionSkill]),
+  skills: Object.freeze([
+    assetLifecycleSkill,
+    buildExportReadinessSkill,
+    engineChangeSafetySkill,
+    evidenceSupportReviewSkill,
+    featureContractPlanningSkill,
+    gameplayVerticalSliceSkill,
+    performanceBudgetReviewSkill,
+    deterministicPlaytestSkill,
+    projectInspectionSkill,
+    saveLoadIntegritySkill,
+    gameUiQaSkill,
+  ]),
   roleLenses: Object.freeze([]),
   workflows: Object.freeze([
     godotHeadlessPreflightWorkflow,

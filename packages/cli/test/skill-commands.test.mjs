@@ -47,19 +47,22 @@ test("skill list exposes a bounded registry catalog without artifact bodies or w
 
   assert.equal(report.commandId, "skill.list");
   assert.equal(report.status, "ready");
-  assert.equal(report.entries.length, 1);
-  assert.equal(report.entries[0].id, "project.inspection");
-  assert.equal(report.entries[0].artifactPath, "skills/project-inspection/SKILL.md");
+  assert.equal(report.entries.length, 11);
+  const projectInspection = report.entries.find(
+    ({ id }) => id === "project.inspection",
+  );
+  assert.notEqual(projectInspection, undefined);
+  assert.equal(projectInspection.artifactPath, "skills/project-inspection/SKILL.md");
   assert.equal(
-    report.entries[0].targetPath,
+    projectInspection.targetPath,
     ".agents/skills/project-inspection/SKILL.md",
   );
-  assert.equal("content" in report.entries[0], false);
-  assert.equal("sourcePath" in report.entries[0], false);
+  assert.equal("content" in projectInspection, false);
+  assert.equal("sourcePath" in projectInspection, false);
   assert.match(report.catalogDigest, /^sha256:[0-9a-f]{64}$/u);
   assert.deepEqual(report.summary, {
-    registered: 1,
-    modelInvoked: 1,
+    registered: 11,
+    modelInvoked: 11,
     userInvoked: 0,
   });
   assert.equal(report.materializationAvailable, false);
@@ -74,8 +77,11 @@ test("skill check distinguishes missing, current, content conflict, and byte ove
 
   const missing = await runSkillCheck(request(project));
   assert.equal(missing.status, "attention");
-  assert.equal(missing.checks[0].targetStatus, "missing");
-  assert.equal(missing.checks[0].code, "skill-target-missing");
+  const missingProjectInspection = missing.checks.find(
+    ({ id }) => id === "project.inspection",
+  );
+  assert.equal(missingProjectInspection?.targetStatus, "missing");
+  assert.equal(missingProjectInspection?.code, "skill-target-missing");
 
   const directory = join(project, ".agents", "skills", "project-inspection");
   const target = join(directory, "SKILL.md");
@@ -83,24 +89,39 @@ test("skill check distinguishes missing, current, content conflict, and byte ove
   await writeFile(target, skillContent);
 
   const current = await runSkillCheck(request(project));
-  assert.equal(current.status, "ready");
-  assert.equal(current.checks[0].targetStatus, "current");
-  assert.equal(current.checks[0].actualDigest, current.checks[0].artifactDigest);
+  assert.equal(current.status, "attention");
+  const currentProjectInspection = current.checks.find(
+    ({ id }) => id === "project.inspection",
+  );
+  assert.equal(currentProjectInspection?.targetStatus, "current");
+  assert.equal(
+    currentProjectInspection?.actualDigest,
+    currentProjectInspection?.artifactDigest,
+  );
 
   await appendFile(target, "User change.\n");
   const conflict = await runSkillCheck(request(project));
   assert.equal(conflict.status, "blocked");
-  assert.equal(conflict.checks[0].targetStatus, "conflict");
-  assert.equal(conflict.checks[0].code, "skill-target-content-conflict");
+  const conflictingProjectInspection = conflict.checks.find(
+    ({ id }) => id === "project.inspection",
+  );
+  assert.equal(conflictingProjectInspection?.targetStatus, "conflict");
+  assert.equal(
+    conflictingProjectInspection?.code,
+    "skill-target-content-conflict",
+  );
 
   await writeFile(target, Buffer.alloc(65_537));
   const oversized = await runSkillCheck(request(project));
   assert.equal(oversized.status, "blocked");
+  const oversizedProjectInspection = oversized.checks.find(
+    ({ id }) => id === "project.inspection",
+  );
   assert.equal(
-    oversized.checks[0].code,
+    oversizedProjectInspection?.code,
     "skill-target-byte-budget-exceeded",
   );
-  assert.equal(oversized.checks[0].actualDigest, undefined);
+  assert.equal(oversizedProjectInspection?.actualDigest, undefined);
   assert.equal(oversized.materializationPerformed, false);
   assert.equal(oversized.mutationPerformed, false);
 });

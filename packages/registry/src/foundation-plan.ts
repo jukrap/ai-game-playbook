@@ -4,7 +4,10 @@ import {
   type Sha256Digest,
 } from "@ai-game-playbook/contracts";
 
-import { BUILTIN_REGISTRY } from "./builtin-registry.js";
+import {
+  BUILTIN_REGISTRY,
+  BUILTIN_REGISTRY_SURFACES,
+} from "./builtin-registry.js";
 
 export interface PlannedCommandSurface {
   readonly id: string;
@@ -17,7 +20,7 @@ export interface PlannedCommandSurface {
 export interface PlannedSkillSurface {
   readonly id: string;
   readonly capability: string;
-  readonly availability: "planned";
+  readonly availability: "available" | "planned";
   readonly mode: "general" | "planning-check";
   readonly engine?: "godot" | "unity" | "unreal";
 }
@@ -37,9 +40,16 @@ export interface FoundationPlanData {
 const availableCommandIds: ReadonlySet<string> = new Set(
   BUILTIN_REGISTRY.commands.map(({ id }) => id),
 );
+const availableSkillIds: ReadonlySet<string> = new Set(
+  BUILTIN_REGISTRY_SURFACES.skills.data.routes.map(({ id }) => id),
+);
 
 function commandAvailability(id: string): "available" | "planned" {
   return availableCommandIds.has(id) ? "available" : "planned";
+}
+
+function skillAvailability(id: string): "available" | "planned" {
+  return availableSkillIds.has(id) ? "available" : "planned";
 }
 
 export interface FoundationPlanArtifact {
@@ -206,61 +216,67 @@ const skills: readonly PlannedSkillSurface[] = [
   {
     id: "project.inspection",
     capability: "project.inspect",
-    availability: "planned",
+    availability: skillAvailability("project.inspection"),
     mode: "general",
   },
   {
-    id: "feature.contracting",
+    id: "feature.contract-planning",
     capability: "feature.contract",
-    availability: "planned",
+    availability: skillAvailability("feature.contract-planning"),
     mode: "general",
   },
   {
     id: "gameplay.vertical-slice",
     capability: "gameplay.vertical-slice",
-    availability: "planned",
+    availability: skillAvailability("gameplay.vertical-slice"),
     mode: "general",
   },
   {
     id: "save-load.integrity",
     capability: "gameplay.save-load",
-    availability: "planned",
+    availability: skillAvailability("save-load.integrity"),
     mode: "general",
   },
   {
-    id: "ui.hud-qa",
-    capability: "ui.hud-qa",
-    availability: "planned",
+    id: "ui.game-qa",
+    capability: "ui.qa",
+    availability: skillAvailability("ui.game-qa"),
     mode: "general",
   },
   {
     id: "playtest.deterministic",
     capability: "playtest.deterministic",
-    availability: "planned",
+    availability: skillAvailability("playtest.deterministic"),
     mode: "general",
   },
   {
     id: "evidence.support-review",
     capability: "evidence.review",
-    availability: "planned",
+    availability: skillAvailability("evidence.support-review"),
     mode: "general",
   },
   {
     id: "performance.budget-review",
     capability: "performance.review",
-    availability: "planned",
+    availability: skillAvailability("performance.budget-review"),
     mode: "general",
   },
   {
-    id: "asset.intake-promotion",
+    id: "asset.lifecycle",
     capability: "asset.provenance",
-    availability: "planned",
+    availability: skillAvailability("asset.lifecycle"),
     mode: "general",
   },
   {
     id: "build.export-readiness",
     capability: "build.export",
-    availability: "planned",
+    availability: skillAvailability("build.export-readiness"),
+    mode: "general",
+  },
+  {
+    id: "engine.change-safety",
+    capability: "engine.change-safety",
+    availability: skillAvailability("engine.change-safety"),
     mode: "general",
   },
   {

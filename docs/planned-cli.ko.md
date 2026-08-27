@@ -1,6 +1,6 @@
 ---
 source: docs/planned-cli.md
-source_sha256: 1d257be9cabc81814b58273ef6c607d5715b432b0fa49b64ca1b9f1d703ef3be
+source_sha256: 3e6cc2fed4b02b401dcea3ba61403ebd9274bbaa8b6c7633617a2d5c1c61cbd7
 translated_at: 2026-08-27
 ---
 
@@ -35,7 +35,7 @@ agpb evidence export
 agpb docs check
 ```
 
-[planned-surface.json](planned-surface.json)과 생성된 [foundation plan](../generated/foundation-plan.json)에서 available로 표시된 것은 `agpb init`, `agpb doctor`, `agpb project inspect`, `agpb pack list`, `agpb pack doctor`, `agpb skill list`, `agpb skill check`, `agpb engine status`, `agpb engine capabilities`입니다. 나머지 entry는 모두 planned입니다. Slash-command interface는 약속하지 않습니다.
+[planned-surface.json](planned-surface.json)과 생성된 [foundation plan](../generated/foundation-plan.json)에서 available command entry로 표시된 것은 `agpb init`, `agpb doctor`, `agpb project inspect`, `agpb pack list`, `agpb pack doctor`, `agpb skill list`, `agpb skill check`, `agpb engine status`, `agpb engine capabilities`입니다. 나머지 command entry는 모두 planned이며 skill availability는 foundation plan에서 별도로 보고합니다. Slash-command interface는 약속하지 않습니다.
 
 ## 현재 사용 가능
 
@@ -129,4 +129,4 @@ Human/JSON mode는 같은 report status와 exit mapping을 사용합니다. `ini
 
 ## 공통 명령 계약
 
-모든 구현 command는 input/output schema, capability, permission, side effect, execution lane, timeout, cancellation, retry mode, budget, evidence requirement, handler digest를 선언해야 합니다. 현재 아홉 command의 handler metadata는 각 compiled module을 attest하며 CI가 digest drift를 거부합니다. 현재 source-built MCP runtime은 pack inspection과 project-only Godot tool 두 개를 포함해 explicitly enabled read-only tool에 같은 command/schema identity를 유지하지만 CLI setup command나 installer는 아닙니다. Registry는 bounded project-inspection skill 하나를 `project.inspect`와, Godot observation이 적격할 때만 `engine.capabilities`로 route합니다. Shared skill runtime을 통해 CLI, MCP, Codex adapter가 이를 materialize하지 않고 deterministic project target을 list/inspect합니다. Mutating skill/host runtime도 같은 identity를 유지해야 하며 generated metadata만으로 해당 capability가 존재하는 것은 아닙니다.
+모든 구현 command는 input/output schema, capability, permission, side effect, execution lane, timeout, cancellation, retry mode, budget, evidence requirement, handler digest를 선언해야 합니다. 현재 아홉 command의 handler metadata는 각 compiled module을 attest하며 CI가 digest drift를 거부합니다. 현재 source-built MCP runtime은 pack inspection과 project-only Godot tool 두 개를 포함해 explicitly enabled read-only tool에 같은 command/schema identity를 유지하지만 CLI setup command나 installer는 아닙니다. Registry는 bounded capability-first skill 열한 개를 route하며 `project.inspection`만 `project.inspect`와, Godot observation이 적격할 때만 `engine.capabilities`로 route합니다. Shared skill runtime을 통해 CLI, MCP, Codex adapter가 열한 deterministic project target을 materialize하지 않고 list/inspect합니다. Task-routing contract는 한 번의 선택을 계속 skill 1~5개로 제한합니다. Mutating skill/host runtime도 같은 identity를 유지해야 하며 generated metadata만으로 해당 capability가 존재하는 것은 아닙니다.

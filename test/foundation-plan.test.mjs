@@ -23,7 +23,7 @@ test("foundation plan separates available and planned command surfaces", () => {
   assert.equal(artifact.data.package.npm, "ai-game-playbook");
   assert.equal(artifact.data.package.executable, "agpb");
   assert.equal(artifact.data.commands.length, 20);
-  assert.equal(artifact.data.skills.length, 13);
+  assert.equal(artifact.data.skills.length, 14);
 
   assert.equal(
     new Set(artifact.data.commands.map(({ id }) => id)).size,
@@ -52,8 +52,27 @@ test("foundation plan separates available and planned command surfaces", () => {
   for (const skill of artifact.data.skills) {
     assert.equal(contracts.isStableId(skill.id), true);
     assert.equal(contracts.isStableId(skill.capability), true);
-    assert.equal(skill.availability, "planned");
+    assert.equal(["available", "planned"].includes(skill.availability), true);
     assert.equal(Object.hasOwn(skill, "body"), false);
+  }
+  assert.deepEqual(
+    artifact.data.skills
+      .filter(({ availability }) => availability === "available")
+      .map(({ id }) => id)
+      .sort(),
+    registry.BUILTIN_REGISTRY_SURFACES.skills.data.routes
+      .map(({ id }) => id)
+      .sort(),
+  );
+  for (const skill of artifact.data.skills.filter(
+    ({ availability }) => availability === "available",
+  )) {
+    assert.equal(
+      registry.BUILTIN_REGISTRY.skills
+        .find(({ id }) => id === skill.id)
+        ?.capabilities.includes(skill.capability),
+      true,
+    );
   }
 
   const engineSkills = artifact.data.skills.filter(({ engine }) =>

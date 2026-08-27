@@ -6,7 +6,7 @@
 
 ## Current checkpoint
 
-Completed foundations include versioned contracts, strict registry validation, generated surfaces, deterministic workflow plans, canonical project/path handling, compare-and-swap filesystem operations, bounded processes, project mutation leases, signed scoped permission admission including explicit host-tool inspection, workflow checkpoints, durable private receipt records, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions with recovery boundaries, a project-bound read-only STDIO MCP runtime, one registry-derived project-inspection skill artifact with a shared read-only runtime, and write-free Codex project-configuration and skill-target planning.
+Completed foundations include versioned contracts, strict registry validation, generated surfaces, deterministic workflow plans, canonical project/path handling, compare-and-swap filesystem operations, bounded processes, project mutation leases, signed scoped permission admission including explicit host-tool inspection, workflow checkpoints, durable private receipt records, bounded private receipt-head queries, pure process/test result normalization, limited retained-artifact assessment, managed-pack transactions with recovery boundaries, a project-bound read-only STDIO MCP runtime, eleven registry-derived capability-first skill artifacts with a shared read-only runtime, and write-free Codex project-configuration and skill-target planning.
 
 The current Stage 2 product slice adds:
 
@@ -28,7 +28,7 @@ The current Stage 2 product slice adds:
 - private fail-closed normalization of bounded process and structured test-report observations into immutable component outcomes;
 - private fail-closed assessment of retained UTF-8, canonical JSON, non-interlaced PNG, and optional current-registry asset-provenance evidence;
 - private modern STDIO exposure of explicitly enabled generated read-only tools with exact project and schema binding;
-- private deterministic Codex project-configuration and project-inspection skill-target planning plus create/retain/conflict inspection without apply or skill materialization;
+- private deterministic Codex project-configuration and eleven capability-first skill-target plans plus create/retain/conflict inspection without apply or skill materialization;
 - compiled-handler digest attestation; and
 - generated/public availability parity.
 
@@ -47,7 +47,7 @@ No command may be marked available merely because a private library function exi
 
 ## Stage 3 — evidence, MCP, and Codex integration
 
-The process/test normalization, limited artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, one registry-derived project-inspection skill artifact, public read-only pack list/doctor and skill list/check commands, static Godot status/capability commands, private Godot executable discovery and exact-version probing, and plan-only Codex project-configuration and skill-target foundations are implemented. Broader engine process/report parsers, required-test selection, gameplay/capture/performance/build normalizers, broader artifact formats, runtime-frame provenance, assessment persistence, and runtime-to-receipt integration remain planned. Other planned work includes filtered and persistent evidence indexing, receipt-history migration and forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export commands, approved Codex configuration and skill materialization, and an approved mutating skill lifecycle.
+The process/test normalization, limited artifact assessment, bounded private receipt-head discovery, explicit read-only STDIO MCP runtime, eleven registry-derived capability-first skill artifacts, public read-only pack list/doctor and skill list/check commands, static Godot status/capability commands, private Godot executable discovery and exact-version probing, and plan-only Codex project-configuration and skill-target foundations are implemented. Broader engine process/report parsers, required-test selection, gameplay/capture/performance/build normalizers, broader artifact formats, runtime-frame provenance, assessment persistence, and runtime-to-receipt integration remain planned. Other planned work includes filtered and persistent evidence indexing, receipt-history migration and forensic access, checkpoint/handoff reconciliation, reachable-head retention cleanup, explicit evidence list/show/export commands, approved Codex configuration and skill materialization, and an approved mutating skill lifecycle.
 
 CLI, MCP, documentation, and skill routing must preserve identical command IDs, schema digests, permissions, and handler identities. MCP annotations remain hints and can never override the permission broker. No background upload or telemetry path is planned.
 

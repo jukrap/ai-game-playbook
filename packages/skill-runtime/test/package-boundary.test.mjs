@@ -32,24 +32,38 @@ test("the skill runtime is private and keeps a one-way workspace boundary", asyn
   );
 });
 
-test("the packaged skill bytes match the only generated registry route", async () => {
+test("the packaged skill bytes match every generated registry route", async () => {
   const routes = BUILTIN_REGISTRY_SURFACES.skills.data.routes;
-  assert.equal(routes.length, 1);
-  const [route] = routes;
-  const content = await readFile(
-    new URL("../skills/project-inspection/SKILL.md", import.meta.url),
-    "utf8",
+  assert.deepEqual(
+    routes.map(({ id }) => id),
+    [
+      "asset.lifecycle",
+      "build.export-readiness",
+      "engine.change-safety",
+      "evidence.support-review",
+      "feature.contract-planning",
+      "gameplay.vertical-slice",
+      "performance.budget-review",
+      "playtest.deterministic",
+      "project.inspection",
+      "save-load.integrity",
+      "ui.game-qa",
+    ],
   );
-  const digest = `sha256:${createHash("sha256").update(content).digest("hex")}`;
+  for (const route of routes) {
+    const name = route.body.path.split("/")[1];
+    const content = await readFile(
+      new URL(`../${route.body.path}`, import.meta.url),
+      "utf8",
+    );
+    const digest = `sha256:${createHash("sha256").update(content).digest("hex")}`;
 
-  assert.equal(route.id, "project.inspection");
-  assert.equal(route.body.path, "skills/project-inspection/SKILL.md");
-  assert.equal(route.body.digest, digest);
-  assert.match(
-    content,
-    /^---\nname: project-inspection\ndescription: Use when [^\n]+\n---\n/u,
-  );
-  assert.match(content, /engine\.capabilities/u);
-  assert.equal(content.includes("\r"), false);
-  assert.equal(content.endsWith("\n"), true);
+    assert.equal(route.body.digest, digest);
+    assert.match(
+      content,
+      new RegExp(`^---\\nname: ${name}\\ndescription: Use when [^\\n]+\\n---\\n`, "u"),
+    );
+    assert.equal(content.includes("\r"), false);
+    assert.equal(content.endsWith("\n"), true);
+  }
 });

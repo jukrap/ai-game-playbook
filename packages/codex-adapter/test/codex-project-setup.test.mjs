@@ -96,8 +96,11 @@ test("setup planning emits one deterministic local-only config without writing",
     plan.target.content,
     /enabled_tools = \["agpb_doctor", "agpb_engine__capabilities", "agpb_project__inspect"\]/u,
   );
-  assert.equal(plan.skillTargets.length, 1);
-  const skillTarget = plan.skillTargets[0];
+  assert.equal(plan.skillTargets.length, 11);
+  const skillTarget = plan.skillTargets.find(
+    ({ id }) => id === "project.inspection",
+  );
+  assert.notEqual(skillTarget, undefined);
   assert.equal(skillTarget.id, "project.inspection");
   assert.equal(skillTarget.name, "project-inspection");
   assert.equal(
@@ -230,13 +233,18 @@ test("inspection distinguishes create, retain, and conflict without mutation", a
 test("skill targets are planned and inspected without mutation", async (t) => {
   const { project } = await fixture(t);
   const plan = await createPlan(project);
-  const [skillPlan] = plan.skillTargets;
+  const skillPlan = plan.skillTargets.find(
+    ({ id }) => id === "project.inspection",
+  );
+  assert.notEqual(skillPlan, undefined);
 
   const missing = await inspectCodexProjectSetup(plan);
-  assert.equal(missing.skillTargets.length, 1);
-  assert.equal(missing.skillTargets[0].id, "project.inspection");
-  assert.equal(missing.skillTargets[0].action, "create");
-  assert.equal(missing.skillTargets[0].code, "target-missing");
+  assert.equal(missing.skillTargets.length, 11);
+  const missingSkill = missing.skillTargets.find(
+    ({ id }) => id === "project.inspection",
+  );
+  assert.equal(missingSkill?.action, "create");
+  assert.equal(missingSkill?.code, "target-missing");
   assert.deepEqual(await readdir(project), []);
 
   const skillDirectory = join(
@@ -250,28 +258,37 @@ test("skill targets are planned and inspected without mutation", async (t) => {
   await writeFile(skillPath, skillPlan.content);
 
   const current = await inspectCodexProjectSetup(plan);
-  assert.equal(current.skillTargets[0].action, "retain");
-  assert.equal(current.skillTargets[0].code, "target-current");
+  const currentSkill = current.skillTargets.find(
+    ({ id }) => id === "project.inspection",
+  );
+  assert.equal(currentSkill?.action, "retain");
+  assert.equal(currentSkill?.code, "target-current");
   assert.equal(
-    current.skillTargets[0].actualDigest,
+    currentSkill?.actualDigest,
     skillPlan.sourceDigest,
   );
 
   await appendFile(skillPath, "\nUser change.\n");
   const conflict = await inspectCodexProjectSetup(plan);
-  assert.equal(conflict.skillTargets[0].action, "conflict");
-  assert.equal(conflict.skillTargets[0].code, "target-content-conflict");
+  const conflictingSkill = conflict.skillTargets.find(
+    ({ id }) => id === "project.inspection",
+  );
+  assert.equal(conflictingSkill?.action, "conflict");
+  assert.equal(conflictingSkill?.code, "target-content-conflict");
   assert.notEqual(
-    conflict.skillTargets[0].actualDigest,
+    conflictingSkill?.actualDigest,
     skillPlan.sourceDigest,
   );
   assert.equal(conflict.mutationPerformed, false);
 
   await writeFile(skillPath, Buffer.alloc(skillPlan.maxBytes + 1));
   const oversized = await inspectCodexProjectSetup(plan);
-  assert.equal(oversized.skillTargets[0].action, "conflict");
-  assert.equal(oversized.skillTargets[0].code, "target-byte-budget-exceeded");
-  assert.equal(oversized.skillTargets[0].actualDigest, undefined);
+  const oversizedSkill = oversized.skillTargets.find(
+    ({ id }) => id === "project.inspection",
+  );
+  assert.equal(oversizedSkill?.action, "conflict");
+  assert.equal(oversizedSkill?.code, "target-byte-budget-exceeded");
+  assert.equal(oversizedSkill?.actualDigest, undefined);
 });
 
 test("unsafe config parents and case aliases fail closed", async (t) => {

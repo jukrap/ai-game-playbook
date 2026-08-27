@@ -1,12 +1,12 @@
 ---
 source: README.md
-source_sha256: 4d6c0f9b72ff8f7f90a16b5f0598ea093b0ceb9e3b76dfc268ec99ef9b2c3408
+source_sha256: 1289b5b57a09b3b401ba469697b40316801161db4851a4064bbbae65af4f6457
 translated_at: 2026-08-27
 ---
 
 # AI Game Playbook
 
-> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction, durable private receipt와 artifact byte, bounded private receipt-head query, 제한된 private artifact assessment, closed-world process-containment assessment와 provider/self-test protocol, bounded pack inspection을 포함한 소스 빌드 방식의 실험적 write-free command 아홉 개, static Godot status/capability adapter, private permission-bound Godot executable discovery와 version probe, fail-closed Godot headless-preflight admission, project-bound modern STDIO MCP runtime, registry-derived project-inspection skill artifact 하나, write-free Codex setup planner를 구현하고 있습니다. 설치 가능한 package와 live engine bridge는 아직 없습니다.
+> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction, durable private receipt와 artifact byte, bounded private receipt-head query, 제한된 private artifact assessment, closed-world process-containment assessment와 provider/self-test protocol, bounded pack inspection을 포함한 소스 빌드 방식의 실험적 write-free command 아홉 개, static Godot status/capability adapter, private permission-bound Godot executable discovery와 version probe, fail-closed Godot headless-preflight admission, project-bound modern STDIO MCP runtime, registry-derived capability-first skill artifact 열한 개, write-free Codex setup planner를 구현하고 있습니다. 설치 가능한 package와 live engine bridge는 아직 없습니다.
 
 [English](README.md)
 
@@ -25,7 +25,7 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine을 사용하는 개인과 
 - 원본 version report, exact project/executable identity, 유한한 registered workflow 하나, 고정 startup argument, core가 만든 containment witness, 세 번째 signed approval을 bind하는 internal-only Godot headless-preflight admission. Closed provider catalog에는 현재 validated provider가 없으므로 assessment는 `block`만 반환합니다. Adapter는 그 digest를 authorization, report, receipt evidence에 bind하고 engine process를 시작하지 않으며 lease를 명확한 실패로 정산하고 support를 `planned`로 유지합니다.
 - 실험적 private CLI package와 repository-local `agpb` entry point. 구현된 명령은 plan-only `agpb init`, read-only `agpb doctor`, `agpb project inspect`, `agpb pack list`, `agpb pack doctor`, `agpb skill list`, `agpb skill check`, static read-only `agpb engine status --engine godot`와 `agpb engine capabilities --engine godot`입니다.
 - 명시적으로 enable한 registry-generated read-only tool만 modern STDIO로 노출하는 실험적 private MCP package. Project identity 하나를 bind하고 exact input/output schema와 transport/result byte limit을 강제하며 network access나 project mutation을 수행하지 않습니다.
-- Deterministic project-inspection skill artifact 하나를 generated registry에 bind하고 적격한 static Godot capability report로 route하며 project target을 inspect하고 machine-specific local-only MCP configuration 하나를 render/inspect하는 private skill runtime과 Codex adapter. 어느 target도 write하거나 merge하지 않고 project skill을 materialize하지 않습니다.
+- Asset lifecycle, build/export readiness, engine change safety, evidence support review, feature-contract planning, gameplay vertical slice, performance budget review, deterministic playtest, project inspection, save/load integrity, game UI QA로 구성된 deterministic capability-first skill artifact 열한 개를 generated registry에 bind하는 private skill runtime과 Codex adapter. 열한 project target을 inspect하고 project inspection에서만 적격한 static Godot capability report로 route하며 machine-specific local-only MCP configuration 하나를 render/inspect합니다. 이러한 target을 write하거나 merge하지 않고 project skill을 materialize하지 않습니다.
 - Bounded pack inspection과 두 static Godot engine command를 available로 표시하되 pack mutation, mutating skill command와 모든 live-engine capability 및 support grade를 planned로 유지하는 digest 결합 공개 surface.
 - 영어 공개 문서와 한국어 mirror, Windows/Linux conformance check.
 

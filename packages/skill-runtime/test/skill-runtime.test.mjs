@@ -29,7 +29,7 @@ async function fixture(t) {
   return { project, sandbox };
 }
 
-test("project skill plans bind one packaged registry artifact without writes", async (t) => {
+test("project skill plans bind the capability-first packaged catalog without writes", async (t) => {
   const { project } = await fixture(t);
   const before = await readdir(project);
 
@@ -42,26 +42,46 @@ test("project skill plans bind one packaged registry artifact without writes", a
   assert.match(plan.planDigest, /^sha256:[0-9a-f]{64}$/u);
   assert.equal(plan.project.canonicalPath, await realpath(project));
   assert.match(plan.project.identityDigest, /^sha256:[0-9a-f]{64}$/u);
-  assert.equal(plan.catalog.length, 1);
-  assert.equal(plan.catalog[0].id, "project.inspection");
-  assert.equal(plan.catalog[0].name, "project-inspection");
-  assert.deepEqual(plan.catalog[0].capabilities, [
+  assert.deepEqual(
+    plan.catalog.map(({ id }) => id),
+    [
+      "asset.lifecycle",
+      "build.export-readiness",
+      "engine.change-safety",
+      "evidence.support-review",
+      "feature.contract-planning",
+      "gameplay.vertical-slice",
+      "performance.budget-review",
+      "playtest.deterministic",
+      "project.inspection",
+      "save-load.integrity",
+      "ui.game-qa",
+    ],
+  );
+  const projectInspection = plan.catalog.find(
+    ({ id }) => id === "project.inspection",
+  );
+  assert.notEqual(projectInspection, undefined);
+  assert.equal(projectInspection.name, "project-inspection");
+  assert.deepEqual(projectInspection.capabilities, [
     "engine.capabilities",
     "project.inspect",
   ]);
   assert.equal(
-    plan.catalog[0].targetPath,
+    projectInspection.targetPath,
     ".agents/skills/project-inspection/SKILL.md",
   );
-  assert.equal(plan.targets.length, 1);
-  assert.equal(plan.targets[0].id, plan.catalog[0].id);
-  assert.equal(plan.targets[0].artifactDigest, plan.catalog[0].artifactDigest);
-  assert.equal(plan.targets[0].content.startsWith("---\nname: project-inspection\n"), true);
-  assert.equal(plan.targets[0].content.includes("\r"), false);
-  assert.equal(plan.targets[0].content.endsWith("\n"), true);
-  assert.match(plan.targets[0].content, /engine\.capabilities/u);
-  assert.equal(plan.targets[0].maxBytes, 65_536);
-  assert.equal(plan.targets[0].materialization, "plan-only");
+  assert.equal(plan.targets.length, plan.catalog.length);
+  for (const target of plan.targets) {
+    const entry = plan.catalog.find(({ id }) => id === target.id);
+    assert.notEqual(entry, undefined);
+    assert.equal(target.artifactDigest, entry.artifactDigest);
+    assert.equal(target.content.startsWith(`---\nname: ${target.name}\n`), true);
+    assert.equal(target.content.includes("\r"), false);
+    assert.equal(target.content.endsWith("\n"), true);
+    assert.equal(target.maxBytes, 65_536);
+    assert.equal(target.materialization, "plan-only");
+  }
   assert.equal(plan.mutationPerformed, false);
   assert.doesNotThrow(() => assertProjectSkillPlan(plan));
   assert.throws(

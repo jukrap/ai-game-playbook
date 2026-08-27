@@ -251,6 +251,14 @@ export const validFoundationProtocolFixtures = {
     mode: "dynamic-main-scene",
     frameBudget: 2,
     invocationDigest: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+    containment: {
+      assessmentDigest: digest,
+      requestDigest: secondDigest,
+      policyDigest: PROCESS_CONTAINMENT_POLICY_DIGEST,
+      providerCatalogDigest: digest,
+      decision: "block",
+      evidenceGrade: "implemented",
+    },
     requirements: {
       filesystem: "deny-project-writes",
       network: "deny",
@@ -283,6 +291,14 @@ export const validFoundationProtocolFixtures = {
     mode: "dynamic-main-scene",
     frameBudget: 2,
     invocationDigest: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+    containment: {
+      assessmentDigest: digest,
+      requestDigest: secondDigest,
+      policyDigest: PROCESS_CONTAINMENT_POLICY_DIGEST,
+      providerCatalogDigest: digest,
+      decision: "block",
+      evidenceGrade: "implemented",
+    },
     status: "blocked",
     code: "godot-headless-containment-unavailable",
     blockers: [

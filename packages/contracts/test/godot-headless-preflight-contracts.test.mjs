@@ -5,6 +5,23 @@ import * as contracts from "../dist/index.js";
 
 const digest = (character) => `sha256:${character.repeat(64)}`;
 
+function containment(projectRootIdentityDigest = digest("b")) {
+  return {
+    assessmentDigest: digest("6"),
+    requestDigest: contracts.computeProcessContainmentRequestDigest({
+      schemaVersion: "1.0.0",
+      workload: "engine-project-process",
+      projectRootIdentityDigest,
+      policyDigest: contracts.PROCESS_CONTAINMENT_POLICY_DIGEST,
+      requirements: contracts.PROCESS_CONTAINMENT_REQUIREMENTS,
+    }),
+    policyDigest: contracts.PROCESS_CONTAINMENT_POLICY_DIGEST,
+    providerCatalogDigest: digest("8"),
+    decision: "block",
+    evidenceGrade: "implemented",
+  };
+}
+
 function report() {
   const value = {
     schemaVersion: "1.0.0",
@@ -32,6 +49,7 @@ function report() {
     mode: "dynamic-main-scene",
     frameBudget: 2,
     invocationDigest: contracts.GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+    containment: containment(),
     status: "blocked",
     code: "godot-headless-containment-unavailable",
     blockers: [
@@ -104,6 +122,7 @@ test("Godot headless preflight contracts retain a fail-closed blocked admission"
     contracts.assertGodotHeadlessPreflightReportSemantics(value),
   );
   assert.equal(value.execution.processStarted, false);
+  assert.equal(value.containment.decision, "block");
   assert.equal("projectRoot" in value, false);
   assert.equal("arguments" in value, false);
   assert.equal("stdout" in value, false);
@@ -120,6 +139,17 @@ test("Godot headless preflight semantics reject false execution and support clai
     {
       ...value,
       preconditions: { ...value.preconditions, containment: "passed" },
+    },
+    {
+      ...value,
+      containment: { ...value.containment, decision: "allow" },
+    },
+    {
+      ...value,
+      containment: {
+        ...value.containment,
+        policyDigest: digest("9"),
+      },
     },
     {
       ...value,
@@ -149,5 +179,33 @@ test("Godot headless preflight semantics reject malformed nested evidence determ
       name: "TypeError",
       message: "Godot headless preflight blockers are contradictory",
     },
+  );
+});
+
+test("Godot headless preflight containment request digest cannot be rebound", () => {
+  const value = report();
+  const changed = {
+    ...value,
+    containment: {
+      ...value.containment,
+      requestDigest: digest("9"),
+    },
+  };
+  const {
+    schemaVersion: _,
+    commandId: __,
+    preflightDigest: ___,
+    ...digestInput
+  } = changed;
+  assert.throws(
+    () => {
+      const reattested = {
+        ...changed,
+        preflightDigest:
+          contracts.computeGodotHeadlessPreflightDigest(digestInput),
+      };
+      contracts.assertGodotHeadlessPreflightReportSemantics(reattested);
+    },
+    TypeError,
   );
 });

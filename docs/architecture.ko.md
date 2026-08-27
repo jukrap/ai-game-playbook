@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: 1aebdd683a537d91675b1cc4f0f3f83ba8ced95a1ccdd746578a203a60a655ee
+source_sha256: e8e0740923ef16fafe8c09c8376096525ea9cc7b769dd2a537d17b09da1bf1dd
 translated_at: 2026-08-27
 ---
 
 # 목표 아키텍처
 
-> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, core 안전 primitive, durable private receipt record와 artifact object, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, managed-pack transaction, static Godot status를 포함한 write-free `agpb` command 여섯 개, private permission-bound Godot executable discovery와 version probe, blocked receipt를 보존하는 fail-closed Godot headless-preflight admission, project-bound read-only STDIO MCP runtime, registry-derived project-inspection skill artifact, write-free Codex setup planner가 존재합니다. General mutation dispatch, evidence export, 실제 host installation, live engine, bridge는 계획 단계입니다.
+> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, closed-world process-containment assessment를 포함한 core 안전 primitive, durable private receipt record와 artifact object, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, managed-pack transaction, static Godot status를 포함한 write-free `agpb` command 여섯 개, private permission-bound Godot executable discovery와 version probe, assessment에 결합된 blocked receipt를 보존하는 fail-closed Godot headless-preflight admission, project-bound read-only STDIO MCP runtime, registry-derived project-inspection skill artifact, write-free Codex setup planner가 존재합니다. General mutation dispatch, evidence export, 실제 host installation, live engine, bridge는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -33,9 +33,9 @@ Typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 
 | 경계 | 상태 | 책임 |
 | --- | --- | --- |
-| `contracts` | 기반 구현 | Versioned schema, canonical data, identifier, approval, workflow, engine, evidence, init-plan, doctor, project-inspection, static engine-status, Godot executable-discovery, version-probe, fail-closed headless-preflight protocol |
+| `contracts` | 기반 구현 | Versioned schema, canonical data, identifier, approval, workflow, engine, evidence, process-containment assessment, init-plan, doctor, project-inspection, static engine-status, Godot executable-discovery, version-probe, fail-closed headless-preflight protocol |
 | `registry` | 기반 구현 | Descriptor validation, generation, digest, routing, workflow-plan resolution, exact implemented-command inventory |
-| `core` | 일부 구현 | Canonical project identity, safe path, compare-and-swap filesystem operation, bounded process, mutation lease, in-memory permission admission, workflow state, durable checkpoint, append-only run receipt, bounded receipt-head query, private artifact promotion |
+| `core` | 일부 구현 | Canonical project identity, safe path, compare-and-swap filesystem operation, bounded process, 빈 closed provider catalog와 fail-closed containment assessment/same-process witness, mutation lease, in-memory permission admission, workflow state, durable checkpoint, append-only run receipt, bounded receipt-head query, private artifact promotion |
 | `pack-runtime` | 일부 구현 | Write-free preflight, exact ownership, local lifecycle transaction, journal, active barrier, rollback, directory ownership, recovery inspection, approved stable-state finalization |
 | `skill-runtime` | Private 기반 일부 구현 | Registry-bound packaged skill catalog, bounded artifact validation, same-process project plan, write-free target inspection. Materialization은 사용할 수 없음 |
 | `cli` | 실험적 일부 구현 | Registry-derived help/version, fail-closed parsing, stable exit category, human/JSON output, plan-only `init`, read-only `doctor`, `project inspect`, `skill list`, `skill check`, static Godot `engine status` |
@@ -43,7 +43,7 @@ Typed registry는 command, skill, role lens, workflow, schema, pack descriptor�
 | `mcp` | 실험적 private runtime | Explicit generated read-only tool allowlist, exact project binding, schema parity, bounded message, canonical result를 제공하는 modern STDIO transport. Mutation/network tool은 사용할 수 없음 |
 | `codex-adapter` | Private planner 일부 구현 | Write, merge, trust 변경, skill materialization 없이 deterministic local-only project MCP configuration과 project-inspection skill target 계획 및 create/retain/conflict 검사 |
 | `engine-common` | Contract만 존재 | 공통 capability negotiation과 engine-operation contract |
-| `godot-adapter` | 실험적 private 경계 | Project-only public status, signed single-use host-tool discovery/exact-version probe, workflow-bound blocked headless-preflight receipt 보존. Contained project process, support promotion, live-engine claim은 없음 |
+| `godot-adapter` | 실험적 private 경계 | Project-only public status, signed single-use host-tool discovery/exact-version probe, workflow와 containment assessment에 결합된 blocked headless-preflight receipt 보존. Contained project process, support promotion, live-engine claim은 없음 |
 | Unity/Unreal adapter | 계획 | Broad host authority 없는 engine-specific orchestration |
 | Project bridge | 계획 | Verified operation 노출에 필요한 최소 Editor/runtime code |
 
@@ -63,7 +63,7 @@ Partial package가 존재한다고 전체 product surface가 존재하는 것은
 
 Handler digest는 public write-free command 여섯 개와 internal Godot operation 세 개를 합친 registered compiled command module 아홉 개를 attest합니다. 어느 executable artifact든 registry metadata와 drift하면 cross-package test가 실패합니다.
 
-Private Godot host-tool flow는 public status와 분리합니다. 준비 단계는 project와 bounded explicit source의 digest만 bind합니다. 그 뒤 exact candidate file을 읽기 전에 broker가 signed single-use `host-tool-inspection` grant를 요구합니다. Discovery는 recursive search나 process launch 없이 configured path와 선택한 PATH directory의 고정 direct executable name을 검사하고 lease를 정산한 뒤 source path나 execution authority가 없는 원본 same-process report를 반환합니다. Version 준비는 해당 report에서 선택한 candidate만 받고, bounded `--version` process 시작 전 executable content/identity digest에 결합된 두 번째 grant를 요구합니다. Headless-preflight 준비는 원본 completed version report만 받고 project/executable identity를 다시 검증하며 exact one-step workflow 하나를 resolve하고 고정 headless startup argument와 zero-change budget을 세 번째 grant에 bind합니다. 현재 process layer는 project write, network access, child process를 deny할 수 없으므로 executor는 Godot을 한 번도 시작하지 않고 lease를 명확한 실패로 정산하며 initialized local evidence storage에 canonical `blocked` receipt 하나를 저장합니다. Clone한 plan, report, authorization decision은 runtime 경계를 넘어 authority를 전달할 수 없습니다.
+Private Godot host-tool flow는 public status와 분리합니다. 준비 단계는 project와 bounded explicit source의 digest만 bind합니다. 그 뒤 exact candidate file을 읽기 전에 broker가 signed single-use `host-tool-inspection` grant를 요구합니다. Discovery는 recursive search나 process launch 없이 configured path와 선택한 PATH directory의 고정 direct executable name을 검사하고 lease를 정산한 뒤 source path나 execution authority가 없는 원본 same-process report를 반환합니다. Version 준비는 해당 report에서 선택한 candidate만 받고, bounded `--version` process 시작 전 executable content/identity digest에 결합된 두 번째 grant를 요구합니다. Headless-preflight 준비는 원본 completed version report만 받고 project/executable identity를 다시 검증하며 exact one-step workflow 하나를 resolve한 뒤 exact root와 deny-project-writes/network/child-process policy에 결합된 path-free assessment를 core에 요청합니다. Assessment JSON은 evidence이지 authority가 아닙니다. 원본 report/root를 same-process witness 하나로 보존하고 admission 직전에 다시 확인합니다. Request, assessment, policy, provider-catalog digest는 command input과 세 번째 grant scope에 들어갑니다. 현재 closed provider catalog가 비어 있으므로 유효한 decision은 `block`뿐입니다. Executor는 Godot을 한 번도 시작하지 않고 lease를 명확한 실패로 정산하며 같은 assessment에 결합된 canonical `blocked` receipt 하나를 initialized local evidence storage에 저장합니다. Clone한 plan, report, assessment, root, authorization decision은 runtime 경계를 넘어 authority를 전달할 수 없습니다.
 
 현재 MCP 경로도 write-free입니다. Startup에는 project root 하나, 명시적인 generated tool name 하나 이상, 선택한 project diagnostic이 active host context에 들어갈 수 있다는 acknowledgement가 필요합니다. Runtime은 canonical project identity를 bind하고 read-only closed-world tool만 등록하며 STDIO message 하나를 1 MiB로 제한하고 exact registered input/output schema를 검증한 뒤 canonical bounded result를 반환합니다. HTTP transport, network access, Editor control, mutation route는 없습니다.
 
@@ -117,7 +117,7 @@ Execution lane은 다음과 같습니다.
 
 각 adapter는 offline inspection, headless execution, Editor preview, actual play, packaged runtime evidence를 구분해야 합니다. Thin bridge는 typed bounded operation만 받습니다. Exact project/session을 인증하고 request/output size를 제한하며 outer transport와 inner operation outcome을 모두 보고하고 changed object/file, save/import state, log, evidence locator를 반환해야 합니다.
 
-Godot에는 첫 static adapter 경계, private permission-bound executable identity/version 경계, 유한한 headless-preflight admission이 생겼습니다. 공개 command는 계속 executable path를 받지 않습니다. Preflight는 required containment 때문에 dispatch를 막은 사유를 기록할 뿐 headless project 실행, Editor 제어, runtime frame, retained engine evidence를 확립하지 않습니다. Live Godot 실행과 Unity/Unreal adapter는 planned입니다. 세 엔진의 현재 support grade는 모두 `planned`입니다.
+Godot에는 첫 static adapter 경계, private permission-bound executable identity/version 경계, core가 만든 containment witness에 결합된 유한한 headless-preflight admission이 생겼습니다. 공개 command는 계속 executable path를 받지 않습니다. Typed assessment와 blocked receipt는 required containment 때문에 dispatch를 막은 사유를 기록하지만 빈 provider catalog는 sandbox가 아니며 headless project 실행, Editor 제어, runtime frame, retained engine evidence를 확립하지 않습니다. Live Godot 실행과 Unity/Unreal adapter는 planned입니다. 세 엔진의 현재 support grade는 모두 `planned`입니다.
 
 ## Degradation과 support claim
 

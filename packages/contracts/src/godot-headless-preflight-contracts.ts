@@ -25,6 +25,11 @@ import {
 import type { SemanticVersion } from "./semantic-version.js";
 import { parseSemanticVersion } from "./semantic-version.js";
 import { isStableId, type StableId } from "./stable-id.js";
+import {
+  PROCESS_CONTAINMENT_POLICY_DIGEST,
+  PROCESS_CONTAINMENT_REQUIREMENTS,
+  computeProcessContainmentRequestDigest,
+} from "./process-containment-assessment-contracts.js";
 
 export const GODOT_HEADLESS_PREFLIGHT_FRAME_BUDGET = 2 as const;
 export const GODOT_HEADLESS_PREFLIGHT_MAX_OUTPUT_BYTES: number = 1024 * 1024;
@@ -75,11 +80,21 @@ export interface GodotHeadlessPreflightCommandInput {
   readonly mode: "dynamic-main-scene";
   readonly frameBudget: typeof GODOT_HEADLESS_PREFLIGHT_FRAME_BUDGET;
   readonly invocationDigest: Sha256Digest;
+  readonly containment: GodotHeadlessPreflightContainmentBinding;
   readonly requirements: {
     readonly filesystem: "deny-project-writes";
     readonly network: "deny";
     readonly childProcesses: "deny";
   };
+}
+
+export interface GodotHeadlessPreflightContainmentBinding {
+  readonly assessmentDigest: Sha256Digest;
+  readonly requestDigest: Sha256Digest;
+  readonly policyDigest: typeof PROCESS_CONTAINMENT_POLICY_DIGEST;
+  readonly providerCatalogDigest: Sha256Digest;
+  readonly decision: "block";
+  readonly evidenceGrade: "implemented";
 }
 
 export interface GodotHeadlessPreflightAuthorization {
@@ -126,6 +141,7 @@ export interface GodotHeadlessPreflightDigestInput {
   readonly mode: "dynamic-main-scene";
   readonly frameBudget: typeof GODOT_HEADLESS_PREFLIGHT_FRAME_BUDGET;
   readonly invocationDigest: Sha256Digest;
+  readonly containment: GodotHeadlessPreflightContainmentBinding;
   readonly status: "blocked";
   readonly code: GodotHeadlessPreflightBlocker;
   readonly blockers: readonly GodotHeadlessPreflightBlocker[];
@@ -229,6 +245,42 @@ function canonicalStableIds(value: unknown, maximum: number): value is StableId[
   );
 }
 
+function validateContainmentBinding(value: unknown): void {
+  if (
+    !record(value) ||
+    !exactKeys(value, [
+      "assessmentDigest",
+      "decision",
+      "evidenceGrade",
+      "policyDigest",
+      "providerCatalogDigest",
+      "requestDigest",
+    ]) ||
+    !isSha256Digest(value["assessmentDigest"]) ||
+    !isSha256Digest(value["requestDigest"]) ||
+    value["policyDigest"] !== PROCESS_CONTAINMENT_POLICY_DIGEST ||
+    !isSha256Digest(value["providerCatalogDigest"]) ||
+    value["decision"] !== "block" ||
+    value["evidenceGrade"] !== "implemented"
+  ) {
+    throw new TypeError(
+      "Godot headless preflight containment binding is invalid",
+    );
+  }
+}
+
+function expectedContainmentRequestDigest(
+  projectRootIdentityDigest: Sha256Digest,
+): Sha256Digest {
+  return computeProcessContainmentRequestDigest({
+    schemaVersion: "1.0.0",
+    workload: "engine-project-process",
+    projectRootIdentityDigest,
+    policyDigest: PROCESS_CONTAINMENT_POLICY_DIGEST,
+    requirements: PROCESS_CONTAINMENT_REQUIREMENTS,
+  });
+}
+
 export function assertGodotHeadlessPreflightRequestSemantics(
   value: GodotHeadlessPreflightCommandInput,
 ): void {
@@ -236,6 +288,7 @@ export function assertGodotHeadlessPreflightRequestSemantics(
     !record(value) ||
     !exactKeys(value, [
       "engine",
+      "containment",
       "executableDigest",
       "executableIdentityDigest",
       "frameBudget",
@@ -275,6 +328,15 @@ export function assertGodotHeadlessPreflightRequestSemantics(
   ) {
     throw new TypeError("Godot headless preflight request is outside the contract");
   }
+  validateContainmentBinding(value.containment);
+  if (
+    value.containment.requestDigest !==
+    expectedContainmentRequestDigest(value.projectRootIdentityDigest)
+  ) {
+    throw new TypeError(
+      "Godot headless preflight containment binding is invalid",
+    );
+  }
 }
 
 function validateDigestInput(input: GodotHeadlessPreflightDigestInput): void {
@@ -284,6 +346,7 @@ function validateDigestInput(input: GodotHeadlessPreflightDigestInput): void {
       "authorization",
       "blockers",
       "code",
+      "containment",
       "controlPlaneVersion",
       "executable",
       "execution",
@@ -320,6 +383,7 @@ function validateDigestInput(input: GodotHeadlessPreflightDigestInput): void {
   ) {
     throw new TypeError("Godot headless preflight report identity is invalid");
   }
+  validateContainmentBinding(input.containment);
   if (
     !record(input.project) ||
     !exactKeys(input.project, [
@@ -338,6 +402,14 @@ function validateDigestInput(input: GodotHeadlessPreflightDigestInput): void {
     !isSha256Digest(input.executable.identityDigest)
   ) {
     throw new TypeError("Godot headless preflight bindings are invalid");
+  }
+  if (
+    input.containment.requestDigest !==
+    expectedContainmentRequestDigest(input.project.rootIdentityDigest)
+  ) {
+    throw new TypeError(
+      "Godot headless preflight containment binding is invalid",
+    );
   }
   if (
     !record(input.versionProbe) ||
@@ -480,6 +552,7 @@ export function assertGodotHeadlessPreflightReportSemantics(
       "blockers",
       "code",
       "commandId",
+      "containment",
       "controlPlaneVersion",
       "executable",
       "execution",
@@ -534,6 +607,25 @@ const requirements = closedObject(
   ["filesystem", "network", "childProcesses"],
 );
 
+const containmentBinding = closedObject(
+  {
+    assessmentDigest: reference("sha256Digest"),
+    requestDigest: reference("sha256Digest"),
+    policyDigest: { const: PROCESS_CONTAINMENT_POLICY_DIGEST },
+    providerCatalogDigest: reference("sha256Digest"),
+    decision: { const: "block" },
+    evidenceGrade: { const: "implemented" },
+  },
+  [
+    "assessmentDigest",
+    "requestDigest",
+    "policyDigest",
+    "providerCatalogDigest",
+    "decision",
+    "evidenceGrade",
+  ],
+);
+
 const requestProperties = {
   schemaVersion: { const: "1.0.0" },
   engine: { const: "godot" },
@@ -548,6 +640,7 @@ const requestProperties = {
   mode: { const: "dynamic-main-scene" },
   frameBudget: { const: GODOT_HEADLESS_PREFLIGHT_FRAME_BUDGET },
   invocationDigest: { const: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST },
+  containment: containmentBinding,
   requirements,
 } as const;
 
@@ -689,6 +782,7 @@ const reportProperties = {
   mode: { const: "dynamic-main-scene" },
   frameBudget: { const: GODOT_HEADLESS_PREFLIGHT_FRAME_BUDGET },
   invocationDigest: { const: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST },
+  containment: containmentBinding,
   status: { const: "blocked" },
   code: blocker,
   blockers: boundedArray(blocker, { minimum: 1, maximum: 2, unique: true }),

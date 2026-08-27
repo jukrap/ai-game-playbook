@@ -5,6 +5,7 @@ import {
   mkdtemp,
   readFile,
   readdir,
+  rename,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -125,6 +126,19 @@ test("headless preflight preparation binds an original version report and finite
     network: "deny",
     childProcesses: "deny",
   });
+  assert.deepEqual(plan.input.containment, plan.containment);
+  assert.equal(plan.containment.decision, "block");
+  assert.equal(plan.containment.evidenceGrade, "implemented");
+  assert.equal(
+    plan.containment.policyDigest,
+    contracts.PROCESS_CONTAINMENT_POLICY_DIGEST,
+  );
+  assert.equal(
+    plan.containment.providerCatalogDigest,
+    core.PROCESS_CONTAINMENT_PROVIDER_CATALOG_DIGEST,
+  );
+  assert.match(plan.containment.assessmentDigest, /^sha256:[0-9a-f]{64}$/);
+  assert.match(plan.containment.requestDigest, /^sha256:[0-9a-f]{64}$/);
   assert.equal(Object.isFrozen(plan), true);
   assert.equal(JSON.stringify(plan).includes(project), false);
   assert.equal(JSON.stringify(plan).includes(process.execPath), false);
@@ -158,6 +172,14 @@ test("headless preflight authority binds host tool approval and registered workf
   assert.deepEqual(decision.lease.grantIds, [
     "approval.host-tool-inspection",
   ]);
+  assert.equal(
+    request.scope.objectIds.includes(plan.containment.assessmentDigest),
+    true,
+  );
+  assert.equal(
+    request.scope.objectIds.includes(plan.containment.providerCatalogDigest),
+    true,
+  );
 
   await assert.rejects(
     godot.runGodotHeadlessPreflight({
@@ -217,6 +239,7 @@ test("headless preflight starts no process and retains one canonical blocked rec
     version: "blocked",
     containment: "blocked",
   });
+  assert.deepEqual(report.containment, plan.containment);
   assert.equal(report.execution.processStarted, false);
   assert.equal(report.externalProcessStarted, false);
   assert.equal(report.networkAccessPerformed, false);
@@ -260,10 +283,22 @@ test("headless preflight starts no process and retains one canonical blocked rec
   assert.equal(receipt.identity.workflowId, plan.workflow.id);
   assert.equal(receipt.identity.stepId, plan.workflow.stepId);
   assert.equal(receipt.authority.command.id, "engine.headless-preflight");
+  assert.equal(
+    receipt.authority.inputDigest,
+    contracts.digestCanonicalJson(plan.input),
+  );
   assert.equal(receipt.outcomes.outer.status, "blocked");
   assert.equal(receipt.outcomes.inner.status, "blocked");
   assert.equal(receipt.mutation.status, "none");
   assert.deepEqual(receipt.artifacts, []);
+  assert.equal(
+    receipt.diagnostics.some(
+      ({ message }) =>
+        message.includes(plan.containment.assessmentDigest) &&
+        message.includes(plan.containment.providerCatalogDigest),
+    ),
+    true,
+  );
   assert.equal("engine" in receipt.environment, false);
   assert.deepEqual((await readdir(project)).sort(), topLevelBefore);
   assert.equal(
@@ -332,4 +367,22 @@ test("pre-dispatch cancellation settles authority and retains no receipt", async
     }),
     (error) => error?.code === "run-receipt-store-not-found",
   );
+});
+
+test("project root replacement invalidates the containment witness before admission", async (t) => {
+  const { project, plan } = await prepared(t);
+  const { decision } = authorize(plan);
+  const moved = `${project}-original`;
+  await rename(project, moved);
+  await mkdir(project);
+
+  await assert.rejects(
+    godot.runGodotHeadlessPreflight({
+      plan,
+      authorization: decision,
+      signal: null,
+    }),
+    expectGodotError("godot-headless-containment-witness-invalid"),
+  );
+  assert.equal(decision.lease.state, "settled");
 });

@@ -6,6 +6,7 @@ import {
   GODOT_HEADLESS_PREFLIGHT_TERMINATION_GRACE_MS,
   GODOT_VERSION_PROBE_TARGET_RELEASE_STATUS,
   GODOT_VERSION_PROBE_TARGET_VERSION,
+  PROCESS_CONTAINMENT_POLICY_DIGEST,
   assertGodotHeadlessPreflightReportSemantics,
   assertGodotHeadlessPreflightRequestSemantics,
   assertGodotVersionProbeReportSemantics,
@@ -21,18 +22,23 @@ import {
   type ExecutionBudgets,
   type GodotHeadlessPreflightBlocker,
   type GodotHeadlessPreflightCommandInput,
+  type GodotHeadlessPreflightContainmentBinding,
   type GodotHeadlessPreflightDigestInput,
   type GodotHeadlessPreflightReport,
   type GodotVersionProbeReport,
   type ProjectStage,
+  type ProcessContainmentAssessmentReport,
   type ResolvedWorkflowPlan,
   type RunReceipt,
   type Sha256Digest,
   type StableId,
 } from "@ai-game-playbook/contracts";
 import {
+  PROCESS_CONTAINMENT_PROVIDER_CATALOG_DIGEST,
   RUN_RECEIPT_STORE_PATH,
+  assessProcessContainment,
   assertAuthorizedPermissionDecision,
+  assertProcessContainmentAssessmentWitness,
   assertProcessExecutableIdentity,
   assertProjectRootIdentity,
   persistRunReceipt,
@@ -101,6 +107,7 @@ export interface PreparedGodotHeadlessPreflight {
     readonly status: GodotVersionProbeReport["status"];
     readonly exactTargetMatch: boolean;
   };
+  readonly containment: GodotHeadlessPreflightContainmentBinding;
   readonly input: GodotHeadlessPreflightCommandInput;
   readonly planDigest: Sha256Digest;
 }
@@ -121,6 +128,7 @@ interface PreparedGodotHeadlessPreflightInternals {
   readonly executable: BoundProcessExecutable;
   readonly versionReport: GodotVersionProbeReport;
   readonly runtime: GodotVersionProbeRuntimeBinding;
+  readonly containmentReport: ProcessContainmentAssessmentReport;
   readonly workflow: ResolvedWorkflowPlan;
 }
 
@@ -286,6 +294,65 @@ async function assertRuntimeBindings(
   await assertBoundIdentities();
 }
 
+function runtimeContainmentDecision(
+  report: ProcessContainmentAssessmentReport,
+): unknown {
+  return (report as unknown as Record<string, unknown>)["decision"];
+}
+
+function containmentBindingFrom(
+  report: ProcessContainmentAssessmentReport,
+): GodotHeadlessPreflightContainmentBinding {
+  return Object.freeze({
+    assessmentDigest: report.assessmentDigest,
+    requestDigest: report.requestDigest,
+    policyDigest: report.policyDigest,
+    providerCatalogDigest: report.provider.catalogDigest,
+    decision: "block",
+    evidenceGrade: "implemented",
+  });
+}
+
+async function assertContainmentWitness(
+  report: ProcessContainmentAssessmentReport,
+  root: CanonicalProjectRoot,
+): Promise<GodotHeadlessPreflightContainmentBinding> {
+  if (runtimeContainmentDecision(report) !== "block") {
+    fail(
+      "godot-headless-contained-dispatch-unimplemented",
+      "Godot headless contained process dispatch is not implemented for this assessment decision.",
+    );
+  }
+  try {
+    await assertProcessContainmentAssessmentWitness(report, root);
+  } catch {
+    return fail(
+      "godot-headless-containment-witness-invalid",
+      "Godot headless containment assessment lost its same-process project authority.",
+    );
+  }
+  if (
+    report.projectRootIdentityDigest !== root.identityDigest ||
+    report.policyDigest !== PROCESS_CONTAINMENT_POLICY_DIGEST ||
+    report.provider.catalogDigest !==
+      PROCESS_CONTAINMENT_PROVIDER_CATALOG_DIGEST ||
+    report.provider.status !== "unavailable" ||
+    report.controls.filesystem.status !== "unavailable" ||
+    report.controls.network.status !== "unavailable" ||
+    report.controls.childProcesses.status !== "unavailable" ||
+    report.probe.status !== "not-run" ||
+    report.probe.externalProcessStarted ||
+    report.probe.mutationPerformed ||
+    report.probe.networkAccessPerformed
+  ) {
+    fail(
+      "godot-headless-containment-witness-invalid",
+      "Godot headless containment assessment is not an exact fail-closed witness.",
+    );
+  }
+  return containmentBindingFrom(report);
+}
+
 function validatePreparationRequest(value: unknown): {
   readonly runId: string;
   readonly projectId: StableId;
@@ -367,6 +434,19 @@ export async function prepareGodotHeadlessPreflightFromVersionProbe(
     );
   }
   await assertRuntimeBindings(request.versionProbe, runtime);
+  let containmentReport: ProcessContainmentAssessmentReport;
+  try {
+    containmentReport = await assessProcessContainment({ root: runtime.root });
+  } catch {
+    return fail(
+      "godot-headless-containment-assessment-failed",
+      "Godot headless containment could not be assessed for the bound project.",
+    );
+  }
+  const containment = await assertContainmentWitness(
+    containmentReport,
+    runtime.root,
+  );
   const workflow = resolveWorkflowPlan(
     BUILTIN_REGISTRY,
     GODOT_HEADLESS_PREFLIGHT_WORKFLOW_ID,
@@ -402,6 +482,7 @@ export async function prepareGodotHeadlessPreflightFromVersionProbe(
       mode: "dynamic-main-scene",
       frameBudget: GODOT_HEADLESS_PREFLIGHT_FRAME_BUDGET,
       invocationDigest: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+      containment,
       requirements: {
         filesystem: "deny-project-writes",
         network: "deny",
@@ -437,6 +518,7 @@ export async function prepareGodotHeadlessPreflightFromVersionProbe(
       status: request.versionProbe.status,
       exactTargetMatch: exactTargetMatch(request.versionProbe),
     }),
+    containment,
     input,
   });
   const plan = Object.freeze({
@@ -454,6 +536,7 @@ export async function prepareGodotHeadlessPreflightFromVersionProbe(
       executable: runtime.executable,
       versionReport: request.versionProbe,
       runtime,
+      containmentReport,
       workflow,
     }),
   );
@@ -507,6 +590,10 @@ export function createGodotHeadlessPreflightAuthorizationRequest(
     [
       plan.executable.digest,
       plan.executable.identityDigest,
+      plan.containment.assessmentDigest,
+      plan.containment.policyDigest,
+      plan.containment.providerCatalogDigest,
+      plan.containment.requestDigest,
       plan.project.inspectionDigest,
       plan.versionProbe.digest,
     ]
@@ -725,6 +812,20 @@ async function assertPlanStable(
   plan: PreparedGodotHeadlessPreflight,
   internals: PreparedGodotHeadlessPreflightInternals,
 ): Promise<void> {
+  const containment = await assertContainmentWitness(
+    internals.containmentReport,
+    internals.root,
+  );
+  if (
+    canonicalizeJson(containment) !== canonicalizeJson(plan.containment) ||
+    canonicalizeJson(containment) !==
+      canonicalizeJson(plan.input.containment)
+  ) {
+    fail(
+      "godot-headless-containment-witness-invalid",
+      "Godot headless plan no longer matches its containment assessment.",
+    );
+  }
   if (
     boundGodotVersionProbeRuntime(internals.versionReport) !==
       internals.runtime ||
@@ -883,7 +984,7 @@ function receiptFrom(
         code: parseStableId(code),
         message:
           code === "godot-headless-containment-unavailable"
-            ? "Required filesystem, network, and child-process containment is unavailable."
+            ? `Containment assessment ${plan.containment.assessmentDigest} blocked startup because provider catalog ${plan.containment.providerCatalogDigest} has no validated provider.`
             : "The exact target Godot version was not verified.",
         redacted: true,
       })),
@@ -926,6 +1027,7 @@ function reportFrom(
     mode: "dynamic-main-scene",
     frameBudget: GODOT_HEADLESS_PREFLIGHT_FRAME_BUDGET,
     invocationDigest: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+    containment: plan.containment,
     status: "blocked",
     code: blockers[0] as GodotHeadlessPreflightBlocker,
     blockers,

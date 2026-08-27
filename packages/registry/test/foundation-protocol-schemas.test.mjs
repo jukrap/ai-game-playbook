@@ -399,6 +399,16 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
         },
       },
     ],
+    [
+      "godot-headless-preflight-request",
+      {
+        ...fixtures["godot-headless-preflight-request"],
+        containment: {
+          ...fixtures["godot-headless-preflight-request"].containment,
+          decision: "allow",
+        },
+      },
+    ],
   ];
   const ajv = validator();
 

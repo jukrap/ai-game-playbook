@@ -365,7 +365,7 @@ const engineHeadlessPreflightCommand: CommandDescriptor = Object.freeze({
     package: "@ai-game-playbook/godot-adapter",
     export: "runGodotHeadlessPreflight",
     digest: parseSha256Digest(
-      "sha256:9c1f31d79cc9aab0d131f53191e6b9982e4235f90faadd5470cc793a112c151c",
+      "sha256:a6b50edc3a2dd2961a03b092370f047bb1975236e5c3bd352aaffff7c1a113ef",
     ),
   }),
 });

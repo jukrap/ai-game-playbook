@@ -158,6 +158,7 @@ export type {
   GodotHeadlessPreflightAuthorization,
   GodotHeadlessPreflightBlocker,
   GodotHeadlessPreflightCommandInput,
+  GodotHeadlessPreflightContainmentBinding,
   GodotHeadlessPreflightDigestInput,
   GodotHeadlessPreflightReceiptPointer,
   GodotHeadlessPreflightReport,

@@ -13,12 +13,18 @@ import {
   MCP_STDIO_MAX_BUFFER_BYTES,
 } from "./server.js";
 import { BoundedMcpSessionTransport } from "./session-transport.js";
+import {
+  BoundedMcpStdioInput,
+  pipeMcpStdioInput,
+} from "./stdio-input.js";
 
 async function main(): Promise<void> {
   const options = parseMcpRuntimeArguments(process.argv.slice(2));
   const plan = await createMcpRuntimePlan(options);
+  const boundedInput = new BoundedMcpStdioInput();
 
   let handle: ReturnType<typeof serveStdio> | undefined;
+  let detachInput: (() => void) | undefined;
   let closing = false;
   const close = (exitCode?: number): void => {
     if (exitCode !== undefined && process.exitCode === undefined) {
@@ -28,6 +34,8 @@ async function main(): Promise<void> {
       return;
     }
     closing = true;
+    detachInput?.();
+    boundedInput.destroy();
     process.stdin.destroy();
     if (handle === undefined) {
       return;
@@ -40,7 +48,7 @@ async function main(): Promise<void> {
   handle = serveStdio(() => createMcpServer(plan), {
     legacy: "reject",
     transport: new BoundedMcpSessionTransport(
-      new StdioServerTransport(process.stdin, process.stdout, {
+      new StdioServerTransport(boundedInput, process.stdout, {
         maxBufferSize: MCP_STDIO_MAX_BUFFER_BYTES,
       }),
     ),
@@ -52,6 +60,7 @@ async function main(): Promise<void> {
       close(1);
     },
   });
+  detachInput = pipeMcpStdioInput(process.stdin, boundedInput);
 
   process.once("SIGINT", () => close());
   process.once("SIGTERM", () => close());

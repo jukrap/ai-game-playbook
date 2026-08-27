@@ -1,6 +1,6 @@
 ---
 source: docs/architecture.md
-source_sha256: e3c08a3db0ad834e7a4d8079685a6a1c9e594f2bacc4b58768f28e1a5d338224
+source_sha256: 8cdf0e232bb6273d386d05577eacc569349d48f8dd0047bd1f4b2348b79939df
 translated_at: 2026-08-27
 ---
 
@@ -67,7 +67,7 @@ Private Godot host-tool flow는 public status와 분리합니다. 준비 단계�
 
 Provider protocol은 admission authority와 의도적으로 분리합니다. Descriptor는 path-free implementation artifact, host, policy, control, protocol identity를 결합합니다. Bounded request/report 쌍은 challenge window와 ordered workload, project-write, network, child-process, cleanup probe를 고정하며, `verified`는 0ms가 아닌 clean run에서 모든 probe가 통과한 경우에만 구조적으로 유효합니다. 이 schema들은 evidence data만 검증합니다. Compiled catalog에는 descriptor가 없고 self-test runner가 실행된 적도 없으며 freshness를 보장하는 same-process witness나 launch handle도 없습니다.
 
-현재 MCP 경로도 write-free입니다. Startup에는 project root 하나, 명시적인 generated tool name 하나 이상, 선택한 project diagnostic이 active host context에 들어갈 수 있다는 acknowledgement가 필요합니다. Runtime은 canonical project identity를 bind하고 선택적 static Godot capability tool을 포함한 read-only closed-world tool만 등록합니다. STDIO admission은 아직 읽지 않은 buffered input을 1 MiB로, 연결 하나를 재직렬화된 JSON-RPC input 16 MiB, message 1,024개, unanswered request 32개로 제한합니다. Exact registered input/output schema와 bounded canonical result는 계속 필수입니다. SDK cancellation과 command deadline은 invocation별 handler signal을 abort하고 registered grace 동안 정산을 기다리며, 정산이 불확실하면 해당 runtime plan을 영구 차단하고 진행 중인 peer도 abort합니다. 이는 read-only 정산 경계이지 process나 mutation authority가 아닙니다. Runtime에는 HTTP transport, network access, executable/provider input, Editor control, mutation route가 없습니다.
+현재 MCP 경로도 write-free입니다. Startup에는 project root 하나, 명시적인 generated tool name 하나 이상, 선택한 project diagnostic이 active host context에 들어갈 수 있다는 acknowledgement가 필요합니다. Runtime은 canonical project identity를 bind하고 선택적 static Godot capability tool을 포함한 read-only closed-world tool만 등록합니다. STDIO admission은 아직 읽지 않은 buffered input을 1 MiB로 제한하고, 연결 하나에 raw STDIO input 16 MiB와 재직렬화된 JSON-RPC input 16 MiB, message 1,024개, unanswered request 32개의 상한을 각각 적용합니다. Exact registered input/output schema와 bounded canonical result는 계속 필수입니다. SDK cancellation과 command deadline은 invocation별 handler signal을 abort하고 registered grace 동안 정산을 기다리며, 정산이 불확실하면 해당 runtime plan을 영구 차단하고 진행 중인 peer도 abort합니다. 이는 read-only 정산 경계이지 process나 mutation authority가 아닙니다. Runtime에는 HTTP transport, network access, executable/provider input, Editor control, mutation route가 없습니다.
 
 Shared skill runtime이 packaged artifact validation과 write-free project-target observation을 소유합니다. 단일 model-invoked route는 먼저 `project.inspect`를 수행하고 report가 compatible하고 non-blocked인 Godot project 하나를 식별한 경우에만 `engine.capabilities`를 허용합니다. Unity, Unreal, incompatible, ambiguous observation은 inspection에서 멈춥니다. Codex adapter는 같은 plan을 소비하고 caller가 선택한 runtime code를 받지 않으며 현재 지원 Node.js executable과 이 installation의 MCP entry point를 자체 결정합니다. Project-local `.codex/config.toml` 하나와 `.agents/skills/project-inspection/SKILL.md` target 하나의 immutable byte를 만들고 project/runtime identity를 다시 확인하면서 각 target을 create, retain, conflict로 분류합니다. Packaged skill source는 bounded canonical regular file이어야 하며 UTF-8, LF-only frontmatter, name, SHA-256 digest가 generated registry route와 일치해야 합니다. 두 runtime 모두 parent directory를 만들거나 target을 write/merge하거나 project trust를 변경하거나 skill을 설치하지 않습니다.
 

@@ -19,6 +19,7 @@ import {
 } from "../dist/index.js";
 import { invokeMcpToolWithSignal } from "../dist/runtime.js";
 import { MCP_STDIO_MAX_SESSION_MESSAGES } from "../dist/session-transport.js";
+import { MCP_STDIO_MAX_SESSION_RAW_INPUT_BYTES } from "../dist/stdio-input.js";
 
 const serverEntryPoint = fileURLToPath(new URL("../dist/bin.js", import.meta.url));
 
@@ -944,6 +945,56 @@ test(
         notification.repeat(MCP_STDIO_MAX_SESSION_MESSAGES + 1),
       );
       const outcome = await waitForChildExit(child);
+
+      assert.deepEqual(outcome, { code: 1, signal: null });
+      assert.equal(stderr, "agpb-mcp: transport error\n");
+    });
+  },
+);
+
+test(
+  "stdio session raw byte overflow terminates below parsed session budgets",
+  { timeout: 20_000 },
+  async () => {
+    await withProject(async (root) => {
+      const child = spawn(
+        process.execPath,
+        [
+          serverEntryPoint,
+          "--project-root",
+          root,
+          "--enable-tool",
+          "agpb_doctor",
+          "--allow-host-disclosure",
+        ],
+        { stdio: ["pipe", "pipe", "pipe"] },
+      );
+      let stderr = "";
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+      child.stdin.on("error", () => {});
+
+      const notification = {
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
+      };
+      const wireMessage = `${" ".repeat(512 * 1_024)}${JSON.stringify(
+        notification,
+      )}\n`;
+      const messageCount = 33;
+      assert.ok(
+        Buffer.byteLength(wireMessage, "utf8") < MCP_STDIO_MAX_BUFFER_BYTES,
+      );
+      assert.ok(messageCount < MCP_STDIO_MAX_SESSION_MESSAGES);
+      assert.ok(
+        Buffer.byteLength(wireMessage.repeat(messageCount), "utf8") >
+          MCP_STDIO_MAX_SESSION_RAW_INPUT_BYTES,
+      );
+
+      child.stdin.end(wireMessage.repeat(messageCount));
+      const outcome = await waitForChildExit(child, 15_000);
 
       assert.deepEqual(outcome, { code: 1, signal: null });
       assert.equal(stderr, "agpb-mcp: transport error\n");

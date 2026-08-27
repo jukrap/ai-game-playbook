@@ -1,5 +1,19 @@
 import { isProxy } from "node:util/types";
 
+export const CLI_RUNTIME_CWD_MAX_BYTES = 32_767;
+export const CLI_RUNTIME_NODE_VERSION_MAX_BYTES = 256;
+
+export function isBoundedUtf8String(
+  value: unknown,
+  maximumBytes: number,
+): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= maximumBytes &&
+    Buffer.byteLength(value, "utf8") <= maximumBytes
+  );
+}
+
 export function snapshotOptionalDataRecord<const Key extends string>(
   value: unknown,
   allowedKeys: readonly Key[],

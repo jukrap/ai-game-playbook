@@ -448,6 +448,39 @@ test("CLI rejects malformed runtime options without invoking accessors", async (
   }
 });
 
+test("CLI rejects runtime option strings outside their UTF-8 byte budgets", async () => {
+  const oversizedOptions = [
+    { cwd: "x".repeat(32_768) },
+    { cwd: "é".repeat(16_384) },
+    { nodeVersion: "x".repeat(257) },
+    { nodeVersion: "é".repeat(129) },
+  ];
+
+  for (const options of oversizedOptions) {
+    const output = await cli.runCli(["--version"], options);
+    assert.equal(output.exitCode, cli.CLI_EXIT_CODES.usage);
+    assert.equal(output.stdout, "");
+    assert.match(output.stderr, /runtime options/i);
+  }
+
+  const boundary = await cli.runCli(["--version"], {
+    cwd: "x".repeat(32_767),
+    nodeVersion: "x".repeat(256),
+  });
+  assert.equal(boundary.exitCode, cli.CLI_EXIT_CODES.success);
+});
+
+test("CLI doctor does not reflect malformed runtime version controls", async () => {
+  const output = await cli.runCli(["doctor"], {
+    cwd: "relative-root-is-invalid",
+    nodeVersion: "\u001b]0;runtime-owned\u0007",
+  });
+
+  assert.equal(output.exitCode, cli.CLI_EXIT_CODES.blocked);
+  assert.doesNotMatch(output.stdout, /runtime-owned|\u001b|\u0007/);
+  assert.match(output.stdout, /canonical semantic version/i);
+});
+
 test("CLI maps a blocked doctor report to the blocked exit category", async () => {
   const result = await cli.runCli(
     ["doctor", "--json"],

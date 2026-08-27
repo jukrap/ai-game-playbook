@@ -164,7 +164,7 @@ const doctorCommand: CommandDescriptor = Object.freeze({
     package: "@ai-game-playbook/cli",
     export: "runDoctor",
     digest: parseSha256Digest(
-      "sha256:b083fb01f8eaadc76554e5c4396554201b63a9326c06cd0118dc95b871022c00",
+      "sha256:52fe80fc0964ea9b75ee1a7d4915e411df9833a63bcb642699dd4bec3691aafc",
     ),
   }),
 });

@@ -34,7 +34,11 @@ import {
   validateRegisteredContractValue,
 } from "@ai-game-playbook/registry";
 
-import { snapshotOptionalDataRecord } from "./plain-data.js";
+import {
+  CLI_RUNTIME_NODE_VERSION_MAX_BYTES,
+  isBoundedUtf8String,
+  snapshotOptionalDataRecord,
+} from "./plain-data.js";
 
 export interface DoctorRuntimeOptions {
   readonly nodeVersion: string;
@@ -62,7 +66,10 @@ function snapshotDoctorRuntimeOptions(
   if (
     record === undefined ||
     !Object.hasOwn(record, "nodeVersion") ||
-    typeof record.nodeVersion !== "string"
+    !isBoundedUtf8String(
+      record.nodeVersion,
+      CLI_RUNTIME_NODE_VERSION_MAX_BYTES,
+    )
   ) {
     return undefined;
   }
@@ -136,26 +143,38 @@ function inspectRegistry(): DoctorCheck {
 }
 
 function inspectNodeVersion(nodeVersion: string): DoctorCheck {
+  let canonicalVersion: ReturnType<typeof parseSemanticVersion>["value"];
   try {
-    const supported =
-      compareSemanticVersions(nodeVersion, MINIMUM_NODE_VERSION) >= 0 &&
-      compareSemanticVersions(nodeVersion, MAXIMUM_NODE_VERSION_EXCLUSIVE) < 0;
-    if (supported) {
-      return check(
-        "runtime.node",
-        "passed",
-        "node-version-supported",
-        `Node.js ${nodeVersion} is within the supported runtime range.`,
-      );
-    }
+    canonicalVersion = parseSemanticVersion(nodeVersion).value;
   } catch {
-    // The bounded diagnostic below covers malformed runtime version text.
+    return check(
+      "runtime.node",
+      "blocked",
+      "node-version-unsupported",
+      "The reported Node.js runtime version is not a canonical Semantic Version.",
+      "Use the supported Node.js major and patch range, then rerun doctor.",
+    );
+  }
+
+  const supported =
+    compareSemanticVersions(canonicalVersion, MINIMUM_NODE_VERSION) >= 0 &&
+    compareSemanticVersions(
+      canonicalVersion,
+      MAXIMUM_NODE_VERSION_EXCLUSIVE,
+    ) < 0;
+  if (supported) {
+    return check(
+      "runtime.node",
+      "passed",
+      "node-version-supported",
+      `Node.js ${canonicalVersion} is within the supported runtime range.`,
+    );
   }
   return check(
     "runtime.node",
     "blocked",
     "node-version-unsupported",
-    `Node.js ${nodeVersion} is outside the supported >=${MINIMUM_NODE_VERSION} <${MAXIMUM_NODE_VERSION_EXCLUSIVE} range.`,
+    `Node.js ${canonicalVersion} is outside the supported >=${MINIMUM_NODE_VERSION} <${MAXIMUM_NODE_VERSION_EXCLUSIVE} range.`,
     "Use the supported Node.js major and patch range, then rerun doctor.",
   );
 }
@@ -407,7 +426,9 @@ export async function runDoctor(
 ): Promise<DoctorReport> {
   const options = snapshotDoctorRuntimeOptions(rawOptions);
   if (options === undefined) {
-    throw new TypeError("doctor runtime options must contain one plain nodeVersion string");
+    throw new TypeError(
+      "doctor runtime options must contain one plain bounded nodeVersion string",
+    );
   }
   const descriptor = doctorDescriptor();
   const request = validateRegisteredContractValue(

@@ -199,3 +199,34 @@ test("doctor rejects malformed runtime options without invoking accessors", asyn
     await assert.rejects(cli.runDoctor(input, options), TypeError);
   }
 });
+
+test("doctor rejects node versions outside its UTF-8 byte budget", async (t) => {
+  const { project } = await fixture(t);
+  const input = { schemaVersion: "1.0.0", projectRoot: project };
+
+  for (const nodeVersion of ["x".repeat(257), "é".repeat(129)]) {
+    await assert.rejects(
+      cli.runDoctor(input, { nodeVersion }),
+      (error) =>
+        error instanceof TypeError && /bounded nodeVersion/.test(error.message),
+    );
+  }
+
+  const boundary = await cli.runDoctor(input, {
+    nodeVersion: "x".repeat(256),
+  });
+  assert.equal(boundary.status, "blocked");
+});
+
+test("doctor does not reflect malformed runtime version text", async (t) => {
+  const { project } = await fixture(t);
+  const report = await cli.runDoctor(
+    { schemaVersion: "1.0.0", projectRoot: project },
+    { nodeVersion: "\u001b]0;runtime-owned\u0007" },
+  );
+  const runtimeCheck = report.checks.find(({ id }) => id === "runtime.node");
+
+  assert.equal(runtimeCheck.status, "blocked");
+  assert.doesNotMatch(runtimeCheck.message, /runtime-owned|\u001b|\u0007/);
+  assert.match(runtimeCheck.message, /canonical semantic version/i);
+});

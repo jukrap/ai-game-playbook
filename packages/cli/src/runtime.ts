@@ -21,6 +21,9 @@ import { runSkillCheck } from "./skill-check.js";
 import { runSkillList } from "./skill-list.js";
 import { CliDeadlineError, runWithDeadline } from "./deadline.js";
 import {
+  CLI_RUNTIME_CWD_MAX_BYTES,
+  CLI_RUNTIME_NODE_VERSION_MAX_BYTES,
+  isBoundedUtf8String,
   snapshotDenseDataArray,
   snapshotOptionalDataRecord,
 } from "./plain-data.js";
@@ -85,11 +88,20 @@ function snapshotCliRuntimeOptions(
 
   const snapshot: { cwd?: string; nodeVersion?: string } = {};
   if (Object.hasOwn(record, "cwd")) {
-    if (typeof record.cwd !== "string") return undefined;
+    if (!isBoundedUtf8String(record.cwd, CLI_RUNTIME_CWD_MAX_BYTES)) {
+      return undefined;
+    }
     snapshot.cwd = record.cwd;
   }
   if (Object.hasOwn(record, "nodeVersion")) {
-    if (typeof record.nodeVersion !== "string") return undefined;
+    if (
+      !isBoundedUtf8String(
+        record.nodeVersion,
+        CLI_RUNTIME_NODE_VERSION_MAX_BYTES,
+      )
+    ) {
+      return undefined;
+    }
     snapshot.nodeVersion = record.nodeVersion;
   }
   return Object.freeze(snapshot);
@@ -1539,7 +1551,7 @@ export async function runCli(
     return result(
       CLI_EXIT_CODES.usage,
       "",
-      "CLI runtime options must contain only plain cwd and nodeVersion strings.\n",
+      "CLI runtime options must contain only plain bounded cwd and nodeVersion strings.\n",
     );
   }
   if (args.length === 0 || args[0] === "-h" || args[0] === "--help") {

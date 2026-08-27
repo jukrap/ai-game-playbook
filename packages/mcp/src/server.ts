@@ -8,7 +8,7 @@ import type { McpRuntimePlan } from "./runtime.js";
 import {
   assertMcpRuntimePlan,
   getMcpRuntimeToolSurface,
-  invokeMcpTool,
+  invokeMcpToolWithSignal,
 } from "./runtime.js";
 
 const SERVER_INSTRUCTIONS =
@@ -44,11 +44,15 @@ export function createMcpServer(plan: McpRuntimePlan): McpServer {
         ),
         annotations: tool.annotations,
       },
-      async (argumentsValue) =>
-        invokeMcpTool(plan, {
-          name: tool.name,
-          arguments: argumentsValue,
-        }),
+      async (argumentsValue, context) =>
+        invokeMcpToolWithSignal(
+          plan,
+          {
+            name: tool.name,
+            arguments: argumentsValue,
+          },
+          context.mcpReq.signal,
+        ),
     );
   }
   return server;

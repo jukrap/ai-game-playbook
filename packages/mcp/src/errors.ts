@@ -8,7 +8,9 @@ export type McpRuntimeBoundaryErrorCode =
   | "mcp-handler-binding-invalid"
   | "mcp-command-input-invalid"
   | "mcp-command-output-invalid"
+  | "mcp-command-cancelled"
   | "mcp-command-deadline"
+  | "mcp-command-settlement-uncertain"
   | "mcp-output-budget-exceeded"
   | "mcp-runtime-failure";
 

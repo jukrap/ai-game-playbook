@@ -1,6 +1,6 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: fc688925aaab4bd247c4e69d40bcb74512dad93af3f564fbb269356f3279aaa9
+source_sha256: e6346f1dc8d10b601755386cc2ab33b412d4b6acf81b9da8fda1e4b3c8ca62f4
 translated_at: 2026-08-27
 ---
 
@@ -18,7 +18,7 @@ Authorization 자체는 execution이 아닙니다. Broker는 general mutation di
 
 현재 CLI는 plan-only `init`, read-only `doctor`, static `project inspect`, `pack list`, `pack doctor`, `skill list`, `skill check`, static read-only `engine status --engine godot`와 `engine capabilities --engine godot`를 dispatch합니다. 아홉 descriptor 모두 `read-project`, side effect 없음, `parallel-read` lane, changed-file/changed-byte budget 0을 선언합니다. 어느 명령도 elevated authority를 요청하거나 repair/recovery finalization을 호출하거나 skill을 materialize하거나 mutation lane에 진입할 수 없습니다.
 
-MCP startup에는 bounded project root 하나, explicit generated tool name 하나 이상, 선택한 project diagnostic이 active host에 disclose될 수 있다는 acknowledgement가 필요합니다. Runtime은 canonical path와 filesystem identity를 bind하고 모든 command input을 그 exact project에 다시 bind하며 duplicated, unknown, write-capable, destructive, open-world tool을 거부합니다. 최대 1 MiB인 modern STDIO message만 받고 registered input/output schema와 command deadline을 강제하며 bounded canonical result를 출력하고 HTTP/network access를 노출하지 않습니다. Host approval UI는 host 책임이며 이 acknowledgement는 evidence export나 telemetry consent가 아닙니다.
+MCP startup에는 bounded project root 하나, explicit generated tool name 하나 이상, 선택한 project diagnostic이 active host에 disclose될 수 있다는 acknowledgement가 필요합니다. Runtime은 canonical path와 filesystem identity를 bind하고 모든 command input을 그 exact project에 다시 bind하며 duplicated, unknown, write-capable, destructive, open-world tool을 거부합니다. Modern STDIO transport는 아직 읽지 않은 buffered input을 1 MiB로 제한하고 연결마다 재직렬화된 JSON-RPC input 16 MiB, inbound message 1,024개, unanswered request 32개로 제한합니다. Runtime은 registered input/output schema를 검증하고 bounded canonical result를 출력하며 HTTP/network access를 노출하지 않습니다. Invocation supervisor는 SDK caller가 취소하거나 descriptor deadline이 만료되면 각 registered handler binding에 내부 abort signal을 제공하고 descriptor의 cancellation grace 동안 정산을 기다립니다. 그 안에 정산되지 않은 invocation은 해당 runtime plan을 영구 차단하고 진행 중인 peer를 abort하며 이후 결과를 성공으로 반환하지 못하게 합니다. 현재 MCP tool은 계속 read-only이고 이 경계는 process나 mutation authority를 노출하지 않습니다. Host approval UI는 host 책임이며 이 acknowledgement는 evidence export나 telemetry consent가 아닙니다.
 
 Shared skill runtime과 Codex setup planner는 caller가 선택한 script/skill path를 받지 않습니다. Skill runtime은 generated registry의 유일한 stable model-invoked skill route를 bind하고 packaged source가 64 KiB 상한 안의 canonical regular file이며 선언 name, UTF-8/LF 형식, frontmatter, SHA-256 digest와 일치하도록 요구합니다. CLI와 MCP는 이 authority에서 bounded catalog metadata와 target observation만 반환합니다. Codex setup은 deterministic project-skill/configuration byte를 반환하기 전에 현재 지원 Node.js executable과 이 installation의 MCP entry point도 bind합니다. Inspection은 runtime identity를 다시 확인하고 linked, case-aliased, type-conflicted, oversized path를 거부하며 target을 분류합니다. 이 경로들은 directory 생성, file write, merge, trust 변경, skill materialization을 수행하지 않습니다.
 

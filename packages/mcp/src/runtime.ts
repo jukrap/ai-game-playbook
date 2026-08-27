@@ -35,6 +35,10 @@ import { isAbsolute, resolve } from "node:path";
 
 import { McpRuntimeBoundaryError } from "./errors.js";
 import {
+  McpInvocationSupervisor,
+  McpInvocationSupervisorError,
+} from "./invocation-supervisor.js";
+import {
   MCP_PROJECT_ROOT_MAX_BYTES,
   isBoundedUtf8String,
   isMcpToolName,
@@ -84,10 +88,18 @@ export interface McpToolInvocationRequest {
 
 interface RuntimePlanState {
   readonly root: CanonicalProjectRoot;
+  readonly supervisor: McpInvocationSupervisor;
   readonly tools: ReadonlyMap<string, McpToolSurface>;
 }
 
-type CommandHandler = (input: unknown) => Promise<unknown>;
+interface CommandHandlerContext {
+  readonly signal: AbortSignal;
+}
+
+type CommandHandler = (
+  input: unknown,
+  context: CommandHandlerContext,
+) => Promise<unknown>;
 
 interface HandlerBinding {
   readonly packageName:
@@ -107,8 +119,6 @@ interface HandlerBinding {
     | "runSkillList";
   readonly invoke: CommandHandler;
 }
-
-class CommandDeadlineError extends Error {}
 
 const runtimePlanStates = new WeakMap<object, RuntimePlanState>();
 const WRITE_PERMISSIONS = new Set([
@@ -388,27 +398,11 @@ export async function createMcpRuntimePlan(
     plan,
     Object.freeze({
       root,
+      supervisor: new McpInvocationSupervisor(),
       tools: new Map(selected.map((tool) => [tool.name, tool])),
     }),
   );
   return plan;
-}
-
-async function runWithDeadline<T>(
-  operation: () => Promise<T>,
-  timeoutMs: number,
-): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  const deadline = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new CommandDeadlineError()), timeoutMs);
-  });
-  try {
-    return await Promise.race([Promise.resolve().then(operation), deadline]);
-  } finally {
-    if (timer !== undefined) {
-      clearTimeout(timer);
-    }
-  }
 }
 
 async function boundCommandInput(
@@ -497,11 +491,8 @@ function runtimeError(error: unknown): McpRuntimeBoundaryError {
   if (error instanceof McpRuntimeBoundaryError) {
     return error;
   }
-  if (error instanceof CommandDeadlineError) {
-    return new McpRuntimeBoundaryError(
-      "mcp-command-deadline",
-      "MCP command exceeded its registered deadline.",
-    );
+  if (error instanceof McpInvocationSupervisorError) {
+    return new McpRuntimeBoundaryError(error.code, error.message);
   }
   return new McpRuntimeBoundaryError(
     "mcp-runtime-failure",
@@ -509,12 +500,24 @@ function runtimeError(error: unknown): McpRuntimeBoundaryError {
   );
 }
 
-export async function invokeMcpTool(
+function assertInvocationActive(signal: AbortSignal): void {
+  if (!signal.aborted) {
+    return;
+  }
+  if (signal.reason instanceof McpInvocationSupervisorError) {
+    throw signal.reason;
+  }
+  throw new McpInvocationSupervisorError("mcp-command-cancelled");
+}
+
+async function invokeMcpToolControlled(
   plan: McpRuntimePlan,
   request: McpToolInvocationRequest,
+  callerSignal?: AbortSignal,
 ): Promise<CallToolResult> {
   const state = assertPlan(plan);
   try {
+    state.supervisor.assertReady(callerSignal);
     const record = snapshotExactDataRecord(request, ["arguments", "name"]);
     if (
       record === undefined ||
@@ -534,50 +537,91 @@ export async function invokeMcpTool(
     }
     const command = tool.meta.command;
     const binding = assertHandlerBinding(command);
-    const input = await boundCommandInput(state, command, record.arguments);
-    const output = await runWithDeadline(
-      () => binding.invoke(input),
-      command.timeoutMs,
-    );
-    await assertProjectRootIdentity(state.root);
+    const runOptions =
+      callerSignal === undefined
+        ? {
+            timeoutMs: command.timeoutMs,
+            graceMs: command.cancellation.graceMs,
+          }
+        : {
+            timeoutMs: command.timeoutMs,
+            graceMs: command.cancellation.graceMs,
+            callerSignal,
+          };
+    return await state.supervisor.run(
+      async (signal) => {
+        assertInvocationActive(signal);
+        const input = await boundCommandInput(
+          state,
+          command,
+          record.arguments,
+        );
+        assertInvocationActive(signal);
+        const output = await binding.invoke(
+          input,
+          Object.freeze({ signal }),
+        );
+        assertInvocationActive(signal);
+        await assertProjectRootIdentity(state.root);
+        assertInvocationActive(signal);
 
-    let validatedOutput: unknown;
-    try {
-      validatedOutput = validateRegisteredContractValue(
-        BUILTIN_REGISTRY,
-        command.output,
-        output,
-      );
-    } catch {
-      throw new McpRuntimeBoundaryError(
-        "mcp-command-output-invalid",
-        "MCP command output does not satisfy its exact registered schema.",
-      );
-    }
-    if (
-      typeof validatedOutput !== "object" ||
-      validatedOutput === null ||
-      Array.isArray(validatedOutput)
-    ) {
-      throw new McpRuntimeBoundaryError(
-        "mcp-command-output-invalid",
-        "MCP structured output must be a registered object contract.",
-      );
-    }
-    const text = canonicalizeJson(validatedOutput);
-    if (Buffer.byteLength(text, "utf8") > command.budgets.maxOutputBytes) {
-      throw new McpRuntimeBoundaryError(
-        "mcp-output-budget-exceeded",
-        "MCP command output exceeded its registered byte budget.",
-      );
-    }
-    return {
-      content: [{ type: "text", text }],
-      structuredContent: validatedOutput as Record<string, unknown>,
-    };
+        let validatedOutput: unknown;
+        try {
+          validatedOutput = validateRegisteredContractValue(
+            BUILTIN_REGISTRY,
+            command.output,
+            output,
+          );
+        } catch {
+          throw new McpRuntimeBoundaryError(
+            "mcp-command-output-invalid",
+            "MCP command output does not satisfy its exact registered schema.",
+          );
+        }
+        if (
+          typeof validatedOutput !== "object" ||
+          validatedOutput === null ||
+          Array.isArray(validatedOutput)
+        ) {
+          throw new McpRuntimeBoundaryError(
+            "mcp-command-output-invalid",
+            "MCP structured output must be a registered object contract.",
+          );
+        }
+        const text = canonicalizeJson(validatedOutput);
+        if (
+          Buffer.byteLength(text, "utf8") > command.budgets.maxOutputBytes
+        ) {
+          throw new McpRuntimeBoundaryError(
+            "mcp-output-budget-exceeded",
+            "MCP command output exceeded its registered byte budget.",
+          );
+        }
+        return {
+          content: [{ type: "text", text }],
+          structuredContent: validatedOutput as Record<string, unknown>,
+        };
+      },
+      runOptions,
+    );
   } catch (error) {
     return errorResult(runtimeError(error));
   }
+}
+
+export async function invokeMcpTool(
+  plan: McpRuntimePlan,
+  request: McpToolInvocationRequest,
+): Promise<CallToolResult> {
+  return invokeMcpToolControlled(plan, request);
+}
+
+export async function invokeMcpToolWithSignal(
+  plan: McpRuntimePlan,
+  request: McpToolInvocationRequest,
+  callerSignal: AbortSignal,
+): Promise<CallToolResult> {
+  return invokeMcpToolControlled(plan, request, callerSignal);
 }
 
 export function assertMcpRuntimePlan(

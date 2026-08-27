@@ -17,6 +17,7 @@ import {
   invokeMcpTool,
   parseMcpRuntimeArguments,
 } from "../dist/index.js";
+import { invokeMcpToolWithSignal } from "../dist/runtime.js";
 import { MCP_STDIO_MAX_SESSION_MESSAGES } from "../dist/session-transport.js";
 
 const serverEntryPoint = fileURLToPath(new URL("../dist/bin.js", import.meta.url));
@@ -386,6 +387,38 @@ test("direct invocation validates the exact bound project and emits canonical st
     } finally {
       await rm(foreign, { recursive: true, force: true });
     }
+  });
+});
+
+test("direct invocation honors caller cancellation before project observation", async () => {
+  await withProject(async (root) => {
+    const plan = await createMcpRuntimePlan({
+      projectRoot: root,
+      enabledTools: ["agpb_doctor"],
+      allowHostDisclosure: true,
+    });
+    await rm(root, { recursive: true, force: true });
+    const caller = new AbortController();
+    caller.abort("private caller reason");
+
+    const result = await invokeMcpToolWithSignal(
+      plan,
+      {
+        name: "agpb_doctor",
+        arguments: { schemaVersion: "1.0.0", projectRoot: root },
+      },
+      caller.signal,
+    );
+
+    assert.equal(result.isError, true);
+    assert.equal(
+      JSON.parse(result.content[0]?.text ?? "").code,
+      "mcp-command-cancelled",
+    );
+    assert.doesNotMatch(
+      result.content[0]?.text ?? "",
+      /private caller reason/u,
+    );
   });
 });
 

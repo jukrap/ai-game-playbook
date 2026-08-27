@@ -20,6 +20,10 @@ import { runProjectInspect } from "./project-inspect.js";
 import { runSkillCheck } from "./skill-check.js";
 import { runSkillList } from "./skill-list.js";
 import { CliDeadlineError, runWithDeadline } from "./deadline.js";
+import {
+  snapshotDenseDataArray,
+  snapshotOptionalDataRecord,
+} from "./plain-data.js";
 
 export interface CliExitCodes {
   readonly success: 0;
@@ -52,22 +56,43 @@ export const CLI_EXIT_CODES: CliExitCodes = Object.freeze({
 
 const CLI_MAX_ARGUMENTS = 64;
 const CLI_MAX_ARGUMENT_BYTES = 65_536;
+const CLI_RUNTIME_OPTION_KEYS = ["cwd", "nodeVersion"] as const;
 
-function argumentsAreBounded(args: readonly string[]): boolean {
-  if (args.length > CLI_MAX_ARGUMENTS) {
-    return false;
-  }
+function snapshotCliArguments(value: unknown): readonly string[] | undefined {
+  const values = snapshotDenseDataArray(value, CLI_MAX_ARGUMENTS);
+  if (values === undefined) return undefined;
+
   let bytes = 0;
-  for (const argument of args) {
+  const snapshot: string[] = [];
+  for (const argument of values) {
     if (typeof argument !== "string") {
-      return false;
+      return undefined;
     }
     bytes += Buffer.byteLength(argument, "utf8");
     if (bytes > CLI_MAX_ARGUMENT_BYTES) {
-      return false;
+      return undefined;
     }
+    snapshot.push(argument);
   }
-  return true;
+  return Object.freeze(snapshot);
+}
+
+function snapshotCliRuntimeOptions(
+  value: unknown,
+): CliRuntimeOptions | undefined {
+  const record = snapshotOptionalDataRecord(value, CLI_RUNTIME_OPTION_KEYS);
+  if (record === undefined) return undefined;
+
+  const snapshot: { cwd?: string; nodeVersion?: string } = {};
+  if (Object.hasOwn(record, "cwd")) {
+    if (typeof record.cwd !== "string") return undefined;
+    snapshot.cwd = record.cwd;
+  }
+  if (Object.hasOwn(record, "nodeVersion")) {
+    if (typeof record.nodeVersion !== "string") return undefined;
+    snapshot.nodeVersion = record.nodeVersion;
+  }
+  return Object.freeze(snapshot);
 }
 
 function result(
@@ -1498,14 +1523,23 @@ async function dispatchPackDoctor(
 }
 
 export async function runCli(
-  args: readonly string[],
-  options: CliRuntimeOptions = {},
+  rawArgs: readonly string[],
+  rawOptions: CliRuntimeOptions = {},
 ): Promise<CliRunResult> {
-  if (!Array.isArray(args) || !argumentsAreBounded(args)) {
+  const args = snapshotCliArguments(rawArgs);
+  if (args === undefined) {
     return result(
       CLI_EXIT_CODES.usage,
       "",
-      "CLI arguments exceed the supported count or byte limit.\n",
+      "CLI arguments must be a plain bounded string array.\n",
+    );
+  }
+  const options = snapshotCliRuntimeOptions(rawOptions);
+  if (options === undefined) {
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      "CLI runtime options must contain only plain cwd and nodeVersion strings.\n",
     );
   }
   if (args.length === 0 || args[0] === "-h" || args[0] === "--help") {

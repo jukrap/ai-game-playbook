@@ -169,3 +169,33 @@ test("doctor blocks a surviving or malformed active pack transaction marker", as
     "blocked",
   );
 });
+
+test("doctor rejects malformed runtime options without invoking accessors", async (t) => {
+  const { project } = await fixture(t);
+  const input = { schemaVersion: "1.0.0", projectRoot: project };
+  let getterCalled = false;
+  const accessorOptions = {};
+  Object.defineProperty(accessorOptions, "nodeVersion", {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return "22.22.0";
+    },
+  });
+
+  await assert.rejects(cli.runDoctor(input, accessorOptions), TypeError);
+  assert.equal(getterCalled, false);
+
+  const hidden = { nodeVersion: "22.22.0" };
+  Object.defineProperty(hidden, "provider", { value: "hidden" });
+  const symbol = { nodeVersion: "22.22.0" };
+  symbol[Symbol("provider")] = "hidden";
+
+  for (const options of [
+    hidden,
+    symbol,
+    { nodeVersion: "22.22.0", provider: "hidden" },
+  ]) {
+    await assert.rejects(cli.runDoctor(input, options), TypeError);
+  }
+});

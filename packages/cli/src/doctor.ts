@@ -34,6 +34,8 @@ import {
   validateRegisteredContractValue,
 } from "@ai-game-playbook/registry";
 
+import { snapshotOptionalDataRecord } from "./plain-data.js";
+
 export interface DoctorRuntimeOptions {
   readonly nodeVersion: string;
 }
@@ -51,6 +53,21 @@ interface PackStateInspection {
 const MINIMUM_NODE_VERSION = "22.22.0";
 const MAXIMUM_NODE_VERSION_EXCLUSIVE = "23.0.0";
 const MAX_DIRECTORY_ENTRIES = 10_000;
+const DOCTOR_RUNTIME_OPTION_KEYS = ["nodeVersion"] as const;
+
+function snapshotDoctorRuntimeOptions(
+  value: unknown,
+): DoctorRuntimeOptions | undefined {
+  const record = snapshotOptionalDataRecord(value, DOCTOR_RUNTIME_OPTION_KEYS);
+  if (
+    record === undefined ||
+    !Object.hasOwn(record, "nodeVersion") ||
+    typeof record.nodeVersion !== "string"
+  ) {
+    return undefined;
+  }
+  return Object.freeze({ nodeVersion: record.nodeVersion });
+}
 
 function doctorDescriptor() {
   const command = BUILTIN_REGISTRY.commands.find(({ id }) => id === "doctor");
@@ -386,8 +403,12 @@ function projectSummary(
 
 export async function runDoctor(
   input: unknown,
-  options: DoctorRuntimeOptions = { nodeVersion: process.versions.node },
+  rawOptions: DoctorRuntimeOptions = { nodeVersion: process.versions.node },
 ): Promise<DoctorReport> {
+  const options = snapshotDoctorRuntimeOptions(rawOptions);
+  if (options === undefined) {
+    throw new TypeError("doctor runtime options must contain one plain nodeVersion string");
+  }
   const descriptor = doctorDescriptor();
   const request = validateRegisteredContractValue(
     BUILTIN_REGISTRY,

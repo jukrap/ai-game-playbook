@@ -368,6 +368,86 @@ test("CLI bounds arguments, contains schema failures, and does not reflect termi
   assert.match(excessive.stderr, /argument/i);
 });
 
+test("CLI rejects accessor arguments without invoking them", async () => {
+  let getterCalled = false;
+  const args = [];
+  Object.defineProperty(args, "0", {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return "--version";
+    },
+  });
+
+  const output = await cli.runCli(args);
+
+  assert.equal(getterCalled, false);
+  assert.equal(output.exitCode, cli.CLI_EXIT_CODES.usage);
+  assert.equal(output.stdout, "");
+  assert.match(output.stderr, /argument/i);
+});
+
+test("CLI rejects hidden and nonstandard argument array state", async () => {
+  class CustomArguments extends Array {}
+
+  const hidden = ["--version"];
+  Object.defineProperty(hidden, "provider", { value: "hidden" });
+  const symbol = ["--version"];
+  symbol[Symbol("provider")] = "hidden";
+  let proxyTrapCalled = false;
+  const proxied = new Proxy(["--version"], {
+    get(target, property, receiver) {
+      proxyTrapCalled = true;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  for (const args of [
+    hidden,
+    symbol,
+    new CustomArguments("--version"),
+    proxied,
+  ]) {
+    const output = await cli.runCli(args);
+    assert.equal(output.exitCode, cli.CLI_EXIT_CODES.usage);
+    assert.equal(output.stdout, "");
+    assert.match(output.stderr, /argument/i);
+  }
+  assert.equal(proxyTrapCalled, false);
+});
+
+test("CLI rejects malformed runtime options without invoking accessors", async () => {
+  let getterCalled = false;
+  const accessorOptions = {};
+  Object.defineProperty(accessorOptions, "cwd", {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return process.cwd();
+    },
+  });
+
+  const accessorOutput = await cli.runCli(["doctor", "--json"], accessorOptions);
+  assert.equal(getterCalled, false);
+  assert.equal(accessorOutput.exitCode, cli.CLI_EXIT_CODES.usage);
+  assert.equal(accessorOutput.stdout, "");
+  assert.match(accessorOutput.stderr, /runtime options/i);
+
+  const hidden = { cwd: process.cwd() };
+  Object.defineProperty(hidden, "provider", { value: "hidden" });
+  const symbol = { cwd: process.cwd() };
+  symbol[Symbol("provider")] = "hidden";
+  const inherited = Object.create({ cwd: process.cwd() });
+  const unexpected = { cwd: process.cwd(), provider: "hidden" };
+
+  for (const options of [hidden, symbol, inherited, unexpected]) {
+    const output = await cli.runCli(["--version"], options);
+    assert.equal(output.exitCode, cli.CLI_EXIT_CODES.usage);
+    assert.equal(output.stdout, "");
+    assert.match(output.stderr, /runtime options/i);
+  }
+});
+
 test("CLI maps a blocked doctor report to the blocked exit category", async () => {
   const result = await cli.runCli(
     ["doctor", "--json"],

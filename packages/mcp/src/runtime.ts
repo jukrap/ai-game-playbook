@@ -35,6 +35,9 @@ import { isAbsolute, resolve } from "node:path";
 
 import { McpRuntimeBoundaryError } from "./errors.js";
 import {
+  MCP_PROJECT_ROOT_MAX_BYTES,
+  isBoundedUtf8String,
+  isMcpToolName,
   snapshotDenseDataArray,
   snapshotExactDataRecord,
 } from "./plain-data.js";
@@ -279,13 +282,15 @@ function validateOptions(
   const enabledTools = snapshotDenseDataArray(record?.enabledTools, 32);
   if (
     record === undefined ||
-    typeof record.projectRoot !== "string" ||
+    !isBoundedUtf8String(
+      record.projectRoot,
+      MCP_PROJECT_ROOT_MAX_BYTES,
+    ) ||
     record.projectRoot.length === 0 ||
-    record.projectRoot.length > 32_767 ||
     /[\u0000-\u001F\u007F]/u.test(record.projectRoot) ||
     enabledTools === undefined ||
     enabledTools.length === 0 ||
-    enabledTools.some((tool) => typeof tool !== "string")
+    enabledTools.some((tool) => !isMcpToolName(tool))
   ) {
     throw new McpRuntimeBoundaryError(
       "mcp-tool-selection-invalid",
@@ -328,9 +333,7 @@ export async function createMcpRuntimePlan(
   const seen = new Set<string>();
   for (const name of validated.enabledTools) {
     if (
-      typeof name !== "string" ||
-      name.length === 0 ||
-      name.length > 128 ||
+      !isMcpToolName(name) ||
       seen.has(name)
     ) {
       throw new McpRuntimeBoundaryError(
@@ -515,7 +518,7 @@ export async function invokeMcpTool(
     const record = snapshotExactDataRecord(request, ["arguments", "name"]);
     if (
       record === undefined ||
-      typeof record.name !== "string"
+      !isMcpToolName(record.name)
     ) {
       throw new McpRuntimeBoundaryError(
         "mcp-command-input-invalid",

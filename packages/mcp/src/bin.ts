@@ -16,28 +16,39 @@ import {
 async function main(): Promise<void> {
   const options = parseMcpRuntimeArguments(process.argv.slice(2));
   const plan = await createMcpRuntimePlan(options);
-  const handle = serveStdio(() => createMcpServer(plan), {
+
+  let handle: ReturnType<typeof serveStdio> | undefined;
+  let closing = false;
+  const close = (exitCode?: number): void => {
+    if (exitCode !== undefined && process.exitCode === undefined) {
+      process.exitCode = exitCode;
+    }
+    if (closing) {
+      return;
+    }
+    closing = true;
+    process.stdin.destroy();
+    if (handle === undefined) {
+      return;
+    }
+    void handle.close().catch(() => {
+      process.exitCode = 1;
+    });
+  };
+
+  handle = serveStdio(() => createMcpServer(plan), {
     legacy: "reject",
     transport: new StdioServerTransport(process.stdin, process.stdout, {
       maxBufferSize: MCP_STDIO_MAX_BUFFER_BYTES,
     }),
     onerror: (): void => {
       console.error("agpb-mcp: transport error");
+      close(1);
     },
   });
 
-  let closing = false;
-  const close = (): void => {
-    if (closing) {
-      return;
-    }
-    closing = true;
-    void handle.close().catch(() => {
-      process.exitCode = 1;
-    });
-  };
-  process.once("SIGINT", close);
-  process.once("SIGTERM", close);
+  process.once("SIGINT", () => close());
+  process.once("SIGTERM", () => close());
 }
 
 try {

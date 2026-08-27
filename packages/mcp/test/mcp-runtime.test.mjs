@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +11,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { BUILTIN_REGISTRY_SURFACES } from "@ai-game-playbook/registry";
 
 import {
+  MCP_STDIO_MAX_BUFFER_BYTES,
   McpRuntimeBoundaryError,
   createMcpRuntimePlan,
   invokeMcpTool,
@@ -17,6 +19,29 @@ import {
 } from "../dist/index.js";
 
 const serverEntryPoint = fileURLToPath(new URL("../dist/bin.js", import.meta.url));
+
+function waitForChildExit(child, timeoutMs = 5_000) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timer;
+    const finish = (callback) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      callback();
+    };
+    timer = setTimeout(() => {
+      child.kill();
+      finish(() =>
+        reject(new Error("MCP child did not exit within its test deadline")),
+      );
+    }, timeoutMs);
+    child.once("error", (error) => finish(() => reject(error)));
+    child.once("close", (code, signal) =>
+      finish(() => resolve({ code, signal })),
+    );
+  });
+}
 
 async function withProject(run) {
   const root = await mkdtemp(join(tmpdir(), "agpb-mcp-project-"));
@@ -80,6 +105,27 @@ test("runtime arguments require explicit project, tool allowlist, and host discl
       (error) => error instanceof McpRuntimeBoundaryError,
     );
   }
+});
+
+test("runtime arguments bound project roots by UTF-8 bytes", () => {
+  const startupArguments = (projectRoot) => [
+    "--project-root",
+    projectRoot,
+    "--enable-tool",
+    "agpb_doctor",
+    "--allow-host-disclosure",
+  ];
+
+  assert.throws(
+    () => parseMcpRuntimeArguments(startupArguments("é".repeat(16_384))),
+    (error) =>
+      error instanceof McpRuntimeBoundaryError &&
+      error.code === "mcp-arguments-invalid",
+  );
+
+  const boundary = "é".repeat(16_383) + "x";
+  const parsed = parseMcpRuntimeArguments(startupArguments(boundary));
+  assert.equal(Buffer.byteLength(parsed.projectRoot, "utf8"), 32_767);
 });
 
 test("runtime arguments reject hidden array state and accessors without invoking them", () => {
@@ -278,6 +324,19 @@ test("runtime plan options reject hidden fields and accessors without invoking t
   });
 });
 
+test("runtime plans reject oversized project roots before filesystem binding", async () => {
+  await assert.rejects(
+    createMcpRuntimePlan({
+      projectRoot: "é".repeat(16_384),
+      enabledTools: ["agpb_doctor"],
+      allowHostDisclosure: true,
+    }),
+    (error) =>
+      error instanceof McpRuntimeBoundaryError &&
+      error.code === "mcp-tool-selection-invalid",
+  );
+});
+
 test("direct invocation validates the exact bound project and emits canonical structured output", async () => {
   await withProject(async (root) => {
     const foreign = await mkdtemp(join(tmpdir(), "agpb-mcp-foreign-"));
@@ -411,6 +470,38 @@ test("direct invocation rejects hidden fields and accessors without invoking the
       /mcp-command-input-invalid/u,
     );
     assert.equal(getterCalled, false);
+  });
+});
+
+test("direct invocation rejects tool names outside the byte budget before lookup", async () => {
+  await withProject(async (root) => {
+    const plan = await createMcpRuntimePlan({
+      projectRoot: root,
+      enabledTools: ["agpb_doctor"],
+      allowHostDisclosure: true,
+    });
+
+    for (const name of [`agpb_${"x".repeat(124)}`, "agpb_é"]) {
+      const denied = await invokeMcpTool(plan, {
+        name,
+        arguments: { schemaVersion: "1.0.0", projectRoot: root },
+      });
+      assert.equal(denied.isError, true);
+      assert.equal(
+        JSON.parse(denied.content[0]?.text ?? "").code,
+        "mcp-command-input-invalid",
+      );
+    }
+
+    const boundary = await invokeMcpTool(plan, {
+      name: `agpb_${"x".repeat(123)}`,
+      arguments: { schemaVersion: "1.0.0", projectRoot: root },
+    });
+    assert.equal(boundary.isError, true);
+    assert.equal(
+      JSON.parse(boundary.content[0]?.text ?? "").code,
+      "mcp-tool-unavailable",
+    );
   });
 });
 
@@ -684,6 +775,70 @@ test(
       } finally {
         await legacyClient.close();
       }
+    });
+  },
+);
+
+test(
+  "stdio EOF terminates the server without an error",
+  { timeout: 10_000 },
+  async () => {
+    await withProject(async (root) => {
+      const child = spawn(
+        process.execPath,
+        [
+          serverEntryPoint,
+          "--project-root",
+          root,
+          "--enable-tool",
+          "agpb_doctor",
+          "--allow-host-disclosure",
+        ],
+        { stdio: ["pipe", "pipe", "pipe"] },
+      );
+      let stderr = "";
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+
+      child.stdin.end();
+      const outcome = await waitForChildExit(child);
+
+      assert.deepEqual(outcome, { code: 0, signal: null });
+      assert.equal(stderr, "");
+    });
+  },
+);
+
+test(
+  "stdio input overflow terminates the server with a bounded diagnostic",
+  { timeout: 10_000 },
+  async () => {
+    await withProject(async (root) => {
+      const child = spawn(
+        process.execPath,
+        [
+          serverEntryPoint,
+          "--project-root",
+          root,
+          "--enable-tool",
+          "agpb_doctor",
+          "--allow-host-disclosure",
+        ],
+        { stdio: ["pipe", "pipe", "pipe"] },
+      );
+      let stderr = "";
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+
+      child.stdin.write(Buffer.alloc(MCP_STDIO_MAX_BUFFER_BYTES + 1, 0x78));
+      const outcome = await waitForChildExit(child);
+
+      assert.deepEqual(outcome, { code: 1, signal: null });
+      assert.equal(stderr, "agpb-mcp: transport error\n");
     });
   },
 );

@@ -1,5 +1,26 @@
 import { isProxy } from "node:util/types";
 
+export const MCP_PROJECT_ROOT_MAX_BYTES = 32_767;
+export const MCP_TOOL_NAME_MAX_BYTES = 128;
+
+export function isBoundedUtf8String(
+  value: unknown,
+  maximumBytes: number,
+): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= maximumBytes &&
+    Buffer.byteLength(value, "utf8") <= maximumBytes
+  );
+}
+
+export function isMcpToolName(value: unknown): value is string {
+  return (
+    isBoundedUtf8String(value, MCP_TOOL_NAME_MAX_BYTES) &&
+    /^agpb_[a-z][a-z0-9_]*$/u.test(value)
+  );
+}
+
 export function snapshotExactDataRecord<const Key extends string>(
   value: unknown,
   expected: readonly Key[],

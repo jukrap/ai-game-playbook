@@ -1,5 +1,10 @@
 import { McpRuntimeBoundaryError } from "./errors.js";
-import { snapshotDenseDataArray } from "./plain-data.js";
+import {
+  MCP_PROJECT_ROOT_MAX_BYTES,
+  isBoundedUtf8String,
+  isMcpToolName,
+  snapshotDenseDataArray,
+} from "./plain-data.js";
 
 export interface McpRuntimeArguments {
   readonly projectRoot: string;
@@ -8,7 +13,6 @@ export interface McpRuntimeArguments {
 }
 
 const MAX_ARGUMENTS = 64;
-const MAX_ARGUMENT_LENGTH = 32_767;
 const MAX_ENABLED_TOOLS = 32;
 
 function invalidArguments(): never {
@@ -22,7 +26,7 @@ function boundedArgument(value: string | undefined): string {
   if (
     value === undefined ||
     value.length === 0 ||
-    value.length > MAX_ARGUMENT_LENGTH ||
+    !isBoundedUtf8String(value, MCP_PROJECT_ROOT_MAX_BYTES) ||
     /[\u0000-\u001F\u007F]/u.test(value)
   ) {
     invalidArguments();
@@ -61,8 +65,7 @@ export function parseMcpRuntimeArguments(
     if (option === "--enable-tool") {
       const tool = boundedArgument(arguments_[index + 1]);
       if (
-        tool.length > 128 ||
-        !/^agpb_[a-z][a-z0-9_]*$/u.test(tool) ||
+        !isMcpToolName(tool) ||
         seenTools.has(tool) ||
         enabledTools.length >= MAX_ENABLED_TOOLS
       ) {

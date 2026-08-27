@@ -1,12 +1,12 @@
 # Current Status and Scope
 
-> Status: Stage 2 control-plane implementation in progress, reviewed on 2026-08-27. Six write-free source-built commands, a closed-world process-containment assessment, a static Godot status adapter, internal permission-bound Godot executable discovery and version probing, assessment-bound fail-closed headless-preflight admission with blocked receipt retention, and an explicit read-only STDIO MCP runtime exist; Codex setup remains plan-only and live-engine support remains planned.
+> Status: Stage 2 control-plane implementation in progress, reviewed on 2026-08-27. Six write-free source-built commands, a closed-world process-containment assessment with strict provider/self-test protocols and an empty compiled catalog, a static Godot status adapter, internal permission-bound Godot executable discovery and version probing, assessment-bound fail-closed headless-preflight admission with blocked receipt retention, and an explicit read-only STDIO MCP runtime exist; Codex setup remains plan-only and live-engine support remains planned.
 
 [한국어](status-and-scope.ko.md) · [Documentation](README.md)
 
 ## Current repository state
 
-The repository contains a private pnpm/TypeScript workspace, versioned schemas, semantic validators, typed registry validation and generation, deterministic workflow-plan attestation, a runtime registry for implemented commands, a digest-bound public surface, tests, Windows/Linux CI, an early core package with fail-closed containment assessment, a private evidence package, managed-pack and skill runtimes, a static Godot status adapter with internal permission-bound executable discovery, exact-version process, and assessment-bound fail-closed headless-preflight boundaries, an experimental CLI package, an experimental MCP package, and a plan-only Codex adapter package.
+The repository contains a private pnpm/TypeScript workspace, versioned schemas, semantic validators, typed registry validation and generation, deterministic workflow-plan attestation, a runtime registry for implemented commands, a digest-bound public surface, tests, Windows/Linux CI, an early core package with fail-closed containment assessment and an immutable empty compiled provider catalog, a private evidence package, managed-pack and skill runtimes, a static Godot status adapter with internal permission-bound executable discovery, exact-version process, and assessment-bound fail-closed headless-preflight boundaries, an experimental CLI package, an experimental MCP package, and a plan-only Codex adapter package.
 
 Implemented core boundaries include:
 
@@ -15,6 +15,7 @@ Implemented core boundaries include:
 - staged SHA-256 compare-and-swap writes, deletion, and reversible empty-directory removal;
 - digest-bound direct process execution with environment, working-directory, time, idle, and output limits;
 - a path-free process-containment assessment bound to one exact root and fixed project-write/network/child-process denial policy, with an empty closed provider catalog, immutable `block` reports, and same-process witness checks;
+- strict path-free provider descriptor and bounded self-test request/report schemas that bind implementation, catalog, host, challenge, fixture, timing, ordered negative probes, effects, and derived outcomes without granting launch authority;
 - one root/project-bound mutation lease with bounded waiting and dead-owner-only recovery;
 - schema-bound permission admission, exact scoped signed grants, and effect settlement;
 - deterministic workflow-plan resolution and immutable state transitions;
@@ -38,7 +39,7 @@ The source-built MCP runtime exposes only tool names explicitly selected at star
 
 ## What is not available
 
-There is no installable or published package, supported MCP/Codex setup command, configuration apply path, materialized project skill, general command dispatcher, approval UI, durable approval store, evidence CLI or export path, public executable discovery, version probe, or headless preflight, mutating pack CLI, recovery-finalization command, CPU, memory, filesystem, network, or child-process sandbox, engine bridge, engine pack, live-engine automation, or playable golden project.
+There is no installable or published package, supported MCP/Codex setup command, configuration apply path, materialized project skill, general command dispatcher, approval UI, durable approval store, evidence CLI or export path, public executable discovery, version probe, or headless preflight, containment self-test runner, registered containment provider, launch handle, mutating pack CLI, recovery-finalization command, CPU, memory, filesystem, network, or child-process sandbox, engine bridge, engine pack, live-engine automation, or playable golden project.
 
 Mutating initialization, pack commands, `skill install`, MCP/Codex configuration apply, project-skill materialization, `engine capabilities`, `engine connect`, engine-backed operations, workflow execution, verification, evidence commands, and documentation command integration remain planned. Private library functions are not public commands. The runtime registry exposes none of those planned operations.
 

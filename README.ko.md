@@ -1,12 +1,12 @@
 ---
 source: README.md
-source_sha256: 973ea7c48bf41fefd1513134b2820e2196eab23af67eda3f22bc0b167e87f650
+source_sha256: 48a566462e8a6426def740116d477b1a693a16669a9ae2c7ed234ad2ddda36d5
 translated_at: 2026-08-27
 ---
 
 # AI Game Playbook
 
-> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction, durable private receipt와 artifact byte, bounded private receipt-head query, 제한된 private artifact assessment, closed-world process-containment assessment, 소스 빌드 방식의 실험적 write-free command 여섯 개, static Godot status adapter, private permission-bound Godot executable discovery와 version probe, fail-closed Godot headless-preflight admission, project-bound modern STDIO MCP runtime, registry-derived project-inspection skill artifact 하나, write-free Codex setup planner를 구현하고 있습니다. 설치 가능한 package와 live engine bridge는 아직 없습니다.
+> 상태: control plane 계약, registry, core 안전 경계, managed-pack transaction, durable private receipt와 artifact byte, bounded private receipt-head query, 제한된 private artifact assessment, closed-world process-containment assessment와 provider/self-test protocol, 소스 빌드 방식의 실험적 write-free command 여섯 개, static Godot status adapter, private permission-bound Godot executable discovery와 version probe, fail-closed Godot headless-preflight admission, project-bound modern STDIO MCP runtime, registry-derived project-inspection skill artifact 하나, write-free Codex setup planner를 구현하고 있습니다. 설치 가능한 package와 live engine bridge는 아직 없습니다.
 
 [English](README.md)
 
@@ -17,6 +17,7 @@ AI Game Playbook은 Godot, Unity 또는 Unreal Engine을 사용하는 개인과 
 - versioned schema, semantic validation과 결정적 digest를 포함한 private pnpm/TypeScript workspace.
 - command, skill, workflow, role lens, schema, pack descriptor를 검증하고 서로 일치하는 CLI, MCP, 문서, skill routing metadata를 생성하는 typed registry.
 - canonical project identity, link-safe path resolution, bounded file read, staged compare-and-swap write/delete, bounded direct process execution, same-process witness가 있는 closed-world fail-closed containment assessment, project mutation lease, scoped signed approval, workflow state, durable checkpoint, append-only run receipt, receipt-attested manifest가 있는 immutable content-addressed artifact object 안전 primitive.
+- 고정 negative probe, canonical digest binding, verified-outcome 일관성을 강제하는 strict path-free containment-provider descriptor와 bounded self-test request/report protocol. Compiled provider catalog는 비어 있고 self-test runner나 launch authority는 없습니다.
 - 고정 limit 안에서 canonical receipt head를 조회하고, bounded process와 structured test observation을 정규화하며, raw content를 반환하지 않으면서 보존된 UTF-8 text, canonical JSON, non-interlaced PNG byte와 등록된 asset provenance를 평가하는 private evidence 경계.
 - write-free preflight, exact ownership, add/update/remove transaction, append-only journal, active-transaction barrier, 명확한 실패 뒤 rollback, marker 결합 directory ownership, 별도 승인 recovery finalization을 제공하는 private managed-pack runtime.
 - project-only evidence에서 준비하고 exact configured candidate 또는 선택한 PATH directory의 고정 direct name을 읽기 전에 signed single-use `host-tool-inspection` 승인을 요구하며 recursive search나 process launch 없이 source path를 제외한 identity digest를 반환하는 internal-only Godot executable discovery 경계.

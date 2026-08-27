@@ -4,7 +4,6 @@ import {
   assertProcessContainmentAssessmentReportSemantics,
   computeProcessContainmentAssessmentDigest,
   computeProcessContainmentRequestDigest,
-  digestCanonicalJson,
   type ProcessContainmentAssessmentDigestInput,
   type ProcessContainmentAssessmentReport,
   type ProcessContainmentAssessmentRequest,
@@ -17,6 +16,7 @@ import {
   assertProjectRootIdentity,
   type CanonicalProjectRoot,
 } from "./project-path.js";
+import { PROCESS_CONTAINMENT_PROVIDER_CATALOG_DIGEST } from "./process-containment-provider-catalog.js";
 
 export interface AssessProcessContainmentRequest {
   readonly root: CanonicalProjectRoot;
@@ -29,13 +29,6 @@ interface ProcessContainmentWitnessAuthority {
   readonly providerCatalogDigest: Sha256Digest;
   readonly assessmentDigest: Sha256Digest;
 }
-
-export const PROCESS_CONTAINMENT_PROVIDER_CATALOG_DIGEST: Sha256Digest =
-  digestCanonicalJson({
-    domain: "ai-game-playbook/process-containment-provider-catalog",
-    version: "1.0.0",
-    providers: [],
-  });
 
 const assessmentWitnesses = new WeakMap<
   object,

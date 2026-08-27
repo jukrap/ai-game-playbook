@@ -1,12 +1,12 @@
 ---
 source: docs/security-and-permissions.md
-source_sha256: 4c3f02032e9e712ba1e71084acd2423d6ae4c1c6f5ee315402249f7af7f738d0
+source_sha256: 80a7ba31ab0883c3126b87722e959ee11e034e894fcfcefb7a10122b9bac2199
 translated_at: 2026-08-27
 ---
 
 # 보안과 권한
 
-> 상태: private admission, workflow checkpoint, durable receipt/artifact record, bounded private receipt-head query, managed-pack transaction, closed-world process-containment assessment, static Godot status를 포함한 write-free CLI command 여섯 개, private permission-bound Godot executable discovery와 version probe, fail-closed Godot headless-preflight admission, read-only STDIO MCP 경계, write-free skill-target/Codex configuration planning이 구현된 계획 permission policy입니다. General mutation dispatch와 contained engine execution은 아직 없습니다.
+> 상태: private admission, workflow checkpoint, durable receipt/artifact record, bounded private receipt-head query, managed-pack transaction, closed-world process-containment assessment와 strict provider/self-test protocol, static Godot status를 포함한 write-free CLI command 여섯 개, private permission-bound Godot executable discovery와 version probe, fail-closed Godot headless-preflight admission, read-only STDIO MCP 경계, write-free skill-target/Codex configuration planning이 구현된 계획 permission policy입니다. General mutation dispatch와 contained engine execution은 아직 없습니다.
 
 [English](security-and-permissions.md) · [문서](README.ko.md)
 
@@ -93,6 +93,8 @@ Uncertain mutation은 자동 재시도하지 않습니다. 별도 authority와 r
 ## Process와 Editor isolation
 
 현재 core는 local executable과 project root를 digest-bind하고 argument array로 직접 spawn하며 environment value와 project-scoped working directory를 제한하고 time, idle, combined output을 cap하며 owned process tree만 종료합니다. 종료에 성공해도 interrupted execution은 mutation-uncertain입니다. 이는 CPU, memory, filesystem, network, child-process sandbox가 아닙니다. 따라서 해당 control을 요구하는 engine-backed preflight는 process 생성 전에 중단합니다.
+
+Contract layer에는 path-free provider descriptor와 bounded self-test request/report schema가 생겼습니다. Implementation/catalog digest, fixed probe suite, 짧은 challenge window, exact timing, effect와 outcome 일관성을 결합합니다. Core는 immutable empty compiled catalog만 노출합니다. Self-test process는 실행되지 않았고 등록된 descriptor, current-time/host-identity witness, launch handle도 없습니다. 따라서 valid-looking serialized report, 복사한 catalog, digest는 authority를 부여하지 않으며 기존 `block` admission을 바꿀 수 없습니다.
 
 Mutation lane은 고정 project-local lease 하나를 사용합니다. Record는 root/project digest, run ID, runtime identity, nonce, lane, optional Editor-session digest를 결합합니다. Acquisition은 bounded waiting/cancellation을 가지며 renew는 explicit합니다. Expiration만으로 live 또는 unverifiable owner를 takeover하지 않습니다. Automatic heartbeat, parallel-reader coordination, independent foreign-process start attestation, actual Editor control은 계획 단계입니다.
 

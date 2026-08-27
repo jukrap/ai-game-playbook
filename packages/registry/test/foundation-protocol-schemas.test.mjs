@@ -30,6 +30,9 @@ const expectedIds = [
   "input-replay-trace",
   "process-containment-assessment-report",
   "process-containment-assessment-request",
+  "process-containment-provider-descriptor",
+  "process-containment-self-test-report",
+  "process-containment-self-test-request",
   "project-inspect-report",
   "project-inspect-request",
   "resolved-workflow-plan",
@@ -387,6 +390,51 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       {
         ...fixtures["process-containment-assessment-report"],
         decision: "allow",
+      },
+    ],
+    [
+      "process-containment-provider-descriptor",
+      {
+        ...fixtures["process-containment-provider-descriptor"],
+        providerPath: "C:\\forbidden",
+      },
+    ],
+    [
+      "process-containment-self-test-request",
+      {
+        ...fixtures["process-containment-self-test-request"],
+        maxDurationMs:
+          contracts.PROCESS_CONTAINMENT_SELF_TEST_MAX_DURATION_MS + 1,
+      },
+    ],
+    [
+      "process-containment-self-test-report",
+      (() => {
+        const fixture = structuredClone(
+          fixtures["process-containment-self-test-report"],
+        );
+        [fixture.probes[1], fixture.probes[2]] = [
+          fixture.probes[2],
+          fixture.probes[1],
+        ];
+        return fixture;
+      })(),
+    ],
+    [
+      "process-containment-self-test-report",
+      {
+        ...fixtures["process-containment-self-test-report"],
+        launchAuthority: true,
+      },
+    ],
+    [
+      "process-containment-self-test-report",
+      {
+        ...fixtures["process-containment-self-test-report"],
+        effects: {
+          ...fixtures["process-containment-self-test-report"].effects,
+          projectMutationPerformed: true,
+        },
       },
     ],
     [

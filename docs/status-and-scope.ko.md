@@ -1,18 +1,18 @@
 ---
 source: docs/status-and-scope.md
-source_sha256: 902e0694922f1a11153a22aec43b26effbee532b3d9ab1094d9e1a07b6e3a56e
+source_sha256: ce2e3492a1ec130945eb1be6d787331d4b47df9f2ee5572acbf4243ade667e42
 translated_at: 2026-08-27
 ---
 
 # 현재 상태와 범위
 
-> 상태: 2026-08-27에 검토한 Stage 2 control-plane 구현 단계입니다. Source-built write-free command 여섯 개, closed-world process-containment assessment, static Godot status adapter, internal permission-bound Godot executable discovery와 version probe, assessment에 결합된 blocked receipt를 보존하는 fail-closed headless-preflight admission, explicit read-only STDIO MCP runtime이 존재하며 Codex setup은 plan-only이고 live-engine 지원은 planned입니다.
+> 상태: 2026-08-27에 검토한 Stage 2 control-plane 구현 단계입니다. Source-built write-free command 여섯 개, strict provider/self-test protocol과 empty compiled catalog가 있는 closed-world process-containment assessment, static Godot status adapter, internal permission-bound Godot executable discovery와 version probe, assessment에 결합된 blocked receipt를 보존하는 fail-closed headless-preflight admission, explicit read-only STDIO MCP runtime이 존재하며 Codex setup은 plan-only이고 live-engine 지원은 planned입니다.
 
 [English](status-and-scope.md) · [문서](README.ko.md)
 
 ## 현재 저장소 상태
 
-저장소에는 private pnpm/TypeScript workspace, versioned schema, semantic validator, typed registry validation/generation, deterministic workflow-plan attestation, implemented command용 runtime registry, digest 결합 공개 surface, test, Windows/Linux CI, fail-closed containment assessment가 있는 초기 core package, private evidence package, managed-pack/skill runtime, internal permission-bound executable discovery, exact-version process, assessment 결합 fail-closed headless-preflight 경계가 있는 static Godot status adapter, experimental CLI package, experimental MCP package, plan-only Codex adapter package가 있습니다.
+저장소에는 private pnpm/TypeScript workspace, versioned schema, semantic validator, typed registry validation/generation, deterministic workflow-plan attestation, implemented command용 runtime registry, digest 결합 공개 surface, test, Windows/Linux CI, fail-closed containment assessment와 immutable empty compiled provider catalog가 있는 초기 core package, private evidence package, managed-pack/skill runtime, internal permission-bound executable discovery, exact-version process, assessment 결합 fail-closed headless-preflight 경계가 있는 static Godot status adapter, experimental CLI package, experimental MCP package, plan-only Codex adapter package가 있습니다.
 
 구현된 core 경계는 다음을 포함합니다.
 
@@ -21,6 +21,7 @@ translated_at: 2026-08-27
 - staged SHA-256 compare-and-swap write, delete, reversible empty-directory removal;
 - environment, working directory, time, idle, output을 제한하는 digest-bound direct process execution;
 - exact root 하나와 고정 project-write/network/child-process denial policy에 결합된 path-free process-containment assessment, 빈 closed provider catalog, immutable `block` report, same-process witness 검사;
+- implementation, catalog, host, challenge, fixture, timing, ordered negative probe, effect, derived outcome을 launch authority 없이 결합하는 strict path-free provider descriptor와 bounded self-test request/report schema;
 - bounded waiting과 dead-owner-only recovery를 가진 root/project 결합 mutation lease 하나;
 - schema-bound permission admission, exact scoped signed grant, effect settlement;
 - deterministic workflow-plan resolution과 immutable state transition;
@@ -44,7 +45,7 @@ Source-built MCP runtime은 startup에서 generated registry surface로부터 �
 
 ## 사용할 수 없는 것
 
-Installable/published package, 지원되는 MCP/Codex setup command, configuration apply path, materialized project skill, general command dispatcher, approval UI, durable approval store, evidence CLI/export path, 공개 executable discovery/version probe/headless preflight, mutating pack CLI, recovery-finalization command, CPU/memory/filesystem/network/child-process sandbox, engine bridge, engine pack, live-engine automation, playable golden project는 없습니다.
+Installable/published package, 지원되는 MCP/Codex setup command, configuration apply path, materialized project skill, general command dispatcher, approval UI, durable approval store, evidence CLI/export path, 공개 executable discovery/version probe/headless preflight, containment self-test runner, 등록된 containment provider, launch handle, mutating pack CLI, recovery-finalization command, CPU/memory/filesystem/network/child-process sandbox, engine bridge, engine pack, live-engine automation, playable golden project는 없습니다.
 
 Mutating initialization, pack command, `skill install`, MCP/Codex configuration apply, project-skill materialization, `engine capabilities`, `engine connect`, engine-backed operation, workflow execution, verification, evidence command, documentation command integration은 planned입니다. Private library function은 public command가 아니며 runtime registry도 이러한 planned operation을 노출하지 않습니다.
 

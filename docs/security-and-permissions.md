@@ -1,6 +1,6 @@
 # Security and Permissions
 
-> Status: planned permission policy with implemented private admission, workflow checkpoints, durable receipt and artifact records, bounded private receipt-head queries, managed-pack transactions, a closed-world process-containment assessment, six write-free CLI commands including static Godot status, private permission-bound Godot executable discovery and version probing, fail-closed Godot headless-preflight admission, a read-only STDIO MCP boundary, and write-free skill-target and Codex configuration planning. General mutation dispatch and contained engine execution do not exist.
+> Status: planned permission policy with implemented private admission, workflow checkpoints, durable receipt and artifact records, bounded private receipt-head queries, managed-pack transactions, a closed-world process-containment assessment plus strict provider/self-test protocols, six write-free CLI commands including static Godot status, private permission-bound Godot executable discovery and version probing, fail-closed Godot headless-preflight admission, a read-only STDIO MCP boundary, and write-free skill-target and Codex configuration planning. General mutation dispatch and contained engine execution do not exist.
 
 [한국어](security-and-permissions.ko.md) · [Documentation](README.md)
 
@@ -87,6 +87,8 @@ Uncertain mutation is never automatically retried. It requires a new reconciliat
 ## Process and editor isolation
 
 The current core digest-binds a local executable and project root, spawns it directly with an argument array, limits environment values and project-scoped working directories, caps time, idle time, and combined output, and terminates only the owned process tree. Interrupted execution remains mutation-uncertain even if termination succeeds. This is not a CPU, memory, filesystem, network, or child-process sandbox. Engine-backed preflight that requires those controls therefore stops before process creation.
+
+The contract layer now defines path-free provider descriptors and bounded self-test request/report schemas. They bind implementation and catalog digests, a fixed probe suite, a short challenge window, exact timing, effects, and outcome consistency. Core exposes only an immutable empty compiled catalog. No self-test process has run, no descriptor is registered, no current-time or host-identity witness exists, and no launch handle is created. A valid-looking serialized report, copied catalog, or digest therefore grants no authority and cannot change the existing `block` admission.
 
 Mutating lanes use one fixed project-local lease. The record binds root and project digests, run ID, runtime identity, nonce, lane, and optional editor-session digest. Acquisition has bounded waiting and cancellation; renewal is explicit. Expiration alone does not permit takeover of a live or unverifiable owner. Automatic heartbeats, parallel-reader coordination, independent foreign-process start attestation, and actual editor control remain planned.
 

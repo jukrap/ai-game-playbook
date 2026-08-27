@@ -1,6 +1,9 @@
 import {
   GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
   PROCESS_CONTAINMENT_POLICY_DIGEST,
+  PROCESS_CONTAINMENT_SELF_TEST_MAX_DURATION_MS,
+  PROCESS_CONTAINMENT_SELF_TEST_PROBES,
+  PROCESS_CONTAINMENT_SELF_TEST_SUITE_DIGEST,
 } from "@ai-game-playbook/contracts";
 
 const digest = `sha256:${"a".repeat(64)}`;
@@ -10,6 +13,62 @@ const endedAt = "2026-08-26T01:02:04.000Z";
 const runId = "018f6f35-2c9e-7d1a-8a4b-123456789abd";
 const requestId = "018f6f35-2c9e-7d1a-8a4b-123456789abe";
 const sessionId = "018f6f35-2c9e-7d1a-8a4b-123456789abf";
+const containmentProviderDescriptor = {
+  schemaVersion: "1.0.0",
+  providerId: "process-containment.windows.schema-fixture",
+  providerVersion: "0.1.0",
+  host: { platform: "windows", architecture: "x64" },
+  workload: "engine-project-process",
+  policyDigest: PROCESS_CONTAINMENT_POLICY_DIGEST,
+  implementation: {
+    entryArtifactDigest: digest,
+    closureManifestDigest: secondDigest,
+    selfTestArtifactDigest: digest,
+  },
+  protocols: { selfTest: "1.0.0", launch: "1.0.0" },
+  controls: {
+    filesystem: {
+      requirement: "deny-project-writes",
+      enforcement: "os-enforced",
+      selfTest: "required",
+    },
+    network: {
+      requirement: "deny",
+      enforcement: "os-enforced",
+      selfTest: "required",
+    },
+    childProcesses: {
+      requirement: "deny",
+      enforcement: "os-enforced",
+      selfTest: "required",
+    },
+  },
+  selfTestSuiteDigest: PROCESS_CONTAINMENT_SELF_TEST_SUITE_DIGEST,
+  descriptorDigest: digest,
+};
+const containmentSelfTestRequest = {
+  schemaVersion: "1.0.0",
+  selfTestId: "018f6f35-2c9e-7d1a-8a4b-123456789ad0",
+  providerDescriptorDigest: digest,
+  providerCatalogDigest: secondDigest,
+  host: { platform: "windows", architecture: "x64" },
+  workload: "engine-project-process",
+  policyDigest: PROCESS_CONTAINMENT_POLICY_DIGEST,
+  selfTestSuiteDigest: PROCESS_CONTAINMENT_SELF_TEST_SUITE_DIGEST,
+  challengeDigest: digest,
+  fixtureIdentityDigest: secondDigest,
+  issuedAt: startedAt,
+  expiresAt: "2026-08-26T01:03:03.000Z",
+  maxDurationMs: PROCESS_CONTAINMENT_SELF_TEST_MAX_DURATION_MS,
+};
+const containmentSelfTestProbes = PROCESS_CONTAINMENT_SELF_TEST_PROBES.map(
+  ({ id, expected }) => ({
+    id,
+    expected,
+    outcome: "passed",
+    observationDigest: digest,
+  }),
+);
 
 export const validFoundationProtocolFixtures = {
   "doctor-request": {
@@ -394,6 +453,34 @@ export const validFoundationProtocolFixtures = {
     checkedAt: startedAt,
     evidenceGrade: "implemented",
     assessmentDigest: digest,
+  },
+  "process-containment-provider-descriptor":
+    containmentProviderDescriptor,
+  "process-containment-self-test-request": containmentSelfTestRequest,
+  "process-containment-self-test-report": {
+    schemaVersion: "1.0.0",
+    selfTestId: containmentSelfTestRequest.selfTestId,
+    request: containmentSelfTestRequest,
+    requestDigest: digest,
+    providerDescriptorDigest: digest,
+    providerCatalogDigest: secondDigest,
+    host: { platform: "windows", architecture: "x64" },
+    workload: "engine-project-process",
+    policyDigest: PROCESS_CONTAINMENT_POLICY_DIGEST,
+    selfTestSuiteDigest: PROCESS_CONTAINMENT_SELF_TEST_SUITE_DIGEST,
+    startedAt,
+    completedAt: endedAt,
+    durationMs: 1_000,
+    probes: containmentSelfTestProbes,
+    effects: {
+      containedProcessStarted: true,
+      projectMutationPerformed: false,
+      networkConnectionEstablished: false,
+      childProcessStarted: false,
+      cleanup: "complete",
+    },
+    outcome: "verified",
+    reportDigest: secondDigest,
   },
   "init-request": {
     schemaVersion: "1.0.0",

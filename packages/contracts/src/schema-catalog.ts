@@ -69,6 +69,11 @@ import {
   processContainmentAssessmentReportSchema,
   processContainmentAssessmentRequestSchema,
 } from "./process-containment-assessment-contracts.js";
+import {
+  processContainmentProviderDescriptorSchema,
+  processContainmentSelfTestReportSchema,
+  processContainmentSelfTestRequestSchema,
+} from "./process-containment-provider-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -123,6 +128,12 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
       processContainmentAssessmentReportSchema,
     "process-containment-assessment-request":
       processContainmentAssessmentRequestSchema,
+    "process-containment-provider-descriptor":
+      processContainmentProviderDescriptorSchema,
+    "process-containment-self-test-report":
+      processContainmentSelfTestReportSchema,
+    "process-containment-self-test-request":
+      processContainmentSelfTestRequestSchema,
     "resolved-workflow-plan": resolvedWorkflowPlanSchema,
     "workflow-checkpoint": workflowCheckpointSchema,
     "run-handle": runHandleSchema,

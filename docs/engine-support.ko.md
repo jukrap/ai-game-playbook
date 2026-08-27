@@ -1,6 +1,6 @@
 ---
 source: docs/engine-support.md
-source_sha256: fea7c1b77c5f60162f9e23195d26980fe478436b7b6b4c7ea8e4e4bc52bca3d7
+source_sha256: 23701b5df8aaafc1b9f8b7874408fadb53734703f211da3a5d5d55fe575273ae
 translated_at: 2026-08-27
 ---
 
@@ -34,6 +34,8 @@ translated_at: 2026-08-27
 Source-built `agpb engine status --engine godot` command는 support grade가 아니라 control-plane observation입니다. Static Godot project candidate 하나를 검증하고 major/minor hint를 pin된 `4.7.2` target과 비교합니다. Executable path를 받지 않고 host-tool discovery/version probe나 process start를 수행하지 않으며 matrix의 모든 cell을 `planned`로 유지합니다.
 
 Internal-only 후속 흐름은 discovery와 execution을 분리합니다. Project-only 준비는 host candidate를 읽지 않고 bounded explicit source count와 source digest를 bind합니다. Discovery가 exact configured file 또는 선택한 PATH directory의 고정 direct name을 읽기 전에 signed single-use `host-tool-inspection` grant가 필요합니다. Discovery는 nonrecursive이고 process를 시작하지 않으며 source path나 execution authority를 반환하지 않고 원본 same-process report 뒤에만 candidate를 보존합니다. Version 준비는 선택한 retained candidate 하나만 받고 bounded runner가 `--version`만 호출하기 전에 content/filesystem-identity digest에 결합된 두 번째 signed grant를 요구합니다. Probe는 dispatch 전 drift를 거부하고 실행 뒤 identity를 다시 확인하며 authorization을 정산하고 raw path/output 없이 normalized process와 output digest를 출력합니다. 세 번째 workflow-bound admission은 그 원본 completed report만 받고 고정 headless startup argument를 bind하며 exact project root에 대한 core-produced containment assessment를 얻습니다. 원본 same-process witness를 보존하고 assessment/provider-catalog digest를 approval, report, receipt evidence에 bind합니다. 현재 provider catalog가 비어 있어 유효한 decision은 `block`뿐이며 project process를 시작하지 않습니다. 이는 fail-closed admission이지 구현된 sandbox가 아닙니다. 이 component들에는 automated local witness가 있지만 실제 Godot binary의 retained execution이 없고 CLI/MCP에 노출되지 않으므로 matrix를 변경하지 않습니다.
+
+Provider descriptor와 bounded self-test schema는 이후 OS 구현이 만족해야 할 exact evidence shape을 정의합니다. Fixed ordered probe suite를 요구하고 모든 denial/cleanup probe를 통과한 0ms가 아닌 clean run에만 `verified`를 허용합니다. Compiled provider descriptor가 없고 self-test가 실행되지 않았으며 same-process launch witness도 없으므로 이 계약은 Godot이나 다른 engine grade를 올리지 않습니다.
 
 ## Godot 방향
 

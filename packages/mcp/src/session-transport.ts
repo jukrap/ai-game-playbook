@@ -14,9 +14,12 @@ export interface McpSessionBudgets {
   readonly maxMessages: number;
   readonly maxPendingRequests: number;
   readonly maxSerializedInputBytes: number;
+  readonly maxSerializedOutputBytes?: number;
 }
 
 export const MCP_STDIO_MAX_SESSION_SERIALIZED_INPUT_BYTES: number =
+  16 * 1_024 * 1_024;
+export const MCP_STDIO_MAX_SESSION_SERIALIZED_OUTPUT_BYTES: number =
   16 * 1_024 * 1_024;
 export const MCP_STDIO_MAX_SESSION_MESSAGES = 1_024;
 export const MCP_STDIO_MAX_PENDING_REQUESTS = 32;
@@ -25,9 +28,13 @@ const DEFAULT_SESSION_BUDGETS: McpSessionBudgets = Object.freeze({
   maxMessages: MCP_STDIO_MAX_SESSION_MESSAGES,
   maxPendingRequests: MCP_STDIO_MAX_PENDING_REQUESTS,
   maxSerializedInputBytes: MCP_STDIO_MAX_SESSION_SERIALIZED_INPUT_BYTES,
+  maxSerializedOutputBytes: MCP_STDIO_MAX_SESSION_SERIALIZED_OUTPUT_BYTES,
 });
 
 function validateBudgets(budgets: McpSessionBudgets): McpSessionBudgets {
+  const maxSerializedOutputBytes =
+    budgets.maxSerializedOutputBytes ??
+    MCP_STDIO_MAX_SESSION_SERIALIZED_OUTPUT_BYTES;
   if (
     !Number.isSafeInteger(budgets.maxMessages) ||
     budgets.maxMessages <= 0 ||
@@ -35,7 +42,9 @@ function validateBudgets(budgets: McpSessionBudgets): McpSessionBudgets {
     budgets.maxPendingRequests <= 0 ||
     budgets.maxPendingRequests > budgets.maxMessages ||
     !Number.isSafeInteger(budgets.maxSerializedInputBytes) ||
-    budgets.maxSerializedInputBytes <= 0
+    budgets.maxSerializedInputBytes <= 0 ||
+    !Number.isSafeInteger(maxSerializedOutputBytes) ||
+    maxSerializedOutputBytes <= 0
   ) {
     throw new TypeError("MCP STDIO session budgets are invalid.");
   }
@@ -43,6 +52,7 @@ function validateBudgets(budgets: McpSessionBudgets): McpSessionBudgets {
     maxMessages: budgets.maxMessages,
     maxPendingRequests: budgets.maxPendingRequests,
     maxSerializedInputBytes: budgets.maxSerializedInputBytes,
+    maxSerializedOutputBytes,
   });
 }
 
@@ -57,6 +67,7 @@ export class BoundedMcpSessionTransport implements Transport {
   private failed = false;
   private receivedInputBytes = 0;
   private receivedMessages = 0;
+  private sentOutputBytes = 0;
   private readonly budgets: McpSessionBudgets;
   private readonly pendingRequests = new Set<RequestId>();
 
@@ -134,7 +145,29 @@ export class BoundedMcpSessionTransport implements Transport {
     message: JSONRPCMessage,
     options?: TransportSendOptions,
   ): Promise<void> {
-    await this.transport.send(message, options);
+    if (this.failed) {
+      throw new Error("MCP STDIO session budget exceeded.");
+    }
+    let messageBytes: number;
+    try {
+      messageBytes = Buffer.byteLength(serializeMessage(message), "utf8");
+    } catch {
+      throw this.fail();
+    }
+    const maxOutputBytes = this.budgets.maxSerializedOutputBytes;
+    if (
+      maxOutputBytes === undefined ||
+      messageBytes > maxOutputBytes - this.sentOutputBytes
+    ) {
+      throw this.fail();
+    }
+    this.sentOutputBytes += messageBytes;
+    try {
+      await this.transport.send(message, options);
+    } catch (error) {
+      this.sentOutputBytes -= messageBytes;
+      throw error;
+    }
     if (
       (isJSONRPCResultResponse(message) || isJSONRPCErrorResponse(message)) &&
       message.id !== undefined &&
@@ -149,12 +182,13 @@ export class BoundedMcpSessionTransport implements Transport {
     await this.transport.close();
   }
 
-  private fail(): void {
+  private fail(): Error {
+    const error = new Error("MCP STDIO session budget exceeded.");
     if (this.failed) {
-      return;
+      return error;
     }
     this.failed = true;
-    this.reportError(new Error("MCP STDIO session budget exceeded."));
+    this.reportError(error);
     void this.close().catch((error: unknown) => {
       this.reportError(
         error instanceof Error
@@ -162,6 +196,7 @@ export class BoundedMcpSessionTransport implements Transport {
           : new Error("MCP STDIO session close failed."),
       );
     });
+    return error;
   }
 
   private reportError(error: Error): void {

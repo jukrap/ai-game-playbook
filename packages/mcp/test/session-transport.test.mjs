@@ -85,6 +85,33 @@ test("session transport bounds aggregate serialized input bytes", async () => {
   assert.equal(harness.inner.closed, true);
 });
 
+test("session transport bounds aggregate serialized output bytes before send", async () => {
+  const oneResponseBytes = Buffer.byteLength(
+    serializeMessage(response(1)),
+    "utf8",
+  );
+  const harness = createHarness({
+    maxMessages: 4,
+    maxPendingRequests: 2,
+    maxSerializedInputBytes: 16_384,
+    maxSerializedOutputBytes: oneResponseBytes,
+  });
+  await harness.transport.start();
+
+  harness.inner.receive(request(1));
+  harness.inner.receive(request(2));
+  await harness.transport.send(response(1));
+  await assert.rejects(
+    () => harness.transport.send(response(2)),
+    /MCP STDIO session budget exceeded/u,
+  );
+
+  assert.deepEqual(harness.inner.sent, [response(1)]);
+  assert.equal(harness.errors.length, 1);
+  assert.equal(harness.errors[0]?.message, "MCP STDIO session budget exceeded.");
+  assert.equal(harness.inner.closed, true);
+});
+
 test("session transport rejects excess pending requests", async () => {
   const harness = createHarness({
     maxMessages: 8,

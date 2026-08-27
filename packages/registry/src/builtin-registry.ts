@@ -640,7 +640,7 @@ const projectInitializationRecoveryAssessmentCommand: CommandDescriptor =
       package: "@ai-game-playbook/project-runtime",
       export: "runProjectInitializationRecoveryAssessment",
       digest: parseSha256Digest(
-        "sha256:dbb1166633739c6c637845af97c74bee2793fb57f1bb3806ab280fe78fc3b79a",
+        "sha256:c1b97119b88cf4da0f8a163bd0ee5bf627c5830db5670f4148b3a48936cb5a38",
       ),
     }),
   });

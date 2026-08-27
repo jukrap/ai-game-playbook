@@ -53,6 +53,15 @@ const TERMINAL_STATUSES = new Set([
   "expired",
   "archived",
 ]);
+const CHECKPOINT_CHAIN_BLOCKED_ERROR_CODES: ReadonlySet<
+  CoreBoundaryError["code"]
+> = new Set([
+  "workflow-checkpoint-store-budget-exceeded",
+  "workflow-checkpoint-store-conflict",
+  "workflow-checkpoint-store-corrupt",
+  "workflow-checkpoint-store-mismatch",
+  "workflow-checkpoint-store-not-found",
+]);
 
 type PathObservation = "absent" | "present" | "invalid";
 
@@ -744,42 +753,69 @@ export async function runProjectInitializationRecoveryAssessment(
         }),
       );
     } else {
-      const loadedCheckpoint = await loadQueriedWorkflowCheckpointChain({
-        query: query!,
-        runId: request.runId,
-      });
-      selectedCheckpoint = loadedCheckpoint.stored;
-      const receiptAssessment = await assessSelectedReceipt(
-        root,
-        selectedCheckpoint,
-        loadedCheckpoint.checkpoints,
-      );
-      receiptQuery = receiptAssessment.query;
-      const candidate =
-        receiptAssessment.disposition === undefined
-          ? observedCandidate
-          : candidateWithDisposition(
-              observedCandidate,
-              receiptAssessment.disposition,
-            );
-      candidateEntries[candidateIndex] = candidate;
-      if (receiptAssessment.issue !== undefined) {
-        issueEntries.push(receiptAssessment.issue);
+      let loadedCheckpoint: Awaited<
+        ReturnType<typeof loadQueriedWorkflowCheckpointChain>
+      > | undefined;
+      try {
+        loadedCheckpoint = await loadQueriedWorkflowCheckpointChain({
+          query: query!,
+          runId: request.runId,
+        });
+      } catch (error) {
+        if (
+          !(error instanceof CoreBoundaryError) ||
+          !CHECKPOINT_CHAIN_BLOCKED_ERROR_CODES.has(error.code)
+        ) {
+          throw error;
+        }
+        candidateEntries[candidateIndex] = candidateWithDisposition(
+          observedCandidate,
+          "corrupt",
+        );
+        selection = Object.freeze({ status: "blocked", runId: request.runId });
+        issueEntries.push(
+          Object.freeze({
+            severity: "blocked",
+            code: parseStableId("initialization-checkpoint-chain-invalid"),
+            subject: "checkpoint",
+            runId: request.runId,
+          }),
+        );
       }
-      selection = Object.freeze({ status: "assessed", runId: request.runId });
-      selected = deepFreeze({
-        runId: request.runId,
-        disposition: candidate.disposition,
-        actionCode: candidate.actionCode,
-        checkpoint: {
-          status: "verified",
-          chainLength: selectedCheckpoint.chainLength,
-          checkpointDigest:
-            selectedCheckpoint.checkpoint.checkpointDigest,
-          headDigest: selectedCheckpoint.headDigest,
-        },
-        receipt: receiptAssessment.receipt,
-      });
+      if (loadedCheckpoint !== undefined) {
+        selectedCheckpoint = loadedCheckpoint.stored;
+        const receiptAssessment = await assessSelectedReceipt(
+          root,
+          selectedCheckpoint,
+          loadedCheckpoint.checkpoints,
+        );
+        receiptQuery = receiptAssessment.query;
+        const candidate =
+          receiptAssessment.disposition === undefined
+            ? observedCandidate
+            : candidateWithDisposition(
+                observedCandidate,
+                receiptAssessment.disposition,
+              );
+        candidateEntries[candidateIndex] = candidate;
+        if (receiptAssessment.issue !== undefined) {
+          issueEntries.push(receiptAssessment.issue);
+        }
+        selection = Object.freeze({ status: "assessed", runId: request.runId });
+        selected = deepFreeze({
+          runId: request.runId,
+          disposition: candidate.disposition,
+          actionCode: candidate.actionCode,
+          checkpoint: {
+            status: "verified",
+            chainLength: selectedCheckpoint.chainLength,
+            checkpointDigest:
+              selectedCheckpoint.checkpoint.checkpointDigest,
+            headDigest: selectedCheckpoint.headDigest,
+          },
+          receipt: receiptAssessment.receipt,
+        });
+      }
     }
   }
   const activeMutationCandidates = candidateEntries.filter(

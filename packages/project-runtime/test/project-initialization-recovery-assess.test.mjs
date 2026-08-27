@@ -507,6 +507,53 @@ test("an exact run selector upgrades only that current checkpoint to full-chain 
   );
 });
 
+test("a selected checkpoint with a missing ancestor becomes a bounded blocked report", async (t) => {
+  const { project, root } = await fixture(t);
+  const { checkpoint } = await persistWaitingApproval(root);
+  await replaceHeadWithStartedCheckpoint(root, checkpoint);
+  await rm(
+    join(
+      project,
+      ".ai-game-playbook",
+      "state",
+      "workflows",
+      `${RUN_ID}.0.${checkpoint.checkpointDigest.slice("sha256:".length)}.checkpoint.json`,
+    ),
+  );
+
+  const report =
+    await projectRuntime.runProjectInitializationRecoveryAssessment({
+      schemaVersion: "1.0.0",
+      projectRoot: project,
+      runId: RUN_ID,
+    });
+
+  assert.equal(report.status, "blocked");
+  assert.equal(report.inventory.storeStatus, "present");
+  assert.equal(report.validationLevel, "head-and-latest-record-presence");
+  assert.deepEqual(report.selection, { status: "blocked", runId: RUN_ID });
+  assert.equal("selected" in report, false);
+  assert.equal(report.candidates[0].disposition, "corrupt");
+  assert.equal(
+    report.candidates[0].actionCode,
+    "repair-initialization-evidence",
+  );
+  assert.deepEqual(report.issues, [
+    {
+      severity: "blocked",
+      code: "initialization-checkpoint-chain-invalid",
+      subject: "checkpoint",
+      runId: RUN_ID,
+    },
+  ]);
+  const serialized = JSON.stringify(report);
+  assert.equal(serialized.includes(project), false);
+  assert.equal(serialized.includes(".checkpoint.json"), false);
+  assert.doesNotThrow(() =>
+    contracts.assertProjectInitializationRecoveryReportSemantics(report),
+  );
+});
+
 test("a durable receipt omitted by the selected checkpoint is a blocked contradiction", async (t) => {
   const { project, root } = await fixture(t);
   const { checkpoint } = await persistWaitingApproval(root);

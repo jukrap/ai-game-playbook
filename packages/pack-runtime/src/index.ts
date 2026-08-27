@@ -1,5 +1,6 @@
 export { PackRuntimeError } from "./errors.js";
 export type { PackRuntimeErrorCode } from "./errors.js";
+export { runPackDoctor, runPackList } from "./inspection.js";
 export {
   computeActivePackTransactionRecordDigest,
   loadActivePackTransactionRecord,

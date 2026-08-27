@@ -78,6 +78,12 @@ import {
   processContainmentSelfTestReportSchema,
   processContainmentSelfTestRequestSchema,
 } from "./process-containment-provider-contracts.js";
+import {
+  packDoctorReportSchema,
+  packDoctorRequestSchema,
+  packListReportSchema,
+  packListRequestSchema,
+} from "./pack-inspection-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -118,6 +124,10 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "godot-version-probe-request": godotVersionProbeRequestSchema,
     "init-report": initReportSchema,
     "init-request": initRequestSchema,
+    "pack-doctor-report": packDoctorReportSchema,
+    "pack-doctor-request": packDoctorRequestSchema,
+    "pack-list-report": packListReportSchema,
+    "pack-list-request": packListRequestSchema,
     "project-inspect-report": projectInspectReportSchema,
     "project-inspect-request": projectInspectRequestSchema,
     "skill-check-report": skillCheckReportSchema,

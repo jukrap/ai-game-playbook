@@ -119,6 +119,7 @@ test("workspace packages stay private and follow the foundation dependency direc
     "@ai-game-playbook/contracts": "workspace:*",
     "@ai-game-playbook/core": "workspace:*",
     "@ai-game-playbook/godot-adapter": "workspace:*",
+    "@ai-game-playbook/pack-runtime": "workspace:*",
     "@ai-game-playbook/project-runtime": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
     "@modelcontextprotocol/server": "2.0.0",

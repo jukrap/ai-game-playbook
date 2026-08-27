@@ -1,12 +1,12 @@
 ---
 source: docs/architecture.md
-source_sha256: 243550c861435932d3e715b1fe362949d776d52c04bd31dc197b5e82439a4286
+source_sha256: 9155927ca9acdc07cc105e708d93ec108d602a898e41dfda204f6ec9ca2b23d4
 translated_at: 2026-08-27
 ---
 
 # 목표 아키텍처
 
-> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, closed-world process-containment assessment와 strict provider/self-test protocol을 포함한 core 안전 primitive, durable private receipt record와 artifact object, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, managed-pack transaction, static Godot status/capability report를 포함한 write-free `agpb` command 일곱 개, private permission-bound Godot executable discovery와 version probe, assessment에 결합된 blocked receipt를 보존하는 fail-closed Godot headless-preflight admission, project-bound read-only STDIO MCP runtime, registry-derived project-inspection skill artifact, write-free Codex setup planner가 존재합니다. General mutation dispatch, evidence export, 실제 host installation, live engine, bridge는 계획 단계입니다.
+> 상태: 일부 control plane이 구현된 목표 아키텍처입니다. Contract, runtime registry, closed-world process-containment assessment와 strict provider/self-test protocol을 포함한 core 안전 primitive, durable private receipt record와 artifact object, bounded private receipt-head query, pure process/test result normalization, 제한된 retained-artifact assessment, managed-pack transaction, bounded pack inspection과 static Godot status/capability report를 포함한 write-free `agpb` command 아홉 개, private permission-bound Godot executable discovery와 version probe, assessment에 결합된 blocked receipt를 보존하는 fail-closed Godot headless-preflight admission, project-bound read-only STDIO MCP runtime, registry-derived project-inspection skill artifact, write-free Codex setup planner가 존재합니다. General mutation dispatch, evidence export, 실제 host installation, live engine, bridge는 계획 단계입니다.
 
 [English](architecture.md) · [문서](README.ko.md)
 
@@ -27,7 +27,7 @@ flowchart TD
     W --> F[Safe filesystem와 process layer]
 ```
 
-Typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 authoring source입니다. Generation은 같은 validated identity에서 CLI, MCP, 문서, skill-routing metadata를 만듭니다. Public runtime surface에는 현재 `init`, `doctor`, `project.inspect`, `skill.list`, `skill.check`, `engine.status`, `engine.capabilities`가 있으며 CLI help, parsing, input/output validation, dispatch가 그 exact descriptor를 사용합니다. Registry에는 internal `engine.executable-discovery`, `engine.version-probe`, `engine.headless-preflight` descriptor와 유한한 internal headless-preflight workflow 하나도 있습니다. 이들은 CLI, MCP, generated public command inventory에서 제외됩니다. 실험적 MCP runtime은 generated MCP metadata와 exact schema에서 명시적으로 선택한 read-only subset만 등록합니다. 공개 foundation plan은 runtime-registry digest를 기록하고 미구현 command를 분리합니다.
+Typed registry는 command, skill, role lens, workflow, schema, pack descriptor의 authoring source입니다. Generation은 같은 validated identity에서 CLI, MCP, 문서, skill-routing metadata를 만듭니다. Public runtime surface에는 현재 `init`, `doctor`, `project.inspect`, `pack.list`, `pack.doctor`, `skill.list`, `skill.check`, `engine.status`, `engine.capabilities`가 있으며 CLI help, parsing, input/output validation, dispatch가 그 exact descriptor를 사용합니다. Registry에는 internal `engine.executable-discovery`, `engine.version-probe`, `engine.headless-preflight` descriptor와 유한한 internal headless-preflight workflow 하나도 있습니다. 이들은 CLI, MCP, generated public command inventory에서 제외됩니다. 실험적 MCP runtime은 generated MCP metadata와 exact schema에서 명시적으로 선택한 read-only subset만 등록합니다. 공개 foundation plan은 runtime-registry digest를 기록하고 미구현 command를 분리합니다.
 
 ## Workspace 경계
 
@@ -61,7 +61,7 @@ Partial package가 존재한다고 전체 product surface가 존재하는 것은
 6. 해당되는 semantic count, identity, digest binding을 검증한 뒤 완성된 report를 descriptor 결합 output schema로 검증합니다.
 7. Human 또는 canonical JSON output을 만들고 stable exit category로 매핑합니다.
 
-Handler digest는 public write-free command 일곱 개와 internal Godot operation 세 개를 합친 registered compiled command module 열 개를 attest합니다. 어느 executable artifact든 registry metadata와 drift하면 cross-package test가 실패합니다.
+Handler digest는 public write-free command 아홉 개와 internal Godot operation 세 개를 합친 registered compiled command module 열두 개를 attest합니다. 어느 executable artifact든 registry metadata와 drift하면 cross-package test가 실패합니다.
 
 Private Godot host-tool flow는 public status와 분리합니다. 준비 단계는 project와 bounded explicit source의 digest만 bind합니다. 그 뒤 exact candidate file을 읽기 전에 broker가 signed single-use `host-tool-inspection` grant를 요구합니다. Discovery는 recursive search나 process launch 없이 configured path와 선택한 PATH directory의 고정 direct executable name을 검사하고 lease를 정산한 뒤 source path나 execution authority가 없는 원본 same-process report를 반환합니다. Version 준비는 해당 report에서 선택한 candidate만 받고, bounded `--version` process 시작 전 executable content/identity digest에 결합된 두 번째 grant를 요구합니다. Headless-preflight 준비는 원본 completed version report만 받고 project/executable identity를 다시 검증하며 exact one-step workflow 하나를 resolve한 뒤 exact root와 deny-project-writes/network/child-process policy에 결합된 path-free assessment를 core에 요청합니다. Assessment JSON은 evidence이지 authority가 아닙니다. 원본 report/root를 same-process witness 하나로 보존하고 admission 직전에 다시 확인합니다. Request, assessment, policy, provider-catalog digest는 command input과 세 번째 grant scope에 들어갑니다. 현재 closed provider catalog가 비어 있으므로 유효한 decision은 `block`뿐입니다. Executor는 Godot을 한 번도 시작하지 않고 lease를 명확한 실패로 정산하며 같은 assessment에 결합된 canonical `blocked` receipt 하나를 initialized local evidence storage에 저장합니다. Clone한 plan, report, assessment, root, authorization decision은 runtime 경계를 넘어 authority를 전달할 수 없습니다.
 

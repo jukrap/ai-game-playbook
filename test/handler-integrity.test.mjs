@@ -18,6 +18,8 @@ test("runtime command handler metadata attests each exact compiled module", asyn
     ["engine.status", "godot-adapter", "status.js"],
     ["engine.version-probe", "godot-adapter", "version-probe.js"],
     ["init", "cli", "init.js"],
+    ["pack.doctor", "pack-runtime", "inspection.js"],
+    ["pack.list", "pack-runtime", "inspection.js"],
     ["project.inspect", "project-runtime", "project-inspect.js"],
     ["skill.check", "cli", "skill-check.js"],
     ["skill.list", "cli", "skill-list.js"],

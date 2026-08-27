@@ -20,6 +20,10 @@ import {
   godotVersionProbeRequestSchema,
   initReportSchema,
   initRequestSchema,
+  packDoctorReportSchema,
+  packDoctorRequestSchema,
+  packListReportSchema,
+  packListRequestSchema,
   parseSemanticVersion,
   parseSha256Digest,
   parseStableId,
@@ -151,6 +155,104 @@ const doctorCommand: CommandDescriptor = Object.freeze({
     export: "runDoctor",
     digest: parseSha256Digest(
       "sha256:5f20c0ba5af33d5c7ac4048fde16550f621fbdd1407d56df24c83a30162111d4",
+    ),
+  }),
+});
+
+const packListCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("pack.list"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "experimental",
+  summary: "List installed pack identities and counts without disclosure or mutation.",
+  cli: Object.freeze({
+    path: Object.freeze(["pack", "list"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: packListRequestSchema.schemaId,
+    digest: packListRequestSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: packListReportSchema.schemaId,
+    digest: packListReportSchema.digest,
+  }),
+  capabilities: Object.freeze([parseStableId("pack.list")]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "none",
+      scope: "pack-installed-list",
+      boundary: "local",
+    }),
+  ]),
+  lane: "parallel-read",
+  timeoutMs: 10_000,
+  cancellation: Object.freeze({ mode: "not-applicable", graceMs: 0 }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: 10_000,
+    maxOutputBytes: 1_048_576,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([parseStableId("pack-list-report")]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/pack-runtime",
+    export: "runPackList",
+    digest: parseSha256Digest(
+      "sha256:b494d5d704940284db73be7fd29e4bfaba57004b420c4736c9bebfdffaf22314",
+    ),
+  }),
+});
+
+const packDoctorCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("pack.doctor"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "experimental",
+  summary: "Inspect managed pack ownership and recovery state without mutation.",
+  cli: Object.freeze({
+    path: Object.freeze(["pack", "doctor"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: packDoctorRequestSchema.schemaId,
+    digest: packDoctorRequestSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: packDoctorReportSchema.schemaId,
+    digest: packDoctorReportSchema.digest,
+  }),
+  capabilities: Object.freeze([parseStableId("pack.doctor")]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>(["read-project"]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "none",
+      scope: "pack-managed-diagnostics",
+      boundary: "local",
+    }),
+  ]),
+  lane: "parallel-read",
+  timeoutMs: 10_000,
+  cancellation: Object.freeze({ mode: "not-applicable", graceMs: 0 }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: 10_000,
+    maxOutputBytes: 1_048_576,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([parseStableId("pack-doctor-report")]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/pack-runtime",
+    export: "runPackDoctor",
+    digest: parseSha256Digest(
+      "sha256:b494d5d704940284db73be7fd29e4bfaba57004b420c4736c9bebfdffaf22314",
     ),
   }),
 });
@@ -675,6 +777,10 @@ const definition: RegistryDefinition = Object.freeze({
     gameProjectProfileSchema,
     initRequestSchema,
     initReportSchema,
+    packDoctorRequestSchema,
+    packDoctorReportSchema,
+    packListRequestSchema,
+    packListReportSchema,
     processContainmentAssessmentRequestSchema,
     processContainmentAssessmentReportSchema,
     projectInspectRequestSchema,
@@ -693,6 +799,8 @@ const definition: RegistryDefinition = Object.freeze({
     engineStatusCommand,
     engineVersionProbeCommand,
     initCommand,
+    packDoctorCommand,
+    packListCommand,
     projectInspectCommand,
     skillCheckCommand,
     skillListCommand,

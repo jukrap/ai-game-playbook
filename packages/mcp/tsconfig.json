@@ -10,6 +10,7 @@
     { "path": "../registry" },
     { "path": "../core" },
     { "path": "../godot-adapter" },
+    { "path": "../pack-runtime" },
     { "path": "../project-runtime" },
     { "path": "../cli" }
   ],

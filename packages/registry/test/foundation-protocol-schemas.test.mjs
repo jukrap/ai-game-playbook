@@ -30,6 +30,10 @@ const expectedIds = [
   "init-report",
   "init-request",
   "input-replay-trace",
+  "pack-doctor-report",
+  "pack-doctor-request",
+  "pack-list-report",
+  "pack-list-request",
   "process-containment-assessment-report",
   "process-containment-assessment-request",
   "process-containment-provider-descriptor",
@@ -97,6 +101,34 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       {
         ...fixtures["approval-grant"],
         permission: "editor-control",
+      },
+    ],
+    [
+      "pack-list-request",
+      {
+        ...fixtures["pack-list-request"],
+        sourceRoot: "D:\\packs",
+      },
+    ],
+    [
+      "pack-doctor-request",
+      {
+        ...fixtures["pack-doctor-request"],
+        repair: true,
+      },
+    ],
+    [
+      "pack-list-report",
+      {
+        ...fixtures["pack-list-report"],
+        artifactContentExposed: true,
+      },
+    ],
+    [
+      "pack-doctor-report",
+      {
+        ...fixtures["pack-doctor-report"],
+        recoveryFinalizationPerformed: true,
       },
     ],
     ["run-handle", { ...fixtures["run-handle"], status: "done" }],

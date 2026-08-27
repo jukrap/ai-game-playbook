@@ -1,12 +1,12 @@
 ---
 source: docs/README.md
-source_sha256: cec9d95d4413ba93884df52b57d2cdd723b044d6a9677720c2d0feca84d1e2db
+source_sha256: be0e06eaf5369a2cf0906d1666ece1d1e50f38e2ad04b22685dcc95b72ccecbf
 translated_at: 2026-08-27
 ---
 
 # 문서
 
-> 상태: 2026-08-27에 검토한 공개 설계 및 구현 상태 문서 묶음입니다. Control plane 기반과 source-built write-free CLI 명령 일곱 개를 구현하고 있습니다.
+> 상태: 2026-08-27에 검토한 공개 설계 및 구현 상태 문서 묶음입니다. Control plane 기반과 source-built write-free CLI 명령 아홉 개를 구현하고 있습니다.
 
 [English](README.md) · [프로젝트 소개](../README.ko.md)
 

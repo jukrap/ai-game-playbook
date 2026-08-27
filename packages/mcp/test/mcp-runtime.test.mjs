@@ -211,6 +211,57 @@ test("skill tools bind the generated registry handlers and remain write-free", a
   });
 });
 
+test("pack inspection tools remain project-bound, write-free, and closed to repair input", async () => {
+  await withProject(async (root) => {
+    const before = await readdir(root);
+    const plan = await createMcpRuntimePlan({
+      projectRoot: root,
+      enabledTools: ["agpb_pack__list", "agpb_pack__doctor"],
+      allowHostDisclosure: true,
+    });
+    assert.deepEqual(
+      plan.enabledTools.map(({ name }) => name),
+      ["agpb_pack__list", "agpb_pack__doctor"],
+    );
+
+    const listed = await invokeMcpTool(plan, {
+      name: "agpb_pack__list",
+      arguments: { schemaVersion: "1.0.0", projectRoot: root },
+    });
+    assert.equal(listed.isError, undefined);
+    assert.equal(listed.structuredContent?.commandId, "pack.list");
+    assert.equal(listed.structuredContent?.artifactContentExposed, false);
+
+    const diagnosed = await invokeMcpTool(plan, {
+      name: "agpb_pack__doctor",
+      arguments: { schemaVersion: "1.0.0", projectRoot: root },
+    });
+    assert.equal(diagnosed.isError, undefined);
+    assert.equal(diagnosed.structuredContent?.commandId, "pack.doctor");
+    assert.equal(
+      diagnosed.structuredContent?.recoveryFinalizationPerformed,
+      false,
+    );
+    assert.deepEqual(await readdir(root), before);
+
+    for (const [name, extra] of [
+      ["agpb_pack__list", { sourceRoot: "D:\\packs" }],
+      ["agpb_pack__doctor", { repair: true }],
+    ]) {
+      const denied = await invokeMcpTool(plan, {
+        name,
+        arguments: {
+          schemaVersion: "1.0.0",
+          projectRoot: root,
+          ...extra,
+        },
+      });
+      assert.equal(denied.isError, true);
+      assert.match(denied.content[0]?.text ?? "", /mcp-command-input-invalid/u);
+    }
+  });
+});
+
 test("engine status MCP tool is project-bound and cannot read a host executable", async () => {
   await withProject(async (root) => {
     await writeFile(

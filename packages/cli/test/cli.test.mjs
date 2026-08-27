@@ -23,6 +23,8 @@ test("CLI help and version are derived from the implemented runtime surface", as
   assert.match(help.stdout, /engine capabilities\s+Report/);
   assert.match(help.stdout, /engine status\s+Inspect/);
   assert.match(help.stdout, /project inspect\s+Inspect/);
+  assert.match(help.stdout, /pack doctor\s+Inspect/);
+  assert.match(help.stdout, /pack list\s+List/);
   assert.match(help.stdout, /skill check\s+Inspect/);
   assert.match(help.stdout, /skill list\s+List/);
   assert.doesNotMatch(help.stdout, /pack add/);
@@ -216,9 +218,67 @@ test("doctor JSON and human output agree with stable exit categories", async (t)
   assert.match(human.stdout, /WARNING\s+project\.state/);
 });
 
+test("pack list and doctor expose read-only JSON and human reports", async (t) => {
+  const { project } = await fixture(t);
+
+  const listed = await cli.runCli([
+    "pack",
+    "list",
+    "--project",
+    project,
+    "--json",
+  ]);
+  assert.equal(listed.exitCode, cli.CLI_EXIT_CODES.success);
+  assert.equal(listed.stderr, "");
+  const listReport = JSON.parse(listed.stdout);
+  assert.equal(listReport.commandId, "pack.list");
+  assert.equal(listReport.status, "attention");
+  assert.equal(listReport.entries.length, 0);
+  assert.equal(listReport.mutationPerformed, false);
+
+  const listHuman = await cli.runCli([
+    "pack",
+    "list",
+    "--project",
+    project,
+  ]);
+  assert.equal(listHuman.exitCode, cli.CLI_EXIT_CODES.success);
+  assert.match(listHuman.stdout, /AI Game Playbook pack list/);
+  assert.match(listHuman.stdout, /Installed packs: 0/);
+  assert.match(listHuman.stdout, /Files changed: 0/);
+
+  const diagnosed = await cli.runCli([
+    "pack",
+    "doctor",
+    "--project",
+    project,
+    "--json",
+  ]);
+  assert.equal(diagnosed.exitCode, cli.CLI_EXIT_CODES.success);
+  const doctorReport = JSON.parse(diagnosed.stdout);
+  assert.equal(doctorReport.commandId, "pack.doctor");
+  assert.equal(doctorReport.status, "attention");
+  assert.equal(doctorReport.recoveryFinalizationPerformed, false);
+
+  const doctorHuman = await cli.runCli([
+    "pack",
+    "doctor",
+    "--project",
+    project,
+  ]);
+  assert.equal(doctorHuman.exitCode, cli.CLI_EXIT_CODES.success);
+  assert.match(doctorHuman.stdout, /AI Game Playbook pack doctor/);
+  assert.match(doctorHuman.stdout, /Transaction: not-inspected/);
+  assert.match(doctorHuman.stdout, /Files changed: 0/);
+});
+
 test("CLI fails closed on unknown commands, flags, and missing option values", async () => {
   for (const args of [
     ["pack", "add"],
+    ["pack", "update"],
+    ["pack", "remove"],
+    ["pack", "list", "--source", "D:\\packs"],
+    ["pack", "doctor", "--repair"],
     ["skill", "install"],
     ["doctor", "--repair"],
     ["init", "--apply"],

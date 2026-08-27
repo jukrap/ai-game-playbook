@@ -8,6 +8,10 @@ import {
   runGodotEngineCapabilities,
   runGodotEngineStatus,
 } from "@ai-game-playbook/godot-adapter";
+import {
+  runPackDoctor,
+  runPackList,
+} from "@ai-game-playbook/pack-runtime";
 import { isAbsolute, resolve } from "node:path";
 
 import { runDoctor } from "./doctor.js";
@@ -203,6 +207,38 @@ function skillCheckHelpText(): string {
     "  -h, --help        Show command help",
     "",
     "This command reports missing, current, conflicting, and unsafe targets without repair.",
+    "",
+  ].join("\n");
+}
+
+function packListHelpText(): string {
+  return [
+    "Usage: agpb pack list [--project <path>] [--json]",
+    "",
+    "List bounded installed-pack metadata without reading artifact content.",
+    "",
+    "Options:",
+    "  --project <path>  Select a project root; defaults to the current directory",
+    "  --json            Emit the registered pack list report as canonical JSON",
+    "  -h, --help        Show command help",
+    "",
+    "Pack installation and source selection are unavailable on this read-only surface.",
+    "",
+  ].join("\n");
+}
+
+function packDoctorHelpText(): string {
+  return [
+    "Usage: agpb pack doctor [--project <path>] [--json]",
+    "",
+    "Inspect bounded installed-pack ownership and recovery state without mutation.",
+    "",
+    "Options:",
+    "  --project <path>  Select a project root; defaults to the current directory",
+    "  --json            Emit the registered pack doctor report as canonical JSON",
+    "  -h, --help        Show command help",
+    "",
+    "Repair and transaction finalization are unavailable on this read-only surface.",
     "",
   ].join("\n");
 }
@@ -613,6 +649,62 @@ function parseSkillArguments(
   return Object.freeze({ json, projectRoot, help });
 }
 
+function parsePackArguments(
+  args: readonly string[],
+  cwd: string,
+  command: "list" | "doctor",
+): ParsedDoctorArguments | CliRunResult {
+  let json = false;
+  let help = false;
+  let projectValue: string | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (value === "--json") {
+      if (json) {
+        return result(CLI_EXIT_CODES.usage, "", "Option --json was repeated.\n");
+      }
+      json = true;
+      continue;
+    }
+    if (value === "-h" || value === "--help") {
+      help = true;
+      continue;
+    }
+    if (value === "--project") {
+      const next = args[index + 1];
+      if (next === undefined || next.startsWith("-")) {
+        return result(
+          CLI_EXIT_CODES.usage,
+          "",
+          "Option --project requires one path.\n",
+        );
+      }
+      if (projectValue !== undefined) {
+        return result(
+          CLI_EXIT_CODES.usage,
+          "",
+          "Option --project was repeated.\n",
+        );
+      }
+      projectValue = next;
+      index += 1;
+      continue;
+    }
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Unknown pack ${command} option.\n${command === "list" ? packListHelpText() : packDoctorHelpText()}`,
+    );
+  }
+  const projectRoot =
+    projectValue === undefined
+      ? cwd
+      : isAbsolute(projectValue)
+        ? projectValue
+        : resolve(cwd, projectValue);
+  return Object.freeze({ json, projectRoot, help });
+}
+
 function humanDoctorReport(report: Awaited<ReturnType<typeof runDoctor>>): string {
   const lines = [
     "AI Game Playbook doctor",
@@ -810,6 +902,84 @@ function humanSkillCheckReport(
     lines.push("", `Check digest: ${report.checkDigest}`);
   }
   lines.push("Inspection only: no skill was installed, replaced, or repaired.");
+  return `${lines.join("\n")}\n`;
+}
+
+function humanPackListReport(
+  report: Awaited<ReturnType<typeof runPackList>>,
+): string {
+  const lines = [
+    "AI Game Playbook pack list",
+    `Status: ${report.status}`,
+    "Files changed: 0",
+    `Project: ${report.project.canonicalPath ?? report.project.requestedPath}`,
+    `Project state: ${report.project.state}`,
+    `Installed state: ${report.installedState.status}`,
+    `Installed packs: ${report.summary.installedPacks}`,
+    `Dependencies: ${report.summary.dependencies}`,
+    `Artifacts: ${report.summary.artifacts} (${report.summary.artifactBytes} bytes declared)`,
+    `Owned directories: ${report.summary.ownedDirectories}`,
+  ];
+  for (const entry of report.entries) {
+    lines.push(
+      `  ${entry.id} ${entry.version} ${entry.digest} artifacts=${entry.artifactCount} directories=${entry.ownedDirectoryCount}`,
+    );
+  }
+  for (const issue of report.issues) {
+    lines.push(
+      "",
+      `${issue.severity.toUpperCase()} ${issue.packId ?? issue.code}  ${issue.message}`,
+      `        Next: ${issue.nextAction}`,
+    );
+  }
+  if (report.listDigest !== undefined) {
+    lines.push("", `List digest: ${report.listDigest}`);
+  }
+  lines.push(
+    "Inspection only: no artifact content or source location was exposed, and no project state was changed.",
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+function humanPackDoctorReport(
+  report: Awaited<ReturnType<typeof runPackDoctor>>,
+): string {
+  const lines = [
+    "AI Game Playbook pack doctor",
+    `Status: ${report.status}`,
+    "Files changed: 0",
+    `Project: ${report.project.canonicalPath ?? report.project.requestedPath}`,
+    `Project state: ${report.project.state}`,
+    `Installed state: ${report.installedState.status}`,
+    `Transaction: ${report.transaction.status}`,
+    `Installed packs: ${report.summary.installedPacks}`,
+    `Registry: current ${report.summary.registryCurrent}, different ${report.summary.registryDifferent}, unavailable ${report.summary.registryUnavailable}`,
+    `Artifacts: current ${report.summary.currentArtifacts}/${report.summary.declaredArtifacts}, missing ${report.summary.missingArtifacts}, modified ${report.summary.modifiedArtifacts}, unreadable ${report.summary.unreadableArtifacts}`,
+    `Directories: current ${report.summary.currentDirectories}/${report.summary.declaredDirectories}, missing ${report.summary.missingDirectories}, modified ${report.summary.modifiedDirectories}, unreadable ${report.summary.unreadableDirectories}`,
+  ];
+  for (const pack of report.packs) {
+    lines.push(
+      `  ${pack.id} ${pack.version} registry=${pack.registryStatus} integrity=${pack.integrityStatus}`,
+    );
+  }
+  if (report.transaction.recovery !== undefined) {
+    lines.push(
+      `Recovery: ${report.transaction.recovery.consistency}, action ${report.transaction.recovery.finalizationAction}, mutation uncertain ${report.transaction.recovery.mutationUncertain ? "yes" : "no"}`,
+    );
+  }
+  for (const finding of report.findings) {
+    lines.push(
+      "",
+      `${finding.severity.toUpperCase()} ${finding.packId ?? finding.code}  ${finding.message}`,
+      `        Next: ${finding.nextAction}`,
+    );
+  }
+  if (report.reportDigest !== undefined) {
+    lines.push("", `Report digest: ${report.reportDigest}`);
+  }
+  lines.push(
+    "Inspection only: no repair, transaction finalization, artifact-content disclosure, or project mutation was performed.",
+  );
   return `${lines.join("\n")}\n`;
 }
 
@@ -1229,6 +1399,104 @@ async function dispatchSkillCheck(
   }
 }
 
+async function dispatchPackList(
+  args: readonly string[],
+  options: CliRuntimeOptions,
+): Promise<CliRunResult> {
+  const parsed = parsePackArguments(args, options.cwd ?? process.cwd(), "list");
+  if ("exitCode" in parsed) return parsed;
+  if (parsed.help) return result(CLI_EXIT_CODES.success, packListHelpText());
+
+  const descriptor = BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "pack.list",
+  );
+  if (descriptor === undefined) {
+    return result(CLI_EXIT_CODES.failure, "", "The pack list command is unavailable.\n");
+  }
+  let input: ReturnType<typeof validateRegisteredContractValue>;
+  try {
+    input = validateRegisteredContractValue(
+      BUILTIN_REGISTRY,
+      descriptor.input,
+      { schemaVersion: "1.0.0", projectRoot: parsed.projectRoot },
+    );
+  } catch {
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      "Pack list input is outside the registered argument contract.\n",
+    );
+  }
+  try {
+    const report = await runWithDeadline(
+      () => runPackList(input),
+      descriptor.timeoutMs,
+    );
+    return result(
+      report.status === "blocked" ? CLI_EXIT_CODES.blocked : CLI_EXIT_CODES.success,
+      parsed.json ? `${canonicalizeJson(report)}\n` : humanPackListReport(report),
+    );
+  } catch (error) {
+    return result(
+      CLI_EXIT_CODES.failure,
+      "",
+      error instanceof CliDeadlineError
+        ? "Pack listing exceeded its registered deadline without producing a report.\n"
+        : "Pack listing failed before it could produce a validated report.\n",
+    );
+  }
+}
+
+async function dispatchPackDoctor(
+  args: readonly string[],
+  options: CliRuntimeOptions,
+): Promise<CliRunResult> {
+  const parsed = parsePackArguments(args, options.cwd ?? process.cwd(), "doctor");
+  if ("exitCode" in parsed) return parsed;
+  if (parsed.help) return result(CLI_EXIT_CODES.success, packDoctorHelpText());
+
+  const descriptor = BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "pack.doctor",
+  );
+  if (descriptor === undefined) {
+    return result(CLI_EXIT_CODES.failure, "", "The pack doctor command is unavailable.\n");
+  }
+  let input: ReturnType<typeof validateRegisteredContractValue>;
+  try {
+    input = validateRegisteredContractValue(
+      BUILTIN_REGISTRY,
+      descriptor.input,
+      { schemaVersion: "1.0.0", projectRoot: parsed.projectRoot },
+    );
+  } catch {
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      "Pack doctor input is outside the registered argument contract.\n",
+    );
+  }
+  try {
+    const report = await runWithDeadline(
+      () => runPackDoctor(input),
+      descriptor.timeoutMs,
+    );
+    return result(
+      report.status === "blocked" ? CLI_EXIT_CODES.blocked : CLI_EXIT_CODES.success,
+      parsed.json
+        ? `${canonicalizeJson(report)}\n`
+        : humanPackDoctorReport(report),
+    );
+  } catch (error) {
+    return result(
+      CLI_EXIT_CODES.failure,
+      "",
+      error instanceof CliDeadlineError
+        ? "Pack doctor exceeded its registered deadline without producing a report.\n"
+        : "Pack doctor failed before it could produce a validated report.\n",
+    );
+  }
+}
+
 export async function runCli(
   args: readonly string[],
   options: CliRuntimeOptions = {},
@@ -1283,6 +1551,19 @@ export async function runCli(
       CLI_EXIT_CODES.usage,
       "",
       `Unknown project command.\n${projectInspectHelpText()}`,
+    );
+  }
+  if (args[0] === "pack") {
+    if (args[1] === "list") {
+      return dispatchPackList(args.slice(2), options);
+    }
+    if (args[1] === "doctor") {
+      return dispatchPackDoctor(args.slice(2), options);
+    }
+    return result(
+      CLI_EXIT_CODES.usage,
+      "",
+      `Unknown pack command.\n${packListHelpText()}${packDoctorHelpText()}`,
     );
   }
   if (args[0] === "skill") {

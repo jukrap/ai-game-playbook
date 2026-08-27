@@ -19,6 +19,8 @@ test("the builtin runtime registry exposes only implemented commands", () => {
       "engine.status",
       "engine.version-probe",
       "init",
+      "pack.doctor",
+      "pack.list",
       "project.inspect",
       "skill.check",
       "skill.list",
@@ -266,6 +268,43 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.equal(init.handler.export, "runInit");
   assert.match(init.handler.digest, digestPattern);
 
+  for (const [id, inputSchema, outputSchema, exportName, scope] of [
+    [
+      "pack.doctor",
+      contracts.packDoctorRequestSchema,
+      contracts.packDoctorReportSchema,
+      "runPackDoctor",
+      "pack-managed-diagnostics",
+    ],
+    [
+      "pack.list",
+      contracts.packListRequestSchema,
+      contracts.packListReportSchema,
+      "runPackList",
+      "pack-installed-list",
+    ],
+  ]) {
+    const command = registry.BUILTIN_REGISTRY.commands.find(
+      ({ id: commandId }) => commandId === id,
+    );
+    assert.notEqual(command, undefined);
+    assert.deepEqual(command.cli, { path: id.split("."), aliases: [] });
+    assert.deepEqual(command.permissions, ["read-project"]);
+    assert.deepEqual(command.sideEffects, [
+      { kind: "none", scope, boundary: "local" },
+    ]);
+    assert.equal(command.lane, "parallel-read");
+    assert.equal(command.timeoutMs, 10_000);
+    assert.deepEqual(command.retry, { mode: "never", maxAttempts: 1 });
+    assert.equal(command.budgets.maxChangedFiles, 0);
+    assert.equal(command.budgets.maxChangedBytes, 0);
+    assert.equal(command.input.schemaId, inputSchema.schemaId);
+    assert.equal(command.output.schemaId, outputSchema.schemaId);
+    assert.equal(command.handler.package, "@ai-game-playbook/pack-runtime");
+    assert.equal(command.handler.export, exportName);
+    assert.match(command.handler.digest, digestPattern);
+  }
+
   const inspect = registry.BUILTIN_REGISTRY.commands.find(
     ({ id }) => id === "project.inspect",
   );
@@ -380,6 +419,8 @@ test("builtin generated surfaces preserve implemented schema and command identit
     "engine.capabilities",
     "engine.status",
     "init",
+    "pack.doctor",
+    "pack.list",
     "project.inspect",
     "skill.check",
     "skill.list",
@@ -389,6 +430,8 @@ test("builtin generated surfaces preserve implemented schema and command identit
     "engine.capabilities",
     "engine.status",
     "init",
+    "pack.doctor",
+    "pack.list",
     "project.inspect",
     "skill.check",
     "skill.list",
@@ -398,6 +441,8 @@ test("builtin generated surfaces preserve implemented schema and command identit
     "engine.capabilities",
     "engine.status",
     "init",
+    "pack.doctor",
+    "pack.list",
     "project.inspect",
     "skill.check",
     "skill.list",

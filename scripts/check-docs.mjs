@@ -37,6 +37,8 @@ const reviewDesignSurface = {
     "agpb init",
     "agpb doctor",
     "agpb project inspect",
+    "agpb pack list",
+    "agpb pack doctor",
     "agpb skill list",
     "agpb skill check",
     "agpb engine status",
@@ -442,7 +444,7 @@ const readme = readText("README.md");
 const statusDoc = readText("docs/status-and-scope.md");
 if (
   !readme.includes("No installable package") ||
-  !readme.includes("The implemented commands are plan-only `agpb init`; read-only `agpb doctor`, `agpb project inspect`, `agpb skill list`, and `agpb skill check`; and static read-only `agpb engine status --engine godot` and `agpb engine capabilities --engine godot`") ||
+  !readme.includes("The implemented commands are plan-only `agpb init`; read-only `agpb doctor`, `agpb project inspect`, `agpb pack list`, `agpb pack doctor`, `agpb skill list`, and `agpb skill check`; and static read-only `agpb engine status --engine godot` and `agpb engine capabilities --engine godot`") ||
   !readme.includes("all live-engine capabilities and support grades planned")
 ) {
   fail("README.md: executable availability limits must remain explicit");

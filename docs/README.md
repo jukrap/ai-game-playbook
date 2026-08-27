@@ -1,6 +1,6 @@
 # Documentation
 
-> Status: public design and implementation-status package, reviewed on 2026-08-27. The control-plane foundation and seven source-built write-free CLI commands are in progress.
+> Status: public design and implementation-status package, reviewed on 2026-08-27. The control-plane foundation and nine source-built write-free CLI commands are in progress.
 
 [한국어](README.ko.md) · [Project overview](../README.md)
 

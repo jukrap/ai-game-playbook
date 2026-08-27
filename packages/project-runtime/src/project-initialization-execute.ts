@@ -35,20 +35,18 @@ import {
   PROJECT_STATE_DIRECTORIES,
   acquireProjectLane,
   assertAuthorizedPermissionDecision,
+  bindWorkflowStepExecutor,
   createProjectDirectoryCas,
   createWorkflowCheckpoint,
   deleteProjectDirectoryCas,
   deleteProjectFileCas,
-  persistRunReceipt,
+  dispatchProjectWorkflowStep,
   persistWorkflowCheckpoint,
   readProjectDirectoryIdentity,
   readProjectFileSnapshot,
   resolveProjectPath,
   stageProjectDirectoryCasCreate,
   stageProjectFileCas,
-  beginWorkflowStep,
-  markWorkflowStepStarted,
-  settleWorkflowStep,
   type AuthorizedPermissionDecision,
   type PermissionActualEffects,
   type PermissionAuthorizationRequest,
@@ -57,8 +55,6 @@ import {
   type ProjectLaneLease,
   type StagedProjectDirectoryCasCreate,
   type StagedProjectFileCasWrite,
-  type StoredRunReceipt,
-  type StoredWorkflowCheckpoint,
 } from "@ai-game-playbook/core";
 import {
   resolveWorkflowPlan,
@@ -1145,6 +1141,16 @@ function reportStatusAfterSettlement(
     : intended;
 }
 
+interface InitializationDispatchOutcome {
+  readonly execution: Awaited<ReturnType<typeof executeTargetMutation>>;
+  readonly settlement: PermissionSettlement;
+  readonly status: "failed" | "recovery-required" | "rolled-back" | "succeeded";
+  readonly startedAt: string;
+  readonly endedAt: string;
+  readonly durationMs: number;
+  readonly receipt: RunReceipt;
+}
+
 async function executeWithLane(
   plan: PreparedProjectInitialization,
   authorization: AuthorizedPermissionDecision,
@@ -1171,7 +1177,7 @@ async function executeWithLane(
   const inputDigest = digestCanonicalJson(
     createProjectInitializationCommandInput(plan),
   );
-  let stored = await persistWorkflowCheckpoint({
+  const initialStored = await persistWorkflowCheckpoint({
     root: targetRoot,
     registry,
     checkpoint: createWorkflowCheckpoint({
@@ -1189,131 +1195,111 @@ async function executeWithLane(
     }),
   });
   controlState.durableCheckpoint = true;
-  const checkpoints: WorkflowCheckpointRecord[] = [stored.checkpoint];
-  assertAuthorizationActive(authorization);
-  await lane.assertOwned();
-  assertAuthorizationActive(authorization);
-  assertNotCancelled(signal);
-  const admitted = beginWorkflowStep({
+  let dispatchOutcome: InitializationDispatchOutcome | undefined;
+  const executor = bindWorkflowStepExecutor({
     registry,
-    checkpoint: stored.checkpoint,
-    authorization,
+    commandId: parseStableId(PROJECT_INITIALIZATION_COMMAND_ID),
+    invoke: async ({ checkpoint }) => {
+      const executionStartedMs = Math.max(
+        Date.now(),
+        Date.parse(checkpoint.updatedAt),
+      );
+      const execution = await executeTargetMutation(
+        plan,
+        authorization,
+        lane,
+        signal,
+      );
+      const executionEndedMs = Math.max(Date.now(), executionStartedMs);
+      const durationMs = executionEndedMs - executionStartedMs;
+      const initialUncertain = execution.status === "recovery-required";
+      const settlement = settleAuthorization(
+        authorization,
+        execution.tracker,
+        durationMs,
+        execution.status === "succeeded"
+          ? "succeeded"
+          : initialUncertain
+            ? "uncertain"
+            : "failed",
+        initialUncertain,
+      );
+      const status = reportStatusAfterSettlement(execution.status, settlement);
+      const startedAt = new Date(executionStartedMs).toISOString();
+      const endedAt = new Date(executionEndedMs).toISOString();
+      const receipt = buildRunReceipt(
+        plan,
+        checkpoint,
+        execution.tracker,
+        status,
+        execution.failure,
+        settlement,
+        startedAt,
+        endedAt,
+      );
+      validateRegisteredContractValue(
+        registry,
+        {
+          schemaId: runReceiptSchema.schemaId,
+          digest: runReceiptSchema.digest,
+        },
+        receipt,
+      );
+      dispatchOutcome = {
+        execution,
+        settlement,
+        status,
+        startedAt,
+        endedAt,
+        durationMs,
+        receipt,
+      };
+      return { receipt, settlement };
+    },
   });
-  stored = await persistWorkflowCheckpoint({
+  const dispatched = await dispatchProjectWorkflowStep({
     root: targetRoot,
     registry,
-    checkpoint: admitted,
-    previous: stored,
-  });
-  checkpoints.push(stored.checkpoint);
-  assertAuthorizationActive(authorization);
-  await lane.assertOwned();
-  assertAuthorizationActive(authorization);
-  assertNotCancelled(signal);
-  const started = markWorkflowStepStarted({
-    registry,
-    checkpoint: stored.checkpoint,
-  });
-  stored = await persistWorkflowCheckpoint({
-    root: targetRoot,
-    registry,
-    checkpoint: started,
-    previous: stored,
-  });
-  checkpoints.push(stored.checkpoint);
-  const executionStartedMs = Math.max(
-    Date.now(),
-    Date.parse(stored.checkpoint.updatedAt),
-  );
-
-  const execution = await executeTargetMutation(
-    plan,
+    stored: initialStored,
     authorization,
     lane,
+    executor,
     signal,
-  );
-  const executionEndedMs = Math.max(Date.now(), executionStartedMs);
-  const durationMs = executionEndedMs - executionStartedMs;
-  const initialUncertain = execution.status === "recovery-required";
-  const settlement = settleAuthorization(
-    authorization,
-    execution.tracker,
-    durationMs,
-    execution.status === "succeeded"
-      ? "succeeded"
-      : initialUncertain
-        ? "uncertain"
-        : "failed",
-    initialUncertain,
-  );
-  const status = reportStatusAfterSettlement(execution.status, settlement);
-  const startedAt = new Date(executionStartedMs).toISOString();
-  const endedAt = new Date(executionEndedMs).toISOString();
-  const receipt = buildRunReceipt(
-    plan,
-    stored.checkpoint,
-    execution.tracker,
-    status,
-    execution.failure,
-    settlement,
-    startedAt,
-    endedAt,
-  );
-  validateRegisteredContractValue(
-    registry,
-    {
-      schemaId: runReceiptSchema.schemaId,
-      digest: runReceiptSchema.digest,
-    },
-    receipt,
-  );
-  let storedReceipt: StoredRunReceipt;
-  try {
-    storedReceipt = await persistRunReceipt({
-      root: targetRoot,
-      registry,
-      receipt,
-      maxArtifactBytes: 0,
-    });
-  } catch {
+    maxArtifactBytes: 0,
+  });
+  if (dispatchOutcome === undefined) {
     runtimeError(
       "project-initialization-evidence-failed",
-      "$evidence.receipt",
-      "initialization run receipt could not be retained",
+      "$dispatcher",
+      "initialization dispatcher completed without its domain outcome",
       true,
     );
   }
-  const terminal = settleWorkflowStep({
-    registry,
-    checkpoint: stored.checkpoint,
-    receipt,
+  const {
+    execution,
     settlement,
-  });
+    status,
+    startedAt,
+    endedAt,
+    durationMs,
+    receipt,
+  } = dispatchOutcome;
+  const storedReceipt = dispatched.receipt;
+  const terminalStored = dispatched.terminal;
   validateRegisteredContractValue(
     registry,
     {
       schemaId: workflowCheckpointSchema.schemaId,
       digest: workflowCheckpointSchema.digest,
     },
-    terminal,
+    terminalStored.checkpoint,
   );
-  let terminalStored: StoredWorkflowCheckpoint;
-  try {
-    terminalStored = await persistWorkflowCheckpoint({
-      root: targetRoot,
-      registry,
-      checkpoint: terminal,
-      previous: stored,
-    });
-  } catch {
-    runtimeError(
-      "project-initialization-evidence-failed",
-      "$evidence.checkpoint",
-      "terminal initialization checkpoint could not be retained",
-      true,
-    );
-  }
-  checkpoints.push(terminalStored.checkpoint);
+  const checkpoints: WorkflowCheckpointRecord[] = [
+    initialStored.checkpoint,
+    dispatched.admitted.checkpoint,
+    dispatched.started.checkpoint,
+    terminalStored.checkpoint,
+  ];
   const controlPlaneState = await controlPlaneEffects(
     plan,
     new Set(

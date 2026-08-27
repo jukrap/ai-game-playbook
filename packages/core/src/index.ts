@@ -270,3 +270,16 @@ export type {
   WorkflowCheckpointFeature,
   WorkflowCheckpointProject,
 } from "./workflow-state.js";
+export {
+  bindWorkflowStepExecutor,
+  dispatchProjectWorkflowStep,
+} from "./workflow-dispatcher.js";
+export type {
+  BindWorkflowStepExecutorRequest,
+  DispatchProjectWorkflowStepRequest,
+  DispatchedProjectWorkflowStep,
+  WorkflowStepExecutorBinding,
+  WorkflowStepExecutorContext,
+  WorkflowStepExecutorInvoke,
+  WorkflowStepExecutorResult,
+} from "./workflow-dispatcher.js";

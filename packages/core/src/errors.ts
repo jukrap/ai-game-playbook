@@ -22,6 +22,7 @@ export type CoreBoundaryErrorCode =
   | "invalid-run-receipt-store-request"
   | "invalid-workflow-checkpoint-request"
   | "invalid-workflow-checkpoint-store-request"
+  | "invalid-workflow-dispatch-request"
   | "project-path-budget-exceeded"
   | "project-path-case-conflict"
   | "project-path-escape"
@@ -102,6 +103,10 @@ export type CoreBoundaryErrorCode =
   | "workflow-checkpoint-store-not-found"
   | "workflow-checkpoint-store-write-failed"
   | "workflow-checkpoint-transition-invalid"
+  | "workflow-dispatch-binding-mismatch"
+  | "workflow-dispatch-cancelled"
+  | "workflow-dispatch-evidence-failed"
+  | "workflow-dispatch-execution-failed"
   | "unsafe-project-root";
 
 export class CoreBoundaryError extends Error {

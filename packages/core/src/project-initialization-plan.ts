@@ -1,11 +1,9 @@
 import {
-  parsePortableProjectPath,
+  PROJECT_INITIALIZATION_TARGET_DEFINITIONS,
   parseStableId,
   type InitPlanIssue,
   type InitPlanTarget,
-  type InitPlanTargetContent,
-  type InitPlanTargetKind,
-  type InitPlanTargetPolicy,
+  type InitPlanTargetDefinition,
   type PortableProjectPath,
   type Sha256Digest,
 } from "@ai-game-playbook/contracts";
@@ -17,12 +15,7 @@ import {
   type CanonicalProjectRoot,
 } from "./project-path.js";
 
-export interface ProjectInitializationTargetDefinition {
-  readonly path: PortableProjectPath;
-  readonly kind: InitPlanTargetKind;
-  readonly policy: InitPlanTargetPolicy;
-  readonly content: InitPlanTargetContent;
-}
+export type ProjectInitializationTargetDefinition = InitPlanTargetDefinition;
 
 export interface PlanProjectInitializationRequest {
   readonly root: CanonicalProjectRoot;
@@ -35,98 +28,8 @@ export interface ProjectInitializationPlan {
   readonly issues: readonly InitPlanIssue[];
 }
 
-function target(
-  path: string,
-  kind: InitPlanTargetKind,
-  policy: InitPlanTargetPolicy,
-  content: InitPlanTargetContent,
-): ProjectInitializationTargetDefinition {
-  return Object.freeze({
-    path: parsePortableProjectPath(path),
-    kind,
-    policy,
-    content,
-  });
-}
-
 export const PROJECT_INITIALIZATION_TARGETS: readonly ProjectInitializationTargetDefinition[] =
-  Object.freeze([
-    target(".ai-game-playbook", "directory", "committed", "none"),
-    target(
-      ".ai-game-playbook/profile.json",
-      "file",
-      "committed",
-      "project-profile",
-    ),
-    target(".ai-game-playbook/policies", "directory", "committed", "none"),
-    target(".ai-game-playbook/features", "directory", "committed", "none"),
-    target(
-      ".ai-game-playbook/packs.lock.json",
-      "file",
-      "committed",
-      "pack-lock",
-    ),
-    target(
-      ".ai-game-playbook/.gitignore",
-      "file",
-      "committed",
-      "ignore-policy",
-    ),
-    target(".ai-game-playbook/cache", "directory", "local-only", "none"),
-    target(".ai-game-playbook/evidence", "directory", "local-only", "none"),
-    target(
-      ".ai-game-playbook/evidence/artifacts",
-      "directory",
-      "local-only",
-      "none",
-    ),
-    target(
-      ".ai-game-playbook/evidence/artifacts/manifests",
-      "directory",
-      "local-only",
-      "none",
-    ),
-    target(
-      ".ai-game-playbook/evidence/artifacts/objects",
-      "directory",
-      "local-only",
-      "none",
-    ),
-    target(
-      ".ai-game-playbook/evidence/receipts",
-      "directory",
-      "local-only",
-      "none",
-    ),
-    target(".ai-game-playbook/logs", "directory", "local-only", "none"),
-    target(
-      ".ai-game-playbook/screenshots",
-      "directory",
-      "local-only",
-      "none",
-    ),
-    target(".ai-game-playbook/locks", "directory", "local-only", "none"),
-    target(".ai-game-playbook/local", "directory", "local-only", "none"),
-    target(".ai-game-playbook/state", "directory", "local-only", "none"),
-    target(
-      ".ai-game-playbook/state/packs",
-      "directory",
-      "local-only",
-      "none",
-    ),
-    target(
-      ".ai-game-playbook/state/packs/transactions",
-      "directory",
-      "local-only",
-      "none",
-    ),
-    target(
-      ".ai-game-playbook/state/workflows",
-      "directory",
-      "local-only",
-      "none",
-    ),
-  ]);
+  PROJECT_INITIALIZATION_TARGET_DEFINITIONS;
 
 function objectHasExactKeys(value: object, keys: readonly string[]): boolean {
   const actual = Object.keys(value).sort();

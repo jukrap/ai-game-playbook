@@ -74,6 +74,8 @@ const targetDefinitions = [
     "local-only",
     "none",
   ],
+  [".agents", "directory", "committed", "none"],
+  [".agents/skills", "directory", "committed", "none"],
 ];
 
 function targets() {
@@ -114,9 +116,9 @@ function commandInput() {
     packLockDigest: digest("f"),
     targets: targets(),
     conflicts: [],
-    summary: { create: 20, retain: 0, conflict: 0 },
+    summary: { create: 22, retain: 0, conflict: 0 },
     budgets: {
-      maxChangedFiles: 20,
+      maxChangedFiles: 22,
       maxChangedBytes: 384,
       maxDurationMs: 30000,
       maxOutputBytes: 1048576,
@@ -198,6 +200,15 @@ function succeededReport(input = commandInput()) {
 }
 
 test("project initialization command schemas are internal, versioned, and closed", () => {
+  assert.deepEqual(
+    contracts.PROJECT_INITIALIZATION_TARGET_DEFINITIONS,
+    targetDefinitions.map(([path, kind, policy, content]) => ({
+      path,
+      kind,
+      policy,
+      content,
+    })),
+  );
   assert.equal(
     contracts.projectInitializationCommandInputSchema.id,
     "project-initialization-command-input",
@@ -227,12 +238,12 @@ test("project initialization command schemas are internal, versioned, and closed
   );
 });
 
-test("command input binds one exact ready 20-target prepared plan", () => {
+test("command input binds the exact ready 22-target layout", () => {
   const input = commandInput();
   assert.doesNotThrow(() =>
     contracts.assertProjectInitializationCommandInputSemantics(input),
   );
-  assert.equal(input.targets.length, 20);
+  assert.equal(input.targets.length, 22);
   assert.match(input.preparedPlanDigest, /^sha256:[0-9a-f]{64}$/);
 
   assert.throws(
@@ -267,6 +278,16 @@ test("command input binds one exact ready 20-target prepared plan", () => {
 
 test("command input rejects conflicts, duplicate paths, and unbounded authority", () => {
   const input = commandInput();
+  assert.throws(
+    () =>
+      contracts.assertProjectInitializationCommandInputSemantics({
+        ...input,
+        targets: input.targets.map((target, index) =>
+          index === 20 ? { ...target, policy: "local-only" } : target,
+        ),
+      }),
+    /layout/,
+  );
   assert.throws(
     () =>
       contracts.assertProjectInitializationCommandInputSemantics({

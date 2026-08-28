@@ -1,6 +1,6 @@
 ---
 source: docs/cli.md
-source_sha256: 4a4782eafbeb5e2f6dde6069b0a395ac033a9dffddd79d28b850f62519d4f5d8
+source_sha256: b1800017805f534ce563435510a546ccedff292c2f22c1620ec716fe7e906d5a
 translated_at: 2026-08-28
 ---
 # CLI 안내
@@ -36,6 +36,8 @@ pnpm run agpb -- --help
 | `agpb engine capabilities` | 예정된 Godot 작업 계약과 현재 미충족 조건 표시 |
 
 두 엔진 명령에는 `--engine godot`이 필요합니다. 실행 파일 경로를 받거나 Godot을 시작하지 않습니다. 에디터에도 연결하지 않으며 지원 등급을 `planned`보다 높이지 않습니다.
+
+`init` 계획에는 프로젝트 제어 상태와 함께 공용 `.agents/skills` 상위 경로도 들어갑니다. 어느 경로도 실제로 만들지 않습니다. 비공개 초기화 워크플로만 별도 승인 뒤에 이 고정 구성을 적용할 수 있으며, 공개 적용 옵션은 없습니다.
 
 ## 전체 명령 표면
 

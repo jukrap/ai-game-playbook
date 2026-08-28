@@ -221,8 +221,8 @@ test("approved initialization commits the exact layout and durable evidence chai
   assert.equal(report.mutationUncertain, false);
   assert.equal(report.authorization.status, "succeeded");
   assert.equal(report.evidence.activeMarker.status, "cleared");
-  assert.equal(report.effects.changedPaths.length, 9);
-  assert.equal(report.effects.appliedPaths.length, 9);
+  assert.equal(report.effects.changedPaths.length, 11);
+  assert.equal(report.effects.appliedPaths.length, 11);
   assert.equal(report.effects.rolledBackPaths.length, 0);
   assert.equal(report.effects.controlPlaneState.changedPaths.length, 18);
   assert.doesNotThrow(() =>
@@ -240,6 +240,10 @@ test("approved initialization commits the exact layout and durable evidence chai
   assert.equal(
     await readFile(native(f.project, ".ai-game-playbook/.gitignore"), "utf8"),
     projectRuntime.PROJECT_INITIALIZATION_IGNORE_POLICY,
+  );
+  assert.equal(
+    (await lstat(native(f.project, ".agents/skills"))).isDirectory(),
+    true,
   );
 
   const workflow = resolveWorkflowPlan(
@@ -515,6 +519,34 @@ test("cooperative cancellation rolls back every confirmed project target creatio
     })).checkpoint.status,
     "failed",
   );
+});
+
+test("cancellation between parent waves rolls back the shared skill parent", async (t) => {
+  const f = await fixture(t);
+  const plan = await prepare(
+    f.root,
+    "52111111-1111-4111-8111-111111111111",
+  );
+  const authority = authorize(plan);
+  const controller = new AbortController();
+  const sharedParent = native(f.project, ".agents");
+  const cancel = (async () => {
+    await waitForPath(sharedParent);
+    controller.abort();
+  })();
+
+  const report = await projectRuntime.executePreparedProjectInitialization({
+    plan,
+    authorization: authority.decision,
+    signal: controller.signal,
+  });
+  await cancel;
+
+  assert.equal(report.status, "rolled-back");
+  assert.equal(report.mutationUncertain, false);
+  assert.equal(report.effects.appliedPaths.includes(".agents"), true);
+  assert.equal(report.effects.rolledBackPaths.includes(".agents"), true);
+  await assert.rejects(lstat(sharedParent), (error) => error?.code === "ENOENT");
 });
 
 test("unsafe rollback preserves user content and retains a recovery barrier", async (t) => {

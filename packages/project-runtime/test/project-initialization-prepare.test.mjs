@@ -140,12 +140,12 @@ test("fresh initialization preparation is write-free, exact, and same-process", 
   assert.equal(prepared.project.rootIdentityDigest, root.identityDigest);
   assert.equal(prepared.project.id, "sample.graybox");
   assert.equal(prepared.project.stage, "vertical-slice");
-  assert.equal(prepared.targets.length, 20);
+  assert.equal(prepared.targets.length, 22);
   assert.equal(prepared.targets.every(({ action }) => action === "create"), true);
-  assert.equal(prepared.summary.create, 20);
+  assert.equal(prepared.summary.create, 22);
   assert.equal(prepared.summary.retain, 0);
   assert.equal(prepared.summary.conflict, 0);
-  assert.equal(prepared.budgets.maxChangedFiles, 20);
+  assert.equal(prepared.budgets.maxChangedFiles, 22);
   assert.equal(prepared.budgets.maxChangedBytes > 0, true);
   assert.match(prepared.preparedPlanDigest, /^sha256:[0-9a-f]{64}$/);
   assert.equal(Object.isFrozen(prepared), true);
@@ -182,7 +182,7 @@ test("exact existing metadata prepares a write-free no-op", async (t) => {
 
   assert.equal(prepared.disposition, "no-op");
   assert.equal(prepared.summary.create, 0);
-  assert.equal(prepared.summary.retain, 20);
+  assert.equal(prepared.summary.retain, 22);
   assert.equal(prepared.budgets.maxChangedFiles, 0);
   assert.equal(prepared.budgets.maxChangedBytes, 0);
   assert.throws(

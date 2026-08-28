@@ -6,6 +6,7 @@ import {
 } from "./digest.js";
 import {
   isPortableProjectPath,
+  parsePortableProjectPath,
   type PortableProjectPath,
 } from "./portable-path.js";
 import type { SemanticVersion } from "./semantic-version.js";
@@ -28,6 +29,148 @@ export type InitPlanTargetContent =
   | "pack-lock"
   | "ignore-policy";
 export type InitPlanTargetAction = "create" | "retain" | "conflict";
+
+export interface InitPlanTargetDefinition {
+  readonly path: PortableProjectPath;
+  readonly kind: InitPlanTargetKind;
+  readonly policy: InitPlanTargetPolicy;
+  readonly content: InitPlanTargetContent;
+}
+
+function targetDefinition(
+  path: string,
+  kind: InitPlanTargetKind,
+  policy: InitPlanTargetPolicy,
+  content: InitPlanTargetContent,
+): InitPlanTargetDefinition {
+  return Object.freeze({
+    path: parsePortableProjectPath(path),
+    kind,
+    policy,
+    content,
+  });
+}
+
+export const PROJECT_INITIALIZATION_TARGET_DEFINITIONS: readonly InitPlanTargetDefinition[] =
+  Object.freeze([
+    targetDefinition(".ai-game-playbook", "directory", "committed", "none"),
+    targetDefinition(
+      ".ai-game-playbook/profile.json",
+      "file",
+      "committed",
+      "project-profile",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/policies",
+      "directory",
+      "committed",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/features",
+      "directory",
+      "committed",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/packs.lock.json",
+      "file",
+      "committed",
+      "pack-lock",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/.gitignore",
+      "file",
+      "committed",
+      "ignore-policy",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/cache",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/evidence",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/evidence/artifacts",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/evidence/artifacts/manifests",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/evidence/artifacts/objects",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/evidence/receipts",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/logs",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/screenshots",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/locks",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/local",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/state",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/state/packs",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/state/packs/transactions",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(
+      ".ai-game-playbook/state/workflows",
+      "directory",
+      "local-only",
+      "none",
+    ),
+    targetDefinition(".agents", "directory", "committed", "none"),
+    targetDefinition(".agents/skills", "directory", "committed", "none"),
+  ]);
 
 export interface InitRequest {
   readonly schemaVersion: SemanticVersion;

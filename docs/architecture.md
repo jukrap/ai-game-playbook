@@ -86,6 +86,6 @@ An adapter reports unsupported operations and the missing evidence. A thin proje
 
 ## Consumer project state
 
-A future initialized game project uses `.ai-game-playbook/` for portable profiles, feature contracts, policies, and pack locks. Those files may be committed. Cache, local receipts, logs, captures, locks, secrets, and machine-specific configuration stay ignored.
+A future initialized game project uses `.ai-game-playbook/` for portable profiles, feature contracts, policies, and pack locks. Those files may be committed. Cache, local receipts, logs, captures, locks, secrets, and machine-specific configuration stay ignored. The same fixed initialization layout includes shared `.agents/skills` directories, but managed skill packs do not own those shared parents.
 
-The current `agpb init` only reports the intended layout. Private initialization code exists behind stronger authority, but no public command applies it.
+The current `agpb init` only reports the intended layout. Private initialization code can create or retain the exact layout through approval, a project-write lane, compare-and-swap operations, rollback, checkpoints, and receipts, but no public command applies it.

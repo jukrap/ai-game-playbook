@@ -3,6 +3,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  readFile,
   readdir,
   rm,
   symlink,
@@ -32,7 +33,7 @@ function nativePath(project, portablePath) {
 
 test("initialization planning reports the fixed layout without writing", async (t) => {
   assert.equal(typeof core.planProjectInitialization, "function");
-  assert.equal(core.PROJECT_INITIALIZATION_TARGETS.length, 20);
+  assert.equal(core.PROJECT_INITIALIZATION_TARGETS.length, 22);
   assert.equal(Object.isFrozen(core.PROJECT_INITIALIZATION_TARGETS), true);
 
   const { project, root } = await fixture(t);
@@ -47,7 +48,7 @@ test("initialization planning reports the fixed layout without writing", async (
   assert.equal(Object.isFrozen(plan), true);
   assert.equal(Object.isFrozen(plan.targets), true);
   assert.equal(Object.isFrozen(plan.issues), true);
-  assert.equal(plan.targets.length, 20);
+  assert.equal(plan.targets.length, 22);
   assert.equal(plan.targets.every(({ action }) => action === "create"), true);
   assert.deepEqual(plan.issues, []);
   assert.deepEqual(
@@ -71,9 +72,34 @@ test("initialization planning reports the fixed layout without writing", async (
       ".ai-game-playbook/evidence/receipts",
     ],
   );
+  assert.deepEqual(
+    core.PROJECT_INITIALIZATION_TARGETS
+      .filter(({ path }) => path === ".agents" || path.startsWith(".agents/"))
+      .map(({ path, kind, policy, content }) => ({
+        path,
+        kind,
+        policy,
+        content,
+      })),
+    [
+      {
+        path: ".agents",
+        kind: "directory",
+        policy: "committed",
+        content: "none",
+      },
+      {
+        path: ".agents/skills",
+        kind: "directory",
+        policy: "committed",
+        content: "none",
+      },
+    ],
+  );
   await assert.rejects(lstat(join(project, ".ai-game-playbook")), {
     code: "ENOENT",
   });
+  await assert.rejects(lstat(join(project, ".agents")), { code: "ENOENT" });
 });
 
 test("initialization planning retains an existing type-correct layout", async (t) => {
@@ -125,7 +151,15 @@ test("initialization planning preserves and reports files, case aliases, and lin
   assert.equal(casePlan.targets[0].action, "conflict");
   assert.equal(casePlan.targets[0].code, "project-path-case-conflict");
   assert.equal(
-    casePlan.targets.slice(1).every(({ code }) => code === "parent-conflict"),
+    casePlan.targets
+      .filter(({ path }) => path.startsWith(".ai-game-playbook/"))
+      .every(({ code }) => code === "parent-conflict"),
+    true,
+  );
+  assert.equal(
+    casePlan.targets
+      .filter(({ path }) => path === ".agents" || path.startsWith(".agents/"))
+      .every(({ action }) => action === "create"),
     true,
   );
   assert.deepEqual(await readdir(caseFixture.project), [".AI-GAME-PLAYBOOK"]);
@@ -144,6 +178,25 @@ test("initialization planning preserves and reports files, case aliases, and lin
   assert.equal(linkPlan.targets[0].action, "conflict");
   assert.equal(linkPlan.targets[0].code, "project-path-link");
   assert.deepEqual(await readdir(outside), []);
+
+  const sharedParentFixture = await fixture(t);
+  await writeFile(join(sharedParentFixture.project, ".agents"), "user-owned\n");
+  const sharedParentPlan = await core.planProjectInitialization({
+    root: sharedParentFixture.root,
+  });
+  assert.equal(
+    sharedParentPlan.targets.find(({ path }) => path === ".agents").code,
+    "project-path-type-mismatch",
+  );
+  assert.equal(
+    sharedParentPlan.targets.find(({ path }) => path === ".agents/skills")
+      .code,
+    "parent-conflict",
+  );
+  assert.equal(
+    await readFile(join(sharedParentFixture.project, ".agents"), "utf8"),
+    "user-owned\n",
+  );
 });
 
 test("initialization planning rejects malformed authority and forged roots", async (t) => {

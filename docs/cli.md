@@ -32,6 +32,8 @@ Use `--project <project-path>` with a command that inspects a project. Add `--js
 
 The two engine commands require `--engine godot`. They do not accept an executable path, start Godot, connect to an editor, or raise support above `planned`.
 
+The `init` plan includes the shared `.agents/skills` parent alongside project-local control state. It never creates either location. The private initialization workflow can apply that exact fixed layout only after separate approval; no public apply flag exists.
+
 ## Complete command surface
 
 The command surface is split by actual availability. Only the first block can be dispatched by the current CLI.

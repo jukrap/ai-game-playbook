@@ -121,6 +121,8 @@ const projectInitializationTargetDefinitions = [
   [".ai-game-playbook/state/packs", "directory", "local-only", "none"],
   [".ai-game-playbook/state/packs/transactions", "directory", "local-only", "none"],
   [".ai-game-playbook/state/workflows", "directory", "local-only", "none"],
+  [".agents", "directory", "committed", "none"],
+  [".agents/skills", "directory", "committed", "none"],
 ];
 const projectInitializationTargets = projectInitializationTargetDefinitions.map(
   ([path, kind, policy, content]) => ({
@@ -741,9 +743,9 @@ export const validFoundationProtocolFixtures = {
     packLockDigest: secondDigest,
     targets: projectInitializationTargets,
     conflicts: [],
-    summary: { create: 20, retain: 0, conflict: 0 },
+    summary: { create: 22, retain: 0, conflict: 0 },
     budgets: {
-      maxChangedFiles: 20,
+      maxChangedFiles: 22,
       maxChangedBytes: 384,
       maxDurationMs: 30000,
       maxOutputBytes: 1048576,

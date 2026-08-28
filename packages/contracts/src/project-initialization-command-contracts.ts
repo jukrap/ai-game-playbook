@@ -18,6 +18,7 @@ import type {
   InitPlanTargetKind,
   InitPlanTargetPolicy,
 } from "./init-contracts.js";
+import { PROJECT_INITIALIZATION_TARGET_DEFINITIONS } from "./init-contracts.js";
 import {
   isPortableProjectPath,
   type PortableProjectPath,
@@ -32,7 +33,8 @@ import {
 import { isStableId, type StableId } from "./stable-id.js";
 
 export const PROJECT_INITIALIZATION_COMMAND_ID = "project.initialize" as const;
-export const PROJECT_INITIALIZATION_COMMAND_TARGET_COUNT: number = 20;
+export const PROJECT_INITIALIZATION_COMMAND_TARGET_COUNT: number =
+  PROJECT_INITIALIZATION_TARGET_DEFINITIONS.length;
 export const PROJECT_INITIALIZATION_COMMAND_MAX_METADATA_BYTES: number =
   1024 * 1024;
 export const PROJECT_INITIALIZATION_COMMAND_MAX_PROJECT_BYTES: number =
@@ -389,8 +391,6 @@ function validateTarget(
   const content = target["content"] as InitPlanTargetContent;
   if (
     !isPortableProjectPath(target["path"]) ||
-    (target["path"] !== ".ai-game-playbook" &&
-      !target["path"].startsWith(".ai-game-playbook/")) ||
     !TARGET_KINDS.has(kind) ||
     !TARGET_POLICIES.has(target["policy"] as InitPlanTargetPolicy) ||
     !TARGET_CONTENTS.has(content) ||
@@ -490,20 +490,22 @@ function validatePreparedPlanBody(
   const paths = new Map<string, ProjectInitializationCommandTarget>();
   const contentCounts = new Map<InitPlanTargetContent, number>();
   for (const [index, target] of targets.entries()) {
+    const expected = PROJECT_INITIALIZATION_TARGET_DEFINITIONS[index];
     if (paths.has(target.path)) {
       throw new TypeError("project initialization target path is duplicated");
     }
-    if (index === 0) {
-      if (
-        target.path !== ".ai-game-playbook" ||
-        target.kind !== "directory" ||
-        target.policy !== "committed" ||
-        target.content !== "none"
-      ) {
-        throw new TypeError("project initialization root target is invalid");
-      }
-    } else {
-      const parent = paths.get(parentPath(target.path));
+    if (
+      expected === undefined ||
+      target.path !== expected.path ||
+      target.kind !== expected.kind ||
+      target.policy !== expected.policy ||
+      target.content !== expected.content
+    ) {
+      throw new TypeError("project initialization target layout is invalid");
+    }
+    const parentPathValue = parentPath(target.path);
+    if (parentPathValue !== ".") {
+      const parent = paths.get(parentPathValue);
       if (parent === undefined || parent.kind !== "directory") {
         throw new TypeError(
           "project initialization target parent must appear first",
@@ -983,8 +985,16 @@ const initializationProject = closedObject(
 
 const initializationSummary = closedObject(
   {
-    create: { type: "integer", minimum: 1, maximum: 20 },
-    retain: { type: "integer", minimum: 0, maximum: 19 },
+    create: {
+      type: "integer",
+      minimum: 1,
+      maximum: PROJECT_INITIALIZATION_COMMAND_TARGET_COUNT,
+    },
+    retain: {
+      type: "integer",
+      minimum: 0,
+      maximum: PROJECT_INITIALIZATION_COMMAND_TARGET_COUNT - 1,
+    },
     conflict: { const: 0 },
   },
   ["create", "retain", "conflict"],

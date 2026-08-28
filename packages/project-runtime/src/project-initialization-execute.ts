@@ -625,15 +625,13 @@ function assertNotCancelled(signal: AbortSignal | null): void {
 
 async function stageProjectTargets(
   plan: PreparedProjectInitialization,
+  targets: readonly PreparedProjectInitializationTarget[],
 ): Promise<TargetStage[]> {
   const { targetRoot, contentByPath } =
     internalsForPreparedProjectInitialization(plan);
   const stages: TargetStage[] = [];
   try {
-    for (const target of plan.targets) {
-      if (target.action !== "create" || CONTROL_STATE_PATHS.has(target.path)) {
-        continue;
-      }
+    for (const target of targets) {
       if (target.kind === "directory") {
         stages.push({
           target,
@@ -685,6 +683,43 @@ async function stageProjectTargets(
     }
     throw error;
   }
+}
+
+function parentPath(path: PortableProjectPath): string {
+  const separator = path.lastIndexOf("/");
+  return separator === -1 ? "." : path.slice(0, separator);
+}
+
+function targetMutationWaves(
+  plan: PreparedProjectInitialization,
+): readonly (readonly PreparedProjectInitializationTarget[])[] {
+  const candidates = plan.targets.filter(
+    (target) =>
+      target.action === "create" && !CONTROL_STATE_PATHS.has(target.path),
+  );
+  const byPath = new Map<string, PreparedProjectInitializationTarget>(
+    candidates.map((target) => [target.path, target]),
+  );
+  const waveByPath = new Map<string, number>();
+  const waves: PreparedProjectInitializationTarget[][] = [];
+  for (const target of candidates) {
+    const parent = byPath.get(parentPath(target.path));
+    const parentWave =
+      parent === undefined ? undefined : waveByPath.get(parent.path);
+    if (parent !== undefined && parentWave === undefined) {
+      runtimeError(
+        "project-initialization-plan-untrusted",
+        "$plan.targets",
+        "a created target appears before its created parent",
+      );
+    }
+    const wave = parentWave === undefined ? 0 : parentWave + 1;
+    waveByPath.set(target.path, wave);
+    (waves[wave] ??= []).push(target);
+  }
+  return Object.freeze(
+    waves.map((wave) => Object.freeze(wave)),
+  );
 }
 
 async function abortRemainingStages(
@@ -804,37 +839,40 @@ async function executeTargetMutation(
     assertAuthorizationActive(authorization);
     await lane.assertOwned();
     assertNotCancelled(signal);
-    stages = await stageProjectTargets(plan);
-    for (const staged of stages) {
-      assertAuthorizationActive(authorization);
-      await lane.assertOwned();
-      assertNotCancelled(signal);
-      try {
-        if (staged.kind === "directory") {
-          const result = await staged.stage.commit();
-          tracker.touchedPaths.add(staged.target.path);
-          tracker.applied.push({
-            target: staged.target,
-            identity: result.identity,
-          });
-        } else {
-          const result = await staged.stage.commit();
-          tracker.touchedPaths.add(staged.target.path);
-          tracker.changedBytes += result.bytes;
-          tracker.applied.push({
-            target: staged.target,
-            digest: result.afterDigest,
-          });
+    for (const wave of targetMutationWaves(plan)) {
+      stages = await stageProjectTargets(plan, wave);
+      for (const staged of stages) {
+        assertAuthorizationActive(authorization);
+        await lane.assertOwned();
+        assertNotCancelled(signal);
+        try {
+          if (staged.kind === "directory") {
+            const result = await staged.stage.commit();
+            tracker.touchedPaths.add(staged.target.path);
+            tracker.applied.push({
+              target: staged.target,
+              identity: result.identity,
+            });
+          } else {
+            const result = await staged.stage.commit();
+            tracker.touchedPaths.add(staged.target.path);
+            tracker.changedBytes += result.bytes;
+            tracker.applied.push({
+              target: staged.target,
+              digest: result.afterDigest,
+            });
+          }
+        } catch (error) {
+          const commitFailure = failureOf(error, "commit");
+          if (commitFailure.mutationUncertain) {
+            tracker.touchedPaths.add(staged.target.path);
+            tracker.changedBytes += staged.target.desiredBytes ?? 0;
+          }
+          throw error;
         }
-      } catch (error) {
-        const commitFailure = failureOf(error, "commit");
-        if (commitFailure.mutationUncertain) {
-          tracker.touchedPaths.add(staged.target.path);
-          tracker.changedBytes += staged.target.desiredBytes ?? 0;
-        }
-        throw error;
+        await yieldImmediate();
       }
-      await yieldImmediate();
+      stages = [];
     }
     assertAuthorizationActive(authorization);
     await lane.assertOwned();

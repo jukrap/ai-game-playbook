@@ -16,9 +16,18 @@ const nativeAvailable =
   process.arch === "x64" &&
   existsSync(artifactPath);
 
-function invoke(input) {
-  return spawnSync(artifactPath, ["self-test"], {
+function invoke(input, operation = "self-test") {
+  return spawnSync(artifactPath, [operation], {
     input,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024,
+    timeout: 5_000,
+    windowsHide: true,
+  });
+}
+
+function invokeArguments(arguments_) {
+  return spawnSync(artifactPath, arguments_, {
     encoding: "utf8",
     maxBuffer: 64 * 1024,
     timeout: 5_000,
@@ -50,6 +59,42 @@ test(
     assertProtocolFailure(
       invoke('{"schemaVersion":"1.0.0","unknown":true}\n'),
       "request-shape-invalid",
+    );
+  },
+);
+
+test(
+  "native synthetic launch protocol rejects duplicate and undeclared fields",
+  { skip: !nativeAvailable },
+  () => {
+    assertProtocolFailure(
+      invoke(
+        '{"schemaVersion":"1.0.0","schemaVersion":"1.0.0"}\n',
+        "synthetic-launch",
+      ),
+      "request-duplicate-field",
+    );
+    assertProtocolFailure(
+      invoke(
+        '{"schemaVersion":"1.0.0","unknown":true}\n',
+        "synthetic-launch",
+      ),
+      "request-shape-invalid",
+    );
+  },
+);
+
+test(
+  "native internal workloads refuse execution outside AppContainer",
+  { skip: !nativeAvailable },
+  () => {
+    assertProtocolFailure(
+      invokeArguments(["synthetic-workload", "--project", "C:\\fixture"]),
+      "synthetic-workload-appcontainer-required",
+    );
+    assertProtocolFailure(
+      invokeArguments(["probe", "--project", "C:\\fixture"]),
+      "probe-appcontainer-required",
     );
   },
 );

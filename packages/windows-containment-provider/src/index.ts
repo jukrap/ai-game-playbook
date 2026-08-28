@@ -20,5 +20,18 @@ export type {
   RunWindowsContainmentSelfTestRequest,
   WindowsContainmentSelfTestWitness,
 } from "./self-test.js";
+export {
+  assertWindowsContainedSyntheticLaunchWitness,
+  consumeWindowsContainedSyntheticLaunchReport,
+  prepareWindowsContainedSyntheticLaunch,
+  runWindowsContainedSyntheticLaunch,
+} from "./launch.js";
+export type {
+  ConsumeWindowsContainedSyntheticLaunchReportRequest,
+  PreparedWindowsContainedSyntheticLaunch,
+  PrepareWindowsContainedSyntheticLaunchRequest,
+  RunWindowsContainedSyntheticLaunchRequest,
+  WindowsContainedSyntheticLaunchWitness,
+} from "./launch.js";
 export { WindowsContainmentProviderError } from "./errors.js";
 export type { WindowsContainmentProviderErrorCode } from "./errors.js";

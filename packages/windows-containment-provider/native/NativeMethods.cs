@@ -18,6 +18,9 @@ internal static class NativeMethods
     internal const uint JobObjectLimitActiveProcess = 0x00000008;
     internal const uint JobObjectLimitKillOnJobClose = 0x00002000;
     internal const uint ProcessCreationChildProcessRestricted = 0x00000001;
+    internal const uint TokenQuery = 0x0008;
+    internal const int TokenIsAppContainer = 29;
+    internal const int TokenAppContainerSid = 31;
     internal static readonly IntPtr ProcThreadAttributeSecurityCapabilities = new(0x00020009);
     internal static readonly IntPtr ProcThreadAttributeChildProcessPolicy = new(0x0002000E);
 
@@ -135,6 +138,25 @@ internal static class NativeMethods
 
     [DllImport("advapi32.dll")]
     internal static extern IntPtr FreeSid(IntPtr sid);
+
+    [DllImport("kernel32.dll")]
+    internal static extern IntPtr GetCurrentProcess();
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool OpenProcessToken(
+        IntPtr process,
+        uint desiredAccess,
+        out IntPtr token);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetTokenInformation(
+        IntPtr token,
+        int informationClass,
+        IntPtr information,
+        uint informationLength,
+        out uint returnLength);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

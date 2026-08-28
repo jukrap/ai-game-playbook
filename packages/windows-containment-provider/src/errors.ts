@@ -12,7 +12,14 @@ export type WindowsContainmentProviderErrorCode =
   | "self-test-process-failed"
   | "self-test-output-invalid"
   | "self-test-witness-invalid"
-  | "self-test-witness-consumed";
+  | "self-test-witness-consumed"
+  | "invalid-launch-request"
+  | "launch-consumed"
+  | "launch-expired"
+  | "launch-process-failed"
+  | "launch-output-invalid"
+  | "launch-witness-invalid"
+  | "launch-witness-consumed";
 
 export class WindowsContainmentProviderError extends Error {
   readonly code: WindowsContainmentProviderErrorCode;

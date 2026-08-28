@@ -8,6 +8,93 @@ namespace AiGamePlaybook.WindowsContainment;
 
 internal static class WindowsProcess
 {
+    internal static bool IsCurrentProcessAppContainer()
+    {
+        if (!NativeMethods.OpenProcessToken(
+                NativeMethods.GetCurrentProcess(),
+                NativeMethods.TokenQuery,
+                out IntPtr token))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "process-token-open-failed");
+        }
+        IntPtr value = IntPtr.Zero;
+        try
+        {
+            value = Marshal.AllocHGlobal(sizeof(int));
+            Marshal.WriteInt32(value, 0);
+            if (!NativeMethods.GetTokenInformation(
+                    token,
+                    NativeMethods.TokenIsAppContainer,
+                    value,
+                    sizeof(int),
+                    out uint returned)
+                || returned != sizeof(int))
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "appcontainer-token-query-failed");
+            }
+            return Marshal.ReadInt32(value) != 0;
+        }
+        finally
+        {
+            if (value != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(value);
+            }
+            NativeMethods.CloseHandle(token);
+        }
+    }
+
+    internal static string GetCurrentAppContainerProfileRoot()
+    {
+        if (!NativeMethods.OpenProcessToken(
+                NativeMethods.GetCurrentProcess(),
+                NativeMethods.TokenQuery,
+                out IntPtr token))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "process-token-open-failed");
+        }
+        IntPtr value = IntPtr.Zero;
+        try
+        {
+            NativeMethods.GetTokenInformation(
+                token,
+                NativeMethods.TokenAppContainerSid,
+                IntPtr.Zero,
+                0,
+                out uint required);
+            if (required < IntPtr.Size || required > 64 * 1024)
+            {
+                throw new InvalidOperationException("appcontainer-sid-size-invalid");
+            }
+            value = Marshal.AllocHGlobal(checked((int)required));
+            if (!NativeMethods.GetTokenInformation(
+                    token,
+                    NativeMethods.TokenAppContainerSid,
+                    value,
+                    required,
+                    out uint returned)
+                || returned != required)
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "appcontainer-sid-query-failed");
+            }
+            IntPtr sidPointer = Marshal.ReadIntPtr(value);
+            if (sidPointer == IntPtr.Zero)
+            {
+                throw new InvalidOperationException("appcontainer-sid-unavailable");
+            }
+            var sid = new SecurityIdentifier(sidPointer);
+            return GetProfileRoot(sid.Value);
+        }
+        finally
+        {
+            if (value != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(value);
+            }
+            NativeMethods.CloseHandle(token);
+        }
+    }
+
     internal static (IntPtr Process, IntPtr Thread) CreateContainedProcess(
         string application,
         string commandLine,
@@ -278,6 +365,39 @@ internal static class WindowsProcess
 
     internal static string BuildCommandLine(IEnumerable<string> arguments) =>
         string.Join(' ', arguments.Select(QuoteWindowsArgument));
+
+    internal static bool DeleteOwnedFixture(string ownedRoot)
+    {
+        try
+        {
+            if (!Directory.Exists(ownedRoot))
+            {
+                return !File.Exists(ownedRoot);
+            }
+            var pending = new Stack<string>();
+            pending.Push(ownedRoot);
+            while (pending.TryPop(out string? current))
+            {
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                {
+                    return false;
+                }
+                foreach (string child in Directory.EnumerateDirectories(
+                             current,
+                             "*",
+                             SearchOption.TopDirectoryOnly))
+                {
+                    pending.Push(child);
+                }
+            }
+            Directory.Delete(ownedRoot, recursive: true);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     private static string QuoteWindowsArgument(string value)
     {

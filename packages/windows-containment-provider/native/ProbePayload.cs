@@ -11,6 +11,10 @@ internal static class ProbePayload
 {
     internal static async Task<int> RunAsync(string[] args)
     {
+        if (!WindowsProcess.IsCurrentProcessAppContainer())
+        {
+            throw new ProtocolException("probe-appcontainer-required");
+        }
         IReadOnlyDictionary<string, string> parsed = ParseArguments(args);
         string project = parsed["project"];
         string alias = parsed["alias"];

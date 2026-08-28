@@ -110,7 +110,7 @@ internal static class SelfTestRunner
 
             ipv4 = new TcpListener(IPAddress.Loopback, 0);
             ipv6 = new TcpListener(IPAddress.IPv6Loopback, 0);
-            dns = new UdpClient(new IPEndPoint(IPAddress.Loopback, 53));
+            dns = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
             ipv4.Start(1);
             ipv6.Server.DualMode = false;
             ipv6.Start(1);
@@ -149,6 +149,7 @@ internal static class SelfTestRunner
 
             int ipv4Port = ((IPEndPoint)ipv4.LocalEndpoint).Port;
             int ipv6Port = ((IPEndPoint)ipv6.LocalEndpoint).Port;
+            int dnsPort = ((IPEndPoint)dns.Client.LocalEndPoint!).Port;
             string[] command =
             {
                 probePath,
@@ -158,7 +159,7 @@ internal static class SelfTestRunner
                 "--report", probeReportPath,
                 "--ipv4-port", ipv4Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 "--ipv6-port", ipv6Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                "--dns-port", "53",
+                "--dns-port", dnsPort.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 "--dns-name", $"{compactId}.invalid",
             };
             IReadOnlyDictionary<string, string> environment =
@@ -320,7 +321,7 @@ internal static class SelfTestRunner
             }
             if (fixtureCreated)
             {
-                fixtureRemoved = DeleteOwnedFixture(ownedRoot);
+                fixtureRemoved = WindowsProcess.DeleteOwnedFixture(ownedRoot);
             }
         }
 
@@ -517,36 +518,6 @@ internal static class SelfTestRunner
             throw new InvalidOperationException("tcp-sentinel-unbound");
         }
         return listener.Pending();
-    }
-
-    private static bool DeleteOwnedFixture(string ownedRoot)
-    {
-        try
-        {
-            if (!Directory.Exists(ownedRoot))
-            {
-                return !File.Exists(ownedRoot);
-            }
-            var pending = new Stack<string>();
-            pending.Push(ownedRoot);
-            while (pending.TryPop(out string? current))
-            {
-                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
-                {
-                    return false;
-                }
-                foreach (string child in Directory.EnumerateDirectories(current, "*", SearchOption.TopDirectoryOnly))
-                {
-                    pending.Push(child);
-                }
-            }
-            Directory.Delete(ownedRoot, recursive: true);
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     private static string FailureCode(Exception error) => error switch

@@ -22,6 +22,19 @@ internal static class Program
                 Protocol.WriteJson(result.Report);
                 return result.ExitCode;
             }
+            if (args.Length == 1 && args[0] == "synthetic-launch")
+            {
+                NativeSyntheticLaunchRequest request =
+                    await Protocol.ReadSyntheticLaunchRequestAsync();
+                NativeSyntheticLaunchResult result =
+                    await SyntheticLaunchRunner.RunAsync(request);
+                Protocol.WriteJson(result.Report);
+                return result.ExitCode;
+            }
+            if (args.Length > 1 && args[0] == "synthetic-workload")
+            {
+                return await SyntheticPayload.RunAsync(args[1..]);
+            }
             if (args.Length > 1 && args[0] == "probe")
             {
                 return await ProbePayload.RunAsync(args[1..]);

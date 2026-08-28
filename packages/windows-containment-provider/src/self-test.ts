@@ -85,6 +85,23 @@ interface ReportAuthority {
   consumed: boolean;
 }
 
+interface WitnessAuthority {
+  readonly runtime: WindowsContainmentProviderRuntime;
+  readonly providerDescriptorDigest: Sha256Digest;
+  readonly providerCatalogDigest: Sha256Digest;
+  readonly projectRootIdentityDigest: Sha256Digest;
+  readonly requestDigest: Sha256Digest;
+  readonly reportDigest: Sha256Digest;
+  readonly expiresAt: string;
+  launchClaimed: boolean;
+}
+
+export interface WindowsContainmentSelfTestLaunchAuthority {
+  readonly requestDigest: Sha256Digest;
+  readonly reportDigest: Sha256Digest;
+  readonly expiresAt: string;
+}
+
 interface NativeProcessResult {
   readonly exitCode: number | null;
   readonly signal: NodeJS.Signals | null;
@@ -189,7 +206,7 @@ interface RawConsumeRequest {
 
 const preparedAuthorities = new WeakMap<object, PreparedAuthority>();
 const reportAuthorities = new WeakMap<object, ReportAuthority>();
-const witnessAuthorities = new WeakSet<object>();
+const witnessAuthorities = new WeakMap<object, WitnessAuthority>();
 
 function fail(
   code:
@@ -260,7 +277,7 @@ function canonicalTimestamp(epochMs: number): string {
   return new Date(epochMs).toISOString();
 }
 
-function safeWindowsEnvironment(): NodeJS.ProcessEnv {
+export function safeWindowsContainmentProviderEnvironment(): NodeJS.ProcessEnv {
   const localPath = (name: string): string => {
     const actual = Object.keys(process.env).find(
       (key) => key.toLowerCase() === name.toLowerCase(),
@@ -321,7 +338,7 @@ async function runNativeSelfTest(
     const child = spawn(authority.artifactPath, ["self-test"], {
       cwd: dirname(authority.artifactPath),
       detached: false,
-      env: safeWindowsEnvironment(),
+      env: safeWindowsContainmentProviderEnvironment(),
       shell: false,
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
@@ -883,24 +900,81 @@ export function consumeWindowsContainmentSelfTestReport(
     reportDigest: report.reportDigest,
     expiresAt: authority.expiresAt,
   });
-  witnessAuthorities.add(witness);
+  witnessAuthorities.set(witness, {
+    runtime,
+    providerDescriptorDigest: report.providerDescriptorDigest,
+    providerCatalogDigest: report.providerCatalogDigest,
+    projectRootIdentityDigest: authority.projectRootIdentityDigest,
+    requestDigest: authority.requestDigest,
+    reportDigest: report.reportDigest,
+    expiresAt: authority.expiresAt,
+    launchClaimed: false,
+  });
   return witness;
 }
 
 export function assertWindowsContainmentSelfTestWitness(
   witness: WindowsContainmentSelfTestWitness,
 ): void {
-  if (
-    witness === null ||
-    typeof witness !== "object" ||
-    !witnessAuthorities.has(witness)
-  ) {
+  const authority =
+    witness !== null && typeof witness === "object"
+      ? witnessAuthorities.get(witness)
+      : undefined;
+  if (authority === undefined) {
     return fail(
       "self-test-witness-invalid",
       "Self-test witness was not created by this process.",
     );
   }
-  if (Date.now() >= Date.parse(witness.expiresAt)) {
+  if (authority.launchClaimed) {
+    return fail(
+      "self-test-witness-consumed",
+      "Self-test witness was already claimed by a launch.",
+    );
+  }
+  if (Date.now() >= Date.parse(authority.expiresAt)) {
     return fail("self-test-expired", "Self-test witness has expired.");
   }
+}
+
+export function claimWindowsContainmentSelfTestWitnessForLaunch(
+  witness: WindowsContainmentSelfTestWitness,
+  runtime: WindowsContainmentProviderRuntime,
+  projectRootIdentityDigest: Sha256Digest,
+): WindowsContainmentSelfTestLaunchAuthority {
+  const authority =
+    witness !== null && typeof witness === "object"
+      ? witnessAuthorities.get(witness)
+      : undefined;
+  if (
+    authority === undefined ||
+    authority.runtime !== runtime ||
+    authority.projectRootIdentityDigest !== projectRootIdentityDigest ||
+    authority.providerDescriptorDigest !==
+      runtime.descriptor.descriptorDigest ||
+    authority.providerCatalogDigest !== runtime.catalogDigest ||
+    authority.requestDigest !== witness.requestDigest ||
+    authority.reportDigest !== witness.reportDigest ||
+    authority.expiresAt !== witness.expiresAt
+  ) {
+    return fail(
+      "self-test-witness-invalid",
+      "Self-test witness does not match the launch runtime or project identity.",
+    );
+  }
+  if (authority.launchClaimed) {
+    return fail(
+      "self-test-witness-consumed",
+      "Self-test witness was already claimed by a launch.",
+    );
+  }
+  if (Date.now() >= Date.parse(authority.expiresAt)) {
+    return fail("self-test-expired", "Self-test witness has expired.");
+  }
+  authority.launchClaimed = true;
+  return Object.freeze({
+    requestDigest: authority.requestDigest,
+    reportDigest: authority.reportDigest,
+    expiresAt: authority.expiresAt,
+  });
 }

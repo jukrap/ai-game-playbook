@@ -43,6 +43,8 @@ const expectedIds = [
   "pack-recovery-output",
   "process-containment-assessment-report",
   "process-containment-assessment-request",
+  "process-containment-launch-report",
+  "process-containment-launch-request",
   "process-containment-provider-descriptor",
   "process-containment-self-test-report",
   "process-containment-self-test-request",

@@ -84,6 +84,10 @@ import {
   processContainmentSelfTestRequestSchema,
 } from "./process-containment-provider-contracts.js";
 import {
+  processContainmentLaunchReportSchema,
+  processContainmentLaunchRequestSchema,
+} from "./process-containment-launch-contracts.js";
+import {
   packDoctorReportSchema,
   packDoctorRequestSchema,
   packListReportSchema,
@@ -187,6 +191,10 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
       processContainmentAssessmentRequestSchema,
     "process-containment-provider-descriptor":
       processContainmentProviderDescriptorSchema,
+    "process-containment-launch-report":
+      processContainmentLaunchReportSchema,
+    "process-containment-launch-request":
+      processContainmentLaunchRequestSchema,
     "process-containment-self-test-report":
       processContainmentSelfTestReportSchema,
     "process-containment-self-test-request":

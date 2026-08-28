@@ -296,7 +296,7 @@ function commandFor(operation) {
   command.requiredEvidence = ["evidence.pack-transaction"];
   command.handler = {
     package: "@ai-game-playbook/pack-runtime",
-    export: "executePreparedPackOperation",
+    export: "dispatchPreparedPackOperation",
     digest: `sha256:${"8".repeat(64)}`,
   };
   return { command, definition };

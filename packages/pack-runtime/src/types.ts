@@ -1,5 +1,6 @@
 import type {
   ExecutionBudgets,
+  ProjectStage,
   SemanticVersion,
   Sha256Digest,
   StableId,
@@ -28,6 +29,11 @@ export interface PreparePackOperationRequest {
   readonly project: {
     readonly id: StableId;
     readonly identityDigest: Sha256Digest;
+  };
+  readonly workflow?: {
+    readonly id: StableId;
+    readonly stepId: StableId;
+    readonly projectStage: ProjectStage;
   };
   readonly runId: string;
   readonly packId: StableId;
@@ -121,6 +127,12 @@ export interface PreparedPackOperation {
     readonly identityDigest: Sha256Digest;
     readonly rootIdentityDigest: Sha256Digest;
   };
+  readonly workflow?: {
+    readonly id: StableId;
+    readonly stepId: StableId;
+    readonly projectStage: ProjectStage;
+    readonly resolvedPlanDigest: Sha256Digest;
+  };
   readonly sourceRootIdentityDigest?: Sha256Digest;
   readonly registryDigest: Sha256Digest;
   readonly pack: {
@@ -150,6 +162,7 @@ export interface ExecutePackOperationRequest {
   readonly plan: unknown;
   readonly authorization?: AuthorizedPermissionDecision;
   readonly lane?: ProjectLaneLease;
+  readonly signal?: AbortSignal | null;
 }
 
 export interface PackExecutionEffects {
@@ -188,6 +201,8 @@ export type PackExecutionResult =
         readonly startedRecordDigest?: Sha256Digest;
         readonly terminalRecordPath: string;
         readonly terminalRecordDigest?: Sha256Digest;
+        readonly terminalRecordFileDigest?: Sha256Digest;
+        readonly terminalRecordBytes?: number;
       };
       readonly installedState: {
         readonly beforeDigest: Sha256Digest;

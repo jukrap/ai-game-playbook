@@ -34,6 +34,8 @@ const expectedIds = [
   "pack-doctor-request",
   "pack-list-report",
   "pack-list-request",
+  "pack-operation-input",
+  "pack-operation-output",
   "process-containment-assessment-report",
   "process-containment-assessment-request",
   "process-containment-provider-descriptor",

@@ -80,6 +80,16 @@ export type {
   PackRegistryStatus,
 } from "./pack-inspection-contracts.js";
 export {
+  PACK_OPERATION_COMMAND_IDS,
+  packOperationCommandInputSchema,
+  packOperationCommandOutputSchema,
+} from "./pack-operation-command-contracts.js";
+export type {
+  PackOperationCommandInput,
+  PackOperationCommandKind,
+  PackOperationCommandOutput,
+} from "./pack-operation-command-contracts.js";
+export {
   PROJECT_PACK_LOCK_MAX_DEPENDENCIES,
   PROJECT_PACK_LOCK_MAX_PACKS,
   assertProjectPackLockSemantics,

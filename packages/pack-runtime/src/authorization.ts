@@ -2,6 +2,7 @@ import {
   canonicalizeJson,
   compareCanonicalText,
   digestCanonicalJson,
+  PACK_OPERATION_COMMAND_IDS,
   type ExecutionBudgets,
   type StableId,
 } from "@ai-game-playbook/contracts";
@@ -80,7 +81,7 @@ function invalid(path: string, message: string): never {
 }
 
 export function packOperationCommandId(operation: PackOperation): StableId {
-  return `pack.${operation}` as StableId;
+  return PACK_OPERATION_COMMAND_IDS[operation];
 }
 
 export function createPackOperationCommandInput(
@@ -247,6 +248,15 @@ export function createPackOperationAuthorizationRequest(
     projectIdentityDigest: readyPlan.project.identityDigest,
     commandId: packOperationCommandId(readyPlan.operation),
     input: createPackOperationCommandInput(readyPlan),
+    ...(readyPlan.workflow === undefined
+      ? {}
+      : {
+          workflow: Object.freeze({
+            id: readyPlan.workflow.id,
+            stepId: readyPlan.workflow.stepId,
+            resolvedPlanDigest: readyPlan.workflow.resolvedPlanDigest,
+          }),
+        }),
     scope: Object.freeze({
       paths,
       objectIds: Object.freeze([]),
@@ -263,6 +273,11 @@ export function createPackOperationAuthorizationRequest(
 export interface ValidatedPackExecutionAuthority {
   readonly authorization: AuthorizedPermissionDecision;
   readonly lane: ProjectLaneLease;
+  readonly request: PermissionAuthorizationRequest;
+}
+
+export interface ValidatedPackAuthorization {
+  readonly authorization: AuthorizedPermissionDecision;
   readonly request: PermissionAuthorizationRequest;
 }
 
@@ -293,11 +308,10 @@ export function assertPackAuthorizationActive(
   }
 }
 
-export async function validatePackExecutionAuthority(
+export function validatePackAuthorization(
   plan: PreparedPackOperation,
   authorizationValue: unknown,
-  laneValue: unknown,
-): Promise<ValidatedPackExecutionAuthority> {
+): ValidatedPackAuthorization {
   let authorization: AuthorizedPermissionDecision;
   try {
     assertAuthorizedPermissionDecision(authorizationValue);
@@ -307,17 +321,6 @@ export async function validatePackExecutionAuthority(
       "pack-authorization-invalid",
       "$request.authorization",
       "pack authorization must be produced by the active broker process",
-    );
-  }
-  let lane: ProjectLaneLease;
-  try {
-    assertProjectLaneLease(laneValue);
-    lane = laneValue;
-  } catch {
-    throw new PackRuntimeError(
-      "pack-lane-invalid",
-      "$request.lane",
-      "pack lane must be produced by the active core process",
     );
   }
   const internals = internalsForPreparedPackOperation(plan);
@@ -334,7 +337,7 @@ export async function validatePackExecutionAuthority(
     command.retry.mode !== "never" ||
     command.retry.maxAttempts !== 1 ||
     command.handler.package !== "@ai-game-playbook/pack-runtime" ||
-    command.handler.export !== "executePreparedPackOperation"
+    command.handler.export !== "dispatchPreparedPackOperation"
   ) {
     authorizationInvalid(
       "$registry.command",
@@ -362,7 +365,11 @@ export async function validatePackExecutionAuthority(
     challenge.permissions[0]?.permission !== "install" ||
     challenge.permissions[0]?.mode !== "approval-required" ||
     challenge.feature !== undefined ||
-    challenge.workflow !== undefined ||
+    (challenge.workflow === undefined) !== (expected.workflow === undefined) ||
+    (challenge.workflow !== undefined &&
+      expected.workflow !== undefined &&
+      canonicalizeJson(challenge.workflow) !==
+        canonicalizeJson(expected.workflow)) ||
     challenge.editorSessionIdentityDigest !== undefined ||
     canonicalizeJson(challenge.scope) !== canonicalizeJson(expected.scope) ||
     authorization.lease.authorizationId.length === 0 ||
@@ -373,6 +380,26 @@ export async function validatePackExecutionAuthority(
     authorizationInvalid(
       "$request.authorization",
       "authorization is not exactly bound to the prepared pack operation",
+    );
+  }
+  return Object.freeze({ authorization, request: expected });
+}
+
+export async function validatePackExecutionAuthority(
+  plan: PreparedPackOperation,
+  authorizationValue: unknown,
+  laneValue: unknown,
+): Promise<ValidatedPackExecutionAuthority> {
+  const validated = validatePackAuthorization(plan, authorizationValue);
+  let lane: ProjectLaneLease;
+  try {
+    assertProjectLaneLease(laneValue);
+    lane = laneValue;
+  } catch {
+    throw new PackRuntimeError(
+      "pack-lane-invalid",
+      "$request.lane",
+      "pack lane must be produced by the active core process",
     );
   }
   if (
@@ -401,5 +428,9 @@ export async function validatePackExecutionAuthority(
         : false,
     );
   }
-  return Object.freeze({ authorization, lane, request: expected });
+  return Object.freeze({
+    authorization: validated.authorization,
+    lane,
+    request: validated.request,
+  });
 }

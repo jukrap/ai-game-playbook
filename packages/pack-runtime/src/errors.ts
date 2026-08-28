@@ -9,6 +9,7 @@ export type PackRuntimeErrorCode =
   | "pack-execution-uncertain"
   | "pack-lane-invalid"
   | "pack-not-found"
+  | "pack-operation-cancelled"
   | "pack-plan-conflicted"
   | "pack-plan-not-executable"
   | "pack-plan-untrusted"

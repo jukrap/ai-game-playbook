@@ -238,6 +238,17 @@ export const validFoundationProtocolFixtures = {
     artifactContentExposed: false,
     sourceLocationExposed: false,
   },
+  "pack-operation-input": {
+    schemaVersion: "1.0.0",
+    operation: "add",
+    packId: "pack.project-skills",
+    planDigest: digest,
+  },
+  "pack-operation-output": {
+    schemaVersion: "1.0.0",
+    status: "succeeded",
+    planDigest: digest,
+  },
   "engine-capabilities-request": {
     schemaVersion: "1.0.0",
     projectRoot: "D:\\games\\sample",

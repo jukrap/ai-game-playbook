@@ -22,6 +22,8 @@ export {
   packOperationCommandId,
 } from "./authorization.js";
 export { executePreparedPackOperation } from "./execute.js";
+export { dispatchPreparedPackOperation } from "./workflow-execute.js";
+export type { DispatchPreparedPackOperationRequest } from "./workflow-execute.js";
 export { preparePackOperation } from "./prepare.js";
 export {
   computePackTransactionRecoveryReportDigest,

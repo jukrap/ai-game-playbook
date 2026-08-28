@@ -25,6 +25,9 @@ import {
   packDoctorRequestSchema,
   packListReportSchema,
   packListRequestSchema,
+  PACK_OPERATION_COMMAND_IDS,
+  packOperationCommandInputSchema,
+  packOperationCommandOutputSchema,
   parseSemanticVersion,
   parseSha256Digest,
   parseStableId,
@@ -118,6 +121,64 @@ const initCommand: CommandDescriptor = Object.freeze({
     export: "runInit",
     digest: parseSha256Digest(
       "sha256:8d6ed0826eafc5855a47e820547af0f8c3d6b49d3c5baa46aa0a93c007e6e07d",
+    ),
+  }),
+});
+
+const PACK_ADD_MAX_CHANGED_FILES = 512;
+const PACK_ADD_MAX_CHANGED_BYTES = 16_777_216;
+const PACK_ADD_MAX_DURATION_MS = 30_000;
+const PACK_ADD_MAX_OUTPUT_BYTES = 1_048_576;
+
+const packAddCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: PACK_OPERATION_COMMAND_IDS.add,
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary: "Apply one approved, digest-bound managed pack add transaction.",
+  cli: Object.freeze({
+    path: Object.freeze(["internal", "pack", "add"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: packOperationCommandInputSchema.schemaId,
+    digest: packOperationCommandInputSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: packOperationCommandOutputSchema.schemaId,
+    digest: packOperationCommandOutputSchema.digest,
+  }),
+  capabilities: Object.freeze([PACK_OPERATION_COMMAND_IDS.add]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>(["install"]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "filesystem",
+      scope: "managed-pack-transaction",
+      boundary: "local",
+    }),
+  ]),
+  lane: "project-write",
+  timeoutMs: PACK_ADD_MAX_DURATION_MS,
+  cancellation: Object.freeze({ mode: "cooperative", graceMs: 1_000 }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: PACK_ADD_MAX_CHANGED_FILES,
+    maxChangedBytes: PACK_ADD_MAX_CHANGED_BYTES,
+    maxDurationMs: PACK_ADD_MAX_DURATION_MS,
+    maxOutputBytes: PACK_ADD_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([
+    parseStableId("pack-transaction"),
+    parseStableId("run-receipt"),
+    parseStableId("workflow-checkpoint"),
+  ]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/pack-runtime",
+    export: "dispatchPreparedPackOperation",
+    digest: parseSha256Digest(
+      "sha256:0203782c1531c4e9b1754139bb766694c58d438e5c012bef2d18bd236a5f0584",
     ),
   }),
 });
@@ -1510,6 +1571,47 @@ const projectInitializationWorkflow: WorkflowDescriptor = Object.freeze({
   requiredEvidence: Object.freeze([parseStableId("run-receipt")]),
 });
 
+const packAddWorkflow: WorkflowDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("workflow.pack-add"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Execute and retain evidence for one approved managed pack add transaction.",
+  input: Object.freeze({
+    schemaId: packOperationCommandInputSchema.schemaId,
+    digest: packOperationCommandInputSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: packOperationCommandOutputSchema.schemaId,
+    digest: packOperationCommandOutputSchema.digest,
+  }),
+  supportedStages: supportedStages(),
+  steps: Object.freeze([
+    Object.freeze({
+      id: parseStableId("step.pack-add"),
+      commandId: PACK_OPERATION_COMMAND_IDS.add,
+      dependsOn: Object.freeze([]),
+      onFailure: "stop" as const,
+      approvalCheckpoint: true,
+    }),
+  ]),
+  budgets: Object.freeze({
+    maxChangedFiles: PACK_ADD_MAX_CHANGED_FILES,
+    maxChangedBytes: PACK_ADD_MAX_CHANGED_BYTES,
+    maxDurationMs: PACK_ADD_MAX_DURATION_MS,
+    maxOutputBytes: PACK_ADD_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  resumePolicy: "never",
+  terminalOracle:
+    "The pack transaction and workflow evidence both close successfully, or uncertainty remains blocked without retry.",
+  requiredEvidence: Object.freeze([
+    parseStableId("pack-transaction"),
+    parseStableId("run-receipt"),
+  ]),
+});
+
 const definition: RegistryDefinition = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   controlPlaneVersion: parseSemanticVersion("0.0.0").value,
@@ -1535,6 +1637,8 @@ const definition: RegistryDefinition = Object.freeze({
     packDoctorReportSchema,
     packListRequestSchema,
     packListReportSchema,
+    packOperationCommandInputSchema,
+    packOperationCommandOutputSchema,
     processContainmentAssessmentRequestSchema,
     processContainmentAssessmentReportSchema,
     projectInitializationCommandInputSchema,
@@ -1558,6 +1662,7 @@ const definition: RegistryDefinition = Object.freeze({
     engineStatusCommand,
     engineVersionProbeCommand,
     initCommand,
+    packAddCommand,
     packDoctorCommand,
     packListCommand,
     projectInitializationRecoveryAssessmentCommand,
@@ -1570,6 +1675,7 @@ const definition: RegistryDefinition = Object.freeze({
   roleLenses: Object.freeze([]),
   workflows: Object.freeze([
     godotHeadlessPreflightWorkflow,
+    packAddWorkflow,
     projectInitializationWorkflow,
   ]),
   packs: Object.freeze([projectSkillsPack]),

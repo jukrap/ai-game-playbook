@@ -19,6 +19,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
       "engine.status",
       "engine.version-probe",
       "init",
+      "pack.add",
       "pack.doctor",
       "pack.list",
       "project.initialization-recovery.assess",
@@ -28,6 +29,44 @@ test("the builtin runtime registry exposes only implemented commands", () => {
       "skill.list",
     ],
   );
+
+  const packAdd = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "pack.add",
+  );
+  assert.notEqual(packAdd, undefined);
+  assert.equal(packAdd.lifecycle, "internal");
+  assert.deepEqual(packAdd.cli, {
+    path: ["internal", "pack", "add"],
+    aliases: [],
+  });
+  assert.deepEqual(packAdd.permissions, ["install"]);
+  assert.equal(packAdd.lane, "project-write");
+  assert.equal(
+    packAdd.input.schemaId,
+    contracts.packOperationCommandInputSchema.schemaId,
+  );
+  assert.equal(
+    packAdd.output.schemaId,
+    contracts.packOperationCommandOutputSchema.schemaId,
+  );
+  assert.equal(packAdd.handler.package, "@ai-game-playbook/pack-runtime");
+  assert.equal(packAdd.handler.export, "dispatchPreparedPackOperation");
+  assert.match(packAdd.handler.digest, digestPattern);
+
+  const packAddWorkflow = registry.BUILTIN_REGISTRY.workflows.find(
+    ({ id }) => id === "workflow.pack-add",
+  );
+  assert.notEqual(packAddWorkflow, undefined);
+  assert.equal(packAddWorkflow.lifecycle, "internal");
+  assert.deepEqual(packAddWorkflow.steps, [
+    {
+      id: "step.pack-add",
+      commandId: "pack.add",
+      dependsOn: [],
+      onFailure: "stop",
+      approvalCheckpoint: true,
+    },
+  ]);
 
   const doctor = registry.BUILTIN_REGISTRY.commands[0];
   assert.equal(doctor.lifecycle, "experimental");
@@ -463,7 +502,11 @@ test("the builtin runtime registry exposes only implemented commands", () => {
 test("the builtin registry binds internal operations to finite workflow steps", () => {
   assert.deepEqual(
     registry.BUILTIN_REGISTRY.workflows.map(({ id }) => id),
-    ["workflow.godot-headless-preflight", "workflow.project-initialization"],
+    [
+      "workflow.godot-headless-preflight",
+      "workflow.pack-add",
+      "workflow.project-initialization",
+    ],
   );
   const workflow = registry.BUILTIN_REGISTRY.workflows.find(
     ({ id }) => id === "workflow.godot-headless-preflight",

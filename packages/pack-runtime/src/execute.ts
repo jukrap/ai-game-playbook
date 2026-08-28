@@ -122,10 +122,18 @@ interface ExecutionFailure {
 
 interface TerminalWriteResult {
   readonly recordDigest?: Sha256Digest;
+  readonly fileDigest?: Sha256Digest;
+  readonly bytes?: number;
   readonly outcome: PackTransactionOutcome;
   readonly mutationUncertain: boolean;
   readonly failure?: ExecutionFailure;
 }
+
+type PackExecutionAuthority = Awaited<
+  ReturnType<typeof validatePackExecutionAuthority>
+> & {
+  readonly signal: AbortSignal | null;
+};
 
 function isRecord(value: unknown): value is MutableRecord {
   return (
@@ -257,8 +265,15 @@ async function assertLaneOwned(lane: ProjectLaneLease): Promise<void> {
 }
 
 async function assertForwardAuthority(
-  authority: Awaited<ReturnType<typeof validatePackExecutionAuthority>>,
+  authority: PackExecutionAuthority,
 ): Promise<void> {
+  if (authority.signal?.aborted === true) {
+    throw new PackRuntimeError(
+      "pack-operation-cancelled",
+      "$request.signal",
+      "pack operation was cancelled before the next mutation boundary",
+    );
+  }
   assertPackAuthorizationActive(authority.authorization);
   await assertLaneOwned(authority.lane);
   assertPackAuthorizationActive(authority.authorization);
@@ -445,7 +460,7 @@ async function assertCreatedDirectoryIdentities(
   plan: PreparedPackOperation,
   root: ReturnType<typeof internalsForPreparedPackOperation>["targetRoot"],
   applied: readonly AppliedDirectoryCreate[],
-  authority: Awaited<ReturnType<typeof validatePackExecutionAuthority>>,
+  authority: PackExecutionAuthority,
 ): Promise<void> {
   for (const { change, identity } of applied) {
     await assertForwardAuthority(authority);
@@ -469,7 +484,7 @@ async function assertRetainedDirectoryIdentities(
   plan: PreparedPackOperation,
   root: ReturnType<typeof internalsForPreparedPackOperation>["targetRoot"],
   changes: readonly PackDirectoryRetainChange[],
-  authority: Awaited<ReturnType<typeof validatePackExecutionAuthority>>,
+  authority: PackExecutionAuthority,
 ): Promise<void> {
   for (const change of changes) {
     await assertForwardAuthority(authority);
@@ -531,7 +546,7 @@ async function restoreDetachedDirectories(
 
 async function finalizeDetachedDirectories(
   applied: readonly DetachedDirectoryRemoval[],
-  authority: Awaited<ReturnType<typeof validatePackExecutionAuthority>>,
+  authority: PackExecutionAuthority,
   tracker: ExecutionTracker,
 ): Promise<ExecutionFailure | undefined> {
   for (const { change, stage } of applied) {
@@ -676,6 +691,8 @@ async function writeTerminalRecord(
     tracker.changedBytes += written.bytes;
     return {
       recordDigest: record.recordDigest,
+      fileDigest: written.fileDigest,
+      bytes: written.bytes,
       outcome,
       mutationUncertain,
       ...(failure === undefined ? {} : { failure }),
@@ -766,6 +783,10 @@ async function closeTransaction(
   if (clearFailure === undefined) return terminal;
   return Object.freeze({
     recordDigest: terminal.recordDigest,
+    ...(terminal.fileDigest === undefined
+      ? {}
+      : { fileDigest: terminal.fileDigest }),
+    ...(terminal.bytes === undefined ? {} : { bytes: terminal.bytes }),
     outcome: "recovery-required",
     mutationUncertain: true,
     failure: clearFailure,
@@ -779,7 +800,7 @@ function executedResult(
   tracker: ExecutionTracker,
   settlement: PermissionSettlement,
   startedRecordDigest: Sha256Digest | undefined,
-  terminalRecordDigest: Sha256Digest | undefined,
+  terminal: TerminalWriteResult | undefined,
   nextState: InstalledPackState | undefined,
   stateFileDigest: Sha256Digest | undefined,
   failure: ExecutionFailure | undefined,
@@ -794,7 +815,15 @@ function executedResult(
       startedRecordPath: packTransactionRecordPath(plan.runId, 0),
       ...(startedRecordDigest === undefined ? {} : { startedRecordDigest }),
       terminalRecordPath: packTransactionRecordPath(plan.runId, 1),
-      ...(terminalRecordDigest === undefined ? {} : { terminalRecordDigest }),
+      ...(terminal?.recordDigest === undefined
+        ? {}
+        : { terminalRecordDigest: terminal.recordDigest }),
+      ...(terminal?.fileDigest === undefined
+        ? {}
+        : { terminalRecordFileDigest: terminal.fileDigest }),
+      ...(terminal?.bytes === undefined
+        ? {}
+        : { terminalRecordBytes: terminal.bytes }),
     },
     installedState: {
       beforeDigest: plan.installedState.digest,
@@ -848,6 +877,15 @@ async function revalidateNoOpPlan(
         id: plan.project.id,
         identityDigest: plan.project.identityDigest,
       },
+      ...(plan.workflow === undefined
+        ? {}
+        : {
+            workflow: {
+              id: plan.workflow.id,
+              stepId: plan.workflow.stepId,
+              projectStage: plan.workflow.projectStage,
+            },
+          }),
       runId: plan.runId,
       packId: plan.pack.id,
       limits: plan.limits,
@@ -882,6 +920,19 @@ export async function executePreparedPackOperation(
     );
   }
   const plan = value.plan;
+  const hasSignal = Object.hasOwn(value, "signal");
+  if (
+    hasSignal &&
+    value.signal !== null &&
+    !(value.signal instanceof AbortSignal)
+  ) {
+    throw new PackRuntimeError(
+      "invalid-pack-execution-request",
+      "$request.signal",
+      "signal must be a genuine AbortSignal or null",
+    );
+  }
+  const signal = hasSignal ? (value.signal ?? null) : null;
   try {
     assertPreparedPackOperation(plan);
   } catch {
@@ -899,17 +950,31 @@ export async function executePreparedPackOperation(
     );
   }
   if (plan.disposition === "no-op") {
-    if (!exactKeys(value, ["plan"])) {
+    if (!exactKeys(value, hasSignal ? ["plan", "signal"] : ["plan"])) {
       throw new PackRuntimeError(
         "invalid-pack-execution-request",
         "$request",
         "write-free pack completion accepts no mutation authority",
       );
     }
+    if (signal?.aborted === true) {
+      throw new PackRuntimeError(
+        "pack-operation-cancelled",
+        "$request.signal",
+        "pack operation was cancelled before no-op revalidation",
+      );
+    }
     await revalidateNoOpPlan(plan);
     return noOpResult(plan);
   }
-  if (!exactKeys(value, ["plan", "authorization", "lane"])) {
+  if (
+    !exactKeys(
+      value,
+      hasSignal
+        ? ["plan", "authorization", "lane", "signal"]
+        : ["plan", "authorization", "lane"],
+    )
+  ) {
     throw new PackRuntimeError(
       "invalid-pack-execution-request",
       "$request",
@@ -917,11 +982,15 @@ export async function executePreparedPackOperation(
     );
   }
 
-  const authority = await validatePackExecutionAuthority(
+  const validatedAuthority = await validatePackExecutionAuthority(
     plan,
     value.authorization,
     value.lane,
   );
+  const authority: PackExecutionAuthority = Object.freeze({
+    ...validatedAuthority,
+    signal,
+  });
   const startedClock = performance.now();
   const tracker: ExecutionTracker = {
     touchedPaths: new Set<string>(),
@@ -1242,7 +1311,7 @@ export async function executePreparedPackOperation(
       tracker,
       settlement,
       startedRecordDigest,
-      terminal.recordDigest,
+      terminal,
       undefined,
       undefined,
       terminal.failure ?? failure,
@@ -1518,7 +1587,7 @@ export async function executePreparedPackOperation(
       tracker,
       settlement,
       startedRecordDigest,
-      terminal.recordDigest,
+      terminal,
       undefined,
       undefined,
       terminal.failure ?? failure,
@@ -1558,7 +1627,7 @@ export async function executePreparedPackOperation(
       tracker,
       settlement,
       startedRecordDigest,
-      terminal.recordDigest,
+      terminal,
       nextState,
       stateResult?.afterDigest,
       terminal.failure ?? finalizeFailure,
@@ -1597,7 +1666,7 @@ export async function executePreparedPackOperation(
     tracker,
     settlement,
     startedRecordDigest,
-    terminal.recordDigest,
+    terminal,
     nextState,
     stateResult?.afterDigest,
     terminal.failure,

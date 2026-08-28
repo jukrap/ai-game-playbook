@@ -304,6 +304,87 @@ test("preflight rejects unvalidated authority and unsupported executable surface
   );
 });
 
+test("preflight rejects non-plain requests without invoking accessors or proxies", async (t) => {
+  const f = await fixture(t);
+  const pack = manifest({ content: f.content });
+  const base = request(f, pack);
+  let getterCalls = 0;
+  const accessorRequest = { ...base };
+  Object.defineProperty(accessorRequest, "operation", {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return "add";
+    },
+  });
+
+  await assert.rejects(
+    packRuntime.preparePackOperation(accessorRequest),
+    expectPackError("invalid-pack-request"),
+  );
+  assert.equal(getterCalls, 0);
+
+  const hiddenRequest = { ...base };
+  Object.defineProperty(hiddenRequest, "hidden", {
+    enumerable: false,
+    value: true,
+  });
+  for (const invalidRequest of [
+    hiddenRequest,
+    { ...base, [Symbol("hidden")]: true },
+    Object.assign(Object.create({ inherited: true }), base),
+  ]) {
+    await assert.rejects(
+      packRuntime.preparePackOperation(invalidRequest),
+      expectPackError("invalid-pack-request"),
+    );
+  }
+
+  for (const [field, nestedField, nestedValue] of [
+    ["project", "id", "sample.graybox"],
+    ["limits", "maxArtifactBytes", 1024],
+    ["workflow", "id", "workflow.pack-add"],
+  ]) {
+    const nested =
+      field === "workflow"
+        ? {
+            id: "workflow.pack-add",
+            stepId: "step.pack-add",
+            projectStage: "vertical-slice",
+          }
+        : { ...base[field] };
+    Object.defineProperty(nested, nestedField, {
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return nestedValue;
+      },
+    });
+    await assert.rejects(
+      packRuntime.preparePackOperation({ ...base, [field]: nested }),
+      expectPackError("invalid-pack-request"),
+    );
+  }
+  assert.equal(getterCalls, 0);
+
+  let proxyTraps = 0;
+  const proxiedRequest = new Proxy(base, {
+    get() {
+      proxyTraps += 1;
+      return undefined;
+    },
+    ownKeys() {
+      proxyTraps += 1;
+      return [];
+    },
+  });
+  await assert.rejects(
+    packRuntime.preparePackOperation(proxiedRequest),
+    expectPackError("invalid-pack-request"),
+  );
+  assert.equal(proxyTraps, 0);
+});
+
 test("preflight reserves control-plane state and lock namespaces", async (t) => {
   const f = await fixture(t);
   for (const reservedTarget of [

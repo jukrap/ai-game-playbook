@@ -84,6 +84,10 @@ import {
   packListReportSchema,
   packListRequestSchema,
 } from "./pack-inspection-contracts.js";
+import {
+  packOperationCommandInputSchema,
+  packOperationCommandOutputSchema,
+} from "./pack-operation-command-contracts.js";
 import { projectPackLockSchema } from "./project-pack-lock-contracts.js";
 import {
   projectInitializationCommandInputSchema,
@@ -138,6 +142,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "pack-doctor-request": packDoctorRequestSchema,
     "pack-list-report": packListReportSchema,
     "pack-list-request": packListRequestSchema,
+    "pack-operation-input": packOperationCommandInputSchema,
+    "pack-operation-output": packOperationCommandOutputSchema,
     "project-inspect-report": projectInspectReportSchema,
     "project-inspect-request": projectInspectRequestSchema,
     "project-initialization-command-input":

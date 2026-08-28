@@ -33,6 +33,10 @@ test("foundation plan separates available and planned command surfaces", () => {
     new Set(artifact.data.skills.map(({ id }) => id)).size,
     artifact.data.skills.length,
   );
+  assert.equal(
+    artifact.data.commands.find(({ id }) => id === "pack.add")?.availability,
+    "planned",
+  );
   for (const command of artifact.data.commands) {
     assert.equal(contracts.isStableId(command.id), true);
     assert.equal(contracts.isStableId(command.capability), true);

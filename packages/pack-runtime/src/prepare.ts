@@ -4,7 +4,10 @@ import {
   digestCanonicalJson,
   isSha256Digest,
   isStableId,
+  PACK_OPERATION_COMMAND_IDS,
+  PROJECT_STAGES,
   type PackManifest,
+  type ProjectStage,
   type Sha256Digest,
   type StableId,
 } from "@ai-game-playbook/contracts";
@@ -19,8 +22,10 @@ import {
 } from "@ai-game-playbook/core";
 import {
   assertValidatedRegistry,
+  resolveWorkflowPlan,
   type ValidatedRegistry,
 } from "@ai-game-playbook/registry";
+import { types as utilTypes } from "node:util";
 
 import { PackRuntimeError } from "./errors.js";
 import { createPackDirectoryOwnershipMarker } from "./directory-ownership.js";
@@ -63,6 +68,12 @@ interface NormalizedPrepareRequest {
     readonly id: StableId;
     readonly identityDigest: Sha256Digest;
   };
+  readonly workflow?: {
+    readonly id: StableId;
+    readonly stepId: StableId;
+    readonly projectStage: ProjectStage;
+    readonly resolvedPlanDigest: Sha256Digest;
+  };
   readonly runId: string;
   readonly packId: StableId;
   readonly limits: PackOperationLimits;
@@ -101,6 +112,48 @@ function invalid(path: string, message: string): never {
   throw new PackRuntimeError("invalid-pack-request", path, message);
 }
 
+function plainDataRecord(
+  value: unknown,
+  path: string,
+): Readonly<Record<string, unknown>> {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    utilTypes.isProxy(value)
+  ) {
+    invalid(path, "expected a plain data object");
+  }
+  try {
+    if (
+      Object.getPrototypeOf(value) !== Object.prototype ||
+      Object.getOwnPropertySymbols(value).length !== 0
+    ) {
+      throw new TypeError("value is not a plain string-keyed object");
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    if (
+      Object.values(descriptors).some(
+        (descriptor) =>
+          !("value" in descriptor) || descriptor.enumerable !== true,
+      )
+    ) {
+      throw new TypeError("value contains an accessor or hidden field");
+    }
+    return Object.freeze(
+      Object.fromEntries(
+        Object.entries(descriptors).map(([key, descriptor]) => [
+          key,
+          descriptor.value,
+        ]),
+      ),
+    );
+  } catch (error) {
+    if (error instanceof PackRuntimeError) throw error;
+    invalid(path, "expected a plain data object");
+  }
+}
+
 function boundedInteger(
   value: unknown,
   minimum: number,
@@ -120,10 +173,8 @@ function boundedInteger(
 function normalizeRequest(
   value: PreparePackOperationRequest,
 ): NormalizedPrepareRequest {
-  if (typeof value !== "object" || value === null) {
-    invalid("$request", "expected a plain request object");
-  }
-  const operation = value.operation;
+  const request = plainDataRecord(value, "$request");
+  const operation = request["operation"];
   if (operation !== "add" && operation !== "update" && operation !== "remove") {
     invalid("$request.operation", "unknown pack lifecycle operation");
   }
@@ -148,11 +199,14 @@ function normalizeRequest(
           "packId",
           "limits",
         ];
-  if (!exactKeys(value, requestKeys)) {
+  const workflowValue = request["workflow"];
+  if (workflowValue !== undefined) requestKeys.push("workflow");
+  if (!exactKeys(request, requestKeys)) {
     invalid("$request", "pack request contains undeclared or missing fields");
   }
+  const registry = request["registry"];
   try {
-    assertValidatedRegistry(value.registry);
+    assertValidatedRegistry(registry);
   } catch {
     throw new PackRuntimeError(
       "pack-registry-untrusted",
@@ -160,25 +214,68 @@ function normalizeRequest(
       "registry must be validated in this runtime process",
     );
   }
+  const project = plainDataRecord(request["project"], "$request.project");
+  const projectId = project["id"];
+  const projectIdentityDigest = project["identityDigest"];
   if (
-    typeof value.project !== "object" ||
-    value.project === null ||
-    !exactKeys(value.project, ["id", "identityDigest"]) ||
-    !isStableId(value.project.id) ||
-    !isSha256Digest(value.project.identityDigest)
+    !exactKeys(project, ["id", "identityDigest"]) ||
+    !isStableId(projectId) ||
+    !isSha256Digest(projectIdentityDigest)
   ) {
     invalid("$request.project", "project identity is invalid");
   }
-  if (!UUID_PATTERN.test(value.runId)) {
+  const requestRunId = request["runId"];
+  if (typeof requestRunId !== "string" || !UUID_PATTERN.test(requestRunId)) {
     invalid("$request.runId", "run identity must be a canonical UUID");
   }
-  if (!isStableId(value.packId)) {
+  let workflow: NormalizedPrepareRequest["workflow"];
+  if (workflowValue !== undefined) {
+    const workflowRecord = plainDataRecord(
+      workflowValue,
+      "$request.workflow",
+    );
+    const workflowId = workflowRecord["id"];
+    const workflowStepId = workflowRecord["stepId"];
+    const projectStage = workflowRecord["projectStage"];
+    if (
+      !exactKeys(workflowRecord, ["id", "stepId", "projectStage"]) ||
+      !isStableId(workflowId) ||
+      !isStableId(workflowStepId) ||
+      typeof projectStage !== "string" ||
+      !PROJECT_STAGES.includes(projectStage as ProjectStage)
+    ) {
+      invalid("$request.workflow", "workflow binding is invalid");
+    }
+    const resolved = resolveWorkflowPlan(
+      registry,
+      workflowId,
+      projectStage as ProjectStage,
+    );
+    const step = resolved.steps.find(({ id }) => id === workflowStepId);
+    if (
+      step === undefined ||
+      step.command.id !== PACK_OPERATION_COMMAND_IDS[operation] ||
+      step.command.lane !== "project-write"
+    ) {
+      invalid(
+        "$request.workflow",
+        "workflow step does not bind the selected pack operation",
+      );
+    }
+    workflow = Object.freeze({
+      id: resolved.workflow.id,
+      stepId: step.id,
+      projectStage: projectStage as ProjectStage,
+      resolvedPlanDigest: resolved.resolvedPlanDigest,
+    });
+  }
+  const packId = request["packId"];
+  if (!isStableId(packId)) {
     invalid("$request.packId", "pack identity must be a stable ID");
   }
+  const limitValues = plainDataRecord(request["limits"], "$request.limits");
   if (
-    typeof value.limits !== "object" ||
-    value.limits === null ||
-    !exactKeys(value.limits, [
+    !exactKeys(limitValues, [
       "maxArtifactBytes",
       "maxTotalBytes",
       "maxDirectoryEntries",
@@ -188,19 +285,19 @@ function normalizeRequest(
   }
   const limits = Object.freeze({
     maxArtifactBytes: boundedInteger(
-      value.limits.maxArtifactBytes,
+      limitValues["maxArtifactBytes"],
       1,
       PACK_RUNTIME_MAX_ARTIFACT_BYTES,
       "$request.limits.maxArtifactBytes",
     ),
     maxTotalBytes: boundedInteger(
-      value.limits.maxTotalBytes,
+      limitValues["maxTotalBytes"],
       1,
       PACK_RUNTIME_MAX_TOTAL_BYTES,
       "$request.limits.maxTotalBytes",
     ),
     maxDirectoryEntries: boundedInteger(
-      value.limits.maxDirectoryEntries,
+      limitValues["maxDirectoryEntries"],
       1,
       PACK_RUNTIME_MAX_DIRECTORY_ENTRIES,
       "$request.limits.maxDirectoryEntries",
@@ -212,22 +309,24 @@ function normalizeRequest(
       "per-artifact byte limit cannot exceed the total byte limit",
     );
   }
-  if (operation !== "remove" && value.sourceRoot === undefined) {
+  const sourceRoot = request["sourceRoot"];
+  if (operation !== "remove" && sourceRoot === undefined) {
     invalid("$request.sourceRoot", "add and update require a local source root");
   }
   return {
     operation,
-    registry: value.registry,
-    targetRoot: value.targetRoot as CanonicalProjectRoot,
+    registry,
+    targetRoot: request["targetRoot"] as CanonicalProjectRoot,
     ...(operation === "remove"
       ? {}
-      : { sourceRoot: value.sourceRoot as CanonicalProjectRoot }),
+      : { sourceRoot: sourceRoot as CanonicalProjectRoot }),
     project: Object.freeze({
-      id: value.project.id,
-      identityDigest: value.project.identityDigest,
+      id: projectId,
+      identityDigest: projectIdentityDigest,
     }),
-    runId: value.runId,
-    packId: value.packId,
+    ...(workflow === undefined ? {} : { workflow }),
+    runId: requestRunId,
+    packId,
     limits,
   };
 }
@@ -1143,7 +1242,10 @@ export async function preparePackOperation(
   }
   const activeTransaction = await loadActivePackTransactionRecord({
     root: request.targetRoot,
-    project: request.project,
+    project: Object.freeze({
+      id: request.project.id,
+      identityDigest: request.project.identityDigest,
+    }),
     maxDirectoryEntries: request.limits.maxDirectoryEntries,
   });
   if (activeTransaction !== undefined) {
@@ -1155,7 +1257,10 @@ export async function preparePackOperation(
   }
   const installed = await loadInstalledPackState(
     request.targetRoot,
-    request.project,
+    Object.freeze({
+      id: request.project.id,
+      identityDigest: request.project.identityDigest,
+    }),
     request.limits.maxDirectoryEntries,
   );
   const manifest = request.registry.packs.find(({ id }) => id === request.packId);
@@ -1301,6 +1406,7 @@ export async function preparePackOperation(
       identityDigest: request.project.identityDigest,
       rootIdentityDigest: request.targetRoot.identityDigest,
     },
+    ...(request.workflow === undefined ? {} : { workflow: request.workflow }),
     ...(request.sourceRoot === undefined
       ? {}
       : { sourceRootIdentityDigest: request.sourceRoot.identityDigest }),

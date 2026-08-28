@@ -53,6 +53,7 @@ test("managed preflight blocks when the shared skill parent is absent and writes
   const prepared = await prepareManagedProjectSkillInstallation({
     materialization,
     projectId: "sample.graybox",
+    projectStage: "vertical-slice",
   });
 
   assert.equal(prepared.schemaVersion, "1.0.0");
@@ -60,6 +61,14 @@ test("managed preflight blocks when the shared skill parent is absent and writes
   assert.equal(prepared.disposition, "conflicted");
   assert.equal(prepared.pack.id, "pack.project-skills");
   assert.equal(prepared.project.id, "sample.graybox");
+  assert.deepEqual(prepared.workflow, {
+    id: "workflow.pack-add",
+    stepId: "step.pack-add",
+    projectStage: "vertical-slice",
+    resolvedPlanDigest:
+      prepared.workflow.resolvedPlanDigest,
+  });
+  assert.match(prepared.workflow.resolvedPlanDigest, /^sha256:[0-9a-f]{64}$/);
   assert.equal(prepared.directoryChanges.length, 0);
   assert.equal(prepared.changes.length, 0);
   assert.equal(prepared.conflicts.length, materialization.targets.length);
@@ -93,6 +102,7 @@ test("managed preflight prepares owned skill directories and artifacts without m
   const prepared = await prepareManagedProjectSkillInstallation({
     materialization,
     projectId: "sample.graybox",
+    projectStage: "vertical-slice",
   });
 
   assert.equal(prepared.disposition, "ready");
@@ -142,6 +152,7 @@ test("managed preflight never adopts an exact unmanaged skill target", async (t)
   const prepared = await prepareManagedProjectSkillInstallation({
     materialization,
     projectId: "sample.graybox",
+    projectStage: "vertical-slice",
   });
 
   assert.equal(prepared.disposition, "conflicted");
@@ -168,6 +179,7 @@ test("managed preflight rejects detached candidates and invalid project identiti
     prepareManagedProjectSkillInstallation({
       materialization: structuredClone(materialization),
       projectId: "sample.graybox",
+      projectStage: "vertical-slice",
     }),
     isBoundaryCode("skill-runtime-materialization-plan-invalid"),
   );
@@ -175,6 +187,7 @@ test("managed preflight rejects detached candidates and invalid project identiti
     prepareManagedProjectSkillInstallation({
       materialization,
       projectId: "Not Valid",
+      projectStage: "vertical-slice",
     }),
     isBoundaryCode("skill-runtime-managed-install-request-invalid"),
   );
@@ -182,6 +195,15 @@ test("managed preflight rejects detached candidates and invalid project identiti
     prepareManagedProjectSkillInstallation({
       materialization,
       projectId: "sample.graybox",
+      projectStage: "production",
+    }),
+    isBoundaryCode("skill-runtime-managed-install-request-invalid"),
+  );
+  await assert.rejects(
+    prepareManagedProjectSkillInstallation({
+      materialization,
+      projectId: "sample.graybox",
+      projectStage: "vertical-slice",
       extra: true,
     }),
     isBoundaryCode("skill-runtime-managed-install-request-invalid"),
@@ -200,6 +222,10 @@ test("managed preflight rejects detached candidates and invalid project identiti
     enumerable: true,
     value: "sample.graybox",
   });
+  Object.defineProperty(accessorRequest, "projectStage", {
+    enumerable: true,
+    value: "vertical-slice",
+  });
   await assert.rejects(
     prepareManagedProjectSkillInstallation(accessorRequest),
     isBoundaryCode("skill-runtime-managed-install-request-invalid"),
@@ -208,7 +234,11 @@ test("managed preflight rejects detached candidates and invalid project identiti
 
   let proxyTraps = 0;
   const proxiedRequest = new Proxy(
-    { materialization, projectId: "sample.graybox" },
+    {
+      materialization,
+      projectId: "sample.graybox",
+      projectStage: "vertical-slice",
+    },
     {
       getPrototypeOf(target) {
         proxyTraps += 1;
@@ -238,6 +268,7 @@ test("managed preflight rejects project identity drift before pack inspection", 
     prepareManagedProjectSkillInstallation({
       materialization,
       projectId: "sample.graybox",
+      projectStage: "vertical-slice",
     }),
     isBoundaryCode("skill-runtime-runtime-drift"),
   );

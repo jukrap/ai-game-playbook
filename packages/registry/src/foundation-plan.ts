@@ -38,7 +38,7 @@ export interface FoundationPlanData {
 }
 
 const availableCommandIds: ReadonlySet<string> = new Set(
-  BUILTIN_REGISTRY.commands.map(({ id }) => id),
+  BUILTIN_REGISTRY_SURFACES.cli.data.commands.map(({ id }) => id),
 );
 const availableSkillIds: ReadonlySet<string> = new Set(
   BUILTIN_REGISTRY_SURFACES.skills.data.routes.map(({ id }) => id),

@@ -1,9 +1,11 @@
 import {
   SKILL_CATALOG_MAX_ENTRIES,
   SKILL_TARGET_MAX_BYTES,
+  PROJECT_STAGES,
   isStableId,
   parseStableId,
   type StableId,
+  type ProjectStage,
 } from "@ai-game-playbook/contracts";
 import {
   preparePackOperation,
@@ -27,6 +29,7 @@ const MANAGED_SKILL_MAX_DIRECTORY_ENTRIES = 10_000;
 export interface PrepareManagedProjectSkillInstallationRequest {
   readonly materialization: PreparedProjectSkillMaterialization;
   readonly projectId: StableId;
+  readonly projectStage: ProjectStage;
 }
 
 type DataRecord = Record<string, unknown>;
@@ -60,9 +63,10 @@ function requestRecord(value: unknown): DataRecord {
     const descriptors = Object.getOwnPropertyDescriptors(value);
     const keys = Object.keys(descriptors).sort();
     if (
-      keys.length !== 2 ||
+      keys.length !== 3 ||
       keys[0] !== "materialization" ||
       keys[1] !== "projectId" ||
+      keys[2] !== "projectStage" ||
       Object.values(descriptors).some(
         (descriptor) =>
           !("value" in descriptor) || descriptor.enumerable !== true,
@@ -73,6 +77,7 @@ function requestRecord(value: unknown): DataRecord {
     return Object.freeze({
       materialization: descriptors["materialization"]?.value,
       projectId: descriptors["projectId"]?.value,
+      projectStage: descriptors["projectStage"]?.value,
     });
   } catch (error) {
     if (error instanceof SkillRuntimeBoundaryError) throw error;
@@ -87,16 +92,20 @@ function validateRequest(
   value: unknown,
 ): PrepareManagedProjectSkillInstallationRequest {
   const record = requestRecord(value);
-  if (!isStableId(record["projectId"])) {
+  if (
+    !isStableId(record["projectId"]) ||
+    !PROJECT_STAGES.includes(record["projectStage"] as ProjectStage)
+  ) {
     fail(
       "skill-runtime-managed-install-request-invalid",
-      "Managed skill installation requires a stable project identity.",
+      "Managed skill installation requires a stable project identity and declared project stage.",
     );
   }
   return Object.freeze({
     materialization:
       record["materialization"] as PreparedProjectSkillMaterialization,
     projectId: record["projectId"],
+    projectStage: record["projectStage"] as ProjectStage,
   });
 }
 
@@ -123,6 +132,11 @@ export async function prepareManagedProjectSkillInstallation(
     project: Object.freeze({
       id: request.projectId,
       identityDigest: internals.targetRoot.identityDigest,
+    }),
+    workflow: Object.freeze({
+      id: parseStableId("workflow.pack-add"),
+      stepId: parseStableId("step.pack-add"),
+      projectStage: request.projectStage,
     }),
     runId: request.materialization.runId,
     packId: PROJECT_SKILLS_PACK_ID,

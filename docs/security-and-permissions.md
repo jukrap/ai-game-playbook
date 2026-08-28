@@ -40,7 +40,11 @@ After an approval response is accepted, the session cannot return to pending. An
 
 The private Codex adapter now has a same-process presenter port for that session. It passes only the immutable presentation and a cancellation signal to the host callback. The adapter constructs the response identity and digests itself, allows only one active presentation per session, and keeps the signer, broker, raw request, and original session handle outside the presenter. Caller cancellation, presentation expiry, host failure, and an invalid decision all end without signing; host failure and invalid output also close the session before returning a bounded error.
 
-This port is an internal integration boundary, not a user interface or an MCP elicitation implementation. No public command currently renders the prompt or accepts an approval, and the read-only MCP tool catalog is unchanged. Internal pack recovery and its first finite evidence-reconciliation path have bounded cancellation and durable closure, but public installation and recovery remain unavailable until a concrete host path, local signer, durable workflow, and recovery entry point carry those boundaries end to end.
+The core now also has a private in-memory local signer. It imports only a caller-supplied, canonical, unencrypted PKCS#8 Ed25519 key and derives the broker's SPKI trust binding from that key. A signer lease lasts at most five minutes, allows at most 32 signatures, accepts only canonical approval digests and a genuine cancellation signal, and can be closed independently of the key. Closing the key blocks every remaining lease and drops the retained key object. It does not claim memory zeroization or revoke signatures already returned.
+
+The runtime does not generate, read, write, or persist signing keys. Key paths and private material never enter the presenter, prompt, session data, snapshot, receipt, or bounded error. Durable key storage, rotation, backup, and operating-system access controls remain unimplemented.
+
+These pieces are internal integration boundaries, not a user interface or an MCP elicitation implementation. No public command currently renders the prompt or accepts an approval, and the read-only MCP tool catalog is unchanged. Internal pack recovery and its first finite evidence-reconciliation path have bounded cancellation and durable closure, but public installation and recovery remain unavailable until one concrete host path owns signer creation and closure, durable workflow status, and recovery entry points end to end.
 
 ## Stop conditions
 

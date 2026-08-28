@@ -18,6 +18,7 @@ import {
 const projectIdentityDigest = `sha256:${"c".repeat(64)}`;
 const { publicKey, privateKey } = generateKeyPairSync("ed25519");
 const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
+const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" });
 
 const approvalInputSchema = contracts.defineContractSchema({
   id: "codex-approval-port-test-input",
@@ -230,6 +231,39 @@ test("Codex presenter receives only immutable authority-free presentation", asyn
   assert.equal(presenter.hostId, CODEX_APPROVAL_HOST_ID);
   assert.equal(Object.isFrozen(presenter), true);
   assert.equal(settleCancelled(result.authorization).status, "cancelled");
+});
+
+test("Codex approval can use a bounded local signer without exposing key material to the presenter", async () => {
+  const { session } = createContext();
+  const localKey = core.createLocalApprovalSigningKey({
+    keyId: "approval.codex-local",
+    privateKeyPem,
+  });
+  const localSigner = core.createLocalApprovalGrantSigner(localKey, {
+    expiresAt: session.presentation.session.expiresAt,
+    maxSignatures: session.presentation.session.grantTerms.length,
+  });
+  let serializedPresentation = "";
+
+  const result = await runCodexApprovalSession(
+    session,
+    createCodexApprovalPresenter((presentation) => {
+      serializedPresentation = JSON.stringify(presentation);
+      return "approved";
+    }),
+    localSigner,
+  );
+
+  assert.equal(result.status, "authorized");
+  assert.equal(
+    core.inspectLocalApprovalGrantSigner(localSigner).status,
+    "exhausted",
+  );
+  assert.equal(serializedPresentation.includes(privateKeyPem), false);
+  assert.equal(serializedPresentation.includes("PRIVATE KEY"), false);
+  settleCancelled(result.authorization);
+  core.closeLocalApprovalGrantSigner(localSigner);
+  core.closeLocalApprovalSigningKey(localKey);
 });
 
 test("copied presenters and sessions for another host are rejected", async () => {

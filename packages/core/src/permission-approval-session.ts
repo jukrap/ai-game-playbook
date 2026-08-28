@@ -478,9 +478,15 @@ function validatedSigner(value: unknown): ValidatedSigner {
       "approval signer must expose one stable key ID and sign function",
     );
   }
+  const receiver = value as ApprovalGrantSigner;
+  const sign = signDescriptor.value as ApprovalGrantSigner["sign"];
   return Object.freeze({
     keyId: keyDescriptor.value,
-    sign: signDescriptor.value as ApprovalGrantSigner["sign"],
+    sign(signingDigest: Sha256Digest, signal: AbortSignal) {
+      return Reflect.apply(sign, receiver, [signingDigest, signal]) as
+        | Promise<string>
+        | string;
+    },
   });
 }
 

@@ -25,9 +25,11 @@ Internal recovery finalization now uses a recovery-run identity separate from th
 
 The first internal evidence-reconciliation provider can now close that retained one-step pack-recovery checkpoint from an exact stable closure proof. Reconciliation has a separate run, approval, and receipt, observes the current checkpoint head and target-receipt state, and records no original attempt or target receipt-chain entry. It never replays the pack mutation. This provider is private and does not cover multi-step, rollback, process, editor, or general engine workflows.
 
-An internal one-shot approval session now carries an exact prompt through approval, denial, cancellation, expiry, external digest signing, and final broker validation. Serialized presentation data has no authority, and an accepted approval cannot be replayed after signing or authorization fails. No public renderer, signing-key store, CLI mutation route, or MCP mutation route uses this session yet.
+An internal one-shot approval session now carries an exact prompt through approval, denial, cancellation, expiry, external digest signing, and final broker validation. Serialized presentation data has no authority, and an accepted approval cannot be replayed after signing or authorization fails. No public renderer, durable signing-key store, CLI mutation route, or MCP mutation route uses this session yet.
 
 The private Codex adapter can now drive that session through a same-process presenter callback. The callback receives only immutable display data and cancellation, while the adapter binds the exact response and keeps the signer and execution authority separate. This is not a concrete host UI or MCP elicitation route, and it does not expose a public mutation command.
+
+The core also has a private in-memory local signer for that path. It imports a caller-supplied canonical Ed25519 private key, derives the broker trust binding, and issues signer leases bounded to five minutes and 32 signatures. Cancellation, expiry, exhaustion, copied handles, and explicit closure fail closed. It does not generate keys, touch key files, provide durable storage, or expose key material to the presenter.
 
 ## What is not available
 
@@ -35,6 +37,7 @@ There is no installable or published package. The following product capabilities
 
 - public project initialization or skill materialization;
 - public pack add, update, remove, repair, or recovery finalization;
+- a concrete approval UI, durable signing-key storage, or key rotation;
 - a live Godot, Unity, or Unreal engine bridge;
 - editor connection, scene or asset mutation, game input, or runtime capture;
 - engine tests, a playable golden project, build or export execution;

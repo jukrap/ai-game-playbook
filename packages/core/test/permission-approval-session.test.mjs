@@ -13,6 +13,7 @@ const initialNow = Date.parse("2026-08-28T02:00:00.000Z");
 const projectIdentityDigest = `sha256:${"c".repeat(64)}`;
 const { publicKey, privateKey } = generateKeyPairSync("ed25519");
 const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
+const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" });
 
 const approvalInputSchema = contracts.defineContractSchema({
   id: "approval-session-test-input",
@@ -249,6 +250,37 @@ test("approval session returns signed grants to the original broker once", async
       ),
     expectCoreError("permission-approval-session-settled"),
   );
+});
+
+test("approval session accepts a bounded local signer bound to the broker key", async () => {
+  const context = createContext();
+  const localKey = core.createLocalApprovalSigningKey({
+    keyId: "approval.local-key",
+    privateKeyPem,
+  });
+  assert.deepEqual(core.getLocalApprovalTrustedKey(localKey), {
+    keyId: "approval.local-key",
+    publicKeyPem,
+  });
+  const localSigner = core.createLocalApprovalGrantSigner(localKey, {
+    expiresAt: "2026-08-28T02:00:10.000Z",
+    maxSignatures: 1,
+    now: context.now,
+  });
+
+  const result = await core.resolvePermissionApprovalSession(
+    context.session,
+    response(context.session),
+    localSigner,
+  );
+
+  assert.equal(result.status, "authorized");
+  assert.equal(
+    core.inspectLocalApprovalGrantSigner(localSigner).status,
+    "exhausted",
+  );
+  settleCancelled(result.authorization);
+  core.closeLocalApprovalSigningKey(localKey);
 });
 
 test("presentation is immutable, serializable, and carries no raw input authority", () => {

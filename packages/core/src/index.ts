@@ -1,6 +1,28 @@
 export { CoreBoundaryError } from "./errors.js";
 export type { CoreBoundaryErrorCode } from "./errors.js";
 export {
+  LOCAL_APPROVAL_KEY_MAX_PEM_BYTES,
+  LOCAL_APPROVAL_SIGNER_MAX_LIFETIME_MS,
+  LOCAL_APPROVAL_SIGNER_MAX_SIGNATURES,
+  closeLocalApprovalGrantSigner,
+  closeLocalApprovalSigningKey,
+  createLocalApprovalGrantSigner,
+  createLocalApprovalSigningKey,
+  getLocalApprovalTrustedKey,
+  inspectLocalApprovalGrantSigner,
+  inspectLocalApprovalSigningKey,
+} from "./local-approval-signer.js";
+export type {
+  CreateLocalApprovalGrantSignerOptions,
+  CreateLocalApprovalSigningKeyOptions,
+  LocalApprovalGrantSigner,
+  LocalApprovalGrantSignerSnapshot,
+  LocalApprovalGrantSignerStatus,
+  LocalApprovalSigningKey,
+  LocalApprovalSigningKeySnapshot,
+  LocalApprovalSigningKeyStatus,
+} from "./local-approval-signer.js";
+export {
   computeEvidenceArtifactManifestDigest,
   EVIDENCE_ARTIFACT_MANIFESTS_PATH,
   EVIDENCE_ARTIFACT_MAX_ARTIFACTS,

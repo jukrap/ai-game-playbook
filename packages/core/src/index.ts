@@ -11,11 +11,13 @@ export {
   getLocalApprovalTrustedKey,
   inspectLocalApprovalGrantSigner,
   inspectLocalApprovalSigningKey,
+  withLocalApprovalGrantSigner,
 } from "./local-approval-signer.js";
 export type {
   CreateLocalApprovalGrantSignerOptions,
   CreateLocalApprovalSigningKeyOptions,
   LocalApprovalGrantSigner,
+  LocalApprovalGrantSignerHandler,
   LocalApprovalGrantSignerSnapshot,
   LocalApprovalGrantSignerStatus,
   LocalApprovalSigningKey,

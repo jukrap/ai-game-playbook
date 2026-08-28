@@ -33,14 +33,14 @@ A generated surface is descriptive until a matching handler and runtime boundary
 | --- | --- |
 | `contracts` | Versioned schemas and semantic validation |
 | `registry` | Descriptor validation, deterministic routing, generation, and digests |
-| `core` | Project identity, safe paths, compare-and-swap writes, process bounds, permission, in-memory approval signing, workflow, receipts, and artifact foundations |
+| `core` | Project identity, safe paths, compare-and-swap writes, process bounds, permission, scoped in-memory approval signing, workflow, receipts, and artifact foundations |
 | `project-runtime` | Static project inspection and private initialization foundations |
 | `pack-runtime` | Read-only pack inspection plus private ownership, transaction, durable dispatch, recovery, and evidence-reconciliation foundations |
 | `skill-runtime` | Packaged skill validation, target inspection, and write-free managed-pack preflight |
 | `evidence` | Process and test outcome normalization plus limited retained-artifact assessment |
 | `cli` | Nine source-built plan-only, read-only, or static commands |
 | `mcp` | Opt-in project-bound read-only STDIO tools selected from registry metadata |
-| `codex-adapter` | Write-free project setup and skill target planning plus private approval presentation |
+| `codex-adapter` | Write-free project setup and skill target planning plus private host-owned approval presentation and signer lifetime |
 | `godot-adapter` | Static public Godot reports and private fail-closed host-tool preflight foundations |
 
 Unity and Unreal adapters and all project bridges remain planned.
@@ -51,7 +51,9 @@ A second internal dispatcher closes an actionable pack-recovery report under a s
 
 A finite internal reconciliation path can now close that retained checkpoint when the pack journal already contains a complete, stable closure proof. It uses a new run, approval, and receipt; observes the exact target checkpoint head and target-receipt state again; and never invokes the original mutation. The target gains append-only reconciliation metadata without inventing an original attempt or rewriting its receipt chain. Version 1 accepts only a one-step, command-phase pack-recovery checkpoint. Multi-step workflows, rollback phases, engine processes, and editor mutations remain unsupported.
 
-Approval presentation, signing, and final authorization remain separate boundaries. The core can import one caller-supplied canonical Ed25519 key into a same-process handle, derive its broker trust binding, and issue short, use-limited signer capabilities. It performs no key-file I/O and provides no durable key store. The private host presenter receives neither the key nor the signer.
+Approval presentation, signing, and final authorization remain separate boundaries. The core can import one caller-supplied canonical Ed25519 key into a same-process handle, derive its broker trust binding, and issue short, use-limited signer capabilities. A scoped-use helper closes a signer after its callback resolves or rejects, including when the callback retained or closed the handle itself. It performs no key-file I/O and provides no durable key store.
+
+The private local host runner derives signer expiry and use count from the exact approval-session challenge, wraps presentation and authorization in that scoped lifetime, and leaves the caller-owned key open. The presenter receives neither the key nor the signer. Durable operation dispatch, status, and recovery are not connected to this runner yet.
 
 ## Current read path
 

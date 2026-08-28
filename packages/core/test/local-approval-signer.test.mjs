@@ -392,3 +392,73 @@ test("copied handles are not authority and explicit close revokes future signing
   );
   assert.equal(core.closeLocalApprovalSigningKey(key).status, "closed");
 });
+
+test("scoped signer use closes captured authority after success, failure, and direct close", async () => {
+  const { key } = createFixtureKey();
+  const options = {
+    expiresAt: "2026-08-28T05:01:00.000Z",
+    maxSignatures: 1,
+    now: () => initialNow,
+  };
+  let returnedSigner;
+
+  const returned = await core.withLocalApprovalGrantSigner(
+    key,
+    options,
+    (signer) => {
+      returnedSigner = signer;
+      return signer;
+    },
+  );
+  assert.equal(returned, returnedSigner);
+  assert.equal(
+    core.inspectLocalApprovalGrantSigner(returnedSigner).status,
+    "closed",
+  );
+  assert.throws(
+    () => returnedSigner.sign(digestA, new AbortController().signal),
+    expectCoreError("permission-approval-signer-closed"),
+  );
+
+  const callbackFailure = new Error("private callback failure");
+  let failedSigner;
+  await assert.rejects(
+    () =>
+      core.withLocalApprovalGrantSigner(key, options, async (signer) => {
+        failedSigner = signer;
+        await Promise.resolve();
+        throw callbackFailure;
+      }),
+    (error) => error === callbackFailure,
+  );
+  assert.equal(
+    core.inspectLocalApprovalGrantSigner(failedSigner).status,
+    "closed",
+  );
+
+  let directlyClosed;
+  await core.withLocalApprovalGrantSigner(key, options, (signer) => {
+    directlyClosed = signer;
+    core.closeLocalApprovalGrantSigner(signer);
+  });
+  assert.equal(
+    core.inspectLocalApprovalGrantSigner(directlyClosed).status,
+    "closed",
+  );
+
+  await assert.rejects(
+    () =>
+      core.withLocalApprovalGrantSigner(
+        key,
+        options,
+        new Proxy(() => undefined, {
+          apply() {
+            throw new Error("proxy callback must not run");
+          },
+        }),
+      ),
+    expectCoreError("permission-approval-signer-invalid"),
+  );
+  assert.equal(core.inspectLocalApprovalSigningKey(key).status, "active");
+  core.closeLocalApprovalSigningKey(key);
+});

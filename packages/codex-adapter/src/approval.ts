@@ -6,7 +6,9 @@ import { approvalSessionResponseSchema } from "@ai-game-playbook/contracts";
 import {
   inspectPermissionApprovalSession,
   resolvePermissionApprovalSession,
+  withLocalApprovalGrantSigner,
   type ApprovalGrantSigner,
+  type LocalApprovalSigningKey,
   type PermissionApprovalSession,
   type PermissionApprovalSessionPresentation,
   type PermissionApprovalSessionResolution,
@@ -260,4 +262,37 @@ export async function runCodexApprovalSession(
   } finally {
     activeSessions.delete(session);
   }
+}
+
+export async function runCodexLocalApprovalSession(
+  session: PermissionApprovalSession,
+  presenter: CodexApprovalPresenter,
+  signingKey: LocalApprovalSigningKey,
+  callerSignal?: AbortSignal,
+): Promise<PermissionApprovalSessionResolution> {
+  const snapshot = inspectPermissionApprovalSession(session);
+  const expiresAt = session.presentation.session.expiresAt;
+  const remaining = Date.parse(expiresAt) - Date.now();
+  if (
+    snapshot.status !== "pending" ||
+    !Number.isSafeInteger(remaining) ||
+    remaining <= 0 ||
+    remaining > CODEX_APPROVAL_MAX_WAIT_MS
+  ) {
+    return runCodexApprovalSession(
+      session,
+      presenter,
+      undefined,
+      callerSignal,
+    );
+  }
+  return withLocalApprovalGrantSigner(
+    signingKey,
+    {
+      expiresAt,
+      maxSignatures: session.presentation.session.grantTerms.length,
+    },
+    (signer) =>
+      runCodexApprovalSession(session, presenter, signer, callerSignal),
+  );
 }

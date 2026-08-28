@@ -27,9 +27,11 @@ The first internal evidence-reconciliation provider can now close that retained 
 
 An internal one-shot approval session now carries an exact prompt through approval, denial, cancellation, expiry, external digest signing, and final broker validation. Serialized presentation data has no authority, and an accepted approval cannot be replayed after signing or authorization fails. No public renderer, durable signing-key store, CLI mutation route, or MCP mutation route uses this session yet.
 
-The private Codex adapter can now drive that session through a same-process presenter callback. The callback receives only immutable display data and cancellation, while the adapter binds the exact response and keeps the signer and execution authority separate. This is not a concrete host UI or MCP elicitation route, and it does not expose a public mutation command.
+The private Codex adapter can now drive that session through a same-process presenter callback. The callback receives only immutable display data and cancellation, while the adapter binds the exact response and keeps the signer and execution authority separate. A private local runner derives an exact signer lease from the session, closes it on every settled path, and leaves the caller-owned key open. This is not a concrete host UI or MCP elicitation route, and it does not expose a public mutation command.
 
 The core also has a private in-memory local signer for that path. It imports a caller-supplied canonical Ed25519 private key, derives the broker trust binding, and issues signer leases bounded to five minutes and 32 signatures. Cancellation, expiry, exhaustion, copied handles, and explicit closure fail closed. It does not generate keys, touch key files, provide durable storage, or expose key material to the presenter.
+
+Durable mutation dispatch, workflow status, and recovery entry points are not yet connected to the local host runner.
 
 ## What is not available
 

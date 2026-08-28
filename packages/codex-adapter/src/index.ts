@@ -11,6 +11,7 @@ export {
   CODEX_APPROVAL_MAX_WAIT_MS,
   createCodexApprovalPresenter,
   runCodexApprovalSession,
+  runCodexLocalApprovalSession,
 } from "./approval.js";
 export type {
   CodexApprovalPresentationHandler,

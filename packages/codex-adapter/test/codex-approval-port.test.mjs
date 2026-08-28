@@ -13,6 +13,7 @@ import {
   CodexApprovalBoundaryError,
   createCodexApprovalPresenter,
   runCodexApprovalSession,
+  runCodexLocalApprovalSession,
 } from "../dist/index.js";
 
 const projectIdentityDigest = `sha256:${"c".repeat(64)}`;
@@ -249,6 +250,8 @@ test("Codex approval can use a bounded local signer without exposing key materia
     session,
     createCodexApprovalPresenter((presentation) => {
       serializedPresentation = JSON.stringify(presentation);
+      assert.equal(Object.hasOwn(presentation, "signer"), false);
+      assert.equal(Object.hasOwn(presentation, "signingKey"), false);
       return "approved";
     }),
     localSigner,
@@ -264,6 +267,72 @@ test("Codex approval can use a bounded local signer without exposing key materia
   settleCancelled(result.authorization);
   core.closeLocalApprovalGrantSigner(localSigner);
   core.closeLocalApprovalSigningKey(localKey);
+});
+
+test("Codex host owns the exact local signer lifetime while leaving the key caller-owned", async () => {
+  const { session } = createContext();
+  const localKey = core.createLocalApprovalSigningKey({
+    keyId: "approval.codex-local",
+    privateKeyPem,
+  });
+  let serializedPresentation = "";
+
+  const result = await runCodexLocalApprovalSession(
+    session,
+    createCodexApprovalPresenter((presentation) => {
+      serializedPresentation = JSON.stringify(presentation);
+      return "approved";
+    }),
+    localKey,
+  );
+
+  assert.equal(result.status, "authorized");
+  assert.equal(core.inspectLocalApprovalSigningKey(localKey).status, "active");
+  assert.equal(serializedPresentation.includes(privateKeyPem), false);
+  assert.equal(serializedPresentation.includes("PRIVATE KEY"), false);
+  settleCancelled(result.authorization);
+  core.closeLocalApprovalSigningKey(localKey);
+});
+
+test("Codex host closes scoped signing after non-approved and failed presentations", async () => {
+  for (const decision of ["denied", "cancelled"]) {
+    const { session } = createContext();
+    const localKey = core.createLocalApprovalSigningKey({
+      keyId: "approval.codex-local",
+      privateKeyPem,
+    });
+    const result = await runCodexLocalApprovalSession(
+      session,
+      createCodexApprovalPresenter(() => decision),
+      localKey,
+    );
+    assert.equal(result.status, decision);
+    assert.equal(core.inspectLocalApprovalSigningKey(localKey).status, "active");
+    core.closeLocalApprovalSigningKey(localKey);
+  }
+
+  for (const [handler, code] of [
+    [() => Promise.reject(new Error("private host failure")), "codex-approval-host-failed"],
+    [() => "allow", "codex-approval-decision-invalid"],
+  ]) {
+    const { session } = createContext();
+    const localKey = core.createLocalApprovalSigningKey({
+      keyId: "approval.codex-local",
+      privateKeyPem,
+    });
+    await assert.rejects(
+      () =>
+        runCodexLocalApprovalSession(
+          session,
+          createCodexApprovalPresenter(handler),
+          localKey,
+        ),
+      expectAdapterError(code),
+    );
+    assert.equal(core.inspectLocalApprovalSigningKey(localKey).status, "active");
+    assert.equal(core.inspectPermissionApprovalSession(session).status, "cancelled");
+    core.closeLocalApprovalSigningKey(localKey);
+  }
 });
 
 test("copied presenters and sessions for another host are rejected", async () => {

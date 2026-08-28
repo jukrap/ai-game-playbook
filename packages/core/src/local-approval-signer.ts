@@ -52,6 +52,10 @@ export interface CreateLocalApprovalGrantSignerOptions {
 
 export interface LocalApprovalGrantSigner extends ApprovalGrantSigner {}
 
+export type LocalApprovalGrantSignerHandler<Result> = (
+  signer: LocalApprovalGrantSigner,
+) => Promise<Result> | Result;
+
 export type LocalApprovalGrantSignerStatus =
   | "active"
   | "closed"
@@ -571,4 +575,24 @@ export function closeLocalApprovalGrantSigner(
   const state = approvalSignerState(signer);
   state.closed = true;
   return signerSnapshot(state);
+}
+
+export async function withLocalApprovalGrantSigner<Result>(
+  key: LocalApprovalSigningKey,
+  options: CreateLocalApprovalGrantSignerOptions,
+  handler: LocalApprovalGrantSignerHandler<Result>,
+): Promise<Result> {
+  if (typeof handler !== "function" || isProxy(handler)) {
+    throw localApprovalError(
+      "permission-approval-signer-invalid",
+      "$handler",
+      "local approval signer use requires one direct callback",
+    );
+  }
+  const signer = createLocalApprovalGrantSigner(key, options);
+  try {
+    return await handler(signer);
+  } finally {
+    closeLocalApprovalGrantSigner(signer);
+  }
 }

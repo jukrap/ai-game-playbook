@@ -1,11 +1,13 @@
 export {
   CodexApprovalBoundaryError,
   CodexManagedSkillBoundaryError,
+  CodexProjectInitializationBoundaryError,
   CodexSetupBoundaryError,
 } from "./errors.js";
 export type {
   CodexApprovalBoundaryErrorCode,
   CodexManagedSkillBoundaryErrorCode,
+  CodexProjectInitializationBoundaryErrorCode,
   CodexSetupBoundaryErrorCode,
 } from "./errors.js";
 export {
@@ -45,6 +47,20 @@ export {
   queryCodexManagedSkillInstallationStatus,
   runCodexManagedSkillInstallation,
 } from "./managed-skill-operation.js";
+export {
+  CODEX_PROJECT_INITIALIZATION_APPROVAL_MAX_WAIT_MS,
+  CODEX_PROJECT_INITIALIZATION_APPROVAL_MIN_WAIT_MS,
+  inspectCodexProjectInitializationRecovery,
+  prepareCodexProjectInitialization,
+  runCodexProjectInitialization,
+} from "./project-initialization-operation.js";
+export type {
+  CodexProjectInitializationRunResult,
+  InspectCodexProjectInitializationRecoveryRequest,
+  PrepareCodexProjectInitializationRequest,
+  PreparedCodexProjectInitialization,
+  RunCodexProjectInitializationRequest,
+} from "./project-initialization-operation.js";
 export type {
   CodexManagedSkillInstallationHead,
   CodexManagedSkillInstallationQueryRequest,

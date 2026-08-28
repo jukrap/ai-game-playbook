@@ -30,6 +30,7 @@ import {
 } from "@ai-game-playbook/contracts";
 import {
   CoreBoundaryError,
+  PERMISSION_REQUEST_MAX_APPROVAL_DELAY_MS,
   RUN_RECEIPT_STORE_PATH,
   WORKFLOW_CHECKPOINT_STORE_PATH,
   PROJECT_STATE_DIRECTORIES,
@@ -82,6 +83,9 @@ const INITIALIZATION_CHECKPOINT_TTL_MS = 86_400_000;
 const INITIALIZATION_LANE_LEASE_MS = 30_000;
 const INITIALIZATION_LANE_WAIT_MS = 5_000;
 const INITIALIZATION_LANE_POLL_MS = 25;
+const INITIALIZATION_AUTHORIZATION_MAX_DELAY_MS =
+  PERMISSION_REQUEST_MAX_APPROVAL_DELAY_MS +
+  PROJECT_INITIALIZATION_COMMAND_MAX_DURATION_MS;
 const CONTROL_STATE_DIRECTORIES = Object.freeze(
   PROJECT_STATE_DIRECTORIES.map((path) => parsePortableProjectPath(path)),
 );
@@ -311,12 +315,12 @@ export function createProjectInitializationAuthorizationRequest(
     !Number.isFinite(deadlineMs) ||
     new Date(deadlineMs).toISOString() !== value.deadlineAt ||
     deadlineMs <= requestedAtMs ||
-    deadlineMs - requestedAtMs > PROJECT_INITIALIZATION_COMMAND_MAX_DURATION_MS
+    deadlineMs - requestedAtMs > INITIALIZATION_AUTHORIZATION_MAX_DELAY_MS
   ) {
     runtimeError(
       "invalid-project-initialization-execution-request",
       "$request.deadlineAt",
-      "authorization deadline must be canonical, future, and within the command timeout",
+      "authorization deadline must be canonical, future, and within the bounded approval and execution window",
     );
   }
   const { workflow } = commandAndWorkflow(plan);

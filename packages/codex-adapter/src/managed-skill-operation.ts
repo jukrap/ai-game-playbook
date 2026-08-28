@@ -9,15 +9,9 @@ import {
 } from "@ai-game-playbook/contracts";
 import {
   canonicalizeProjectRoot,
-  createPermissionApprovalSession,
-  createPermissionBroker,
-  getLocalApprovalTrustedKey,
-  inspectLocalApprovalSigningKey,
   queryWorkflowCheckpointHeads,
-  type AuthorizedPermissionDecision,
   type CanonicalProjectRoot,
   type LocalApprovalSigningKey,
-  type PermissionApprovalSession,
   type WorkflowCheckpointHeadSummary,
 } from "@ai-game-playbook/core";
 import {
@@ -36,12 +30,22 @@ import {
 import { isProxy } from "node:util/types";
 
 import {
-  CODEX_APPROVAL_HOST_ID,
-  CODEX_APPROVAL_MAX_WAIT_MS,
   runCodexLocalApprovalSession,
   type CodexApprovalPresenter,
 } from "./approval.js";
 import { CodexManagedSkillBoundaryError } from "./errors.js";
+import {
+  HOST_OPERATION_APPROVAL_MAX_WAIT_MS,
+  HOST_OPERATION_APPROVAL_MIN_WAIT_MS,
+  assertBoundHostSigningKey,
+  assertHostApprovalWait,
+  createBoundHostApproval,
+  exactHostOperationDataRecord,
+  isHostOperationSignal,
+  settleHostAuthorizationUncertain,
+  type BoundHostApproval,
+  type HostOperationFailureKind,
+} from "./host-operation-boundary.js";
 
 const PACK_ADD_COMMAND_ID = "pack.add" as StableId;
 const PACK_ADD_WORKFLOW_ID = "workflow.pack-add" as StableId;
@@ -52,15 +56,16 @@ const STATUS_MAX_HEADS = 256;
 const STATUS_MAX_TOTAL_HEAD_BYTES = 4 * 1024 * 1024;
 const RECOVERY_MAX_DIRECTORY_ENTRIES = 10_000;
 
-export const CODEX_MANAGED_SKILL_APPROVAL_MIN_WAIT_MS: number = 1_000;
+export const CODEX_MANAGED_SKILL_APPROVAL_MIN_WAIT_MS: number =
+  HOST_OPERATION_APPROVAL_MIN_WAIT_MS;
 export const CODEX_MANAGED_SKILL_APPROVAL_MAX_WAIT_MS: number =
-  CODEX_APPROVAL_MAX_WAIT_MS;
+  HOST_OPERATION_APPROVAL_MAX_WAIT_MS;
 
 export interface PrepareCodexManagedSkillInstallationRequest {
   readonly materialization: PreparedProjectSkillMaterialization;
   readonly projectId: StableId;
   readonly projectStage: ProjectStage;
-  readonly signingKey: LocalApprovalSigningKey;
+  readonly signingKey: LocalApprovalSigningKey | null;
   readonly approvalWaitMs: number;
 }
 
@@ -179,13 +184,9 @@ type OperationPhase = "prepared" | "running" | "settled";
 
 interface OperationState {
   readonly plan: PreparedPackOperation;
-  readonly session?: PermissionApprovalSession;
-  readonly signingKeyId?: StableId;
-  readonly signingKeyFingerprint?: Sha256Digest;
+  readonly approval?: BoundHostApproval;
   phase: OperationPhase;
 }
-
-type DataRecord = Record<string, unknown>;
 
 const operationStates = new WeakMap<object, OperationState>();
 
@@ -196,62 +197,15 @@ function operationError(
   throw new CodexManagedSkillBoundaryError(code, message);
 }
 
-function exactDataRecord(
-  value: unknown,
-  keys: readonly string[],
-): DataRecord {
-  if (
-    value === null ||
-    typeof value !== "object" ||
-    Array.isArray(value) ||
-    isProxy(value)
-  ) {
-    operationError(
-      "codex-managed-skill-operation-invalid",
-      "Managed skill operation requires one plain data request.",
-    );
-  }
-  try {
-    if (
-      Object.getPrototypeOf(value) !== Object.prototype ||
-      Object.getOwnPropertySymbols(value).length !== 0
-    ) {
-      throw new TypeError("not plain data");
-    }
-    const descriptors = Object.getOwnPropertyDescriptors(value);
-    const actual = Object.keys(descriptors).sort();
-    const expected = [...keys].sort();
-    if (
-      actual.length !== expected.length ||
-      actual.some((key, index) => key !== expected[index]) ||
-      Object.values(descriptors).some(
-        (descriptor) =>
-          !("value" in descriptor) || descriptor.enumerable !== true,
-      )
-    ) {
-      throw new TypeError("request fields are not exact data properties");
-    }
-    return Object.freeze(
-      Object.fromEntries(
-        keys.map((key) => [key, descriptors[key]?.value]),
-      ),
-    );
-  } catch (error) {
-    if (error instanceof CodexManagedSkillBoundaryError) throw error;
-    operationError(
-      "codex-managed-skill-operation-invalid",
-      "Managed skill operation request fields are invalid.",
-    );
-  }
-}
-
-function validSignal(value: unknown): value is AbortSignal | null {
-  return (
-    value === null ||
-    (typeof value === "object" &&
-      value !== null &&
-      !isProxy(value) &&
-      value instanceof AbortSignal)
+function hostFailure(
+  kind: HostOperationFailureKind,
+  message: string,
+): never {
+  operationError(
+    kind === "signing-key-mismatch"
+      ? "codex-managed-skill-signing-key-mismatch"
+      : "codex-managed-skill-operation-invalid",
+    message,
   );
 }
 
@@ -297,42 +251,21 @@ function packAddCommand() {
 function validatePrepareRequest(
   value: unknown,
 ): PrepareCodexManagedSkillInstallationRequest {
-  const record = exactDataRecord(value, [
+  const record = exactHostOperationDataRecord(value, [
     "materialization",
     "projectId",
     "projectStage",
     "signingKey",
     "approvalWaitMs",
-  ]);
+  ], hostFailure);
+  assertHostApprovalWait(record["approvalWaitMs"], hostFailure);
   if (
     !isStableId(record["projectId"]) ||
-    !PROJECT_STAGES.includes(record["projectStage"] as ProjectStage) ||
-    !Number.isSafeInteger(record["approvalWaitMs"]) ||
-    (record["approvalWaitMs"] as number) <
-      CODEX_MANAGED_SKILL_APPROVAL_MIN_WAIT_MS ||
-    (record["approvalWaitMs"] as number) >
-      CODEX_MANAGED_SKILL_APPROVAL_MAX_WAIT_MS
+    !PROJECT_STAGES.includes(record["projectStage"] as ProjectStage)
   ) {
     operationError(
       "codex-managed-skill-operation-invalid",
       "Managed skill operation requires canonical project fields and a bounded approval wait.",
-    );
-  }
-  let keySnapshot;
-  try {
-    keySnapshot = inspectLocalApprovalSigningKey(
-      record["signingKey"] as LocalApprovalSigningKey,
-    );
-  } catch {
-    operationError(
-      "codex-managed-skill-signing-key-mismatch",
-      "Managed skill operation requires one active local approval key.",
-    );
-  }
-  if (keySnapshot.status !== "active") {
-    operationError(
-      "codex-managed-skill-signing-key-mismatch",
-      "Managed skill operation requires one active local approval key.",
     );
   }
   return Object.freeze({
@@ -340,14 +273,14 @@ function validatePrepareRequest(
       record["materialization"] as PreparedProjectSkillMaterialization,
     projectId: record["projectId"],
     projectStage: record["projectStage"] as ProjectStage,
-    signingKey: record["signingKey"] as LocalApprovalSigningKey,
+    signingKey: record["signingKey"] as LocalApprovalSigningKey | null,
     approvalWaitMs: record["approvalWaitMs"] as number,
   });
 }
 
 function publicOperation(
   plan: PreparedPackOperation,
-  session?: PermissionApprovalSession,
+  approval?: BoundHostApproval,
 ): PreparedCodexManagedSkillInstallation {
   const base: PreparedOperationBase = {
     schemaVersion: "1.0.0",
@@ -366,7 +299,7 @@ function publicOperation(
       approval: Object.freeze({ required: false as const }),
     });
   }
-  if (session === undefined) {
+  if (approval === undefined) {
     operationError(
       "codex-managed-skill-operation-invalid",
       "Ready managed skill operation is missing its approval session.",
@@ -377,10 +310,10 @@ function publicOperation(
     disposition: "ready",
     approval: Object.freeze({
       required: true as const,
-      sessionId: session.presentation.session.sessionId,
-      promptDigest: session.presentation.prompt.promptDigest,
-      sessionDigest: session.presentation.session.sessionDigest,
-      expiresAt: session.presentation.session.expiresAt,
+      sessionId: approval.session.presentation.session.sessionId,
+      promptDigest: approval.session.presentation.prompt.promptDigest,
+      sessionDigest: approval.session.presentation.session.sessionDigest,
+      expiresAt: approval.session.presentation.session.expiresAt,
     }),
   });
 }
@@ -389,7 +322,6 @@ export async function prepareCodexManagedSkillInstallation(
   value: PrepareCodexManagedSkillInstallationRequest,
 ): Promise<PreparedCodexManagedSkillInstallation> {
   const request = validatePrepareRequest(value);
-  const keySnapshot = inspectLocalApprovalSigningKey(request.signingKey);
   const plan = await prepareManagedProjectSkillInstallation({
     materialization: request.materialization,
     projectId: request.projectId,
@@ -402,17 +334,16 @@ export async function prepareCodexManagedSkillInstallation(
     );
   }
 
-  let session: PermissionApprovalSession | undefined;
+  let approval: BoundHostApproval | undefined;
   if (plan.disposition === "ready") {
+    if (request.signingKey === null) {
+      hostFailure(
+        "signing-key-mismatch",
+        "Managed skill installation requires one active local approval key.",
+      );
+    }
     const command = packAddCommand();
-    const createdAt = Date.now();
-    const sessionExpiresAt = new Date(
-      createdAt + request.approvalWaitMs,
-    ).toISOString();
-    const requestDeadline = new Date(
-      createdAt + request.approvalWaitMs + command.budgets.maxDurationMs,
-    ).toISOString();
-    const broker = createPermissionBroker({
+    approval = createBoundHostApproval({
       registry: BUILTIN_REGISTRY,
       project: {
         id: plan.project.id,
@@ -420,74 +351,25 @@ export async function prepareCodexManagedSkillInstallation(
         stage: request.projectStage,
         budgets: command.budgets,
       },
-      trustedApprovalKeys: [getLocalApprovalTrustedKey(request.signingKey)],
-      now: Date.now,
-    });
-    const authorizationRequest = createPackOperationAuthorizationRequest({
-      plan,
-      budgets: command.budgets,
-      deadlineAt: requestDeadline,
-    });
-    const pending = broker.authorize(authorizationRequest, []);
-    if (pending.status !== "approval-required") {
-      operationError(
-        "codex-managed-skill-operation-invalid",
-        "Managed skill installation did not produce an approval challenge.",
-      );
-    }
-    session = createPermissionApprovalSession({
-      broker,
-      registry: BUILTIN_REGISTRY,
-      request: authorizationRequest,
-      hostId: CODEX_APPROVAL_HOST_ID as StableId,
-      expiresAt: sessionExpiresAt,
-      grantTerms: pending.missingPermissions.map((permission) =>
-        Object.freeze({
-          permission,
-          expiresAt: requestDeadline,
-          maxUses: 1,
+      signingKey: request.signingKey,
+      approvalWaitMs: request.approvalWaitMs,
+      createAuthorizationRequest: (deadlineAt) =>
+        createPackOperationAuthorizationRequest({
+          plan,
+          budgets: command.budgets,
+          deadlineAt,
         }),
-      ),
-      now: Date.now,
+      fail: hostFailure,
     });
   }
 
-  const operation = publicOperation(plan, session);
+  const operation = publicOperation(plan, approval);
   operationStates.set(operation, {
     plan,
-    ...(session === undefined ? {} : { session }),
-    ...(plan.disposition === "no-op"
-      ? {}
-      : {
-          signingKeyId: keySnapshot.keyId,
-          signingKeyFingerprint: keySnapshot.publicKeyFingerprint,
-        }),
+    ...(approval === undefined ? {} : { approval }),
     phase: "prepared",
   });
   return operation;
-}
-
-function settleAuthorizationUncertain(
-  authorization: AuthorizedPermissionDecision,
-  startedAt: number,
-): void {
-  if (authorization.lease.state !== "active") return;
-  authorization.lease.settle({
-    outcome: "uncertain",
-    mutationUncertain: true,
-    actual: {
-      changedPaths: [],
-      changedBytes: 0,
-      objectIds: [],
-      destinations: [],
-      dataClasses: [],
-      changeKinds: [],
-      publishTargets: [],
-      durationMs: Math.max(0, Date.now() - startedAt),
-      outputBytes: 0,
-      repairCycles: 0,
-    },
-  });
 }
 
 export async function runCodexManagedSkillInstallation(
@@ -499,11 +381,12 @@ export async function runCodexManagedSkillInstallation(
       : undefined;
   const state = operationState(operationCandidate);
   const operation = operationCandidate as PreparedCodexManagedSkillInstallation;
-  const record = exactDataRecord(
+  const record = exactHostOperationDataRecord(
     value,
     operation.disposition === "no-op"
       ? ["operation", "signal"]
       : ["operation", "presenter", "signingKey", "signal"],
+    hostFailure,
   );
   if (record["operation"] !== operation) {
     operationError(
@@ -523,7 +406,7 @@ export async function runCodexManagedSkillInstallation(
       "Managed skill operation has already settled.",
     );
   }
-  if (!validSignal(record["signal"])) {
+  if (!isHostOperationSignal(record["signal"])) {
     operationError(
       "codex-managed-skill-operation-invalid",
       "Managed skill operation requires a genuine cancellation signal or null.",
@@ -532,27 +415,17 @@ export async function runCodexManagedSkillInstallation(
   const signal = record["signal"] as AbortSignal | null;
 
   if (operation.disposition === "ready") {
-    let keySnapshot;
-    try {
-      keySnapshot = inspectLocalApprovalSigningKey(
-        record["signingKey"] as LocalApprovalSigningKey,
-      );
-    } catch {
+    if (state.approval === undefined) {
       operationError(
-        "codex-managed-skill-signing-key-mismatch",
-        "Managed skill execution requires the bound local approval key.",
+        "codex-managed-skill-operation-invalid",
+        "Ready managed skill operation lost its approval binding.",
       );
     }
-    if (
-      keySnapshot.status !== "active" ||
-      keySnapshot.keyId !== state.signingKeyId ||
-      keySnapshot.publicKeyFingerprint !== state.signingKeyFingerprint
-    ) {
-      operationError(
-        "codex-managed-skill-signing-key-mismatch",
-        "Managed skill execution requires the bound active approval key.",
-      );
-    }
+    assertBoundHostSigningKey(
+      record["signingKey"],
+      state.approval,
+      hostFailure,
+    );
   }
 
   state.phase = "running";
@@ -571,14 +444,14 @@ export async function runCodexManagedSkillInstallation(
         output,
       });
     }
-    if (state.session === undefined) {
+    if (state.approval === undefined) {
       operationError(
         "codex-managed-skill-operation-invalid",
         "Ready managed skill operation lost its approval session.",
       );
     }
     const resolution = await runCodexLocalApprovalSession(
-      state.session,
+      state.approval.session,
       record["presenter"] as CodexApprovalPresenter,
       record["signingKey"] as LocalApprovalSigningKey,
       signal ?? undefined,
@@ -608,7 +481,7 @@ export async function runCodexManagedSkillInstallation(
         output,
       });
     } catch (error) {
-      settleAuthorizationUncertain(
+      settleHostAuthorizationUncertain(
         resolution.authorization,
         dispatchStartedAt,
       );
@@ -632,7 +505,11 @@ interface QueriedStatus {
 function validateStatusRequest(
   value: unknown,
 ): CodexManagedSkillInstallationQueryRequest {
-  const record = exactDataRecord(value, ["projectRoot", "runId"]);
+  const record = exactHostOperationDataRecord(
+    value,
+    ["projectRoot", "runId"],
+    hostFailure,
+  );
   if (
     typeof record["runId"] !== "string" ||
     !UUID_PATTERN.test(record["runId"])

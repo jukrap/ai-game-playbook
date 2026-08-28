@@ -346,11 +346,18 @@ test("execution rejects copied authority and settles approval-time drift without
     "31111111-1111-4111-8111-111111111111",
   );
   const copiedAuthority = authorize(copiedPlan);
-  assert.throws(
+  assert.doesNotThrow(
     () =>
       projectRuntime.createProjectInitializationAuthorizationRequest({
         plan: copiedPlan,
         deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+      }),
+  );
+  assert.throws(
+    () =>
+      projectRuntime.createProjectInitializationAuthorizationRequest({
+        plan: copiedPlan,
+        deadlineAt: new Date(Date.now() + 331_000).toISOString(),
       }),
     expectRuntimeError("invalid-project-initialization-execution-request"),
   );

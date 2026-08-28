@@ -56,3 +56,24 @@ export class CodexManagedSkillBoundaryError extends Error {
     this.code = code;
   }
 }
+
+export type CodexProjectInitializationBoundaryErrorCode =
+  | "codex-project-initialization-operation-active"
+  | "codex-project-initialization-operation-invalid"
+  | "codex-project-initialization-operation-settled"
+  | "codex-project-initialization-plan-blocked"
+  | "codex-project-initialization-recovery-mismatch"
+  | "codex-project-initialization-signing-key-mismatch";
+
+export class CodexProjectInitializationBoundaryError extends Error {
+  readonly code: CodexProjectInitializationBoundaryErrorCode;
+
+  constructor(
+    code: CodexProjectInitializationBoundaryErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "CodexProjectInitializationBoundaryError";
+    this.code = code;
+  }
+}

@@ -148,12 +148,24 @@ test("managed skill operation rejects copied handles and mismatched signing keys
   const otherKey = signingKey("approval.codex-managed-skill-other");
   t.after(() => core.closeLocalApprovalSigningKey(key));
   t.after(() => core.closeLocalApprovalSigningKey(otherKey));
-  const { operation } = await prepared(project, key);
+  const { materialization, operation } = await prepared(project, key);
   let presentations = 0;
   const presenter = createCodexApprovalPresenter(() => {
     presentations += 1;
     return "denied";
   });
+
+  await assert.rejects(
+    () =>
+      prepareCodexManagedSkillInstallation({
+        materialization,
+        projectId: "sample.graybox",
+        projectStage: "vertical-slice",
+        signingKey: null,
+        approvalWaitMs: 5_000,
+      }),
+    expectOperationError("codex-managed-skill-signing-key-mismatch"),
+  );
 
   await assert.rejects(
     () =>
@@ -279,7 +291,21 @@ test("managed skill no-op remains approval-free and durable queries are bounded"
     signal: null,
   });
 
-  const second = await prepared(project, key);
+  const skillPlan = await createProjectSkillPlan({ projectRoot: project });
+  const materialization = await prepareProjectSkillMaterialization({
+    plan: skillPlan,
+    runId: randomUUID(),
+  });
+  const second = {
+    materialization,
+    operation: await prepareCodexManagedSkillInstallation({
+      materialization,
+      projectId: "sample.graybox",
+      projectStage: "vertical-slice",
+      signingKey: null,
+      approvalWaitMs: 5_000,
+    }),
+  };
   assert.equal(second.operation.disposition, "no-op");
   assert.deepEqual(second.operation.approval, { required: false });
   const result = await runCodexManagedSkillInstallation({

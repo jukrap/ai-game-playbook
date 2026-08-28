@@ -884,7 +884,7 @@ const projectInitializationCommand: CommandDescriptor = Object.freeze({
     package: "@ai-game-playbook/project-runtime",
     export: "executePreparedProjectInitialization",
     digest: parseSha256Digest(
-      "sha256:e154b755ba54ef3a08288c9dc5a949007aac2f619d5f8e6365513b38e73e6eee",
+      "sha256:d2d9542b573fdb9a256e4fb5d2828ee597cf4df118f8e02039e99e354cc09092",
     ),
   }),
 });

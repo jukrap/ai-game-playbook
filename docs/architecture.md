@@ -40,7 +40,7 @@ A generated surface is descriptive until a matching handler and runtime boundary
 | `evidence` | Process and test outcome normalization plus limited retained-artifact assessment |
 | `cli` | Nine source-built plan-only, read-only, or static commands |
 | `mcp` | Opt-in project-bound read-only STDIO tools selected from registry metadata |
-| `codex-adapter` | Write-free project setup and skill target planning plus private one-shot approval, managed-skill dispatch, status, and recovery assessment |
+| `codex-adapter` | Write-free project setup planning plus private one-shot approval for project initialization and managed-skill installation, with read-only recovery assessment |
 | `godot-adapter` | Static public Godot reports and private fail-closed host-tool preflight foundations |
 
 Unity and Unreal adapters and all project bridges remain planned.
@@ -53,9 +53,11 @@ A finite internal reconciliation path can now close that retained checkpoint whe
 
 Approval presentation, signing, and final authorization remain separate boundaries. The core can import one caller-supplied canonical Ed25519 key into a same-process handle, derive its broker trust binding, and issue short, use-limited signer capabilities. A scoped-use helper closes a signer after its callback resolves or rejects, including when the callback retained or closed the handle itself. It performs no key-file I/O and provides no durable key store.
 
-The private local host path derives signer expiry and use count from the exact approval session, then binds that session, the prepared managed-skill plan, project identity, and signing-key identity to one same-process operation handle. Approval is presented at most once. An approval immediately enters durable dispatch in the same call; denial, cancellation, expiry, copied handles, changed keys, concurrent calls, and repeat calls cannot reach mutation. A no-op uses neither approval nor mutation authority. The caller-owned key remains open, and the presenter receives neither the key nor the signer.
+The private local host path derives signer expiry and use count from the exact approval session. Project initialization and managed-skill installation each bind their own session, prepared plan, project and run identity, and signing-key ID and fingerprint to one same-process operation handle. Approval is presented at most once. An approval immediately enters durable dispatch in the same call; denial, cancellation, expiry, copied handles, changed keys, concurrent calls, and repeat calls cannot reach mutation. A no-op uses neither approval nor mutation authority. The caller-owned key remains open, and the presenter receives neither the key nor the signer.
 
-That private path also provides bounded, read-only lookup of a durable workflow head by project and run identity. Recovery assessment compares a stable transaction journal with the current project state and checks that the workflow head did not change during the assessment. It does not replay the original operation or finalize recovery. No public CLI or MCP command invokes the dispatcher or these recovery boundaries.
+Initialization and skill installation remain separate operations: each has a fresh approval, run identity, checkpoint, receipt, and recovery boundary. A clean project can therefore initialize the fixed control layout first and install the managed skill pack through a second approval without creating an implicit composite transaction.
+
+That private path also provides bounded read-only recovery inspection. Managed-skill recovery compares a stable transaction journal with current project state and rechecks its workflow head. Initialization recovery performs two exact-run assessments and rejects state drift between them. Neither path replays the original operation or finalizes recovery. No public CLI or MCP command invokes these dispatch or recovery boundaries.
 
 The permission broker separates approval admission from execution duration. Explicit approvals may wait for at most five minutes, while the resulting authorization lease is still capped from authorization time by the registered execution budget and the request's absolute deadline. Automatic permission paths retain their original execution-only deadline bound.
 
@@ -100,4 +102,4 @@ An adapter reports unsupported operations and the missing evidence. A thin proje
 
 A future initialized game project uses `.ai-game-playbook/` for portable profiles, feature contracts, policies, and pack locks. Those files may be committed. Cache, local receipts, logs, captures, locks, secrets, and machine-specific configuration stay ignored. The same fixed initialization layout includes shared `.agents/skills` directories, but managed skill packs do not own those shared parents.
 
-The current `agpb init` only reports the intended layout. Private initialization code can create or retain the exact layout through approval, a project-write lane, compare-and-swap operations, rollback, checkpoints, and receipts, but no public command applies it.
+The current `agpb init` only reports the intended layout. A private one-shot host operation can create or retain the exact layout through approval, a project-write lane, compare-and-swap operations, rollback, checkpoints, and receipts, but no public command applies it.

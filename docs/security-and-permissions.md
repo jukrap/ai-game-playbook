@@ -48,11 +48,15 @@ One private managed-skill operation now binds the prepared plan, approval sessio
 
 After interruption, a bounded read-only query can report the durable workflow head. A separate read-only recovery assessment compares the transaction journal and project state twice and rejects a workflow head that changes during inspection. It may report that no transaction exists, but it cannot resume the original operation or write a recovery decision. Recovery finalization remains a separately authorized internal workflow.
 
+Project initialization uses the same one-shot host rules with its own operation type. It binds the fixed-layout plan and exact key ID and fingerprint, presents approval before any write, and dispatches immediately after approval. Its approval-admission window is separate from the 30-second execution budget. A blocked plan cannot become an operation, and an already initialized project completes as a no-op without approval or mutation authority.
+
+Initialization and managed-skill installation never share an approval or run identity. A clean-project sequence completes initialization first, then prepares a fresh skill plan and asks separately before installation. Initialization recovery is read-only, selects one exact run, repeats the bounded assessment, and fails if state changes between observations. It cannot execute recovery finalization.
+
 Approval waiting and execution time now have separate bounds. A request that needs explicit approval may reserve up to five minutes for admission in addition to its registered execution duration. Automatic requests gain no extra delay. Once approval succeeds, the authorization lease ends at the earliest of the grant expiry, the absolute request deadline, or the authorization time plus the execution budget. Approval therefore cannot silently consume the execution budget or enlarge it.
 
 The runtime does not generate, read, write, or persist signing keys. Key paths and private material never enter the presenter, prompt, session data, snapshot, receipt, or bounded error. Durable key storage, rotation, backup, and operating-system access controls remain unimplemented.
 
-These pieces are internal integration boundaries, not a user interface or an MCP elicitation implementation. No public command renders the prompt or accepts an approval, and the read-only MCP tool catalog is unchanged. The private host path now owns one managed-skill add operation through approval, dispatch, durable status, and read-only recovery assessment. Public installation and recovery remain unavailable; recovery execution still requires its separate internal approval and cannot be reached through this host path.
+These pieces are internal integration boundaries, not a user interface or an MCP elicitation implementation. No public command renders the prompt or accepts an approval, and the read-only MCP tool catalog is unchanged. The private host path now owns project initialization and managed-skill add through separate approval and dispatch operations with read-only recovery inspection. Public initialization, installation, and recovery remain unavailable; recovery execution still requires its separate internal approval and cannot be reached through this host path.
 
 ## Stop conditions
 

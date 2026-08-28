@@ -1,5 +1,9 @@
 import { compareCanonicalText } from "./canonical-json.js";
-import { defineContractSchema, type VersionedContractSchema } from "./contract-schema.js";
+import {
+  defineContractSchema,
+  type JsonSchemaObject,
+  type VersionedContractSchema,
+} from "./contract-schema.js";
 import type {
   ExecutionBudgets,
   PermissionClass,
@@ -163,7 +167,7 @@ const destinationArray = boundedArray(
   { maximum: 32, unique: true },
 );
 
-const grantScope = closedObject(
+export const approvalScopeSchema: JsonSchemaObject = closedObject(
   {
     paths: boundedArray(reference("portablePath"), {
       maximum: 256,
@@ -236,7 +240,7 @@ export const approvalGrantSchema: VersionedContractSchema =
           command: commandBinding,
           registryDigest: reference("sha256Digest"),
           editorSessionIdentityDigest: reference("sha256Digest"),
-          scope: grantScope,
+          scope: approvalScopeSchema,
           budgets: grantBudgets,
           requestDigest: reference("sha256Digest"),
           approvedBy: { const: "user" },

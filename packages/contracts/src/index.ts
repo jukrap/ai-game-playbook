@@ -21,6 +21,18 @@ export type {
   ApprovalGrantSigningDigestInput,
 } from "./approval-contracts.js";
 export {
+  APPROVAL_IMPACT_CLASSES,
+  APPROVAL_PERMISSION_IMPACT_CLASSES,
+  approvalPromptSchema,
+  computeApprovalPromptDigest,
+} from "./approval-prompt-contracts.js";
+export type {
+  ApprovalImpactClass,
+  ApprovalPrompt,
+  ApprovalPromptDigestInput,
+  ApprovalPromptPermission,
+} from "./approval-prompt-contracts.js";
+export {
   DOCTOR_CHECK_STATUSES,
   computeDoctorStatus,
   doctorReportSchema,

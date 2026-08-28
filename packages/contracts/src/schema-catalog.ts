@@ -31,6 +31,7 @@ import {
   runHandleSchema,
 } from "./run-engine-contracts.js";
 import { approvalGrantSchema } from "./approval-contracts.js";
+import { approvalPromptSchema } from "./approval-prompt-contracts.js";
 import { taskRoutingSelectionSchema } from "./routing-contracts.js";
 import {
   doctorReportSchema,
@@ -123,6 +124,7 @@ export const ORCHESTRATION_DESCRIPTOR_SCHEMAS: ContractSchemaCatalog =
 export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
   Object.freeze({
     "approval-grant": approvalGrantSchema,
+    "approval-prompt": approvalPromptSchema,
     "build-artifact-evidence": buildArtifactEvidenceSchema,
     "doctor-report": doctorReportSchema,
     "doctor-request": doctorRequestSchema,

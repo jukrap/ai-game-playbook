@@ -9,6 +9,7 @@ import { validFoundationProtocolFixtures } from "./fixtures/foundation-protocols
 
 const expectedIds = [
   "approval-grant",
+  "approval-prompt",
   "build-artifact-evidence",
   "doctor-report",
   "doctor-request",
@@ -93,6 +94,39 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       {
         ...fixtures["approval-grant"],
         budgets: { ...fixtures["approval-grant"].budgets, maxUses: 2 },
+      },
+    ],
+    [
+      "approval-prompt",
+      {
+        ...fixtures["approval-prompt"],
+        input: { secret: "must-not-be-presented" },
+      },
+    ],
+    [
+      "approval-prompt",
+      {
+        ...fixtures["approval-prompt"],
+        permissions: [
+          ...fixtures["approval-prompt"].permissions,
+          {
+            ...fixtures["approval-prompt"].permissions[0],
+            mode: "automatic",
+          },
+        ],
+      },
+    ],
+    [
+      "approval-prompt",
+      {
+        ...fixtures["approval-prompt"],
+        permissions: [
+          {
+            permission: "install",
+            mode: "approval-required",
+            impactClasses: ["software-installation"],
+          },
+        ],
       },
     ],
     [

@@ -7,12 +7,15 @@ import {
 } from "node:crypto";
 
 import {
+  APPROVAL_PERMISSION_IMPACT_CLASSES,
   approvalGrantSchema,
+  approvalPromptSchema,
   canonicalizeJson,
   checkApprovalGrantSemantics,
   checkFeatureContractSemantics,
   compareCanonicalText,
   computeApprovalGrantSigningDigest,
+  computeApprovalPromptDigest,
   computeFeatureContractApprovalDigest,
   digestCanonicalJson,
   featureContractSchema,
@@ -22,6 +25,7 @@ import {
   parsePortableProjectPath,
   type ApprovalGrant,
   type ApprovalGrantScope,
+  type ApprovalPrompt,
   type ExecutionBudgets,
   type FeatureContract,
   type PermissionClass,
@@ -282,6 +286,10 @@ interface GrantUsage {
 }
 
 const preparedChallenges = new WeakSet<object>();
+const approvalPromptChallenges = new WeakMap<
+  object,
+  PermissionAuthorizationChallenge
+>();
 const authorizationLeaseInstances = new WeakSet<object>();
 const permissionSettlementInstances = new WeakSet<object>();
 
@@ -1306,6 +1314,73 @@ export function createApprovalGrantSubject(
   return Object.freeze(subject);
 }
 
+export function createPermissionApprovalPrompt(
+  challenge: PermissionAuthorizationChallenge,
+): ApprovalPrompt {
+  if (!preparedChallenges.has(challenge)) {
+    throw boundaryError(
+      "permission-prompt-invalid",
+      "$challenge",
+      "challenge must be produced by a permission broker in this process",
+    );
+  }
+  const permissions = Object.freeze(
+    challenge.permissions.map(({ permission, mode }) =>
+      Object.freeze({
+        permission,
+        mode,
+        impactClasses: APPROVAL_PERMISSION_IMPACT_CLASSES[permission],
+      }),
+    ),
+  );
+  const body: Omit<ApprovalPrompt, "promptDigest"> = Object.freeze({
+    schemaVersion: approvalPromptSchema.version,
+    runId: challenge.runId,
+    requestDigest: challenge.requestDigest,
+    project: challenge.project,
+    command: challenge.command,
+    registryDigest: challenge.registryDigest,
+    inputDigest: challenge.inputDigest,
+    ...(challenge.feature === undefined
+      ? {}
+      : { feature: challenge.feature }),
+    ...(challenge.workflow === undefined
+      ? {}
+      : { workflow: challenge.workflow }),
+    ...(challenge.editorSessionIdentityDigest === undefined
+      ? {}
+      : {
+          editorSessionIdentityDigest:
+            challenge.editorSessionIdentityDigest,
+        }),
+    scope: challenge.scope,
+    budgets: challenge.budgets,
+    deadlineAt: challenge.deadlineAt,
+    permissions,
+  });
+  const prompt = Object.freeze({
+    ...body,
+    promptDigest: computeApprovalPromptDigest(body),
+  });
+  approvalPromptChallenges.set(prompt, challenge);
+  return prompt;
+}
+
+export function createApprovalGrantSubjectFromPrompt(
+  prompt: ApprovalPrompt,
+  options: CreateApprovalGrantSubjectOptions,
+): UnsignedApprovalGrant {
+  const challenge = approvalPromptChallenges.get(prompt);
+  if (challenge === undefined) {
+    throw boundaryError(
+      "permission-prompt-invalid",
+      "$prompt",
+      "prompt must be produced by this process and retain its original authority binding",
+    );
+  }
+  return createApprovalGrantSubject(challenge, options);
+}
+
 class PermissionAuthorizationLeaseImplementation
   implements PermissionAuthorizationLease
 {
@@ -1680,15 +1755,17 @@ class PermissionBrokerImplementation implements PermissionBroker {
       );
     }
     this.#now = options.now ?? Date.now;
-    const grantSchema = this.#registry.schemas.find(
-      ({ schemaId }) => schemaId === approvalGrantSchema.schemaId,
-    );
-    if (grantSchema?.digest !== approvalGrantSchema.digest) {
-      throw boundaryError(
-        "invalid-permission-broker-options",
-        "$options.registry",
-        "approval grant schema is not registered with its exact digest",
+    for (const requiredSchema of [approvalGrantSchema, approvalPromptSchema]) {
+      const registered = this.#registry.schemas.find(
+        ({ schemaId }) => schemaId === requiredSchema.schemaId,
       );
+      if (registered?.digest !== requiredSchema.digest) {
+        throw boundaryError(
+          "invalid-permission-broker-options",
+          "$options.registry",
+          `${requiredSchema.id} schema is not registered with its exact digest`,
+        );
+      }
     }
   }
 

@@ -28,6 +28,14 @@ Current public commands use only the first row. The remaining decisions describe
 
 An approval binds the project, command, request, scope, budget, expiration, and relevant feature, workflow, or editor session. It is single-purpose and cannot be transferred through copied data.
 
+## Approval presentation boundary
+
+The control plane now defines an internal, host-neutral `ApprovalPrompt` contract. It presents the exact project, command, registry, input digest, scope, budgets, deadline, permission modes, and stable impact classes that a future host must show before requesting a signature.
+
+The prompt has no field for raw command input, an absolute project root, credentials, a signature, or an approval key. Its digest detects changes to the displayed authority but is not itself permission to execute. A validated serialized copy can be rendered, but only the original in-process prompt remains linked to the broker challenge that can produce an unsigned grant subject. The resulting grant still requires a trusted signature and exact broker validation.
+
+No public command currently renders this prompt or accepts an approval. Public installation and other mutation routes remain unavailable until cancellation and recovery are also exposed through bounded contracts.
+
 ## Stop conditions
 
 Execution stops before a new effect when any of these conditions appears:

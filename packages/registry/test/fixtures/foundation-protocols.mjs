@@ -1040,6 +1040,49 @@ export const validFoundationProtocolFixtures = {
       value: "A".repeat(86),
     },
   },
+  "approval-prompt": {
+    schemaVersion: "1.0.0",
+    runId,
+    requestDigest: digest,
+    project: {
+      id: "sample.graybox",
+      identityDigest: secondDigest,
+    },
+    command: {
+      id: "pack.add",
+      version: "1.0.0",
+      handlerDigest: digest,
+    },
+    registryDigest: secondDigest,
+    inputDigest: digest,
+    scope: {
+      paths: [".agents/skills/gameplay.vertical-slice"],
+      objectIds: [],
+      destinations: [],
+      dataClasses: [],
+      changeKinds: [],
+      publishTargets: [],
+    },
+    budgets: {
+      maxChangedFiles: 16,
+      maxChangedBytes: 65536,
+      maxDurationMs: 30000,
+      maxOutputBytes: 1048576,
+      maxRepairCycles: 0,
+    },
+    deadlineAt: "2026-08-26T01:03:03.000Z",
+    permissions: [
+      {
+        permission: "install",
+        mode: "approval-required",
+        impactClasses: [
+          "project-files-change",
+          "software-installation",
+        ],
+      },
+    ],
+    promptDigest: secondDigest,
+  },
   "resolved-workflow-plan": {
     schemaVersion: "1.0.0",
     registryDigest: digest,

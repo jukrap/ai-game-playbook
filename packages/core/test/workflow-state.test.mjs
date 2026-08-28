@@ -40,6 +40,7 @@ function executionRequest(validatedRegistry) {
 function executionRegistry() {
   const definition = createValidRegistryDefinition();
   definition.schemas.push(contracts.approvalGrantSchema);
+  definition.schemas.push(contracts.approvalPromptSchema);
   return registry.validateRegistry(definition);
 }
 
@@ -115,6 +116,7 @@ function oneStepRegistry({
 } = {}) {
   const definition = createValidRegistryDefinition();
   definition.schemas.push(contracts.approvalGrantSchema);
+  definition.schemas.push(contracts.approvalPromptSchema);
   const step = structuredClone(definition.workflows[0].steps[0]);
   step.onFailure = onFailure;
   if (rollback) {
@@ -143,6 +145,7 @@ function oneStepRegistry({
 function twoReadStepRegistry() {
   const definition = createValidRegistryDefinition();
   definition.schemas.push(contracts.approvalGrantSchema);
+  definition.schemas.push(contracts.approvalPromptSchema);
   const first = structuredClone(definition.workflows[0].steps[0]);
   first.id = "step.inspect-a";
   const second = structuredClone(first);

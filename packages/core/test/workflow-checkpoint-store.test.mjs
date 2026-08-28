@@ -48,6 +48,7 @@ function validatedRegistry() {
   const definition = createValidRegistryDefinition();
   definition.schemas.push(
     contracts.approvalGrantSchema,
+    contracts.approvalPromptSchema,
     contracts.workflowCheckpointSchema,
   );
   return registry.validateRegistry(definition);
@@ -154,6 +155,7 @@ function rollbackRegistry() {
   const definition = createValidRegistryDefinition();
   definition.schemas.push(
     contracts.approvalGrantSchema,
+    contracts.approvalPromptSchema,
     contracts.workflowCheckpointSchema,
   );
   const step = structuredClone(definition.workflows[0].steps[0]);

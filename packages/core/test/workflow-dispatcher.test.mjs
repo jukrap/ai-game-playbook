@@ -31,6 +31,7 @@ function mutationRegistry({ twoSteps = false } = {}) {
   const definition = createValidRegistryDefinition();
   definition.schemas.push(
     contracts.approvalGrantSchema,
+    contracts.approvalPromptSchema,
     contracts.workflowCheckpointSchema,
   );
   const command = definition.commands.find(({ id }) => id === "project.inspect");

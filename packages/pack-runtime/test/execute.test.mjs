@@ -346,6 +346,7 @@ function validatedRegistry(pack, operation = "add") {
   const { command, definition } = commandFor(operation);
   definition.schemas.push(
     contracts.approvalGrantSchema,
+    contracts.approvalPromptSchema,
     packOperationInputSchema,
     packOperationOutputSchema,
     packRecoveryInputSchema,
@@ -360,6 +361,7 @@ function validatedRegistryWithoutPack(operation) {
   const { command, definition } = commandFor(operation);
   definition.schemas.push(
     contracts.approvalGrantSchema,
+    contracts.approvalPromptSchema,
     packOperationInputSchema,
     packOperationOutputSchema,
     packRecoveryInputSchema,

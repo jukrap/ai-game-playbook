@@ -76,6 +76,7 @@ export type CoreBoundaryErrorCode =
   | "permission-input-invalid"
   | "permission-lease-state-invalid"
   | "permission-project-mismatch"
+  | "permission-prompt-invalid"
   | "permission-reconciliation-required"
   | "permission-scope-invalid"
   | "permission-stage-unsupported"

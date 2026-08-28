@@ -31,6 +31,7 @@ function brokerRegistry({
 } = {}) {
   const definition = createValidRegistryDefinition();
   definition.schemas.push(contracts.approvalGrantSchema);
+  definition.schemas.push(contracts.approvalPromptSchema);
   const inspect = definition.commands.find(({ id }) => id === "project.inspect");
   inspect.budgets = { ...inspect.budgets, ...inspectBudgetOverrides };
   const network = structuredClone(
@@ -777,4 +778,126 @@ test("permission broker rejects unusable or failing clocks at the boundary", () 
       expectCoreError("invalid-permission-broker-options"),
     );
   }
+});
+
+test("approval prompt presents exact bounded authority without raw input", () => {
+  const broker = createBroker();
+  const installRequest = request("pack.install-test", {
+    scope: scope({
+      paths: [".agents/skills/gameplay.vertical-slice"],
+    }),
+    budgets: budgets({ maxChangedFiles: 16, maxChangedBytes: 65_536 }),
+  });
+  const challenge = broker.prepare(installRequest);
+  const prompt = core.createPermissionApprovalPrompt(challenge);
+
+  assert.equal(prompt.requestDigest, challenge.requestDigest);
+  assert.equal(prompt.inputDigest, challenge.inputDigest);
+  assert.equal("input" in prompt, false);
+  assert.deepEqual(prompt.permissions, [
+    {
+      permission: "install",
+      mode: "approval-required",
+      impactClasses: [
+        "project-files-change",
+        "software-installation",
+      ],
+    },
+  ]);
+  assert.equal(
+    prompt.promptDigest,
+    contracts.computeApprovalPromptDigest(prompt),
+  );
+  assert.equal(Object.isFrozen(prompt), true);
+  assert.equal(Object.isFrozen(prompt.project), true);
+  assert.equal(Object.isFrozen(prompt.scope), true);
+  assert.equal(Object.isFrozen(prompt.scope.paths), true);
+  assert.equal(Object.isFrozen(prompt.budgets), true);
+  assert.equal(Object.isFrozen(prompt.permissions), true);
+  assert.equal(Object.isFrozen(prompt.permissions[0]), true);
+  assert.equal(Object.isFrozen(prompt.permissions[0].impactClasses), true);
+});
+
+test("approval prompt is deterministic but only its original instance carries authority", () => {
+  const broker = createBroker();
+  const installRequest = request("pack.install-test", {
+    scope: scope({
+      paths: [".agents/skills/gameplay.vertical-slice"],
+    }),
+    budgets: budgets({ maxChangedFiles: 16, maxChangedBytes: 65_536 }),
+  });
+  const firstChallenge = broker.prepare(installRequest);
+  const secondChallenge = broker.prepare(installRequest);
+  const firstPrompt = core.createPermissionApprovalPrompt(firstChallenge);
+  const secondPrompt = core.createPermissionApprovalPrompt(secondChallenge);
+  const serializedPrompt = structuredClone(firstPrompt);
+  const options = {
+    grantId: "approval.install.once",
+    permission: "install",
+    approvedAt: "2026-08-26T01:59:00.000Z",
+    expiresAt: "2026-08-26T02:05:00.000Z",
+    maxUses: 1,
+  };
+
+  assert.deepEqual(firstPrompt, secondPrompt);
+  assert.deepEqual(
+    registry.validateRegisteredContractValue(
+      brokerRegistry(),
+      {
+        schemaId: contracts.approvalPromptSchema.schemaId,
+        digest: contracts.approvalPromptSchema.digest,
+      },
+      serializedPrompt,
+    ),
+    firstPrompt,
+  );
+  assert.deepEqual(
+    core.createApprovalGrantSubjectFromPrompt(firstPrompt, options),
+    core.createApprovalGrantSubject(firstChallenge, options),
+  );
+  assert.throws(
+    () =>
+      core.createApprovalGrantSubjectFromPrompt(
+        serializedPrompt,
+        options,
+      ),
+    expectCoreError("permission-prompt-invalid"),
+  );
+  assert.throws(
+    () =>
+      core.createApprovalGrantSubjectFromPrompt({ ...firstPrompt }, options),
+    expectCoreError("permission-prompt-invalid"),
+  );
+});
+
+test("approval presentation rejects untrusted objects without invoking them", () => {
+  let accessorReads = 0;
+  const accessor = Object.defineProperty({}, "schemaVersion", {
+    enumerable: true,
+    get() {
+      accessorReads += 1;
+      return "1.0.0";
+    },
+  });
+  let proxyReads = 0;
+  const proxy = new Proxy(
+    {},
+    {
+      get() {
+        proxyReads += 1;
+        return undefined;
+      },
+    },
+  );
+
+  assert.throws(
+    () => core.createPermissionApprovalPrompt(accessor),
+    expectCoreError("permission-prompt-invalid"),
+  );
+  assert.throws(
+    () => core.createPermissionApprovalPrompt(proxy),
+    expectCoreError("permission-prompt-invalid"),
+  );
+  assert.equal(accessorReads, 0);
+  assert.equal(proxyReads, 0);
 });

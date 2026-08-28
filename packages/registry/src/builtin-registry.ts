@@ -1,5 +1,6 @@
 import {
   approvalGrantSchema,
+  approvalPromptSchema,
   assetProvenanceSchema,
   computePackManifestDigest,
   doctorReportSchema,
@@ -1617,6 +1618,7 @@ const definition: RegistryDefinition = Object.freeze({
   controlPlaneVersion: parseSemanticVersion("0.0.0").value,
   schemas: Object.freeze([
     approvalGrantSchema,
+    approvalPromptSchema,
     assetProvenanceSchema,
     doctorRequestSchema,
     doctorReportSchema,

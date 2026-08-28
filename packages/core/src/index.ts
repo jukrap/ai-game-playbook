@@ -88,7 +88,9 @@ export {
   assertAuthorizedPermissionDecision,
   assertPermissionSettlement,
   createApprovalGrantSubject,
+  createApprovalGrantSubjectFromPrompt,
   createPermissionBroker,
+  createPermissionApprovalPrompt,
 } from "./permission-broker.js";
 export type {
   CreateApprovalGrantSubjectOptions,

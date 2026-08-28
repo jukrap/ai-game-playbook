@@ -1,6 +1,6 @@
 # Roadmap
 
-> Status: the source-built control-plane foundation and Windows x64 containment self-test are active. Engine adapters, public mutation, release packaging, and verified golden projects remain ahead.
+> Status: the source-built control-plane foundation and Windows x64 containment verification are active. Engine adapters, public mutation, release packaging, and verified golden projects remain ahead.
 
 [한국어](roadmap.ko.md) · [Documentation](README.md)
 
@@ -15,7 +15,7 @@ The repository now has:
 - a bounded read-only MCP runtime and write-free host setup planning;
 - separate private one-shot project-initialization and managed-skill operations with approval, durable dispatch, and read-only recovery inspection;
 - private pack recovery closure, finite evidence reconciliation, and Godot preflight foundations;
-- a source-built Windows x64 AppContainer and Job Object self-test with disposable file, network, child-process, settlement, and cleanup probes;
+- a source-built Windows x64 AppContainer and Job Object self-test plus a one-shot, snapshot-bound synthetic contained launch;
 - paired English and Korean public documentation with structural checks.
 
 This checkpoint does not include an installable package or a live engine loop.
@@ -32,7 +32,8 @@ The private initialization-to-skill-install sequence now passes success, denial,
 
 ## Stage 2: Godot alpha
 
-- connect the verified Windows x64 containment self-test to fresh project snapshots, one-shot process admission, and bounded launch authority;
+- replace the synthetic fixture with exact read-only Godot project and executable snapshots without widening the fixed launch boundary;
+- register the validated provider through a project-bound core admission path while keeping public dispatch closed until evidence and approval are connected;
 - admit exact Godot executable and project identities;
 - add the thin GDScript bridge and bounded command schema;
 - build the shared 3D graybox with movement, camera, collision, collectible, HUD, save and load, and win state;

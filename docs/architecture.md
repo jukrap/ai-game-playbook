@@ -1,6 +1,6 @@
 # Architecture
 
-> Status: the Node.js/TypeScript control-plane foundation and a Windows x64 containment self-test are source-built. Public engine mutation, live bridges, and evidence export are not implemented.
+> Status: the Node.js/TypeScript control-plane foundation and Windows x64 containment verification are source-built. Public engine mutation, live bridges, and evidence export are not implemented.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -42,11 +42,15 @@ A generated surface is descriptive until a matching handler and runtime boundary
 | `mcp` | Opt-in project-bound read-only STDIO tools selected from registry metadata |
 | `codex-adapter` | Write-free project setup planning plus private one-shot approval for project initialization and managed-skill installation, with read-only recovery assessment |
 | `godot-adapter` | Static public Godot reports and private fail-closed host-tool preflight foundations |
-| `windows-containment-provider` | Windows x64 native artifact identity and disposable AppContainer and Job Object self-test authority |
+| `windows-containment-provider` | Windows x64 artifact identity, disposable isolation self-test, and one-shot synthetic contained launch authority |
 
 Unity and Unreal adapters and all project bridges remain planned.
 
-The Windows containment package derives its descriptor and local catalog digest from the exact packaged x64 artifact. A one-use prepared handle binds the artifact, descriptor, project identity digest, challenge, and deadline. The native self-test runs only its own disposable fixture; a validated report can produce a short-lived same-process witness, while serialized reports and copied witnesses carry no authority. No launch API, core catalog registration, public command, or MCP tool consumes that witness yet.
+The Windows containment package derives its descriptor and local catalog digest from the exact packaged x64 artifact. A one-use self-test handle binds the artifact, descriptor, project identity digest, challenge, and deadline. The native test runs only disposable state and produces a short-lived same-process witness after every probe and cleanup check passes.
+
+That witness can be claimed once by a private synthetic-launch API. Preparation creates fresh path-free project and executable snapshots and binds a fixed invocation, deterministic output, process count, time, output, and termination budgets. The native host copies the already verified artifact into a disposable read-only fixture, runs only its built-in workload in a zero-capability AppContainer and one-process Job Object, checks both snapshots again, and removes the profile and fixture. The internal workload checks its AppContainer token before reading or writing. Serialized values and copied handles have no authority.
+
+This path is an isolation admission test, not an engine adapter. The core provider catalog stays empty, and no public command, MCP tool, Godot preflight, user-project path, or arbitrary executable can reach it.
 
 The registry binds all twelve packaged skills to one digest-bound experimental pack. An internal preflight evaluates an `add` operation against project identity, installed state, exact file digests, and direct skill-directory ownership. A separate private dispatcher can execute a fresh ready plan only with exact install approval and the project-write lane. It revalidates the plan before admission, uses compare-and-swap ownership and rollback, and retains workflow checkpoints, a run receipt, and content-addressed terminal transaction evidence. Copied, stale, cancelled, unapproved, or conflicted plans stop before managed mutation. No public command invokes this path.
 

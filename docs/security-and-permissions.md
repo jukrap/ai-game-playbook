@@ -96,13 +96,17 @@ Reconciliation succeeds only when one complete proof, the target identities, the
 
 This is not a general recovery escape hatch. The core contract can represent a proved `succeeded` or `failed` target, but the current pack-recovery provider emits only `succeeded` after proving the completed closure. Version 1 supports only that one-step command phase. It does not reconcile rollback, multi-step, process, editor, or live-engine effects, and it has no public CLI, MCP, or host mutation surface.
 
-## Windows containment self-test
+## Windows containment verification
 
 The source-built Windows x64 containment package verifies one native artifact before it can produce a self-test witness. The package requires a regular x64 PE artifact at its fixed packaged location, checks its digest before and after execution, and keeps the opened artifact bound while the native host prepares the contained payload.
 
 The native test creates a disposable private fixture and an AppContainer profile with no capabilities. It checks file create, replace, remove, rename, and hard-link alias denial; owned IPv4 and IPv6 TCP plus loopback UDP denial; normal and detached child-process denial; a Job Object limit of one active process; kill-on-close settlement; and exact fixture and profile cleanup. Positive controls prove the local network sentinels were reachable before the contained probes. No external endpoint or user project file is used.
 
-The TypeScript boundary binds the artifact, descriptor, local catalog, project identity digest, challenge, and deadline to one-use in-process handles. A native JSON report is schema-checked and can produce a short-lived witness only in the process that ran the test. Serialized reports, reconstructed objects, copied witnesses, expired handles, artifact drift, cleanup uncertainty, and failed probes do not grant authority. The package cannot launch an arbitrary executable, admit a project process, or control an engine.
+The TypeScript boundary binds the artifact, descriptor, local catalog, project identity digest, challenge, and deadline to one-use in-process handles. A native JSON report is schema-checked and can produce a short-lived witness only in the process that ran the test. Serialized reports, reconstructed objects, copied witnesses, expired handles, artifact drift, cleanup uncertainty, and failed probes do not grant authority.
+
+One fresh witness can be consumed by a private synthetic-launch path. The path creates new path-free project and executable snapshots, fixes the invocation and deterministic output in advance, and admits exactly one process for at most ten seconds with 64 KiB of output. The native host rechecks the artifact and snapshots before and after execution. Its internal workload refuses direct execution unless the current token is an AppContainer token, writes only one expected result inside its disposable profile, and cannot accept an arbitrary command, environment, network destination, executable, or user-project path. A successful result requires exit code zero, one total and zero active processes, matching output digest, preserved snapshots, confirmed termination, and complete profile and fixture cleanup.
+
+Failed and uncertain settlement are distinct. An unconfirmed process, unreadable post-run snapshot, artifact drift, malformed native result, or uncertain cleanup cannot produce launch authority and is never promoted to success.
 
 ## Processes and editors
 
@@ -110,7 +114,7 @@ Process authority binds the executable content and identity, start information, 
 
 Output, duration, child processes, cancellation, and termination settlement are bounded. A process result does not imply that inner tests or gameplay passed. Editor-bound work uses one lane per project and requires an exact session identity after reload or restart.
 
-The compiled containment catalog used by the Godot adapter and public runtime remains empty. The standalone Windows self-test package does not register project-process launch authority there. Godot project startup preflight therefore blocks before launch.
+The compiled containment catalog used by the Godot adapter and public runtime remains empty. The private synthetic launch is not registered as project-process authority there. Godot project startup preflight therefore blocks before launch.
 
 ## MCP limits
 

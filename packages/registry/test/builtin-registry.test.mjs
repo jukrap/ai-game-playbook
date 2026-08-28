@@ -22,6 +22,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
       "pack.add",
       "pack.doctor",
       "pack.list",
+      "pack.recover",
       "project.initialization-recovery.assess",
       "project.initialize",
       "project.inspect",
@@ -52,6 +53,35 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.equal(packAdd.handler.package, "@ai-game-playbook/pack-runtime");
   assert.equal(packAdd.handler.export, "dispatchPreparedPackOperation");
   assert.match(packAdd.handler.digest, digestPattern);
+
+  const packRecovery = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "pack.recover",
+  );
+  assert.notEqual(packRecovery, undefined);
+  assert.equal(packRecovery.lifecycle, "internal");
+  assert.deepEqual(packRecovery.cli, {
+    path: ["internal", "pack", "recover"],
+    aliases: [],
+  });
+  assert.deepEqual(packRecovery.permissions, ["install"]);
+  assert.equal(packRecovery.lane, "project-write");
+  assert.equal(
+    packRecovery.input.schemaId,
+    contracts.packRecoveryCommandInputSchema.schemaId,
+  );
+  assert.equal(
+    packRecovery.output.schemaId,
+    contracts.packRecoveryCommandOutputSchema.schemaId,
+  );
+  assert.equal(
+    packRecovery.handler.package,
+    "@ai-game-playbook/pack-runtime",
+  );
+  assert.equal(
+    packRecovery.handler.export,
+    "dispatchPreparedPackRecoveryFinalization",
+  );
+  assert.match(packRecovery.handler.digest, digestPattern);
 
   const packAddWorkflow = registry.BUILTIN_REGISTRY.workflows.find(
     ({ id }) => id === "workflow.pack-add",
@@ -518,6 +548,7 @@ test("the builtin registry binds internal operations to finite workflow steps", 
     [
       "workflow.godot-headless-preflight",
       "workflow.pack-add",
+      "workflow.pack-recover",
       "workflow.project-initialization",
     ],
   );
@@ -596,6 +627,42 @@ test("the builtin registry binds internal operations to finite workflow steps", 
     contracts.isResolvedWorkflowPlanDigestValid(initializationPlan),
     true,
   );
+
+  const recovery = registry.BUILTIN_REGISTRY.workflows.find(
+    ({ id }) => id === "workflow.pack-recover",
+  );
+  assert.notEqual(recovery, undefined);
+  assert.equal(recovery.lifecycle, "internal");
+  assert.equal(
+    recovery.input.schemaId,
+    contracts.packRecoveryCommandInputSchema.schemaId,
+  );
+  assert.equal(
+    recovery.output.schemaId,
+    contracts.packRecoveryCommandOutputSchema.schemaId,
+  );
+  assert.deepEqual(recovery.steps, [
+    {
+      id: "step.pack-recover",
+      commandId: "pack.recover",
+      dependsOn: [],
+      onFailure: "stop",
+      approvalCheckpoint: true,
+    },
+  ]);
+  assert.deepEqual(recovery.requiredEvidence, [
+    "pack-recovery",
+    "run-receipt",
+  ]);
+  const recoveryPlan = registry.resolveWorkflowPlan(
+    registry.BUILTIN_REGISTRY,
+    recovery.id,
+    "vertical-slice",
+  );
+  assert.equal(recoveryPlan.steps.length, 1);
+  assert.equal(recoveryPlan.steps[0].command.id, "pack.recover");
+  assert.equal(recoveryPlan.steps[0].command.lane, "project-write");
+  assert.equal(contracts.isResolvedWorkflowPlanDigestValid(recoveryPlan), true);
 });
 
 test("builtin generated surfaces preserve implemented schema and command identity", () => {
@@ -907,4 +974,110 @@ test("builtin registry validates implemented input and output values", () => {
     { schemaVersion: "1.0.0", projectRoot: "D:\\games\\sample" },
   );
   assert.equal(inspectInput.projectRoot, "D:\\games\\sample");
+});
+
+test("pack recovery schemas enforce conditional execution outcomes", () => {
+  const command = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === contracts.PACK_RECOVERY_COMMAND_ID,
+  );
+  assert.notEqual(command, undefined);
+  const digest = `sha256:${"a".repeat(64)}`;
+  const input = {
+    schemaVersion: "1.0.0",
+    recoveryRunId: "018f6f35-2c9e-7d1a-8a4b-123456789ac0",
+    transactionRunId: "018f6f35-2c9e-7d1a-8a4b-123456789abc",
+    reportDigest: digest,
+    journalSnapshotDigest: digest,
+    action: "append-terminal",
+    finalOutcome: "committed",
+    planDigest: digest,
+  };
+  const output = {
+    schemaVersion: "1.0.0",
+    status: "finalized",
+    recoveryRunId: input.recoveryRunId,
+    transactionRunId: input.transactionRunId,
+    action: input.action,
+    finalOutcome: input.finalOutcome,
+    reportDigest: digest,
+    finalReportDigest: digest,
+    journalRecordDigest: digest,
+    planDigest: digest,
+    receiptDigest: digest,
+    mutationUncertain: false,
+  };
+
+  assert.equal(
+    registry.validateRegisteredContractValue(
+      registry.BUILTIN_REGISTRY,
+      command.input,
+      input,
+    ).recoveryRunId,
+    input.recoveryRunId,
+  );
+  assert.equal(
+    registry.validateRegisteredContractValue(
+      registry.BUILTIN_REGISTRY,
+      command.output,
+      output,
+    ).status,
+    "finalized",
+  );
+  const nonFinalizedOutput = {
+    schemaVersion: output.schemaVersion,
+    recoveryRunId: output.recoveryRunId,
+    transactionRunId: output.transactionRunId,
+    action: output.action,
+    finalOutcome: output.finalOutcome,
+    reportDigest: output.reportDigest,
+    planDigest: output.planDigest,
+    receiptDigest: output.receiptDigest,
+  };
+
+  for (const invalidInput of [
+    { ...input, extra: true },
+    {
+      ...input,
+      action: "append-reconciliation",
+      finalOutcome: "rolled-back",
+    },
+  ]) {
+    assert.throws(
+      () =>
+        registry.validateRegisteredContractValue(
+          registry.BUILTIN_REGISTRY,
+          command.input,
+          invalidInput,
+        ),
+      (error) => error?.code === "registered-value-invalid",
+    );
+  }
+
+  for (const invalidOutput of [
+    {
+      ...nonFinalizedOutput,
+      status: "finalized",
+      mutationUncertain: false,
+    },
+    {
+      ...nonFinalizedOutput,
+      status: "recovery-required",
+      mutationUncertain: false,
+    },
+    {
+      ...nonFinalizedOutput,
+      status: "failed",
+      mutationUncertain: true,
+    },
+  ]) {
+    assert.throws(
+      () =>
+        registry.validateRegisteredContractValue(
+          registry.BUILTIN_REGISTRY,
+          command.output,
+          invalidOutput,
+        ),
+      (error) => error?.code === "registered-value-invalid",
+    );
+  }
 });

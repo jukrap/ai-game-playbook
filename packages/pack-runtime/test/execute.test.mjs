@@ -26,6 +26,7 @@ import { createValidRegistryDefinition } from "../../registry/test/fixtures/regi
 const runId = "018f6f35-2c9e-7d1a-8a4b-123456789abd";
 const updateRunId = "018f6f35-2c9e-7d1a-8a4b-123456789abe";
 const removeRunId = "018f6f35-2c9e-7d1a-8a4b-123456789abf";
+const recoveryRunId = "018f6f35-2c9e-7d1a-8a4b-123456789ac0";
 const projectIdentityDigest = `sha256:${"c".repeat(64)}`;
 const { publicKey, privateKey } = generateKeyPairSync("ed25519");
 const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
@@ -79,84 +80,8 @@ const packOperationOutputSchema = contracts.defineContractSchema({
   },
 });
 
-const packRecoveryInputSchema = contracts.defineContractSchema({
-  id: "pack-recovery-input",
-  version: "1.0.0",
-  title: "Pack Recovery Input",
-  description: "Digest-bound input for one approved pack recovery closure.",
-  schema: {
-    type: "object",
-    properties: {
-      schemaVersion: { type: "string" },
-      transactionRunId: {
-        type: "string",
-        pattern:
-          "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-      },
-      reportDigest: {
-        type: "string",
-        pattern: "^sha256:[0-9a-f]{64}$",
-      },
-      journalSnapshotDigest: {
-        type: "string",
-        pattern: "^sha256:[0-9a-f]{64}$",
-      },
-      action: {
-        enum: [
-          "append-reconciliation",
-          "append-started-and-terminal",
-          "append-terminal",
-          "clear-marker",
-        ],
-      },
-      finalOutcome: { enum: ["committed", "failed", "rolled-back"] },
-    },
-    required: [
-      "schemaVersion",
-      "transactionRunId",
-      "reportDigest",
-      "journalSnapshotDigest",
-      "action",
-      "finalOutcome",
-    ],
-    additionalProperties: false,
-  },
-});
-
-const packRecoveryOutputSchema = contracts.defineContractSchema({
-  id: "pack-recovery-output",
-  version: "1.0.0",
-  title: "Pack Recovery Output",
-  description: "Bounded outcome for one approved pack recovery closure.",
-  schema: {
-    type: "object",
-    properties: {
-      schemaVersion: { type: "string" },
-      status: { enum: ["failed", "finalized", "recovery-required", "stale"] },
-      action: {
-        enum: [
-          "append-reconciliation",
-          "append-started-and-terminal",
-          "append-terminal",
-          "clear-marker",
-        ],
-      },
-      reportDigest: {
-        type: "string",
-        pattern: "^sha256:[0-9a-f]{64}$",
-      },
-      mutationUncertain: { type: "boolean" },
-    },
-    required: [
-      "schemaVersion",
-      "status",
-      "action",
-      "reportDigest",
-      "mutationUncertain",
-    ],
-    additionalProperties: false,
-  },
-});
+const packRecoveryInputSchema = contracts.packRecoveryCommandInputSchema;
+const packRecoveryOutputSchema = contracts.packRecoveryCommandOutputSchema;
 
 function currentOperatingSystem() {
   if (process.platform === "win32") return "windows";
@@ -310,7 +235,7 @@ function recoveryCommand(definition) {
   command.version = "1.0.0";
   command.lifecycle = "internal";
   command.summary = "Finalize one separately approved pack recovery closure.";
-  command.cli = { path: ["internal", "pack-recover"], aliases: [] };
+  command.cli = { path: ["internal", "pack", "recover"], aliases: [] };
   command.input = {
     schemaId: packRecoveryInputSchema.schemaId,
     digest: packRecoveryInputSchema.digest,
@@ -336,10 +261,54 @@ function recoveryCommand(definition) {
   command.requiredEvidence = ["evidence.pack-recovery"];
   command.handler = {
     package: "@ai-game-playbook/pack-runtime",
-    export: "finalizePackTransactionRecovery",
+    export: "dispatchPreparedPackRecoveryFinalization",
     digest: `sha256:${"9".repeat(64)}`,
   };
   return command;
+}
+
+function recoveryWorkflow() {
+  return {
+    schemaVersion: "1.0.0",
+    id: "workflow.pack-recover",
+    version: "1.0.0",
+    lifecycle: "internal",
+    summary: "Execute one approved pack recovery closure.",
+    input: {
+      schemaId: packRecoveryInputSchema.schemaId,
+      digest: packRecoveryInputSchema.digest,
+    },
+    output: {
+      schemaId: packRecoveryOutputSchema.schemaId,
+      digest: packRecoveryOutputSchema.digest,
+    },
+    supportedStages: [
+      "concept",
+      "risk-prototype",
+      "vertical-slice",
+      "stabilization",
+      "release-candidate",
+    ],
+    steps: [
+      {
+        id: "step.pack-recover",
+        commandId: "pack.recover",
+        dependsOn: [],
+        onFailure: "stop",
+        approvalCheckpoint: true,
+      },
+    ],
+    budgets: {
+      maxChangedFiles: 512,
+      maxChangedBytes: 4_194_304,
+      maxDurationMs: 30_000,
+      maxOutputBytes: 65_536,
+      maxRepairCycles: 0,
+    },
+    resumePolicy: "never",
+    terminalOracle: "The recovery result and retained evidence agree.",
+    requiredEvidence: ["pack-recovery", "run-receipt"],
+  };
 }
 
 function validatedRegistry(pack, operation = "add") {
@@ -351,8 +320,10 @@ function validatedRegistry(pack, operation = "add") {
     packOperationOutputSchema,
     packRecoveryInputSchema,
     packRecoveryOutputSchema,
+    contracts.workflowCheckpointSchema,
   );
   definition.commands.push(command, recoveryCommand(definition));
+  definition.workflows.push(recoveryWorkflow());
   definition.packs.push(pack);
   return registry.validateRegistry(definition);
 }
@@ -366,9 +337,20 @@ function validatedRegistryWithoutPack(operation) {
     packOperationOutputSchema,
     packRecoveryInputSchema,
     packRecoveryOutputSchema,
+    contracts.workflowCheckpointSchema,
   );
   definition.commands.push(command, recoveryCommand(definition));
+  definition.workflows.push(recoveryWorkflow());
   return registry.validateRegistry(definition);
+}
+
+function prepareRecovery(report, selectedRegistry, selectedRunId = recoveryRunId) {
+  return packRuntime.preparePackTransactionRecoveryFinalization({
+    report,
+    registry: selectedRegistry,
+    runId: selectedRunId,
+    projectStage: "vertical-slice",
+  });
 }
 
 async function fixture(t, content = "pack payload\n") {
@@ -402,6 +384,18 @@ async function fixture(t, content = "pack payload\n") {
     targetRoot: await core.canonicalizeProjectRoot(project),
     sourceRoot: await core.canonicalizeProjectRoot(source),
   };
+}
+
+async function ensureDurableStores(f) {
+  for (const path of [
+    core.EVIDENCE_ARTIFACT_STORE_PATH,
+    core.EVIDENCE_ARTIFACT_MANIFESTS_PATH,
+    core.EVIDENCE_ARTIFACT_OBJECTS_PATH,
+    core.RUN_RECEIPT_STORE_PATH,
+    core.WORKFLOW_CHECKPOINT_STORE_PATH,
+  ]) {
+    await mkdir(join(f.project, ...path.split("/")), { recursive: true });
+  }
 }
 
 function prepareRequest(
@@ -525,7 +519,7 @@ function authorizeRecovery(plan, selectedRegistry, options = {}) {
     trustedApprovalKeys: [
       { keyId: "approval.local-key", publicKeyPem },
     ],
-    now: () => brokerNow,
+    now: options.now ?? Date.now,
   });
   const request = packRuntime.createPackRecoveryAuthorizationRequest({
     plan,
@@ -1094,18 +1088,14 @@ test("approved recovery finalizes an exact detached directory before journal clo
     },
   ]);
 
-  const recoveryPlan =
-    packRuntime.preparePackTransactionRecoveryFinalization({
-      report,
-      registry: removeRegistry,
-    });
+  const recoveryPlan = prepareRecovery(report, removeRegistry);
   assert.equal(recoveryPlan.paths.includes(directoryPath), true);
   assert.equal(recoveryPlan.paths.includes(directoryChange.tombstonePath), true);
   const recoveryAuthority = authorizeRecovery(
     recoveryPlan,
     removeRegistry,
   ).decision;
-  const recoveryLane = await acquireLane(f.targetRoot, removeRunId);
+  const recoveryLane = await acquireLane(f.targetRoot, recoveryPlan.runId);
   const finalized = await packRuntime.finalizePackTransactionRecovery({
     plan: recoveryPlan,
     authorization: recoveryAuthority,
@@ -1968,11 +1958,26 @@ test("separately approved recovery closes a stable started-only postimage", asyn
   });
   assert.equal(report.finalizationAction, "append-terminal");
   assert.equal(report.finalizationOutcome, "committed");
-  const recoveryPlan =
-    packRuntime.preparePackTransactionRecoveryFinalization({
-      report,
-      registry: selectedRegistry,
-    });
+  const recoveryPlan = prepareRecovery(report, selectedRegistry);
+  assert.equal(recoveryPlan.runId, recoveryRunId);
+  assert.equal(recoveryPlan.transactionRunId, runId);
+  assert.notEqual(recoveryPlan.runId, recoveryPlan.transactionRunId);
+  assert.equal(recoveryPlan.workflow.id, "workflow.pack-recover");
+  assert.equal(recoveryPlan.workflow.stepId, "step.pack-recover");
+  assert.deepEqual(packRuntime.createPackRecoveryCommandInput(recoveryPlan), {
+    schemaVersion: "1.0.0",
+    recoveryRunId,
+    transactionRunId: runId,
+    reportDigest: recoveryPlan.reportDigest,
+    journalSnapshotDigest: recoveryPlan.journalSnapshotDigest,
+    action: "append-terminal",
+    finalOutcome: "committed",
+    planDigest: recoveryPlan.planDigest,
+  });
+  assert.throws(
+    () => prepareRecovery(report, selectedRegistry, runId),
+    expectPackError("invalid-pack-recovery-request"),
+  );
   const recoveryByteFloor =
     packRuntime.PACK_ACTIVE_TRANSACTION_MAX_BYTES * 2 +
     packRuntime.PACK_TRANSACTION_MAX_RECORD_BYTES;
@@ -1993,7 +1998,7 @@ test("separately approved recovery closes a stable started-only postimage", asyn
     packRuntime.PACK_ACTIVE_TRANSACTION_PATH,
     packRuntime.packTransactionRecordPath(runId, 1),
   ].sort());
-  const recoveryLane = await acquireLane(f.targetRoot);
+  const recoveryLane = await acquireLane(f.targetRoot, recoveryPlan.runId);
   t.after(() =>
     recoveryLane.state === "active" ? recoveryLane.release() : undefined,
   );
@@ -2036,15 +2041,238 @@ test("separately approved recovery closes a stable started-only postimage", asyn
   assert.equal(closed.consistency, "consistent");
   assert.equal(closed.finalizationAction, "none");
   assert.throws(
-    () =>
-      packRuntime.preparePackTransactionRecoveryFinalization({
-        report: closed,
-        registry: selectedRegistry,
-      }),
+    () => prepareRecovery(closed, selectedRegistry),
     expectPackError("pack-recovery-not-actionable"),
   );
 
   await recoveryLane.release();
+});
+
+test("durable recovery dispatch retains checkpoint, receipt, and closure artifact", async (t) => {
+  const f = await fixture(t);
+  await ensureDurableStores(f);
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+  const plan = await packRuntime.preparePackOperation(
+    prepareRequest(f, selectedRegistry, pack),
+  );
+  const executionAuthority = authorize(plan, selectedRegistry);
+  const executionLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    executionLane.state === "active" ? executionLane.release() : undefined,
+  );
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan,
+      authorization: executionAuthority.decision,
+      lane: executionLane,
+    })).status,
+    "succeeded",
+  );
+  await executionLane.release();
+  await reopenAsStartedOnly(f);
+
+  const report = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  const recoveryPlan = prepareRecovery(report, selectedRegistry);
+  const rejectedAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
+  await assert.rejects(
+    packRuntime.dispatchPreparedPackRecoveryFinalization({
+      plan: structuredClone(recoveryPlan),
+      authorization: rejectedAuthority.decision,
+      signal: null,
+    }),
+    expectPackError("pack-recovery-plan-untrusted"),
+  );
+  assert.equal(rejectedAuthority.decision.lease.state, "active");
+  const cancelled = new AbortController();
+  cancelled.abort();
+  await assert.rejects(
+    packRuntime.dispatchPreparedPackRecoveryFinalization({
+      plan: recoveryPlan,
+      authorization: rejectedAuthority.decision,
+      signal: cancelled.signal,
+    }),
+    expectPackError("pack-operation-cancelled"),
+  );
+  assert.equal(rejectedAuthority.decision.lease.state, "settled");
+  const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
+  const output = await packRuntime.dispatchPreparedPackRecoveryFinalization({
+    plan: recoveryPlan,
+    authorization: recoveryAuthority.decision,
+    signal: null,
+  });
+
+  assert.equal(output.status, "finalized");
+  assert.equal(output.recoveryRunId, recoveryRunId);
+  assert.equal(output.transactionRunId, runId);
+  assert.equal(output.planDigest, recoveryPlan.planDigest);
+  assert.equal(output.mutationUncertain, false);
+  assert.equal(recoveryAuthority.decision.lease.state, "settled");
+
+  const inputDigest = contracts.digestCanonicalJson(
+    packRuntime.createPackRecoveryCommandInput(recoveryPlan),
+  );
+  const checkpoint = await core.loadWorkflowCheckpoint({
+    root: f.targetRoot,
+    registry: selectedRegistry,
+    runId: recoveryPlan.runId,
+    project: {
+      id: recoveryPlan.project.id,
+      identityDigest: recoveryPlan.project.identityDigest,
+      rootIdentityDigest: recoveryPlan.project.rootIdentityDigest,
+      stage: recoveryPlan.workflow.projectStage,
+    },
+    inputDigest,
+  });
+  assert.equal(checkpoint.checkpoint.status, "succeeded");
+  assert.deepEqual(checkpoint.checkpoint.evidenceKinds, [
+    "pack-recovery",
+    "run-receipt",
+  ]);
+  assert.equal(checkpoint.checkpoint.receiptChainHead, output.receiptDigest);
+
+  const receipts = await core.loadRunReceiptChain({
+    root: f.targetRoot,
+    registry: selectedRegistry,
+    runId: recoveryPlan.runId,
+    projectId: recoveryPlan.project.id,
+    projectIdentityDigest: recoveryPlan.project.rootIdentityDigest,
+    workflowId: recoveryPlan.workflow.id,
+    resolvedPlanDigest: recoveryPlan.workflow.resolvedPlanDigest,
+    maxArtifactBytes: packRuntime.PACK_TRANSACTION_MAX_RECORD_BYTES,
+  });
+  assert.equal(receipts.receipts.length, 1);
+  assert.equal(receipts.stored.receipt.status, "succeeded");
+  assert.equal(receipts.stored.receipt.receiptDigest, output.receiptDigest);
+  assert.equal(receipts.stored.receipt.artifacts.length, 1);
+  assert.equal(receipts.stored.receipt.artifacts[0].kind, "pack-recovery");
+  assert.equal(
+    receipts.stored.receipt.artifacts[0].sourcePath,
+    packRuntime.packTransactionRecordPath(runId, 1),
+  );
+  assert.equal(
+    (await core.inspectProjectLane({ root: f.targetRoot })).status,
+    "free",
+  );
+});
+
+test("durable recovery dispatch retains a started checkpoint when evidence promotion fails", async (t) => {
+  const f = await fixture(t);
+  await ensureDurableStores(f);
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+  const plan = await packRuntime.preparePackOperation(
+    prepareRequest(f, selectedRegistry, pack),
+  );
+  const executionAuthority = authorize(plan, selectedRegistry);
+  const executionLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    executionLane.state === "active" ? executionLane.release() : undefined,
+  );
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan,
+      authorization: executionAuthority.decision,
+      lane: executionLane,
+    })).status,
+    "succeeded",
+  );
+  await executionLane.release();
+  await reopenAsStartedOnly(f);
+
+  const report = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  const interruptedRunId = "018f6f35-2c9e-7d1a-8a4b-123456789ac1";
+  const recoveryPlan = prepareRecovery(
+    report,
+    selectedRegistry,
+    interruptedRunId,
+  );
+  const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
+  const packStateDirectory = join(
+    f.project,
+    ".ai-game-playbook",
+    "state",
+    "packs",
+  );
+  const artifactObjectsDirectory = join(
+    f.project,
+    ...core.EVIDENCE_ARTIFACT_OBJECTS_PATH.split("/"),
+  );
+  const watcher = watch(packStateDirectory);
+  const breakEvidenceStore = (async () => {
+    for await (const event of watcher) {
+      if (event.filename?.toString() === "active.json") {
+        await rm(artifactObjectsDirectory, { recursive: true, force: true });
+        await writeFile(artifactObjectsDirectory, "not a directory\n", "utf8");
+        return;
+      }
+    }
+  })();
+
+  await assert.rejects(
+    packRuntime.dispatchPreparedPackRecoveryFinalization({
+      plan: recoveryPlan,
+      authorization: recoveryAuthority.decision,
+      signal: null,
+    }),
+    (error) =>
+      error?.name === "CoreBoundaryError" &&
+      error?.code === "workflow-dispatch-execution-failed" &&
+      error?.mutationUncertain === true,
+  );
+  await breakEvidenceStore;
+  assert.equal(recoveryAuthority.decision.lease.state, "settled");
+
+  const inputDigest = contracts.digestCanonicalJson(
+    packRuntime.createPackRecoveryCommandInput(recoveryPlan),
+  );
+  const checkpoint = await core.loadWorkflowCheckpoint({
+    root: f.targetRoot,
+    registry: selectedRegistry,
+    runId: recoveryPlan.runId,
+    project: {
+      id: recoveryPlan.project.id,
+      identityDigest: recoveryPlan.project.identityDigest,
+      rootIdentityDigest: recoveryPlan.project.rootIdentityDigest,
+      stage: recoveryPlan.workflow.projectStage,
+    },
+    inputDigest,
+  });
+  assert.equal(checkpoint.checkpoint.status, "running");
+  assert.equal(checkpoint.checkpoint.inFlight.sideEffect, "started");
+  assert.equal(checkpoint.checkpoint.receiptChainHead, undefined);
+
+  const closed = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(closed.consistency, "consistent");
+  assert.equal(closed.finalizationAction, "none");
+  assert.equal(
+    (await core.inspectProjectLane({ root: f.targetRoot })).status,
+    "free",
+  );
 });
 
 test("recovery can close a marker-only preimage without touching game artifacts", async (t) => {
@@ -2094,13 +2322,9 @@ test("recovery can close a marker-only preimage without touching game artifacts"
   });
   assert.equal(report.finalizationAction, "append-started-and-terminal");
   assert.equal(report.finalizationOutcome, "failed");
-  const recoveryPlan =
-    packRuntime.preparePackTransactionRecoveryFinalization({
-      report,
-      registry: selectedRegistry,
-    });
+  const recoveryPlan = prepareRecovery(report, selectedRegistry);
   const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
-  const recoveryLane = await acquireLane(f.targetRoot);
+  const recoveryLane = await acquireLane(f.targetRoot, recoveryPlan.runId);
   t.after(() =>
     recoveryLane.state === "active" ? recoveryLane.release() : undefined,
   );
@@ -2171,16 +2395,12 @@ test("recovery clears a stranded marker only after an existing terminal still ma
   });
   assert.equal(report.finalizationAction, "clear-marker");
   assert.equal(report.finalizationOutcome, "committed");
-  const recoveryPlan =
-    packRuntime.preparePackTransactionRecoveryFinalization({
-      report,
-      registry: selectedRegistry,
-    });
+  const recoveryPlan = prepareRecovery(report, selectedRegistry);
   assert.deepEqual(recoveryPlan.paths, [
     packRuntime.PACK_ACTIVE_TRANSACTION_PATH,
   ]);
   const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
-  const recoveryLane = await acquireLane(f.targetRoot);
+  const recoveryLane = await acquireLane(f.targetRoot, recoveryPlan.runId);
   t.after(() =>
     recoveryLane.state === "active" ? recoveryLane.release() : undefined,
   );
@@ -2274,13 +2494,9 @@ test("recovery-required terminal is resolved by a separate reconciliation record
   });
   assert.equal(report.finalizationAction, "append-reconciliation");
   assert.equal(report.finalizationOutcome, "committed");
-  const recoveryPlan =
-    packRuntime.preparePackTransactionRecoveryFinalization({
-      report,
-      registry: selectedRegistry,
-    });
+  const recoveryPlan = prepareRecovery(report, selectedRegistry);
   const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
-  const recoveryLane = await acquireLane(f.targetRoot);
+  const recoveryLane = await acquireLane(f.targetRoot, recoveryPlan.runId);
   t.after(() =>
     recoveryLane.state === "active" ? recoveryLane.release() : undefined,
   );
@@ -2373,18 +2589,10 @@ test("recovery rejects copied authority and settles a drifted report without wri
     maxDirectoryEntries: 1000,
   });
   assert.throws(
-    () =>
-      packRuntime.preparePackTransactionRecoveryFinalization({
-        report: structuredClone(report),
-        registry: selectedRegistry,
-      }),
+    () => prepareRecovery(structuredClone(report), selectedRegistry),
     expectPackError("pack-recovery-report-untrusted"),
   );
-  const recoveryPlan =
-    packRuntime.preparePackTransactionRecoveryFinalization({
-      report,
-      registry: selectedRegistry,
-    });
+  const recoveryPlan = prepareRecovery(report, selectedRegistry);
   assert.throws(
     () =>
       packRuntime.createPackRecoveryAuthorizationRequest({
@@ -2395,7 +2603,7 @@ test("recovery rejects copied authority and settles a drifted report without wri
     expectPackError("pack-recovery-plan-untrusted"),
   );
   const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
-  const recoveryLane = await acquireLane(f.targetRoot);
+  const recoveryLane = await acquireLane(f.targetRoot, recoveryPlan.runId);
   t.after(() =>
     recoveryLane.state === "active" ? recoveryLane.release() : undefined,
   );
@@ -2474,13 +2682,9 @@ test("recovery keeps the active barrier when state drifts after journal closure"
     },
     maxDirectoryEntries: 1000,
   });
-  const recoveryPlan =
-    packRuntime.preparePackTransactionRecoveryFinalization({
-      report,
-      registry: selectedRegistry,
-    });
+  const recoveryPlan = prepareRecovery(report, selectedRegistry);
   const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
-  const recoveryLane = await acquireLane(f.targetRoot);
+  const recoveryLane = await acquireLane(f.targetRoot, recoveryPlan.runId);
   t.after(() =>
     recoveryLane.state === "active" ? recoveryLane.release() : undefined,
   );
@@ -2570,13 +2774,9 @@ test("recovery restores the barrier when post-clear verification detects drift",
     },
     maxDirectoryEntries: 1000,
   });
-  const recoveryPlan =
-    packRuntime.preparePackTransactionRecoveryFinalization({
-      report,
-      registry: selectedRegistry,
-    });
+  const recoveryPlan = prepareRecovery(report, selectedRegistry);
   const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
-  const recoveryLane = await acquireLane(f.targetRoot);
+  const recoveryLane = await acquireLane(f.targetRoot, recoveryPlan.runId);
   t.after(() =>
     recoveryLane.state === "active" ? recoveryLane.release() : undefined,
   );

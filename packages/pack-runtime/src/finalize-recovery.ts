@@ -371,7 +371,7 @@ export async function finalizePackTransactionRecovery(
     await assertForwardAuthority(authority);
     freshReport = await inspectPackTransactionRecovery({
       root: planInternals.reportInternals.root,
-      runId: plan.runId,
+      runId: plan.transactionRunId,
       project: {
         id: plan.project.id,
         identityDigest: plan.project.identityDigest,
@@ -494,7 +494,7 @@ export async function finalizePackTransactionRecovery(
         freshInternals.root,
         maxDirectoryEntries,
       );
-      const terminalPath = packTransactionRecordPath(plan.runId, 1);
+      const terminalPath = packTransactionRecordPath(plan.transactionRunId, 1);
       tracker.touchedPaths.add(terminalPath);
       tracker.changedBytes += serializePackTransactionRecord(terminal).byteLength;
       journalRecordDigest = terminal.recordDigest;
@@ -504,7 +504,7 @@ export async function finalizePackTransactionRecovery(
       if (terminal === undefined) {
         throw new PackRuntimeError(
           "pack-recovery-stale",
-          packTransactionRecordPath(plan.runId, 1),
+          packTransactionRecordPath(plan.transactionRunId, 1),
           "recovery-required terminal disappeared before reconciliation",
         );
       }
@@ -517,7 +517,10 @@ export async function finalizePackTransactionRecovery(
         freshInternals.root,
         maxDirectoryEntries,
       );
-      const reconciliationPath = packTransactionRecordPath(plan.runId, 2);
+      const reconciliationPath = packTransactionRecordPath(
+        plan.transactionRunId,
+        2,
+      );
       tracker.touchedPaths.add(reconciliationPath);
       tracker.changedBytes +=
         serializePackTransactionRecord(reconciliation).byteLength;
@@ -527,7 +530,7 @@ export async function finalizePackTransactionRecovery(
     await assertForwardAuthority(authority);
     const beforeClear = await inspectPackTransactionRecovery({
       root: freshInternals.root,
-      runId: plan.runId,
+      runId: plan.transactionRunId,
       project: {
         id: plan.project.id,
         identityDigest: plan.project.identityDigest,
@@ -605,7 +608,7 @@ export async function finalizePackTransactionRecovery(
     await assertForwardAuthority(authority);
     finalReport = await inspectPackTransactionRecovery({
       root: freshInternals.root,
-      runId: plan.runId,
+      runId: plan.transactionRunId,
       project: {
         id: plan.project.id,
         identityDigest: plan.project.identityDigest,

@@ -89,6 +89,10 @@ import {
   packOperationCommandInputSchema,
   packOperationCommandOutputSchema,
 } from "./pack-operation-command-contracts.js";
+import {
+  packRecoveryCommandInputSchema,
+  packRecoveryCommandOutputSchema,
+} from "./pack-recovery-command-contracts.js";
 import { projectPackLockSchema } from "./project-pack-lock-contracts.js";
 import {
   projectInitializationCommandInputSchema,
@@ -146,6 +150,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "pack-list-request": packListRequestSchema,
     "pack-operation-input": packOperationCommandInputSchema,
     "pack-operation-output": packOperationCommandOutputSchema,
+    "pack-recovery-input": packRecoveryCommandInputSchema,
+    "pack-recovery-output": packRecoveryCommandOutputSchema,
     "project-inspect-report": projectInspectReportSchema,
     "project-inspect-request": projectInspectRequestSchema,
     "project-initialization-command-input":

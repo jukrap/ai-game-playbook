@@ -21,6 +21,8 @@ All nine commands avoid project writes, engine launch, editor control, network a
 
 The repository also contains typed contracts, one validated registry, and bounded project, process, permission, and workflow primitives. Receipt, artifact, managed-pack, MCP, and host-setup foundations are present too. Private initialization can create or retain a fixed control layout and the non-owned shared `.agents/skills` parent with rollback and durable evidence. The twelve packaged skills are bound to one digest-checked experimental pack. Its private add lifecycle now covers exact install approval, stale-plan revalidation, one project-write lane, compare-and-swap ownership, checkpoints, receipts, content-addressed terminal transaction evidence, rollback, and recovery barriers. These pieces are foundations unless a public command above exposes them.
 
+Internal recovery finalization now uses a recovery-run identity separate from the original pack transaction. It requires fresh approval, revalidates the transaction under one project-write lane, and returns success only when journal closure, content-addressed closure evidence, a `RunReceipt`, and the terminal workflow checkpoint agree. If evidence retention fails after the transaction closes, no success is returned and the started checkpoint remains for later reconciliation. The runtime does not retry that mutation.
+
 ## What is not available
 
 There is no installable or published package. The following product capabilities do not exist yet:

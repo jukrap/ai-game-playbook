@@ -59,6 +59,8 @@ export type {
   FinalizePackTransactionRecoveryRequest,
   PackRecoveryFinalizationResult,
 } from "./finalize-recovery.js";
+export { dispatchPreparedPackRecoveryFinalization } from "./recovery-workflow-execute.js";
+export type { DispatchPreparedPackRecoveryFinalizationRequest } from "./recovery-workflow-execute.js";
 export {
   computeInstalledPackStateDigest,
   createEmptyInstalledPackState,

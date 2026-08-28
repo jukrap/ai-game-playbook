@@ -29,6 +29,11 @@ import {
   PACK_OPERATION_COMMAND_IDS,
   packOperationCommandInputSchema,
   packOperationCommandOutputSchema,
+  PACK_RECOVERY_COMMAND_ID,
+  PACK_RECOVERY_WORKFLOW_ID,
+  PACK_RECOVERY_WORKFLOW_STEP_ID,
+  packRecoveryCommandInputSchema,
+  packRecoveryCommandOutputSchema,
   parseSemanticVersion,
   parseSha256Digest,
   parseStableId,
@@ -130,6 +135,10 @@ const PACK_ADD_MAX_CHANGED_FILES = 512;
 const PACK_ADD_MAX_CHANGED_BYTES = 16_777_216;
 const PACK_ADD_MAX_DURATION_MS = 30_000;
 const PACK_ADD_MAX_OUTPUT_BYTES = 1_048_576;
+const PACK_RECOVERY_MAX_CHANGED_FILES = 512;
+const PACK_RECOVERY_MAX_CHANGED_BYTES = 4_194_304;
+const PACK_RECOVERY_MAX_DURATION_MS = 30_000;
+const PACK_RECOVERY_MAX_OUTPUT_BYTES = 65_536;
 
 const packAddCommand: CommandDescriptor = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
@@ -180,6 +189,60 @@ const packAddCommand: CommandDescriptor = Object.freeze({
     export: "dispatchPreparedPackOperation",
     digest: parseSha256Digest(
       "sha256:0203782c1531c4e9b1754139bb766694c58d438e5c012bef2d18bd236a5f0584",
+    ),
+  }),
+});
+
+const packRecoveryCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: PACK_RECOVERY_COMMAND_ID,
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Finalize one separately approved managed pack recovery and retain its evidence.",
+  cli: Object.freeze({
+    path: Object.freeze(["internal", "pack", "recover"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: packRecoveryCommandInputSchema.schemaId,
+    digest: packRecoveryCommandInputSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: packRecoveryCommandOutputSchema.schemaId,
+    digest: packRecoveryCommandOutputSchema.digest,
+  }),
+  capabilities: Object.freeze([PACK_RECOVERY_COMMAND_ID]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>(["install"]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "filesystem",
+      scope: "managed-pack-recovery",
+      boundary: "local",
+    }),
+  ]),
+  lane: "project-write",
+  timeoutMs: PACK_RECOVERY_MAX_DURATION_MS,
+  cancellation: Object.freeze({ mode: "cooperative", graceMs: 1_000 }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: PACK_RECOVERY_MAX_CHANGED_FILES,
+    maxChangedBytes: PACK_RECOVERY_MAX_CHANGED_BYTES,
+    maxDurationMs: PACK_RECOVERY_MAX_DURATION_MS,
+    maxOutputBytes: PACK_RECOVERY_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([
+    parseStableId("pack-recovery"),
+    parseStableId("run-receipt"),
+    parseStableId("workflow-checkpoint"),
+  ]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/pack-runtime",
+    export: "dispatchPreparedPackRecoveryFinalization",
+    digest: parseSha256Digest(
+      "sha256:32df6ba1507cc6770e863ae67e3eead1c5f932da7465e71ec1d94cfff627b882",
     ),
   }),
 });
@@ -1613,6 +1676,47 @@ const packAddWorkflow: WorkflowDescriptor = Object.freeze({
   ]),
 });
 
+const packRecoveryWorkflow: WorkflowDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: PACK_RECOVERY_WORKFLOW_ID,
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Execute and retain evidence for one approved managed pack recovery closure.",
+  input: Object.freeze({
+    schemaId: packRecoveryCommandInputSchema.schemaId,
+    digest: packRecoveryCommandInputSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: packRecoveryCommandOutputSchema.schemaId,
+    digest: packRecoveryCommandOutputSchema.digest,
+  }),
+  supportedStages: supportedStages(),
+  steps: Object.freeze([
+    Object.freeze({
+      id: PACK_RECOVERY_WORKFLOW_STEP_ID,
+      commandId: PACK_RECOVERY_COMMAND_ID,
+      dependsOn: Object.freeze([]),
+      onFailure: "stop" as const,
+      approvalCheckpoint: true,
+    }),
+  ]),
+  budgets: Object.freeze({
+    maxChangedFiles: PACK_RECOVERY_MAX_CHANGED_FILES,
+    maxChangedBytes: PACK_RECOVERY_MAX_CHANGED_BYTES,
+    maxDurationMs: PACK_RECOVERY_MAX_DURATION_MS,
+    maxOutputBytes: PACK_RECOVERY_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  resumePolicy: "never",
+  terminalOracle:
+    "The exact pack journal closure, run receipt and workflow checkpoint agree, or execution evidence remains uncertain without retry.",
+  requiredEvidence: Object.freeze([
+    parseStableId("pack-recovery"),
+    parseStableId("run-receipt"),
+  ]),
+});
+
 const definition: RegistryDefinition = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   controlPlaneVersion: parseSemanticVersion("0.0.0").value,
@@ -1641,6 +1745,8 @@ const definition: RegistryDefinition = Object.freeze({
     packListReportSchema,
     packOperationCommandInputSchema,
     packOperationCommandOutputSchema,
+    packRecoveryCommandInputSchema,
+    packRecoveryCommandOutputSchema,
     processContainmentAssessmentRequestSchema,
     processContainmentAssessmentReportSchema,
     projectInitializationCommandInputSchema,
@@ -1667,6 +1773,7 @@ const definition: RegistryDefinition = Object.freeze({
     packAddCommand,
     packDoctorCommand,
     packListCommand,
+    packRecoveryCommand,
     projectInitializationRecoveryAssessmentCommand,
     projectInitializationCommand,
     projectInspectCommand,
@@ -1678,6 +1785,7 @@ const definition: RegistryDefinition = Object.freeze({
   workflows: Object.freeze([
     godotHeadlessPreflightWorkflow,
     packAddWorkflow,
+    packRecoveryWorkflow,
     projectInitializationWorkflow,
   ]),
   packs: Object.freeze([projectSkillsPack]),

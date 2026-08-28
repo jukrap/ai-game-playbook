@@ -102,6 +102,20 @@ export type {
   PackOperationCommandOutput,
 } from "./pack-operation-command-contracts.js";
 export {
+  PACK_RECOVERY_COMMAND_ID,
+  PACK_RECOVERY_WORKFLOW_ID,
+  PACK_RECOVERY_WORKFLOW_STEP_ID,
+  packRecoveryCommandInputSchema,
+  packRecoveryCommandOutputSchema,
+} from "./pack-recovery-command-contracts.js";
+export type {
+  PackRecoveryCommandAction,
+  PackRecoveryCommandInput,
+  PackRecoveryCommandOutcome,
+  PackRecoveryCommandOutput,
+  PackRecoveryCommandStatus,
+} from "./pack-recovery-command-contracts.js";
+export {
   PROJECT_PACK_LOCK_MAX_DEPENDENCIES,
   PROJECT_PACK_LOCK_MAX_PACKS,
   assertProjectPackLockSemantics,

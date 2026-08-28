@@ -34,7 +34,7 @@ The control plane now defines an internal, host-neutral `ApprovalPrompt` contrac
 
 The prompt has no field for raw command input, an absolute project root, credentials, a signature, or an approval key. Its digest detects changes to the displayed authority but is not itself permission to execute. A validated serialized copy can be rendered, but only the original in-process prompt remains linked to the broker challenge that can produce an unsigned grant subject. The resulting grant still requires a trusted signature and exact broker validation.
 
-No public command currently renders this prompt or accepts an approval. Public installation and other mutation routes remain unavailable until cancellation and recovery are also exposed through bounded contracts.
+No public command currently renders this prompt or accepts an approval. Internal pack recovery has bounded cancellation and durable closure, but public installation and recovery remain unavailable until a host approval path and generic reconciliation for incomplete workflow evidence exist.
 
 ## Stop conditions
 
@@ -57,6 +57,14 @@ Project paths are canonicalized and checked against one bound root. Linked paths
 Managed packs declare exact owned files and directories. Stable installed state is committed last. Clear failure rolls back confirmed writes in reverse order; uncertain effects preserve the transaction marker for inspection. Removal must not touch unowned files.
 
 The current `pack list`, `pack doctor`, `skill check`, and `init` commands only inspect or plan these states.
+
+## Internal recovery closure
+
+One internal workflow can finalize an already inspected managed-pack transaction. The recovery execution has its own run identity; it never reuses the transaction identity for approval, lane ownership, checkpoints, or receipts. The original transaction identity remains bound to its journal and active marker.
+
+The runtime revalidates the exact report before admission, persists a started checkpoint before the effect, and promotes the actual terminal or reconciliation record into content-addressed evidence. Success requires that closure record, its receipt, and the terminal checkpoint to agree. A failure after the side-effect boundary is uncertain: it returns no success, preserves the started checkpoint, releases the lane, and does not retry automatically.
+
+This workflow is internal. It does not make `pack add`, `pack update`, `pack remove`, skill installation, or recovery available through CLI or MCP.
 
 ## Processes and editors
 

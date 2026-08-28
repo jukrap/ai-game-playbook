@@ -1,8 +1,8 @@
 import {
+  PACK_RECOVERY_COMMAND_ID,
   canonicalizeJson,
   digestCanonicalJson,
   type ExecutionBudgets,
-  type StableId,
 } from "@ai-game-playbook/contracts";
 import {
   assertAuthorizedPermissionDecision,
@@ -30,8 +30,6 @@ import {
 
 type MutableRecord = Record<string, unknown>;
 
-const PACK_RECOVERY_COMMAND_ID = "pack.recover" as StableId;
-
 const BUDGET_REQUIRED_KEYS = Object.freeze([
   "maxDurationMs",
   "maxOutputBytes",
@@ -55,6 +53,11 @@ export interface CreatePackRecoveryAuthorizationRequest {
 export interface ValidatedPackRecoveryAuthority {
   readonly authorization: AuthorizedPermissionDecision;
   readonly lane: ProjectLaneLease;
+  readonly request: PermissionAuthorizationRequest;
+}
+
+export interface ValidatedPackRecoveryAuthorization {
+  readonly authorization: AuthorizedPermissionDecision;
   readonly request: PermissionAuthorizationRequest;
 }
 
@@ -168,6 +171,11 @@ export function createPackRecoveryAuthorizationRequest(
     projectIdentityDigest: plan.project.identityDigest,
     commandId: PACK_RECOVERY_COMMAND_ID,
     input: createPackRecoveryCommandInput(plan),
+    workflow: Object.freeze({
+      id: plan.workflow.id,
+      stepId: plan.workflow.stepId,
+      resolvedPlanDigest: plan.workflow.resolvedPlanDigest,
+    }),
     scope: Object.freeze({
       paths: plan.paths,
       objectIds: Object.freeze([]),
@@ -185,11 +193,10 @@ function authorizationInvalid(path: string, message: string): never {
   throw new PackRuntimeError("pack-authorization-invalid", path, message);
 }
 
-export async function validatePackRecoveryAuthority(
+export function validatePackRecoveryAuthorization(
   plan: PreparedPackRecoveryFinalization,
   authorizationValue: unknown,
-  laneValue: unknown,
-): Promise<ValidatedPackRecoveryAuthority> {
+): ValidatedPackRecoveryAuthorization {
   const internals = internalsForPreparedPackRecoveryFinalization(plan);
   let authorization: AuthorizedPermissionDecision;
   try {
@@ -201,19 +208,8 @@ export async function validatePackRecoveryAuthority(
       "recovery authorization must be produced by the active broker process",
     );
   }
-  let lane: ProjectLaneLease;
-  try {
-    assertProjectLaneLease(laneValue);
-    lane = laneValue;
-  } catch {
-    throw new PackRuntimeError(
-      "pack-lane-invalid",
-      "$request.lane",
-      "recovery lane must be produced by the active core process",
-    );
-  }
   const command = internals.registry.commands.find(
-    ({ id }) => id === "pack.recover",
+    ({ id }) => id === PACK_RECOVERY_COMMAND_ID,
   );
   if (command === undefined) {
     authorizationInvalid(
@@ -242,7 +238,10 @@ export async function validatePackRecoveryAuthority(
     challenge.permissions[0]?.permission !== "install" ||
     challenge.permissions[0]?.mode !== "approval-required" ||
     challenge.feature !== undefined ||
-    challenge.workflow !== undefined ||
+    challenge.workflow === undefined ||
+    expected.workflow === undefined ||
+    canonicalizeJson(challenge.workflow) !==
+      canonicalizeJson(expected.workflow) ||
     challenge.editorSessionIdentityDigest !== undefined ||
     canonicalizeJson(challenge.scope) !== canonicalizeJson(expected.scope) ||
     authorization.lease.requestDigest !== challenge.requestDigest ||
@@ -252,6 +251,25 @@ export async function validatePackRecoveryAuthority(
     authorizationInvalid(
       "$request.authorization",
       "authorization is not exactly bound to the recovery finalization plan",
+    );
+  }
+  return Object.freeze({ authorization, request: expected });
+}
+
+export async function validatePackRecoveryLane(
+  plan: PreparedPackRecoveryFinalization,
+  laneValue: unknown,
+): Promise<ProjectLaneLease> {
+  internalsForPreparedPackRecoveryFinalization(plan);
+  let lane: ProjectLaneLease;
+  try {
+    assertProjectLaneLease(laneValue);
+    lane = laneValue;
+  } catch {
+    throw new PackRuntimeError(
+      "pack-lane-invalid",
+      "$request.lane",
+      "recovery lane must be produced by the active core process",
     );
   }
   if (
@@ -280,5 +298,18 @@ export async function validatePackRecoveryAuthority(
         : false,
     );
   }
-  return Object.freeze({ authorization, lane, request: expected });
+  return lane;
+}
+
+export async function validatePackRecoveryAuthority(
+  plan: PreparedPackRecoveryFinalization,
+  authorizationValue: unknown,
+  laneValue: unknown,
+): Promise<ValidatedPackRecoveryAuthority> {
+  const validated = validatePackRecoveryAuthorization(
+    plan,
+    authorizationValue,
+  );
+  const lane = await validatePackRecoveryLane(plan, laneValue);
+  return Object.freeze({ ...validated, lane });
 }

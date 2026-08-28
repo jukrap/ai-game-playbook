@@ -13,7 +13,7 @@ The repository now has:
 - project, pack, skill, and static Godot inspection;
 - twelve packaged capability-first skills;
 - a bounded read-only MCP runtime and write-free host setup planning;
-- private permission, workflow, checkpoint, receipt, artifact, managed skill-add and recovery closure, initialization, and Godot preflight foundations;
+- private permission, workflow, checkpoint, receipt, artifact, managed skill-add, recovery closure, finite evidence reconciliation, initialization, and Godot preflight foundations;
 - paired English and Korean public documentation with structural checks.
 
 This checkpoint does not include an installable package or a live engine loop.
@@ -22,11 +22,11 @@ This checkpoint does not include an installable package or a live engine loop.
 
 - expose approved initialization and skill materialization through a stable public approval boundary;
 - carry the existing fresh-plan, project-write lane, compare-and-swap, durable checkpoint, receipt, rollback, and recovery rules through that public boundary;
-- reconcile a transaction that closed before its receipt or terminal checkpoint without replaying the mutation;
+- carry the finite internal pack-recovery reconciliation path through the public approval and evidence boundary, then add providers only for explicitly proved effect domains;
 - expose managed pack add, update, remove, and recovery only after the same lifecycle passes conflict and interruption tests;
 - design public evidence list, show, and explicit export with redaction and retention rules.
 
-Public mutation stays closed until unknown effects can be reconciled safely.
+Public mutation stays closed until the host approval path, evidence inspection, and interruption behavior are verified through the public boundary.
 
 ## Stage 2: Godot alpha
 

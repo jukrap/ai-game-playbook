@@ -85,6 +85,21 @@ export interface WorkflowCheckpointBudgetUsage {
   };
 }
 
+export interface WorkflowCheckpointReconciliation {
+  readonly reconciliationRunId: string;
+  readonly workflowId: StableId;
+  readonly resolvedPlanDigest: Sha256Digest;
+  readonly inputDigest: Sha256Digest;
+  readonly receiptDigest: Sha256Digest;
+  readonly proofKind: StableId;
+  readonly proofDigest: Sha256Digest;
+  readonly targetCheckpointHeadDigest: Sha256Digest;
+  readonly targetReceiptState: "missing" | "present";
+  readonly targetReceiptDigest?: Sha256Digest;
+  readonly outcome: "failed" | "succeeded";
+  readonly reconciledAt: string;
+}
+
 export interface WorkflowCheckpointRecord {
   readonly schemaVersion: SemanticVersion;
   readonly checkpointId: string;
@@ -113,6 +128,7 @@ export interface WorkflowCheckpointRecord {
   readonly evidenceKinds: readonly StableId[];
   readonly artifactDigests: readonly Sha256Digest[];
   readonly receiptChainHead?: Sha256Digest;
+  readonly reconciliation?: WorkflowCheckpointReconciliation;
   readonly dirtyStateDigest?: Sha256Digest;
   readonly sessionIdentityDigest?: Sha256Digest;
   readonly createdAt: string;
@@ -277,6 +293,57 @@ const checkpointBudgetUsage = closedObject(
   ["durationMs", "outputBytes", "changedFiles", "changedBytes", "repairCycles"],
 );
 
+const checkpointReconciliationRoot = closedObject(
+  {
+    reconciliationRunId: reference("uuid"),
+    workflowId: reference("stableId"),
+    resolvedPlanDigest: reference("sha256Digest"),
+    inputDigest: reference("sha256Digest"),
+    receiptDigest: reference("sha256Digest"),
+    proofKind: reference("stableId"),
+    proofDigest: reference("sha256Digest"),
+    targetCheckpointHeadDigest: reference("sha256Digest"),
+    targetReceiptState: enumSchema(["missing", "present"]),
+    targetReceiptDigest: reference("sha256Digest"),
+    outcome: enumSchema(["failed", "succeeded"]),
+    reconciledAt: reference("timestamp"),
+  },
+  [
+    "reconciliationRunId",
+    "workflowId",
+    "resolvedPlanDigest",
+    "inputDigest",
+    "receiptDigest",
+    "proofKind",
+    "proofDigest",
+    "targetCheckpointHeadDigest",
+    "targetReceiptState",
+    "outcome",
+    "reconciledAt",
+  ],
+);
+
+const checkpointReconciliation = {
+  ...checkpointReconciliationRoot,
+  allOf: [
+    {
+      if: {
+        type: "object",
+        properties: { targetReceiptState: { const: "present" } },
+        required: ["targetReceiptState"],
+      },
+      then: {
+        type: "object",
+        properties: {
+          targetReceiptDigest: reference("sha256Digest"),
+        },
+        required: ["targetReceiptDigest"],
+      },
+      else: { properties: { targetReceiptDigest: false } },
+    },
+  ],
+};
+
 const checkpointRoot = contractRoot(
   {
     schemaVersion: reference("semanticVersion"),
@@ -311,6 +378,7 @@ const checkpointRoot = contractRoot(
       unique: true,
     }),
     receiptChainHead: reference("sha256Digest"),
+    reconciliation: checkpointReconciliation,
     dirtyStateDigest: reference("sha256Digest"),
     sessionIdentityDigest: reference("sha256Digest"),
     createdAt: reference("timestamp"),

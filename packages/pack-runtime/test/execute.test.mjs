@@ -4,6 +4,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  rename,
   rm,
   watch,
   writeFile,
@@ -82,6 +83,10 @@ const packOperationOutputSchema = contracts.defineContractSchema({
 
 const packRecoveryInputSchema = contracts.packRecoveryCommandInputSchema;
 const packRecoveryOutputSchema = contracts.packRecoveryCommandOutputSchema;
+const workflowReconciliationInputSchema =
+  contracts.workflowReconciliationCommandInputSchema;
+const workflowReconciliationOutputSchema =
+  contracts.workflowReconciliationCommandOutputSchema;
 
 function currentOperatingSystem() {
   if (process.platform === "win32") return "windows";
@@ -311,6 +316,98 @@ function recoveryWorkflow() {
   };
 }
 
+function workflowReconciliationCommand(definition) {
+  const command = structuredClone(
+    definition.commands.find(({ id }) => id === "project.inspect"),
+  );
+  command.id = contracts.WORKFLOW_RECONCILIATION_COMMAND_ID;
+  command.version = "1.0.0";
+  command.lifecycle = "internal";
+  command.summary = "Accept complete evidence for one uncertain workflow.";
+  command.cli = {
+    path: ["internal", "workflow", "evidence-reconcile"],
+    aliases: [],
+  };
+  command.input = {
+    schemaId: workflowReconciliationInputSchema.schemaId,
+    digest: workflowReconciliationInputSchema.digest,
+  };
+  command.output = {
+    schemaId: workflowReconciliationOutputSchema.schemaId,
+    digest: workflowReconciliationOutputSchema.digest,
+  };
+  command.capabilities = [contracts.WORKFLOW_RECONCILIATION_COMMAND_ID];
+  command.permissions = ["write-project-metadata"];
+  command.sideEffects = [
+    {
+      kind: "filesystem",
+      scope: "workflow-evidence-reconciliation",
+      boundary: "local",
+    },
+  ];
+  command.lane = "project-write";
+  command.timeoutMs = 30_000;
+  command.retry = { mode: "never", maxAttempts: 1 };
+  command.budgets = {
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: 30_000,
+    maxOutputBytes: 65_536,
+    maxRepairCycles: 0,
+  };
+  command.requiredEvidence = ["run-receipt", "workflow-reconciliation"];
+  command.handler = {
+    package: "@ai-game-playbook/pack-runtime",
+    export: "dispatchPreparedPackRecoveryWorkflowReconciliation",
+    digest: `sha256:${"a".repeat(64)}`,
+  };
+  return command;
+}
+
+function workflowReconciliationWorkflow() {
+  return {
+    schemaVersion: "1.0.0",
+    id: contracts.WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+    version: "1.0.0",
+    lifecycle: "internal",
+    summary: "Retain one separately approved reconciliation receipt.",
+    input: {
+      schemaId: workflowReconciliationInputSchema.schemaId,
+      digest: workflowReconciliationInputSchema.digest,
+    },
+    output: {
+      schemaId: workflowReconciliationOutputSchema.schemaId,
+      digest: workflowReconciliationOutputSchema.digest,
+    },
+    supportedStages: [
+      "concept",
+      "risk-prototype",
+      "vertical-slice",
+      "stabilization",
+      "release-candidate",
+    ],
+    steps: [
+      {
+        id: contracts.WORKFLOW_RECONCILIATION_STEP_ID,
+        commandId: contracts.WORKFLOW_RECONCILIATION_COMMAND_ID,
+        dependsOn: [],
+        onFailure: "stop",
+        approvalCheckpoint: true,
+      },
+    ],
+    budgets: {
+      maxChangedFiles: 0,
+      maxChangedBytes: 0,
+      maxDurationMs: 30_000,
+      maxOutputBytes: 65_536,
+      maxRepairCycles: 0,
+    },
+    resumePolicy: "never",
+    terminalOracle: "The separate receipt and exact proof close the target.",
+    requiredEvidence: ["run-receipt", "workflow-reconciliation"],
+  };
+}
+
 function validatedRegistry(pack, operation = "add") {
   const { command, definition } = commandFor(operation);
   definition.schemas.push(
@@ -320,10 +417,19 @@ function validatedRegistry(pack, operation = "add") {
     packOperationOutputSchema,
     packRecoveryInputSchema,
     packRecoveryOutputSchema,
+    workflowReconciliationInputSchema,
+    workflowReconciliationOutputSchema,
     contracts.workflowCheckpointSchema,
   );
-  definition.commands.push(command, recoveryCommand(definition));
-  definition.workflows.push(recoveryWorkflow());
+  definition.commands.push(
+    command,
+    recoveryCommand(definition),
+    workflowReconciliationCommand(definition),
+  );
+  definition.workflows.push(
+    recoveryWorkflow(),
+    workflowReconciliationWorkflow(),
+  );
   definition.packs.push(pack);
   return registry.validateRegistry(definition);
 }
@@ -435,10 +541,18 @@ function budgets(overrides = {}) {
   };
 }
 
-function signedGrant(challenge, { approvedAt, expiresAt }) {
+function signedGrant(
+  challenge,
+  {
+    approvedAt,
+    expiresAt,
+    permission = "install",
+    grantId = "approval.pack.install",
+  },
+) {
   const subject = core.createApprovalGrantSubject(challenge, {
-    grantId: "approval.pack.install",
-    permission: "install",
+    grantId,
+    permission,
     approvedAt,
     expiresAt,
     maxUses: 1,
@@ -536,6 +650,237 @@ function authorizeRecovery(plan, selectedRegistry, options = {}) {
   ]);
   assert.equal(decision.status, "authorized");
   return { broker, decision, request };
+}
+
+function authorizeWorkflowReconciliation(plan, selectedRegistry, options = {}) {
+  const brokerNow = options.brokerNow ?? Date.now();
+  const deadlineAt =
+    options.deadlineAt ?? new Date(brokerNow + 30_000).toISOString();
+  const broker = core.createPermissionBroker({
+    registry: selectedRegistry,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+      stage: "vertical-slice",
+      budgets: budgets({
+        maxChangedFiles: 512,
+        maxChangedBytes: 16_777_216,
+        maxDurationMs: 900_000,
+      }),
+    },
+    trustedApprovalKeys: [
+      { keyId: "approval.local-key", publicKeyPem },
+    ],
+    now: options.now ?? Date.now,
+  });
+  const request =
+    packRuntime.createPackRecoveryWorkflowReconciliationAuthorizationRequest({
+      plan,
+      budgets: budgets({ maxChangedFiles: 0, maxChangedBytes: 0 }),
+      deadlineAt,
+    });
+  const pending = broker.authorize(request, []);
+  assert.equal(pending.status, "approval-required");
+  const decision = broker.authorize(request, [
+    signedGrant(pending.challenge, {
+      approvedAt: new Date(brokerNow - 60_000).toISOString(),
+      expiresAt: new Date(brokerNow + 600_000).toISOString(),
+      permission: "write-project-metadata",
+      grantId: "approval.workflow.reconcile",
+    }),
+  ]);
+  assert.equal(decision.status, "authorized");
+  return { broker, decision, request };
+}
+
+async function reconcileInterruptedRecovery({
+  f,
+  selectedRegistry,
+  recoveryPlan,
+  artifactObjectsDirectory,
+  expectedReceiptState = "missing",
+  expectedReceiptDigest,
+}) {
+  if (expectedReceiptState === "missing") {
+    await rm(artifactObjectsDirectory, { force: true });
+    await mkdir(artifactObjectsDirectory, { recursive: true });
+  }
+  const originalInput = packRuntime.createPackRecoveryCommandInput(recoveryPlan);
+  const reconciliationRunId = "018f6f35-2c9e-7d1a-8a4b-123456789ac2";
+  const reconciliationPlan =
+    await packRuntime.preparePackRecoveryWorkflowReconciliation({
+      projectRoot: f.project,
+      registry: selectedRegistry,
+      targetRunId: recoveryPlan.runId,
+      reconciliationRunId,
+      originalInput,
+    });
+  assert.equal(
+    reconciliationPlan.target.receiptState,
+    expectedReceiptState,
+  );
+  assert.equal(
+    reconciliationPlan.target.receiptDigest,
+    expectedReceiptDigest,
+  );
+  assert.equal(reconciliationPlan.targetOutcome, "succeeded");
+  assert.equal(reconciliationPlan.proof.kind, "pack-recovery");
+  assert.equal(
+    packRuntime.computePackRecoveryWorkflowReconciliationPlanDigest(
+      reconciliationPlan,
+    ),
+    reconciliationPlan.planDigest,
+  );
+  assert.deepEqual(
+    packRuntime.createWorkflowReconciliationCommandInput(reconciliationPlan),
+    {
+      schemaVersion: "1.0.0",
+      reconciliationRunId,
+      targetRunId: recoveryPlan.runId,
+      targetCheckpointDigest: reconciliationPlan.target.checkpointDigest,
+      targetCheckpointHeadDigest: reconciliationPlan.target.checkpointHeadDigest,
+      targetWorkflowId: contracts.PACK_RECOVERY_WORKFLOW_ID,
+      targetResolvedPlanDigest: reconciliationPlan.target.resolvedPlanDigest,
+      targetCommandId: contracts.PACK_RECOVERY_COMMAND_ID,
+      targetInputDigest: reconciliationPlan.target.inputDigest,
+      targetReceiptState: expectedReceiptState,
+      ...(expectedReceiptDigest === undefined
+        ? {}
+        : { targetReceiptDigest: expectedReceiptDigest }),
+      proofKind: "pack-recovery",
+      proofDigest: reconciliationPlan.proof.digest,
+      targetOutcome: "succeeded",
+      planDigest: reconciliationPlan.planDigest,
+    },
+  );
+  const proofPath = join(
+    f.project,
+    ...reconciliationPlan.proof.path.split("/"),
+  );
+  const proofBefore = await readFile(proofPath);
+  const rejectedAuthority = authorizeWorkflowReconciliation(
+    reconciliationPlan,
+    selectedRegistry,
+  );
+  await assert.rejects(
+    packRuntime.dispatchPreparedPackRecoveryWorkflowReconciliation({
+      plan: structuredClone(reconciliationPlan),
+      authorization: rejectedAuthority.decision,
+      signal: null,
+    }),
+    expectPackError("pack-workflow-reconciliation-plan-untrusted"),
+  );
+  assert.equal(rejectedAuthority.decision.lease.state, "active");
+  const cancelled = new AbortController();
+  cancelled.abort();
+  await assert.rejects(
+    packRuntime.dispatchPreparedPackRecoveryWorkflowReconciliation({
+      plan: reconciliationPlan,
+      authorization: rejectedAuthority.decision,
+      signal: cancelled.signal,
+    }),
+    expectPackError("pack-operation-cancelled"),
+  );
+
+  const reconciliationAuthority = authorizeWorkflowReconciliation(
+    reconciliationPlan,
+    selectedRegistry,
+  );
+  assert.deepEqual(reconciliationAuthority.request.budgets, {
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: 30_000,
+    maxOutputBytes: 65_536,
+    maxRepairCycles: 0,
+  });
+  const reconciled =
+    await packRuntime.dispatchPreparedPackRecoveryWorkflowReconciliation({
+      plan: reconciliationPlan,
+      authorization: reconciliationAuthority.decision,
+      signal: null,
+    });
+  assert.equal(reconciled.status, "reconciled");
+  assert.equal(reconciled.targetRunId, recoveryPlan.runId);
+  assert.equal(reconciled.reconciliationRunId, reconciliationRunId);
+  assert.equal(reconciled.targetOutcome, "succeeded");
+  assert.equal(reconciled.mutationReplayed, false);
+  assert.deepEqual(await readFile(proofPath), proofBefore);
+
+  const reconciledTarget = await core.loadWorkflowCheckpoint({
+    root: f.targetRoot,
+    registry: selectedRegistry,
+    runId: recoveryPlan.runId,
+    project: {
+      id: recoveryPlan.project.id,
+      identityDigest: recoveryPlan.project.identityDigest,
+      rootIdentityDigest: recoveryPlan.project.rootIdentityDigest,
+      stage: recoveryPlan.workflow.projectStage,
+    },
+    inputDigest: contracts.digestCanonicalJson(originalInput),
+  });
+  assert.equal(reconciledTarget.checkpoint.status, "succeeded");
+  assert.equal(reconciledTarget.checkpoint.inFlight, undefined);
+  assert.deepEqual(reconciledTarget.checkpoint.attempts, []);
+  assert.equal(reconciledTarget.checkpoint.receiptChainHead, undefined);
+  assert.equal(
+    reconciledTarget.checkpoint.reconciliation.reconciliationRunId,
+    reconciliationRunId,
+  );
+  assert.equal(
+    reconciledTarget.checkpoint.reconciliation.receiptDigest,
+    reconciled.reconciliationReceiptDigest,
+  );
+  assert.equal(
+    reconciledTarget.checkpoint.reconciliation.proofDigest,
+    reconciliationPlan.proof.digest,
+  );
+  assert.equal(
+    reconciledTarget.checkpoint.reconciliation.targetReceiptState,
+    expectedReceiptState,
+  );
+  assert.equal(
+    reconciledTarget.checkpoint.reconciliation.targetReceiptDigest,
+    expectedReceiptDigest,
+  );
+  assert.deepEqual(reconciledTarget.checkpoint.evidenceKinds, [
+    "pack-recovery",
+    "run-receipt",
+    "workflow-reconciliation",
+  ]);
+
+  const reconciliationReceipts = await core.loadRunReceiptChain({
+    root: f.targetRoot,
+    registry: selectedRegistry,
+    runId: reconciliationRunId,
+    projectId: reconciliationPlan.project.id,
+    projectIdentityDigest: reconciliationPlan.project.rootIdentityDigest,
+    workflowId: reconciliationPlan.workflow.id,
+    resolvedPlanDigest: reconciliationPlan.workflow.resolvedPlanDigest,
+    maxArtifactBytes: packRuntime.PACK_TRANSACTION_MAX_RECORD_BYTES,
+  });
+  assert.equal(reconciliationReceipts.receipts.length, 1);
+  assert.equal(reconciliationReceipts.stored.receipt.status, "succeeded");
+  assert.equal(reconciliationReceipts.stored.receipt.mutation.status, "none");
+  assert.deepEqual(reconciliationReceipts.stored.receipt.effects.changedPaths, []);
+  assert.equal(
+    reconciliationReceipts.stored.receipt.artifacts[0].digest,
+    reconciliationPlan.proof.digest,
+  );
+  const targetReceiptQuery = await core.queryRunReceiptHeads({
+    root: f.targetRoot,
+    registry: selectedRegistry,
+    maxEntries: core.RUN_RECEIPT_QUERY_MAX_ENTRIES,
+    maxHeads: core.RUN_RECEIPT_QUERY_MAX_HEADS,
+    maxTotalHeadBytes: core.RUN_RECEIPT_QUERY_MAX_TOTAL_HEAD_BYTES,
+  });
+  assert.equal(
+    targetReceiptQuery.heads.some(({ runId: id }) => id === recoveryPlan.runId),
+    expectedReceiptState === "present",
+  );
+  assert.equal(
+    (await core.inspectProjectLane({ root: f.targetRoot })).status,
+    "free",
+  );
 }
 
 async function acquireLane(root, selectedRunId = runId) {
@@ -2162,6 +2507,7 @@ test("durable recovery dispatch retains checkpoint, receipt, and closure artifac
     (await core.inspectProjectLane({ root: f.targetRoot })).status,
     "free",
   );
+
 });
 
 test("durable recovery dispatch retains a started checkpoint when evidence promotion fails", async (t) => {
@@ -2273,6 +2619,161 @@ test("durable recovery dispatch retains a started checkpoint when evidence promo
     (await core.inspectProjectLane({ root: f.targetRoot })).status,
     "free",
   );
+  await reconcileInterruptedRecovery({
+    f,
+    selectedRegistry,
+    recoveryPlan,
+    artifactObjectsDirectory,
+  });
+});
+
+test("durable recovery reconciliation accepts one detached successful receipt after terminal checkpoint interruption", async (t) => {
+  const f = await fixture(t);
+  await ensureDurableStores(f);
+  const pack = manifest(f.content);
+  const selectedRegistry = validatedRegistry(pack);
+  const plan = await packRuntime.preparePackOperation(
+    prepareRequest(f, selectedRegistry, pack),
+  );
+  const executionAuthority = authorize(plan, selectedRegistry);
+  const executionLane = await acquireLane(f.targetRoot);
+  t.after(() =>
+    executionLane.state === "active" ? executionLane.release() : undefined,
+  );
+  assert.equal(
+    (await packRuntime.executePreparedPackOperation({
+      plan,
+      authorization: executionAuthority.decision,
+      lane: executionLane,
+    })).status,
+    "succeeded",
+  );
+  await executionLane.release();
+  await reopenAsStartedOnly(f);
+
+  const report = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  const interruptedRunId = "018f6f35-2c9e-7d1a-8a4b-123456789ac3";
+  const recoveryPlan = prepareRecovery(
+    report,
+    selectedRegistry,
+    interruptedRunId,
+  );
+  const recoveryAuthority = authorizeRecovery(recoveryPlan, selectedRegistry);
+  const workflowStoreDirectory = join(
+    f.project,
+    ...core.WORKFLOW_CHECKPOINT_STORE_PATH.split("/"),
+  );
+  const headFilename = `${recoveryPlan.runId}.head.json`;
+  const headPath = join(workflowStoreDirectory, headFilename);
+  const headBackupPath = `${headPath}.interrupted`;
+  const receiptStoreDirectory = join(
+    f.project,
+    ...core.RUN_RECEIPT_STORE_PATH.split("/"),
+  );
+  let headBlocked = false;
+  const blockTerminalCheckpoint = (async () => {
+    const watcher = watch(receiptStoreDirectory, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    for await (const event of watcher) {
+      const filename = event.filename?.toString() ?? "";
+      if (
+        !filename.startsWith(`${recoveryPlan.runId}.`) ||
+        !filename.endsWith(".receipt.json")
+      ) {
+        continue;
+      }
+      break;
+    }
+    await rename(headPath, headBackupPath);
+    await mkdir(headPath);
+    headBlocked = true;
+  })();
+
+  try {
+    await assert.rejects(
+      packRuntime.dispatchPreparedPackRecoveryFinalization({
+        plan: recoveryPlan,
+        authorization: recoveryAuthority.decision,
+        signal: null,
+      }),
+      (error) =>
+        error?.name === "CoreBoundaryError" &&
+        error?.code === "workflow-dispatch-evidence-failed" &&
+        error?.path === "$checkpoint.terminal" &&
+        error?.mutationUncertain === true,
+    );
+    await blockTerminalCheckpoint;
+  } finally {
+    if (!headBlocked) await blockTerminalCheckpoint.catch(() => undefined);
+    if (headBlocked) {
+      await rm(headPath, { recursive: true, force: true });
+      await rename(headBackupPath, headPath);
+    }
+  }
+  assert.equal(recoveryAuthority.decision.lease.state, "settled");
+
+  const originalInput = packRuntime.createPackRecoveryCommandInput(recoveryPlan);
+  const checkpoint = await core.loadWorkflowCheckpoint({
+    root: f.targetRoot,
+    registry: selectedRegistry,
+    runId: recoveryPlan.runId,
+    project: {
+      id: recoveryPlan.project.id,
+      identityDigest: recoveryPlan.project.identityDigest,
+      rootIdentityDigest: recoveryPlan.project.rootIdentityDigest,
+      stage: recoveryPlan.workflow.projectStage,
+    },
+    inputDigest: contracts.digestCanonicalJson(originalInput),
+  });
+  assert.equal(checkpoint.checkpoint.status, "running");
+  assert.equal(checkpoint.checkpoint.inFlight.sideEffect, "started");
+  assert.equal(checkpoint.checkpoint.receiptChainHead, undefined);
+
+  const receipts = await core.loadRunReceiptChain({
+    root: f.targetRoot,
+    registry: selectedRegistry,
+    runId: recoveryPlan.runId,
+    projectId: recoveryPlan.project.id,
+    projectIdentityDigest: recoveryPlan.project.rootIdentityDigest,
+    workflowId: recoveryPlan.workflow.id,
+    resolvedPlanDigest: recoveryPlan.workflow.resolvedPlanDigest,
+    maxArtifactBytes: packRuntime.PACK_TRANSACTION_MAX_RECORD_BYTES,
+  });
+  assert.equal(receipts.receipts.length, 1);
+  assert.equal(receipts.stored.receipt.status, "succeeded");
+  assert.equal(receipts.stored.receipt.artifacts.length, 1);
+  assert.equal(
+    receipts.stored.receipt.artifacts[0].sourcePath,
+    packRuntime.packTransactionRecordPath(runId, 1),
+  );
+
+  const closed = await packRuntime.inspectPackTransactionRecovery({
+    root: f.targetRoot,
+    runId,
+    project: {
+      id: "sample.graybox",
+      identityDigest: projectIdentityDigest,
+    },
+    maxDirectoryEntries: 1000,
+  });
+  assert.equal(closed.consistency, "consistent");
+  assert.equal(closed.finalizationAction, "none");
+  await reconcileInterruptedRecovery({
+    f,
+    selectedRegistry,
+    recoveryPlan,
+    expectedReceiptState: "present",
+    expectedReceiptDigest: receipts.stored.receipt.receiptDigest,
+  });
 });
 
 test("recovery can close a marker-only preimage without touching game artifacts", async (t) => {

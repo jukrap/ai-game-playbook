@@ -268,6 +268,41 @@ export function checkWorkflowCheckpointSemantics(
     );
   }
 
+  const reconciliation = checkpoint.reconciliation;
+  if (reconciliation !== undefined) {
+    const reconciledAt = timestampMillis(reconciliation.reconciledAt);
+    const targetReceiptMatches =
+      (reconciliation.targetReceiptState === "missing" &&
+        reconciliation.targetReceiptDigest === undefined) ||
+      (reconciliation.targetReceiptState === "present" &&
+        reconciliation.targetReceiptDigest !== undefined);
+    const reconciliationMatches =
+      reconciliation.reconciliationRunId !== checkpoint.identity.runId &&
+      targetReceiptMatches &&
+      reconciledAt !== undefined &&
+      createdAt !== undefined &&
+      updatedAt !== undefined &&
+      reconciledAt >= createdAt &&
+      reconciledAt <= updatedAt &&
+      checkpoint.status === reconciliation.outcome &&
+      checkpoint.inFlight === undefined &&
+      checkpoint.evidenceKinds.some((kind) => kind === "run-receipt") &&
+      checkpoint.evidenceKinds.some(
+        (kind) => kind === "workflow-reconciliation",
+      ) &&
+      checkpoint.evidenceKinds.includes(reconciliation.proofKind) &&
+      checkpoint.artifactDigests.includes(reconciliation.proofDigest);
+    if (!reconciliationMatches) {
+      issues.push(
+        issue(
+          "workflow-checkpoint-state-invalid",
+          "/reconciliation",
+          "A reconciliation must use a separate run, retain exact receipt and proof state, and agree with the terminal checkpoint outcome.",
+        ),
+      );
+    }
+  }
+
   const attemptKeys = new Set<string>();
   let attemptInvalid = false;
   for (const attempt of checkpoint.attempts) {

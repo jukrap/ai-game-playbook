@@ -555,18 +555,18 @@ test("bounded output activity refreshes the idle deadline", async (t) => {
     "const timer = setInterval(() => {",
     "  process.stdout.write('.');",
     "  count += 1;",
-    "  if (count === 6) clearInterval(timer);",
+    "  if (count === 24) clearInterval(timer);",
     "}, 50);",
   ].join("\n");
   const base = await request(root, ["--input-type=commonjs", "-e", script]);
   const result = await core.runBoundedProcess({
     ...base,
-    limits: { ...base.limits, idleTimeoutMs: 150 },
+    limits: { ...base.limits, idleTimeoutMs: 1_000 },
   });
 
   assert.equal(result.outcome, "exited");
   assert.equal(result.exitCode, 0);
-  assert.equal(result.output.stdout, "......");
+  assert.equal(result.output.stdout, ".".repeat(24));
   assert.equal(result.output.truncated, false);
 });
 

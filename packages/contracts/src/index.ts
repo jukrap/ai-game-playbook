@@ -116,6 +116,19 @@ export type {
   PackRecoveryCommandStatus,
 } from "./pack-recovery-command-contracts.js";
 export {
+  WORKFLOW_RECONCILIATION_COMMAND_ID,
+  WORKFLOW_RECONCILIATION_STEP_ID,
+  WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+  workflowReconciliationCommandInputSchema,
+  workflowReconciliationCommandOutputSchema,
+} from "./workflow-reconciliation-contracts.js";
+export type {
+  WorkflowReconciliationCommandInput,
+  WorkflowReconciliationCommandOutput,
+  WorkflowReconciliationTargetOutcome,
+  WorkflowReconciliationTargetReceiptState,
+} from "./workflow-reconciliation-contracts.js";
+export {
   PROJECT_PACK_LOCK_MAX_DEPENDENCIES,
   PROJECT_PACK_LOCK_MAX_PACKS,
   assertProjectPackLockSemantics,
@@ -614,6 +627,7 @@ export type {
   WorkflowCheckpointDigestInput,
   WorkflowCheckpointInFlight,
   WorkflowCheckpointRecord,
+  WorkflowCheckpointReconciliation,
   WorkflowCheckpointSideEffect,
   WorkflowCheckpointStatus,
 } from "./workflow-checkpoint-contracts.js";

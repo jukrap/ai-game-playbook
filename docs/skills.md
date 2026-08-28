@@ -61,4 +61,6 @@ A private add path now connects a freshly prepared plan to exact install approva
 
 A private recovery path can now close one stable actionable transaction with a separate approval and recovery-run identity. It retains the journal closure as content-addressed evidence and binds it to a receipt and terminal checkpoint. If evidence persistence is interrupted after the transaction changes, it preserves a started checkpoint and returns no success. It does not expose a public recovery command.
 
-`agpb skill install` is still planned. Public installation requires an explicit user-facing approval flow, generic reconciliation for incomplete workflow evidence, and end-to-end interruption tests through the public command boundary. Until those gates pass, users can inspect skill targets but cannot install them through `agpb`.
+A separate private reconciliation path can close that retained checkpoint from the exact stable journal proof without replaying the pack mutation. It requires its own approval, run, receipt, and current target-head observation. The first provider is limited to the one-step pack-recovery workflow and does not expose a public command.
+
+`agpb skill install` is still planned. Public installation requires an explicit user-facing approval flow, public evidence inspection, and end-to-end interruption tests through the public command boundary. Until those gates pass, users can inspect skill targets but cannot install them through `agpb`.

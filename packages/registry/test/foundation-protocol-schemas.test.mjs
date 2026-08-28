@@ -59,6 +59,8 @@ const expectedIds = [
   "skill-list-request",
   "task-routing-selection",
   "workflow-checkpoint",
+  "workflow-reconciliation-input",
+  "workflow-reconciliation-output",
 ];
 
 function validator() {
@@ -201,6 +203,30 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       {
         ...fixtures["workflow-checkpoint"],
         status: "running",
+      },
+    ],
+    [
+      "workflow-reconciliation-input",
+      (() => {
+        const invalid = structuredClone(
+          fixtures["workflow-reconciliation-input"],
+        );
+        delete invalid.targetReceiptDigest;
+        return invalid;
+      })(),
+    ],
+    [
+      "workflow-reconciliation-input",
+      {
+        ...fixtures["workflow-reconciliation-input"],
+        targetReceiptState: "missing",
+      },
+    ],
+    [
+      "workflow-reconciliation-output",
+      {
+        ...fixtures["workflow-reconciliation-output"],
+        mutationReplayed: true,
       },
     ],
     [

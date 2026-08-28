@@ -23,6 +23,11 @@ test("runtime command handler metadata attests each exact compiled module", asyn
     ["pack.list", "pack-runtime", "inspection.js"],
     ["pack.recover", "pack-runtime", "recovery-workflow-execute.js"],
     [
+      "workflow.evidence-reconcile",
+      "pack-runtime",
+      "recovery-workflow-reconcile.js",
+    ],
+    [
       "project.initialization-recovery.assess",
       "project-runtime",
       "project-initialization-recovery-assess.js",

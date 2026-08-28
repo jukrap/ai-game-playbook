@@ -23,6 +23,8 @@ The repository also contains typed contracts, one validated registry, and bounde
 
 Internal recovery finalization now uses a recovery-run identity separate from the original pack transaction. It requires fresh approval, revalidates the transaction under one project-write lane, and returns success only when journal closure, content-addressed closure evidence, a `RunReceipt`, and the terminal workflow checkpoint agree. If evidence retention fails after the transaction closes, no success is returned and the started checkpoint remains for later reconciliation. The runtime does not retry that mutation.
 
+The first internal evidence-reconciliation provider can now close that retained one-step pack-recovery checkpoint from an exact stable closure proof. Reconciliation has a separate run, approval, and receipt, observes the current checkpoint head and target-receipt state, and records no original attempt or target receipt-chain entry. It never replays the pack mutation. This provider is private and does not cover multi-step, rollback, process, editor, or general engine workflows.
+
 ## What is not available
 
 There is no installable or published package. The following product capabilities do not exist yet:

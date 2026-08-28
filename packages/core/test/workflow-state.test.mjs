@@ -4,6 +4,7 @@ import test from "node:test";
 import * as contracts from "@ai-game-playbook/contracts";
 import * as registry from "@ai-game-playbook/registry";
 import * as core from "../dist/index.js";
+import { recoverHydratedWorkflowCheckpoint } from "../dist/workflow-state.js";
 
 import { createValidRegistryDefinition } from "../../registry/test/fixtures/registry.mjs";
 
@@ -142,6 +143,95 @@ function oneStepRegistry({
   return registry.validateRegistry(definition);
 }
 
+function reconciliationRegistry() {
+  const definition = createValidRegistryDefinition();
+  definition.schemas.push(contracts.approvalGrantSchema);
+  definition.schemas.push(contracts.approvalPromptSchema);
+  definition.schemas.push(contracts.workflowReconciliationCommandInputSchema);
+  definition.schemas.push(contracts.workflowReconciliationCommandOutputSchema);
+
+  const targetWorkflow = definition.workflows[0];
+  const targetStep = structuredClone(targetWorkflow.steps[0]);
+  targetStep.onFailure = "stop";
+  delete targetStep.rollbackCommandId;
+  targetWorkflow.steps = [targetStep];
+  targetWorkflow.requiredEvidence = ["proof.test", "run-receipt"];
+
+  const inspectCommand = definition.commands.find(
+    ({ id }) => id === "project.inspect",
+  );
+  const reconciliationCommand = {
+    ...structuredClone(inspectCommand),
+    id: contracts.WORKFLOW_RECONCILIATION_COMMAND_ID,
+    lifecycle: "internal",
+    summary:
+      "Accept one complete proof for an uncertain workflow without replay.",
+    cli: {
+      path: ["internal", "workflow", "evidence-reconcile"],
+      aliases: [],
+    },
+    input: {
+      schemaId: contracts.workflowReconciliationCommandInputSchema.schemaId,
+      digest: contracts.workflowReconciliationCommandInputSchema.digest,
+    },
+    output: {
+      schemaId: contracts.workflowReconciliationCommandOutputSchema.schemaId,
+      digest: contracts.workflowReconciliationCommandOutputSchema.digest,
+    },
+    capabilities: [contracts.WORKFLOW_RECONCILIATION_COMMAND_ID],
+    permissions: ["write-project-metadata"],
+    sideEffects: [
+      {
+        kind: "filesystem",
+        scope: "workflow-evidence-reconciliation",
+        boundary: "local",
+      },
+    ],
+    lane: "project-write",
+    timeoutMs: 30_000,
+    cancellation: { mode: "cooperative", graceMs: 1_000 },
+    retry: { mode: "never", maxAttempts: 1 },
+    budgets: {
+      maxChangedFiles: 0,
+      maxChangedBytes: 0,
+      maxDurationMs: 30_000,
+      maxOutputBytes: 65_536,
+      maxRepairCycles: 0,
+    },
+    requiredEvidence: ["run-receipt", "workflow-reconciliation"],
+    handler: {
+      package: "@ai-game-playbook/core",
+      export: "reconcileWorkflowEvidence",
+      digest: `sha256:${"5".repeat(64)}`,
+    },
+  };
+  definition.commands.push(reconciliationCommand);
+
+  definition.workflows.push({
+    ...structuredClone(targetWorkflow),
+    id: contracts.WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+    lifecycle: "internal",
+    summary: "Reconcile one uncertain workflow from complete evidence.",
+    input: structuredClone(reconciliationCommand.input),
+    output: structuredClone(reconciliationCommand.output),
+    steps: [
+      {
+        id: contracts.WORKFLOW_RECONCILIATION_STEP_ID,
+        commandId: contracts.WORKFLOW_RECONCILIATION_COMMAND_ID,
+        dependsOn: [],
+        onFailure: "stop",
+        approvalCheckpoint: true,
+      },
+    ],
+    budgets: structuredClone(reconciliationCommand.budgets),
+    resumePolicy: "never",
+    terminalOracle:
+      "Complete proof closes the exact target without replaying its command.",
+    requiredEvidence: ["run-receipt", "workflow-reconciliation"],
+  });
+  return registry.validateRegistry(definition);
+}
+
 function twoReadStepRegistry() {
   const definition = createValidRegistryDefinition();
   definition.schemas.push(contracts.approvalGrantSchema);
@@ -245,6 +335,137 @@ function receiptFor(checkpoint, overrides = {}) {
   };
   receipt.receiptDigest = contracts.computeRunReceiptDigest(receipt);
   return receipt;
+}
+
+function uncertainCheckpointForReconciliation(validatedRegistry) {
+  const initial = core.createWorkflowCheckpoint(
+    executionRequest(validatedRegistry),
+  );
+  const authorization = authorizeInspect(validatedRegistry, initial);
+  const admitted = core.beginWorkflowStep({
+    registry: validatedRegistry,
+    checkpoint: initial,
+    authorization,
+    now: () => now,
+  });
+  const started = core.markWorkflowStepStarted({
+    registry: validatedRegistry,
+    checkpoint: admitted,
+    now: () => now,
+  });
+  return recoverHydratedWorkflowCheckpoint(validatedRegistry, started, now + 1);
+}
+
+function reconciliationInputFor(checkpoint, overrides = {}) {
+  return {
+    schemaVersion: "1.0.0",
+    reconciliationRunId: "623e4567-e89b-42d3-a456-426614174000",
+    targetRunId: checkpoint.identity.runId,
+    targetCheckpointDigest: checkpoint.checkpointDigest,
+    targetCheckpointHeadDigest: checkpoint.checkpointDigest,
+    targetWorkflowId: checkpoint.identity.workflow.id,
+    targetResolvedPlanDigest:
+      checkpoint.identity.workflow.resolvedPlanDigest,
+    targetCommandId: checkpoint.inFlight.command.id,
+    targetInputDigest: checkpoint.inFlight.inputDigest,
+    targetReceiptState: "missing",
+    proofKind: "proof.test",
+    proofDigest: `sha256:${"4".repeat(64)}`,
+    targetOutcome: "succeeded",
+    planDigest: `sha256:${"3".repeat(64)}`,
+    ...overrides,
+  };
+}
+
+function reconciliationReceiptFor(
+  validatedRegistry,
+  checkpoint,
+  input,
+  overrides = {},
+) {
+  const plan = registry.resolveWorkflowPlan(
+    validatedRegistry,
+    contracts.WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+    checkpoint.identity.projectStage,
+  );
+  const command = validatedRegistry.commands.find(
+    ({ id }) => id === contracts.WORKFLOW_RECONCILIATION_COMMAND_ID,
+  );
+  const timestamp = new Date(now + 1).toISOString();
+  const body = {
+    schemaVersion: "1.0.0",
+    receiptId: "723e4567-e89b-42d3-a456-426614174000",
+    status: "succeeded",
+    identity: {
+      runId: input.reconciliationRunId,
+      workflowId: contracts.WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+      stepId: contracts.WORKFLOW_RECONCILIATION_STEP_ID,
+      attempt: 1,
+      phase: "command",
+      projectId: checkpoint.identity.projectId,
+      resolvedPlanDigest: plan.resolvedPlanDigest,
+    },
+    authority: {
+      command: {
+        id: command.id,
+        version: command.version,
+        descriptorDigest: contracts.digestCanonicalJson(command),
+      },
+      registryDigest: validatedRegistry.digest,
+      handlerDigest: command.handler.digest,
+      inputDigest: contracts.digestCanonicalJson(input),
+      authorizationId: "823e4567-e89b-42d3-a456-426614174000",
+      authorizationRequestDigest: `sha256:${"2".repeat(64)}`,
+      packDigests: [],
+      approvalIds: ["grant.workflow-reconcile"],
+    },
+    environment: {
+      platform: "windows",
+      architecture: "x64",
+      nodeVersion: "22.22.0",
+      projectIdentityDigest:
+        checkpoint.identity.projectRootIdentityDigest ??
+        checkpoint.identity.projectIdentityDigest,
+    },
+    timing: { startedAt: timestamp, endedAt: timestamp, durationMs: 0 },
+    effects: actualEffects(),
+    outcomes: {
+      outer: { status: "passed", exitCode: 0, timedOut: false },
+      inner: {
+        status: "passed",
+        code: "workflow-evidence-reconciled",
+        message: "Complete proof accepted without target command replay.",
+      },
+    },
+    mutation: {
+      status: "none",
+      changedFiles: [],
+      unexpectedDirtyFiles: [],
+    },
+    artifacts: [
+      {
+        artifactId: "workflow-reconciliation-proof",
+        kind: input.proofKind,
+        path: ".ai-game-playbook/evidence/reconciliation-proof.json",
+        digest: input.proofDigest,
+        bytes: 128,
+        complete: true,
+        createdAt: timestamp,
+        commandId: contracts.WORKFLOW_RECONCILIATION_COMMAND_ID,
+      },
+    ],
+    diagnostics: [],
+    recovery: {
+      attempted: true,
+      outcome: "passed",
+      actions: ["Accepted complete proof without mutation replay."],
+    },
+    ...overrides,
+  };
+  return {
+    ...body,
+    receiptDigest: contracts.computeRunReceiptDigest(body),
+  };
 }
 
 test("initial workflow checkpoints bind exact resolved plan and project identity", () => {
@@ -921,4 +1142,94 @@ test("aggregate workflow budgets stop later steps even when each lease stayed in
   assert.equal(checkpoint.status, "uncertain");
   assert.equal(checkpoint.inFlight.sideEffect, "uncertain");
   assert.equal(checkpoint.attempts.at(-1).outcome, "uncertain");
+});
+
+test("separate complete evidence reconciles one restarted uncertain workflow without replay", () => {
+  const validated = reconciliationRegistry();
+  const uncertain = uncertainCheckpointForReconciliation(validated);
+  const input = reconciliationInputFor(uncertain);
+  const receipt = reconciliationReceiptFor(validated, uncertain, input);
+
+  const reconciled = core.reconcileWorkflowEvidence({
+    registry: validated,
+    checkpoint: uncertain,
+    input,
+    receipt,
+    now: () => now + 1,
+  });
+
+  assert.equal(reconciled.status, "succeeded");
+  assert.equal(reconciled.nextOrdinal, 1);
+  assert.equal(reconciled.inFlight, undefined);
+  assert.deepEqual(reconciled.attempts, []);
+  assert.equal(reconciled.receiptChainHead, undefined);
+  assert.deepEqual(reconciled.evidenceKinds, [
+    "proof.test",
+    "run-receipt",
+    "workflow-reconciliation",
+  ]);
+  assert.deepEqual(reconciled.artifactDigests, [input.proofDigest]);
+  assert.deepEqual(reconciled.reconciliation, {
+    reconciliationRunId: input.reconciliationRunId,
+    workflowId: contracts.WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+    resolvedPlanDigest: receipt.identity.resolvedPlanDigest,
+    inputDigest: contracts.digestCanonicalJson(input),
+    receiptDigest: receipt.receiptDigest,
+    proofKind: input.proofKind,
+    proofDigest: input.proofDigest,
+    targetCheckpointHeadDigest: input.targetCheckpointHeadDigest,
+    targetReceiptState: "missing",
+    outcome: "succeeded",
+    reconciledAt: receipt.timing.endedAt,
+  });
+  assert.equal(
+    reconciled.parentCheckpointDigest,
+    uncertain.checkpointDigest,
+  );
+  assert.equal(contracts.isWorkflowCheckpointDigestValid(reconciled), true);
+});
+
+test("workflow reconciliation rejects a stale target checkpoint and domain mutation", () => {
+  const validated = reconciliationRegistry();
+  const staleTarget = uncertainCheckpointForReconciliation(validated);
+  const staleInput = reconciliationInputFor(staleTarget, {
+    targetCheckpointDigest: `sha256:${"1".repeat(64)}`,
+  });
+
+  assert.throws(
+    () =>
+      core.reconcileWorkflowEvidence({
+        registry: validated,
+        checkpoint: staleTarget,
+        input: staleInput,
+        receipt: reconciliationReceiptFor(
+          validated,
+          staleTarget,
+          staleInput,
+        ),
+        now: () => now + 1,
+      }),
+    expectCoreError("workflow-checkpoint-transition-invalid"),
+  );
+
+  const mutatedTarget = uncertainCheckpointForReconciliation(validated);
+  const input = reconciliationInputFor(mutatedTarget);
+  const receipt = reconciliationReceiptFor(validated, mutatedTarget, input, {
+    effects: actualEffects({
+      changedPaths: ["project.godot"],
+      changedBytes: 1,
+    }),
+  });
+
+  assert.throws(
+    () =>
+      core.reconcileWorkflowEvidence({
+        registry: validated,
+        checkpoint: mutatedTarget,
+        input,
+        receipt,
+        now: () => now + 1,
+      }),
+    expectCoreError("workflow-checkpoint-receipt-invalid"),
+  );
 });

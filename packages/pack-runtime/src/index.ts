@@ -62,6 +62,19 @@ export type {
 export { dispatchPreparedPackRecoveryFinalization } from "./recovery-workflow-execute.js";
 export type { DispatchPreparedPackRecoveryFinalizationRequest } from "./recovery-workflow-execute.js";
 export {
+  computePackRecoveryWorkflowReconciliationPlanDigest,
+  createPackRecoveryWorkflowReconciliationAuthorizationRequest,
+  createWorkflowReconciliationCommandInput,
+  dispatchPreparedPackRecoveryWorkflowReconciliation,
+  preparePackRecoveryWorkflowReconciliation,
+} from "./recovery-workflow-reconcile.js";
+export type {
+  CreatePackRecoveryWorkflowReconciliationAuthorizationRequest,
+  DispatchPreparedPackRecoveryWorkflowReconciliationRequest,
+  PreparedPackRecoveryWorkflowReconciliation,
+  PreparePackRecoveryWorkflowReconciliationRequest,
+} from "./recovery-workflow-reconcile.js";
+export {
   computeInstalledPackStateDigest,
   createEmptyInstalledPackState,
   loadInstalledPackState,

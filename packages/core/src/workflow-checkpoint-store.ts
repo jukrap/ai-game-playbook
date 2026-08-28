@@ -6,6 +6,9 @@ import {
   isSha256Digest,
   isStableId,
   sha256Digest,
+  WORKFLOW_RECONCILIATION_COMMAND_ID,
+  WORKFLOW_RECONCILIATION_STEP_ID,
+  WORKFLOW_RECONCILIATION_WORKFLOW_ID,
   workflowCheckpointSchema,
   type ProjectStage,
   type ResolvedWorkflowCommand,
@@ -811,6 +814,13 @@ function sameValue(left: unknown, right: unknown): boolean {
   return canonicalizeJson(left) === canonicalizeJson(right);
 }
 
+function sameOptionalValue(left: unknown, right: unknown): boolean {
+  return (
+    (left === undefined && right === undefined) ||
+    (left !== undefined && right !== undefined && sameValue(left, right))
+  );
+}
+
 function sameCommand(
   left: ResolvedWorkflowCommand,
   right: ResolvedWorkflowCommand,
@@ -1006,6 +1016,8 @@ function assertSuccessor(
   parent: WorkflowCheckpointRecord,
   child: WorkflowCheckpointRecord,
   plan: ResolvedWorkflowPlan,
+  registry: ValidatedRegistry,
+  parentHeadDigest: Sha256Digest,
 ): void {
   const immutableMatches =
     child.sequence === parent.sequence + 1 &&
@@ -1031,12 +1043,88 @@ function assertSuccessor(
 
   const appendedAttempts = child.attempts.length - parent.attempts.length;
   if (appendedAttempts === 0) {
+    const reconciliation = child.reconciliation;
+    let reconciliationPlan: ResolvedWorkflowPlan | undefined;
+    if (reconciliation !== undefined) {
+      try {
+        reconciliationPlan = resolveWorkflowPlan(
+          registry,
+          WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+          parent.identity.projectStage,
+        );
+      } catch {
+        reconciliationPlan = undefined;
+      }
+    }
+    const reconciliationStep = reconciliationPlan?.steps[0];
+    const targetStep = plan.steps[0];
+    const reconciliationEvidence =
+      reconciliation === undefined
+        ? undefined
+        : [...new Set([
+            ...parent.evidenceKinds,
+            reconciliation.proofKind,
+            "run-receipt" as StableId,
+            "workflow-reconciliation" as StableId,
+          ])].sort(compareCanonicalText);
+    const reconciliationArtifacts =
+      reconciliation === undefined
+        ? undefined
+        : [...new Set([
+            ...parent.artifactDigests,
+            reconciliation.proofDigest,
+          ])].sort(compareCanonicalText);
+    const reconciliationOrdinal =
+      reconciliation?.outcome === "succeeded"
+        ? parent.nextOrdinal + 1
+        : parent.nextOrdinal;
+    const reconciliationStatus =
+      reconciliation?.outcome === "succeeded"
+        ? expectedReadyStatus(
+            plan,
+            reconciliationOrdinal,
+            reconciliationEvidence ?? [],
+          )
+        : reconciliation?.outcome;
+    const evidenceReconciliation =
+      parent.status === "uncertain" &&
+      parent.inFlight?.phase === "command" &&
+      parent.inFlight.sideEffect === "uncertain" &&
+      plan.steps.length === 1 &&
+      parent.nextOrdinal === 0 &&
+      parent.attempts.length === 0 &&
+      parent.receiptChainHead === undefined &&
+      parent.inFlight.ordinal === 0 &&
+      parent.inFlight.stepId === targetStep?.id &&
+      targetStep?.onFailure === "stop" &&
+      targetStep.rollbackCommand === undefined &&
+      parent.reconciliation === undefined &&
+      reconciliation !== undefined &&
+      reconciliation.workflowId === WORKFLOW_RECONCILIATION_WORKFLOW_ID &&
+      reconciliation.targetCheckpointHeadDigest === parentHeadDigest &&
+      reconciliation.resolvedPlanDigest ===
+        reconciliationPlan?.resolvedPlanDigest &&
+      reconciliationPlan?.steps.length === 1 &&
+      reconciliationStep?.id === WORKFLOW_RECONCILIATION_STEP_ID &&
+      reconciliationStep.command.id === WORKFLOW_RECONCILIATION_COMMAND_ID &&
+      child.inFlight === undefined &&
+      child.status === reconciliationStatus &&
+      child.status === reconciliation.outcome &&
+      child.nextOrdinal === reconciliationOrdinal &&
+      sameValue(child.attempts, parent.attempts) &&
+      sameValue(child.budgetUsage, parent.budgetUsage) &&
+      sameValue(child.evidenceKinds, reconciliationEvidence) &&
+      sameValue(child.artifactDigests, reconciliationArtifacts) &&
+      child.receiptChainHead === parent.receiptChainHead;
+    if (evidenceReconciliation) return;
+
     const stateDataUnchanged =
       child.nextOrdinal === parent.nextOrdinal &&
       sameValue(child.budgetUsage, parent.budgetUsage) &&
       sameValue(child.evidenceKinds, parent.evidenceKinds) &&
       sameValue(child.artifactDigests, parent.artifactDigests) &&
-      child.receiptChainHead === parent.receiptChainHead;
+      child.receiptChainHead === parent.receiptChainHead &&
+      sameOptionalValue(child.reconciliation, parent.reconciliation);
     const parentFlight = parent.inFlight;
     const childFlight = child.inFlight;
     const step = plan.steps[parent.nextOrdinal];
@@ -1110,7 +1198,8 @@ function assertSuccessor(
     parent.inFlight?.sideEffect !== "started" ||
     !budgetNondecreasing(parent.budgetUsage, child.budgetUsage) ||
     !isSubset(parent.evidenceKinds, child.evidenceKinds) ||
-    !isSubset(parent.artifactDigests, child.artifactDigests)
+    !isSubset(parent.artifactDigests, child.artifactDigests) ||
+    !sameOptionalValue(child.reconciliation, parent.reconciliation)
   ) {
     throw storeError(
       "workflow-checkpoint-store-corrupt",
@@ -2093,7 +2182,13 @@ export async function persistWorkflowCheckpoint(
     );
   }
   if (previous !== undefined) {
-    assertSuccessor(previous.checkpoint, checkpoint, plan);
+    assertSuccessor(
+      previous.checkpoint,
+      checkpoint,
+      plan,
+      value.registry,
+      previous.headDigest,
+    );
   }
 
   const checkpointPath = recordPath(checkpoint);
@@ -2359,7 +2454,15 @@ export async function loadWorkflowCheckpoint(
     }
     const plan = assertPlanBinding(request.registry, current);
     checkpointsNewestFirst.push(current);
-    if (child !== undefined) assertSuccessor(current, child, plan);
+    if (child !== undefined) {
+      assertSuccessor(
+        current,
+        child,
+        plan,
+        request.registry,
+        makeHead(current, file.digest).headDigest,
+      );
+    }
     if (expectedSequence === head.sequence) {
       headRecordFileDigest = file.digest;
       if (
@@ -2539,6 +2642,7 @@ export async function resumeWorkflowCheckpoint(
     );
   }
   if (checkpoint.status === "uncertain") {
+    retainHydratedWorkflowCheckpoint(checkpoint);
     return resumeResult("reconciliation-required", false, stored);
   }
 

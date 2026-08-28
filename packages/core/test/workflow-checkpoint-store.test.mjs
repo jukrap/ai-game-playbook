@@ -762,6 +762,124 @@ test("a self-consistent but illegal checkpoint transition is rejected by chain v
   );
 });
 
+test("forged reconciliation cannot bypass registered authority or finite target shape", async (t) => {
+  const { root, store } = await fixture(t);
+  const validated = validatedRegistry();
+  const initial = await persistInitial(root, validated);
+  const authorization = authorizeInspect(validated, initial.checkpoint);
+  const admitted = core.beginWorkflowStep({
+    registry: validated,
+    checkpoint: initial.checkpoint,
+    authorization,
+    now: () => now + 100,
+  });
+  const storedAdmission = await core.persistWorkflowCheckpoint({
+    root,
+    registry: validated,
+    checkpoint: admitted,
+    previous: initial.stored,
+  });
+  const started = core.markWorkflowStepStarted({
+    registry: validated,
+    checkpoint: admitted,
+    now: () => now + 200,
+  });
+  await core.persistWorkflowCheckpoint({
+    root,
+    registry: validated,
+    checkpoint: started,
+    previous: storedAdmission,
+  });
+  const loaded = await core.loadWorkflowCheckpoint(
+    loadRequest(root, validated, { now: () => now + 300 }),
+  );
+  const resumed = await core.resumeWorkflowCheckpoint({
+    registry: validated,
+    stored: loaded,
+    policy: "safe",
+    now: () => now + 400,
+  });
+  assert.equal(resumed.checkpoint.status, "uncertain");
+  assert.equal(resumed.checkpoint.attempts.length, 0);
+
+  const parent = resumed.checkpoint;
+  const {
+    checkpointDigest: _checkpointDigest,
+    parentCheckpointDigest: _parentCheckpointDigest,
+    inFlight: _inFlight,
+    reconciliation: _reconciliation,
+    ...retained
+  } = parent;
+  const proofDigest = `sha256:${"4".repeat(64)}`;
+  const updatedAt = new Date(now + 500).toISOString();
+  const forgedBody = {
+    ...retained,
+    sequence: parent.sequence + 1,
+    status: "failed",
+    evidenceKinds: [
+      "proof.test",
+      "run-receipt",
+      "workflow-reconciliation",
+    ],
+    artifactDigests: [proofDigest],
+    reconciliation: {
+      reconciliationRunId: "a23e4567-e89b-42d3-a456-426614174000",
+      workflowId: "workflow.forged-reconciliation",
+      resolvedPlanDigest: `sha256:${"3".repeat(64)}`,
+      inputDigest: `sha256:${"2".repeat(64)}`,
+      receiptDigest: `sha256:${"1".repeat(64)}`,
+      proofKind: "proof.test",
+      proofDigest,
+      targetCheckpointHeadDigest: resumed.stored.headDigest,
+      targetReceiptState: "missing",
+      outcome: "failed",
+      reconciledAt: updatedAt,
+    },
+    updatedAt,
+    parentCheckpointDigest: parent.checkpointDigest,
+  };
+  const forged = {
+    ...forgedBody,
+    checkpointDigest: contracts.computeWorkflowCheckpointDigest(forgedBody),
+  };
+  assert.deepEqual(contracts.checkWorkflowCheckpointSemantics(forged), []);
+  const recordText = `${contracts.canonicalizeJson(forged)}\n`;
+  const recordName = `${runId}.${forged.sequence}.${forged.checkpointDigest.slice("sha256:".length)}.checkpoint.json`;
+  await writeFile(join(store, recordName), recordText, "utf8");
+
+  const headBody = {
+    schemaVersion: "1.0.0",
+    runId,
+    checkpointId: forged.checkpointId,
+    sequence: forged.sequence,
+    checkpointDigest: forged.checkpointDigest,
+    recordDigest: contracts.sha256Digest(recordText),
+    registryDigest: forged.identity.registryDigest,
+    projectIdentityDigest: forged.identity.projectIdentityDigest,
+    updatedAt: forged.updatedAt,
+  };
+  const head = {
+    ...headBody,
+    headDigest: contracts.digestCanonicalJson({
+      domain: "ai-game-playbook.workflow-checkpoint-head",
+      version: "1",
+      subject: headBody,
+    }),
+  };
+  await writeFile(
+    join(store, `${runId}.head.json`),
+    `${contracts.canonicalizeJson(head)}\n`,
+    "utf8",
+  );
+
+  await assert.rejects(
+    core.loadWorkflowCheckpoint(
+      loadRequest(root, validated, { now: () => now + 600 }),
+    ),
+    expectCoreError("workflow-checkpoint-store-corrupt", false),
+  );
+});
+
 test("corrupt, noncanonical, missing, mismatched, and linked store state is preserved and rejected", async (t) => {
   const first = await fixture(t);
   const validated = validatedRegistry();

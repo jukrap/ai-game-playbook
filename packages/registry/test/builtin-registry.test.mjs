@@ -28,6 +28,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
       "project.inspect",
       "skill.check",
       "skill.list",
+      "workflow.evidence-reconcile",
     ],
   );
 
@@ -82,6 +83,37 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     "dispatchPreparedPackRecoveryFinalization",
   );
   assert.match(packRecovery.handler.digest, digestPattern);
+
+  const workflowReconciliation = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === contracts.WORKFLOW_RECONCILIATION_COMMAND_ID,
+  );
+  assert.notEqual(workflowReconciliation, undefined);
+  assert.equal(workflowReconciliation.lifecycle, "internal");
+  assert.deepEqual(workflowReconciliation.cli, {
+    path: ["internal", "workflow", "evidence-reconcile"],
+    aliases: [],
+  });
+  assert.deepEqual(workflowReconciliation.permissions, [
+    "write-project-metadata",
+  ]);
+  assert.equal(workflowReconciliation.lane, "project-write");
+  assert.equal(
+    workflowReconciliation.input.schemaId,
+    contracts.workflowReconciliationCommandInputSchema.schemaId,
+  );
+  assert.equal(
+    workflowReconciliation.output.schemaId,
+    contracts.workflowReconciliationCommandOutputSchema.schemaId,
+  );
+  assert.equal(
+    workflowReconciliation.handler.package,
+    "@ai-game-playbook/pack-runtime",
+  );
+  assert.equal(
+    workflowReconciliation.handler.export,
+    "dispatchPreparedPackRecoveryWorkflowReconciliation",
+  );
+  assert.match(workflowReconciliation.handler.digest, digestPattern);
 
   const packAddWorkflow = registry.BUILTIN_REGISTRY.workflows.find(
     ({ id }) => id === "workflow.pack-add",
@@ -546,6 +578,7 @@ test("the builtin registry binds internal operations to finite workflow steps", 
   assert.deepEqual(
     registry.BUILTIN_REGISTRY.workflows.map(({ id }) => id),
     [
+      "workflow.evidence-reconciliation",
       "workflow.godot-headless-preflight",
       "workflow.pack-add",
       "workflow.pack-recover",
@@ -663,6 +696,48 @@ test("the builtin registry binds internal operations to finite workflow steps", 
   assert.equal(recoveryPlan.steps[0].command.id, "pack.recover");
   assert.equal(recoveryPlan.steps[0].command.lane, "project-write");
   assert.equal(contracts.isResolvedWorkflowPlanDigestValid(recoveryPlan), true);
+
+  const reconciliation = registry.BUILTIN_REGISTRY.workflows.find(
+    ({ id }) => id === contracts.WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+  );
+  assert.notEqual(reconciliation, undefined);
+  assert.equal(reconciliation.lifecycle, "internal");
+  assert.equal(
+    reconciliation.input.schemaId,
+    contracts.workflowReconciliationCommandInputSchema.schemaId,
+  );
+  assert.equal(
+    reconciliation.output.schemaId,
+    contracts.workflowReconciliationCommandOutputSchema.schemaId,
+  );
+  assert.deepEqual(reconciliation.steps, [
+    {
+      id: contracts.WORKFLOW_RECONCILIATION_STEP_ID,
+      commandId: contracts.WORKFLOW_RECONCILIATION_COMMAND_ID,
+      dependsOn: [],
+      onFailure: "stop",
+      approvalCheckpoint: true,
+    },
+  ]);
+  assert.deepEqual(reconciliation.requiredEvidence, [
+    "run-receipt",
+    "workflow-reconciliation",
+  ]);
+  const reconciliationPlan = registry.resolveWorkflowPlan(
+    registry.BUILTIN_REGISTRY,
+    reconciliation.id,
+    "vertical-slice",
+  );
+  assert.equal(reconciliationPlan.steps.length, 1);
+  assert.equal(
+    reconciliationPlan.steps[0].command.id,
+    contracts.WORKFLOW_RECONCILIATION_COMMAND_ID,
+  );
+  assert.equal(reconciliationPlan.steps[0].command.lane, "project-write");
+  assert.equal(
+    contracts.isResolvedWorkflowPlanDigestValid(reconciliationPlan),
+    true,
+  );
 });
 
 test("builtin generated surfaces preserve implemented schema and command identity", () => {

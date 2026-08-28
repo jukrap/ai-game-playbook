@@ -56,6 +56,11 @@ import {
   skillListReportSchema,
   skillListRequestSchema,
   workflowCheckpointSchema,
+  WORKFLOW_RECONCILIATION_COMMAND_ID,
+  WORKFLOW_RECONCILIATION_STEP_ID,
+  WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+  workflowReconciliationCommandInputSchema,
+  workflowReconciliationCommandOutputSchema,
   type CommandDescriptor,
   type PackManifest,
   type PermissionClass,
@@ -243,6 +248,62 @@ const packRecoveryCommand: CommandDescriptor = Object.freeze({
     export: "dispatchPreparedPackRecoveryFinalization",
     digest: parseSha256Digest(
       "sha256:32df6ba1507cc6770e863ae67e3eead1c5f932da7465e71ec1d94cfff627b882",
+    ),
+  }),
+});
+
+const WORKFLOW_RECONCILIATION_MAX_DURATION_MS = 30_000;
+const WORKFLOW_RECONCILIATION_MAX_OUTPUT_BYTES = 65_536;
+
+const workflowReconciliationCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: WORKFLOW_RECONCILIATION_COMMAND_ID,
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Accept one complete domain proof for an uncertain workflow without replaying its mutation.",
+  cli: Object.freeze({
+    path: Object.freeze(["internal", "workflow", "evidence-reconcile"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: workflowReconciliationCommandInputSchema.schemaId,
+    digest: workflowReconciliationCommandInputSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: workflowReconciliationCommandOutputSchema.schemaId,
+    digest: workflowReconciliationCommandOutputSchema.digest,
+  }),
+  capabilities: Object.freeze([WORKFLOW_RECONCILIATION_COMMAND_ID]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>(["write-project-metadata"]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "filesystem",
+      scope: "workflow-evidence-reconciliation",
+      boundary: "local",
+    }),
+  ]),
+  lane: "project-write",
+  timeoutMs: WORKFLOW_RECONCILIATION_MAX_DURATION_MS,
+  cancellation: Object.freeze({ mode: "cooperative", graceMs: 1_000 }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: WORKFLOW_RECONCILIATION_MAX_DURATION_MS,
+    maxOutputBytes: WORKFLOW_RECONCILIATION_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([
+    parseStableId("run-receipt"),
+    parseStableId("workflow-reconciliation"),
+  ]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/pack-runtime",
+    export: "dispatchPreparedPackRecoveryWorkflowReconciliation",
+    digest: parseSha256Digest(
+      "sha256:4d96632884b6ec9528806c6039277c0f2686cb09240ff4f3e9306a8e8e950cb4",
     ),
   }),
 });
@@ -1717,6 +1778,48 @@ const packRecoveryWorkflow: WorkflowDescriptor = Object.freeze({
   ]),
 });
 
+const workflowEvidenceReconciliationWorkflow: WorkflowDescriptor =
+  Object.freeze({
+    schemaVersion: parseSemanticVersion("1.0.0").value,
+    id: WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+    version: parseSemanticVersion("1.0.0").value,
+    lifecycle: "internal",
+    summary:
+      "Retain one separately approved receipt that reconciles complete domain evidence with an uncertain target workflow.",
+    input: Object.freeze({
+      schemaId: workflowReconciliationCommandInputSchema.schemaId,
+      digest: workflowReconciliationCommandInputSchema.digest,
+    }),
+    output: Object.freeze({
+      schemaId: workflowReconciliationCommandOutputSchema.schemaId,
+      digest: workflowReconciliationCommandOutputSchema.digest,
+    }),
+    supportedStages: supportedStages(),
+    steps: Object.freeze([
+      Object.freeze({
+        id: WORKFLOW_RECONCILIATION_STEP_ID,
+        commandId: WORKFLOW_RECONCILIATION_COMMAND_ID,
+        dependsOn: Object.freeze([]),
+        onFailure: "stop" as const,
+        approvalCheckpoint: true,
+      }),
+    ]),
+    budgets: Object.freeze({
+      maxChangedFiles: 0,
+      maxChangedBytes: 0,
+      maxDurationMs: WORKFLOW_RECONCILIATION_MAX_DURATION_MS,
+      maxOutputBytes: WORKFLOW_RECONCILIATION_MAX_OUTPUT_BYTES,
+      maxRepairCycles: 0,
+    }),
+    resumePolicy: "never",
+    terminalOracle:
+      "The reconciliation receipt and complete proof must close the exact uncertain target checkpoint without replaying its command.",
+    requiredEvidence: Object.freeze([
+      parseStableId("run-receipt"),
+      parseStableId("workflow-reconciliation"),
+    ]),
+  });
+
 const definition: RegistryDefinition = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   controlPlaneVersion: parseSemanticVersion("0.0.0").value,
@@ -1761,6 +1864,8 @@ const definition: RegistryDefinition = Object.freeze({
     skillListRequestSchema,
     skillListReportSchema,
     workflowCheckpointSchema,
+    workflowReconciliationCommandInputSchema,
+    workflowReconciliationCommandOutputSchema,
   ]),
   commands: Object.freeze([
     doctorCommand,
@@ -1779,6 +1884,7 @@ const definition: RegistryDefinition = Object.freeze({
     projectInspectCommand,
     skillCheckCommand,
     skillListCommand,
+    workflowReconciliationCommand,
   ]),
   skills: builtinSkills,
   roleLenses: Object.freeze([]),
@@ -1787,6 +1893,7 @@ const definition: RegistryDefinition = Object.freeze({
     packAddWorkflow,
     packRecoveryWorkflow,
     projectInitializationWorkflow,
+    workflowEvidenceReconciliationWorkflow,
   ]),
   packs: Object.freeze([projectSkillsPack]),
 });

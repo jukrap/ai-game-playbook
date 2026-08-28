@@ -102,6 +102,10 @@ import {
   projectInitializationRecoveryReportSchema,
   projectInitializationRecoveryRequestSchema,
 } from "./project-initialization-recovery-contracts.js";
+import {
+  workflowReconciliationCommandInputSchema,
+  workflowReconciliationCommandOutputSchema,
+} from "./workflow-reconciliation-contracts.js";
 
 export type ContractSchemaCatalog = Readonly<
   Record<string, VersionedContractSchema>
@@ -183,6 +187,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
       processContainmentSelfTestRequestSchema,
     "resolved-workflow-plan": resolvedWorkflowPlanSchema,
     "workflow-checkpoint": workflowCheckpointSchema,
+    "workflow-reconciliation-input": workflowReconciliationCommandInputSchema,
+    "workflow-reconciliation-output": workflowReconciliationCommandOutputSchema,
     "run-handle": runHandleSchema,
     "runtime-frame-evidence": runtimeFrameEvidenceSchema,
     "task-routing-selection": taskRoutingSelectionSchema,

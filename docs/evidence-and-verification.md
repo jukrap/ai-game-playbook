@@ -26,6 +26,12 @@ Receipts are append-only records linked by digests. A current implementation can
 
 A successful outer response and a successful inner result are separate fields. Cancellation, termination uncertainty, rollback, and post-result failure remain visible.
 
+## Reconciliation receipts
+
+An uncertain target is not repaired by editing its original receipt history. A reconciliation uses a separate run and `RunReceipt` that binds the exact target checkpoint, current store head, observed target-receipt state, complete proof, registered authority, and zero target mutation. A present target receipt is accepted only when it is the single detached successful receipt and its complete closure artifact matches that proof. The target keeps its original attempts and receipt-chain head and receives append-only reconciliation metadata.
+
+The first provider recognizes only a stable managed-pack recovery closure. It can terminalize one command-phase, one-step target without replaying the command. Incomplete proof, target drift, receipt drift, nonzero change effects, or an unsupported workflow shape leaves the target uncertain. Public evidence queries and broader reconciliation providers remain planned.
+
 ## Component results
 
 The result model distinguishes:

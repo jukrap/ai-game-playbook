@@ -9,6 +9,10 @@ import {
   isSha256Digest,
   isStableId,
   runReceiptSchema,
+  WORKFLOW_RECONCILIATION_COMMAND_ID,
+  WORKFLOW_RECONCILIATION_STEP_ID,
+  WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+  workflowReconciliationCommandInputSchema,
   workflowCheckpointSchema,
   type RunReceipt,
   type ProjectStage,
@@ -20,7 +24,10 @@ import {
   type WorkflowCheckpointBudgetUsage,
   type WorkflowCheckpointInFlight,
   type WorkflowCheckpointRecord,
+  type WorkflowCheckpointReconciliation,
   type WorkflowCheckpointStatus,
+  type WorkflowReconciliationCommandInput,
+  type WorkflowReconciliationTargetOutcome,
 } from "@ai-game-playbook/contracts";
 import {
   resolveWorkflowPlan,
@@ -103,6 +110,14 @@ export interface SettleWorkflowStepRequest {
   readonly checkpoint: WorkflowCheckpointRecord;
   readonly receipt: RunReceipt;
   readonly settlement: PermissionSettlement;
+  readonly now?: () => number;
+}
+
+export interface ReconcileWorkflowEvidenceRequest {
+  readonly registry: ValidatedRegistry;
+  readonly checkpoint: WorkflowCheckpointRecord;
+  readonly input: WorkflowReconciliationCommandInput;
+  readonly receipt: RunReceipt;
   readonly now?: () => number;
 }
 
@@ -733,6 +748,280 @@ function mergeCanonical<T extends string>(
   additions: readonly T[],
 ): readonly T[] {
   return [...new Set([...current, ...additions])].sort(compareCanonicalText);
+}
+
+function hasNoReconciliationDomainMutation(receipt: RunReceipt): boolean {
+  const effects = receipt.effects;
+  return (
+    effects.changedPaths.length === 0 &&
+    effects.changedBytes === 0 &&
+    effects.objectIds.length === 0 &&
+    effects.destinations.length === 0 &&
+    effects.dataClasses.length === 0 &&
+    effects.changeKinds.length === 0 &&
+    effects.provider === undefined &&
+    effects.model === undefined &&
+    effects.publishTargets.length === 0 &&
+    effects.outputBytes === 0 &&
+    effects.repairCycles === 0 &&
+    effects.cost === undefined &&
+    receipt.mutation.status === "none" &&
+    receipt.mutation.changedFiles.length === 0 &&
+    receipt.mutation.unexpectedDirtyFiles.length === 0
+  );
+}
+
+function assertReconciliationReceiptBinding(
+  registry: ValidatedRegistry,
+  checkpoint: WorkflowCheckpointRecord,
+  input: WorkflowReconciliationCommandInput,
+  receipt: RunReceipt,
+  currentTime: number,
+): {
+  readonly reconciliationPlan: ResolvedWorkflowPlan;
+  readonly proofArtifact: RunReceipt["artifacts"][number];
+} {
+  let validatedInput: WorkflowReconciliationCommandInput;
+  try {
+    validatedInput = validateRegisteredContractValue(
+      registry,
+      {
+        schemaId: workflowReconciliationCommandInputSchema.schemaId,
+        digest: workflowReconciliationCommandInputSchema.digest,
+      },
+      input,
+    ) as unknown as WorkflowReconciliationCommandInput;
+  } catch {
+    throw checkpointError(
+      "workflow-checkpoint-transition-invalid",
+      "$request.input",
+      "reconciliation input failed strict registry schema validation",
+    );
+  }
+  const inFlight = checkpoint.inFlight;
+  if (inFlight === undefined) {
+    throw checkpointError(
+      "workflow-checkpoint-transition-invalid",
+      "$request.checkpoint.inFlight",
+      "reconciliation requires one uncertain in-flight command",
+    );
+  }
+  if (
+    validatedInput.reconciliationRunId === checkpoint.identity.runId ||
+    validatedInput.targetRunId !== checkpoint.identity.runId ||
+    validatedInput.targetCheckpointDigest !== checkpoint.checkpointDigest ||
+    validatedInput.targetWorkflowId !== checkpoint.identity.workflow.id ||
+    validatedInput.targetResolvedPlanDigest !==
+      checkpoint.identity.workflow.resolvedPlanDigest ||
+    validatedInput.targetCommandId !== inFlight.command.id ||
+    validatedInput.targetInputDigest !== inFlight.inputDigest ||
+    ((validatedInput.targetReceiptState === "present") !==
+      (validatedInput.targetReceiptDigest !== undefined))
+  ) {
+    throw checkpointError(
+      "workflow-checkpoint-transition-invalid",
+      "$request.input",
+      "reconciliation input differs from the uncertain target checkpoint",
+    );
+  }
+
+  const reconciliationPlan = resolveWorkflowPlan(
+    registry,
+    WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+    checkpoint.identity.projectStage,
+  );
+  const reconciliationStep = reconciliationPlan.steps[0];
+  const reconciliationCommand = registry.commands.find(
+    ({ id }) => id === WORKFLOW_RECONCILIATION_COMMAND_ID,
+  );
+  if (
+    reconciliationPlan.steps.length !== 1 ||
+    reconciliationStep === undefined ||
+    reconciliationStep.id !== WORKFLOW_RECONCILIATION_STEP_ID ||
+    reconciliationStep.command.id !== WORKFLOW_RECONCILIATION_COMMAND_ID ||
+    reconciliationCommand === undefined
+  ) {
+    throw checkpointError(
+      "workflow-checkpoint-plan-mismatch",
+      "$registry",
+      "reconciliation command or workflow is not the exact registered authority",
+    );
+  }
+
+  const validatedReceipt = validateReceipt(registry, receipt);
+  const proofArtifact = validatedReceipt.artifacts[0];
+  const projectIdentityDigest =
+    checkpoint.identity.projectRootIdentityDigest ??
+    checkpoint.identity.projectIdentityDigest;
+  if (
+    validatedReceipt.previousReceiptDigest !== undefined ||
+    validatedReceipt.status !== "succeeded" ||
+    validatedReceipt.identity.runId !== validatedInput.reconciliationRunId ||
+    validatedReceipt.identity.workflowId !==
+      WORKFLOW_RECONCILIATION_WORKFLOW_ID ||
+    validatedReceipt.identity.stepId !== WORKFLOW_RECONCILIATION_STEP_ID ||
+    validatedReceipt.identity.attempt !== 1 ||
+    validatedReceipt.identity.phase !== "command" ||
+    validatedReceipt.identity.projectId !== checkpoint.identity.projectId ||
+    validatedReceipt.identity.resolvedPlanDigest !==
+      reconciliationPlan.resolvedPlanDigest ||
+    validatedReceipt.identity.featureId !== undefined ||
+    validatedReceipt.identity.featureContractDigest !== undefined ||
+    validatedReceipt.authority.command.id !==
+      WORKFLOW_RECONCILIATION_COMMAND_ID ||
+    validatedReceipt.authority.command.version !==
+      reconciliationCommand.version ||
+    validatedReceipt.authority.command.descriptorDigest !==
+      digestCanonicalJson(reconciliationCommand) ||
+    validatedReceipt.authority.registryDigest !== registry.digest ||
+    validatedReceipt.authority.handlerDigest !==
+      reconciliationCommand.handler.digest ||
+    validatedReceipt.authority.inputDigest !==
+      digestCanonicalJson(validatedInput) ||
+    validatedReceipt.environment.projectIdentityDigest !==
+      projectIdentityDigest ||
+    validatedReceipt.environment.sessionIdentityDigest !== undefined ||
+    validatedReceipt.outcomes.outer.status !== "passed" ||
+    validatedReceipt.outcomes.outer.timedOut ||
+    validatedReceipt.outcomes.inner.status !== "passed" ||
+    validatedReceipt.outcomes.tests !== undefined ||
+    validatedReceipt.diagnostics.length !== 0 ||
+    validatedReceipt.recovery.attempted !== true ||
+    validatedReceipt.recovery.outcome !== "passed" ||
+    !hasNoReconciliationDomainMutation(validatedReceipt) ||
+    validatedReceipt.artifacts.length !== 1 ||
+    proofArtifact === undefined ||
+    proofArtifact.complete !== true ||
+    proofArtifact.kind !== validatedInput.proofKind ||
+    proofArtifact.digest !== validatedInput.proofDigest ||
+    proofArtifact.commandId !== WORKFLOW_RECONCILIATION_COMMAND_ID ||
+    Date.parse(validatedReceipt.timing.startedAt) <
+      Date.parse(checkpoint.updatedAt) ||
+    Date.parse(validatedReceipt.timing.endedAt) > currentTime
+  ) {
+    throw receiptError(
+      "$request.receipt",
+      "reconciliation receipt does not exactly bind the target, authority, proof, and zero-replay outcome",
+    );
+  }
+  return { reconciliationPlan, proofArtifact };
+}
+
+export function reconcileWorkflowEvidence(
+  value: ReconcileWorkflowEvidenceRequest,
+): WorkflowCheckpointRecord {
+  const record = dataRecord(value, "$request");
+  exactKeys(
+    record,
+    ["registry", "checkpoint", "input", "receipt", "now"],
+    ["registry", "checkpoint", "input", "receipt"],
+    "$request",
+  );
+  const currentTime = readClock(record["now"] ?? Date.now);
+  const { checkpoint, plan } = resolveCheckpointPlan(
+    value.registry,
+    record["checkpoint"],
+    currentTime,
+  );
+  if (
+    checkpoint.status !== "uncertain" ||
+    checkpoint.inFlight?.phase !== "command" ||
+    checkpoint.inFlight.sideEffect !== "uncertain" ||
+    checkpoint.reconciliation !== undefined ||
+    plan.steps.length !== 1 ||
+    checkpoint.nextOrdinal !== 0 ||
+    checkpoint.attempts.length !== 0 ||
+    checkpoint.receiptChainHead !== undefined ||
+    checkpoint.inFlight.ordinal !== 0 ||
+    checkpoint.inFlight.stepId !== plan.steps[0]?.id ||
+    plan.steps[0]?.onFailure !== "stop" ||
+    plan.steps[0]?.rollbackCommand !== undefined
+  ) {
+    throw checkpointError(
+      "workflow-checkpoint-transition-invalid",
+      "$request.checkpoint",
+      "v1 reconciliation accepts only one unreconciled uncertain command in a one-step stop workflow",
+    );
+  }
+  const input = record["input"] as WorkflowReconciliationCommandInput;
+  const receipt = record["receipt"] as RunReceipt;
+  const { reconciliationPlan } = assertReconciliationReceiptBinding(
+    value.registry,
+    checkpoint,
+    input,
+    receipt,
+    currentTime,
+  );
+  const targetOutcome = input.targetOutcome as WorkflowReconciliationTargetOutcome;
+  const evidenceKinds = mergeCanonical(checkpoint.evidenceKinds, [
+    input.proofKind,
+    "run-receipt" as StableId,
+    "workflow-reconciliation" as StableId,
+  ]);
+  const artifactDigests = mergeCanonical(checkpoint.artifactDigests, [
+    input.proofDigest,
+  ]);
+  const nextOrdinal = targetOutcome === "succeeded" ? 1 : 0;
+  const status =
+    targetOutcome === "succeeded"
+      ? nextReadyStatus(plan, nextOrdinal, evidenceKinds)
+      : "failed";
+  if (status !== targetOutcome) {
+    throw checkpointError(
+      "workflow-checkpoint-transition-invalid",
+      "$request.input.targetOutcome",
+      "reconciliation proof does not satisfy the target workflow terminal oracle",
+    );
+  }
+  const reconciliation: WorkflowCheckpointReconciliation = {
+    reconciliationRunId: input.reconciliationRunId,
+    workflowId: WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+    resolvedPlanDigest: reconciliationPlan.resolvedPlanDigest,
+    inputDigest: digestCanonicalJson(input),
+    receiptDigest: receipt.receiptDigest,
+    proofKind: input.proofKind,
+    proofDigest: input.proofDigest,
+    targetCheckpointHeadDigest: input.targetCheckpointHeadDigest,
+    targetReceiptState: input.targetReceiptState,
+    ...(input.targetReceiptDigest === undefined
+      ? {}
+      : { targetReceiptDigest: input.targetReceiptDigest }),
+    outcome: targetOutcome,
+    reconciledAt: receipt.timing.endedAt,
+  };
+  const {
+    checkpointDigest: _checkpointDigest,
+    parentCheckpointDigest: _parentCheckpointDigest,
+    inFlight: _inFlight,
+    reconciliation: _reconciliation,
+    ...retained
+  } = checkpoint;
+  const body: Omit<WorkflowCheckpointRecord, "checkpointDigest"> = {
+    ...retained,
+    sequence: checkpoint.sequence + 1,
+    status,
+    nextOrdinal,
+    evidenceKinds,
+    artifactDigests,
+    reconciliation,
+    updatedAt: new Date(currentTime).toISOString(),
+    parentCheckpointDigest: checkpoint.checkpointDigest,
+  };
+  const child: WorkflowCheckpointRecord = {
+    ...body,
+    checkpointDigest: computeWorkflowCheckpointDigest(body),
+  };
+  const issues = checkWorkflowCheckpointSemantics(child);
+  if (issues.length > 0) {
+    throw checkpointError(
+      "workflow-checkpoint-state-invalid",
+      "$checkpoint",
+      `reconciled checkpoint violated ${issues[0]?.code ?? "an invariant"}`,
+    );
+  }
+  const retainedChild = retainCheckpoint(child);
+  transitionedCheckpointInstances.add(checkpoint);
+  return retainedChild;
 }
 
 interface SettledCheckpointTransition {

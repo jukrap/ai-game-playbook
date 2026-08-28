@@ -35,7 +35,7 @@ A generated surface is descriptive until a matching handler and runtime boundary
 | `registry` | Descriptor validation, deterministic routing, generation, and digests |
 | `core` | Project identity, safe paths, compare-and-swap writes, process bounds, permission, workflow, receipts, and artifact foundations |
 | `project-runtime` | Static project inspection and private initialization foundations |
-| `pack-runtime` | Read-only pack inspection plus private ownership, transaction, durable dispatch, and recovery foundations |
+| `pack-runtime` | Read-only pack inspection plus private ownership, transaction, durable dispatch, recovery, and evidence-reconciliation foundations |
 | `skill-runtime` | Packaged skill validation, target inspection, and write-free managed-pack preflight |
 | `evidence` | Process and test outcome normalization plus limited retained-artifact assessment |
 | `cli` | Nine source-built plan-only, read-only, or static commands |
@@ -48,6 +48,8 @@ Unity and Unreal adapters and all project bridges remain planned.
 The registry binds all twelve packaged skills to one digest-bound experimental pack. An internal preflight evaluates an `add` operation against project identity, installed state, exact file digests, and direct skill-directory ownership. A separate private dispatcher can execute a fresh ready plan only with exact install approval and the project-write lane. It revalidates the plan before admission, uses compare-and-swap ownership and rollback, and retains workflow checkpoints, a run receipt, and content-addressed terminal transaction evidence. Copied, stale, cancelled, unapproved, or conflicted plans stop before managed mutation. No public command invokes this path.
 
 A second internal dispatcher closes an actionable pack-recovery report under a separate recovery-run identity. The original transaction continues to identify its journal; the recovery run identifies approval, lane ownership, checkpoint, receipt, and evidence. Success is withheld unless the domain closure and all durable execution records agree. Incomplete evidence remains a nonterminal checkpoint for later reconciliation rather than an automatic retry.
+
+A finite internal reconciliation path can now close that retained checkpoint when the pack journal already contains a complete, stable closure proof. It uses a new run, approval, and receipt; observes the exact target checkpoint head and target-receipt state again; and never invokes the original mutation. The target gains append-only reconciliation metadata without inventing an original attempt or rewriting its receipt chain. Version 1 accepts only a one-step, command-phase pack-recovery checkpoint. Multi-step workflows, rollback phases, engine processes, and editor mutations remain unsupported.
 
 ## Current read path
 
@@ -72,7 +74,7 @@ A mutating workflow must add several boundaries that the public CLI does not yet
 6. execute with output, time, file, byte, and repair-cycle budgets;
 7. persist receipts and evidence, then reconcile or roll back.
 
-An unknown effect moves the run to `uncertain`. It cannot return directly to execution.
+An unknown effect moves the run to `uncertain`. It cannot return directly to execution. A supported provider may only terminalize it from separate, complete evidence; otherwise it remains blocked.
 
 ## Identity and lanes
 

@@ -25,7 +25,11 @@ export type PackRuntimeErrorCode =
   | "pack-target-invalid"
   | "pack-transaction-conflict"
   | "pack-transaction-corrupt"
-  | "pack-transaction-not-found";
+  | "pack-transaction-not-found"
+  | "pack-workflow-reconciliation-evidence-uncertain"
+  | "pack-workflow-reconciliation-not-actionable"
+  | "pack-workflow-reconciliation-plan-untrusted"
+  | "pack-workflow-reconciliation-stale";
 
 export class PackRuntimeError extends Error {
   readonly code: PackRuntimeErrorCode;

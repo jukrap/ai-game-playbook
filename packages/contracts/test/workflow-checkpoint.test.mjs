@@ -147,3 +147,83 @@ test("uncertain effects remain attestable after the resume window expires", () =
     true,
   );
 });
+
+test("workflow reconciliation metadata is separate, terminal, and proof-bound", () => {
+  assert.equal(
+    contracts.WORKFLOW_RECONCILIATION_COMMAND_ID,
+    "workflow.evidence-reconcile",
+  );
+  assert.equal(
+    contracts.WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+    "workflow.evidence-reconciliation",
+  );
+  assert.equal(
+    contracts.WORKFLOW_RECONCILIATION_STEP_ID,
+    "step.workflow-evidence-reconcile",
+  );
+
+  const base = checkpointBody();
+  const proofDigest = digest("6");
+  const reconciledBody = {
+    ...base,
+    sequence: 1,
+    status: "succeeded",
+    nextOrdinal: 1,
+    evidenceKinds: [
+      "pack-recovery",
+      "run-receipt",
+      "workflow-reconciliation",
+    ],
+    artifactDigests: [proofDigest],
+    reconciliation: {
+      reconciliationRunId: "323e4567-e89b-42d3-a456-426614174000",
+      workflowId: contracts.WORKFLOW_RECONCILIATION_WORKFLOW_ID,
+      resolvedPlanDigest: digest("1"),
+      inputDigest: digest("2"),
+      receiptDigest: digest("3"),
+      proofKind: "pack-recovery",
+      proofDigest,
+      targetCheckpointHeadDigest: digest("5"),
+      targetReceiptState: "missing",
+      outcome: "succeeded",
+      reconciledAt: "2026-08-26T04:30:01.000Z",
+    },
+    updatedAt: "2026-08-26T04:30:01.000Z",
+    parentCheckpointDigest: digest("4"),
+  };
+  const reconciled = {
+    ...reconciledBody,
+    checkpointDigest:
+      contracts.computeWorkflowCheckpointDigest(reconciledBody),
+  };
+  assert.deepEqual(contracts.checkWorkflowCheckpointSemantics(reconciled), []);
+
+  for (const mutate of [
+    (value) => {
+      value.reconciliation.reconciliationRunId = value.identity.runId;
+    },
+    (value) => {
+      value.reconciliation.outcome = "failed";
+    },
+    (value) => {
+      value.artifactDigests = [];
+    },
+    (value) => {
+      value.evidenceKinds = ["pack-recovery", "run-receipt"];
+    },
+    (value) => {
+      value.reconciliation.targetReceiptDigest = digest("5");
+    },
+  ]) {
+    const invalid = structuredClone(reconciled);
+    mutate(invalid);
+    invalid.checkpointDigest =
+      contracts.computeWorkflowCheckpointDigest(invalid);
+    assert.equal(
+      contracts
+        .checkWorkflowCheckpointSemantics(invalid)
+        .some(({ code }) => code === "workflow-checkpoint-state-invalid"),
+      true,
+    );
+  }
+});

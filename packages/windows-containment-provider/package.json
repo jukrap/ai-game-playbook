@@ -1,0 +1,22 @@
+{
+  "name": "@ai-game-playbook/windows-containment-provider",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Windows x64 OS-enforced process containment provider.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -b --pretty false",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@ai-game-playbook/contracts": "workspace:*"
+  }
+}

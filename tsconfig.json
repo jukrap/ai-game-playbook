@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/contracts" },
+    { "path": "./packages/windows-containment-provider" },
     { "path": "./packages/registry" },
     { "path": "./packages/core" },
     { "path": "./packages/project-runtime" },

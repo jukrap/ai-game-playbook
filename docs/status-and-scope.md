@@ -1,6 +1,6 @@
 # Status and Scope
 
-> Status: early source-built foundation. Public commands are write-free, every engine support grade is `planned`, and no package is published.
+> Status: early source-built foundation. Public commands are write-free, a Windows x64 containment self-test is available from source, every engine support grade is `planned`, and no package is published.
 
 [한국어](status-and-scope.ko.md) · [Documentation](README.md)
 
@@ -33,6 +33,8 @@ The core also has a private in-memory local signer for that path. It imports a c
 
 The local host runner now connects exact project initialization and managed-skill add to durable dispatch and read-only recovery inspection. Recovery execution, evidence reconciliation, pack update or removal, and every engine mutation remain disconnected from the host path.
 
+A separate Windows x64 package now builds a native containment artifact and runs an opt-in self-test against a disposable fixture. It proves bounded file denial, owned loopback network denial, child-process denial, process-count limits, termination settlement, and exact cleanup. The artifact, request, report, project identity digest, and short-lived same-process witness are bound together. This package has no public command, MCP tool, project-process admission, or engine-launch authority.
+
 ## What is not available
 
 There is no installable or published package. The following product capabilities do not exist yet:
@@ -45,7 +47,7 @@ There is no installable or published package. The following product capabilities
 - engine tests, a playable golden project, build or export execution;
 - evidence list, show, export, or release publication.
 
-Internal Godot discovery and preflight code does not change this status. The containment-provider catalog is empty, so project process admission fails closed and no live-engine support is established.
+Internal Godot discovery and preflight code does not change this status. The compiled catalog used by Godot remains empty. The standalone Windows x64 self-test verifies only its disposable fixture and cannot admit a project process or launch an engine, so live-engine support remains unestablished.
 
 ## Product scope
 

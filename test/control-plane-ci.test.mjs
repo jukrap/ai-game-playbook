@@ -28,6 +28,12 @@ test("control-plane CI runs the same locked verification on Windows and Linux", 
   assert.match(workflow, /run: pnpm run ci:check-clean/);
   assert.match(workflow, /- "generated\/\*\*"/);
   assert.match(workflow, /- "docs\/planned-surface\.json"/);
+  assert.equal(workflow.match(/- "global\.json"/g)?.length, 2);
+  assert.match(
+    workflow,
+    /uses: actions\/setup-dotnet@[0-9a-f]{40}\r?\n\s+with:\r?\n\s+dotnet-version: 10\.0\.400/,
+  );
+  assert.match(workflow, /run: pnpm run provider:windows:verify/);
 
   const actionReferences = [...workflow.matchAll(/^\s*- uses: ([^\s]+)$/gm)].map(
     ([, value]) => value,

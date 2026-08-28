@@ -1,6 +1,6 @@
 # AI Game Playbook
 
-> Status: source-built control-plane foundation. Nine write-free CLI commands and twelve packaged skills exist; no package or live-engine adapter is released.
+> Status: source-built control-plane foundation. Nine write-free CLI commands, twelve packaged skills, and a Windows x64 containment self-test exist; no package or live-engine adapter is released.
 
 [한국어](README.ko.md)
 
@@ -19,6 +19,7 @@ This repository contains an early control plane, not a finished game-development
 | Godot | Static project status and a documented operation catalog; no engine launch |
 | Skills | Twelve capability-first game-development skills with exact packaged artifacts |
 | MCP | An opt-in, project-bound, read-only STDIO runtime for selected tools |
+| Windows containment | Source-built AppContainer and Job Object self-test on disposable fixtures; no engine launch |
 | Safety foundation | Typed contracts, registry checks, bounded permissions and workflows, receipts, and managed lifecycle primitives |
 
 No installable package is published. The CLI does not edit a game project, install skills, control an editor, run a game, produce a build, or export evidence. All live-engine capabilities and support grades remain planned.
@@ -43,6 +44,8 @@ pnpm run agpb -- engine status --engine godot --project <project-path>
 ```
 
 Add `--json` to an implemented command for canonical machine-readable output. Commands return a nonzero exit code for invalid use, blocking findings, cancellation, uncertainty, or an internal failure. The [CLI guide](docs/cli.md) lists every available and planned command.
+
+The containment self-test is an opt-in developer check for Windows x64 and requires .NET SDK `10.0.400`. It validates the isolation boundary on a disposable fixture; it does not admit a project executable or establish engine support.
 
 ## Engine support
 

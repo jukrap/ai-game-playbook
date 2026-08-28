@@ -38,7 +38,9 @@ The core also has an internal one-shot approval session. Its serializable challe
 
 After an approval response is accepted, the session cannot return to pending. An external signer receives only each exact grant digest, and the resulting signed grants go back to the original broker for full request validation. Denial, cancellation, and expiry never invoke the signer. A signer or broker failure after approval terminates the session as failed, so retry requires a new session and a new decision. A host's own tool prompt and a future MCP elicitation are additional presentation boundaries, not substitutes for this grant check.
 
-No public command currently renders this prompt or accepts an approval. Internal pack recovery and its first finite evidence-reconciliation path have bounded cancellation and durable closure, but public installation and recovery remain unavailable until a host approval path carries those boundaries end to end.
+The private Codex adapter now has a same-process presenter port for that session. It passes only the immutable presentation and a cancellation signal to the host callback. The adapter constructs the response identity and digests itself, allows only one active presentation per session, and keeps the signer, broker, raw request, and original session handle outside the presenter. Caller cancellation, presentation expiry, host failure, and an invalid decision all end without signing; host failure and invalid output also close the session before returning a bounded error.
+
+This port is an internal integration boundary, not a user interface or an MCP elicitation implementation. No public command currently renders the prompt or accepts an approval, and the read-only MCP tool catalog is unchanged. Internal pack recovery and its first finite evidence-reconciliation path have bounded cancellation and durable closure, but public installation and recovery remain unavailable until a concrete host path, local signer, durable workflow, and recovery entry point carry those boundaries end to end.
 
 ## Stop conditions
 

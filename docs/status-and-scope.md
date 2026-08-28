@@ -27,6 +27,8 @@ The first internal evidence-reconciliation provider can now close that retained 
 
 An internal one-shot approval session now carries an exact prompt through approval, denial, cancellation, expiry, external digest signing, and final broker validation. Serialized presentation data has no authority, and an accepted approval cannot be replayed after signing or authorization fails. No public renderer, signing-key store, CLI mutation route, or MCP mutation route uses this session yet.
 
+The private Codex adapter can now drive that session through a same-process presenter callback. The callback receives only immutable display data and cancellation, while the adapter binds the exact response and keeps the signer and execution authority separate. This is not a concrete host UI or MCP elicitation route, and it does not expose a public mutation command.
+
 ## What is not available
 
 There is no installable or published package. The following product capabilities do not exist yet:

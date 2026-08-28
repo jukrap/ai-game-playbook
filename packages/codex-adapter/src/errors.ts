@@ -19,3 +19,22 @@ export class CodexSetupBoundaryError extends Error {
     this.code = code;
   }
 }
+
+export type CodexApprovalBoundaryErrorCode =
+  | "codex-approval-decision-invalid"
+  | "codex-approval-host-failed"
+  | "codex-approval-host-mismatch"
+  | "codex-approval-presenter-invalid"
+  | "codex-approval-session-active"
+  | "codex-approval-session-invalid"
+  | "codex-approval-session-settled";
+
+export class CodexApprovalBoundaryError extends Error {
+  readonly code: CodexApprovalBoundaryErrorCode;
+
+  constructor(code: CodexApprovalBoundaryErrorCode, message: string) {
+    super(message);
+    this.name = "CodexApprovalBoundaryError";
+    this.code = code;
+  }
+}

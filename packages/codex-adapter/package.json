@@ -2,7 +2,7 @@
   "name": "@ai-game-playbook/codex-adapter",
   "version": "0.0.0",
   "private": true,
-  "description": "Plan-only Codex project integration for AI Game Playbook.",
+  "description": "Private Codex project setup and approval presentation integration for AI Game Playbook.",
   "license": "UNLICENSED",
   "type": "module",
   "exports": {

@@ -1,5 +1,21 @@
-export { CodexSetupBoundaryError } from "./errors.js";
-export type { CodexSetupBoundaryErrorCode } from "./errors.js";
+export {
+  CodexApprovalBoundaryError,
+  CodexSetupBoundaryError,
+} from "./errors.js";
+export type {
+  CodexApprovalBoundaryErrorCode,
+  CodexSetupBoundaryErrorCode,
+} from "./errors.js";
+export {
+  CODEX_APPROVAL_HOST_ID,
+  CODEX_APPROVAL_MAX_WAIT_MS,
+  createCodexApprovalPresenter,
+  runCodexApprovalSession,
+} from "./approval.js";
+export type {
+  CodexApprovalPresentationHandler,
+  CodexApprovalPresenter,
+} from "./approval.js";
 export {
   CODEX_CONFIG_MAX_BYTES,
   CODEX_CONFIG_PATH,

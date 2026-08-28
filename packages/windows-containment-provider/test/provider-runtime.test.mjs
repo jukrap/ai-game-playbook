@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { appendFile, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  appendFile,
+  mkdtemp,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -18,7 +24,10 @@ function fakeWindowsX64Executable() {
 }
 
 async function fixture(t) {
-  const root = await mkdtemp(join(tmpdir(), "agpb-windows-provider-"));
+  const canonicalTempRoot = await realpath(tmpdir());
+  const root = await mkdtemp(
+    join(canonicalTempRoot, "agpb-windows-provider-"),
+  );
   const artifactPath = join(root, "provider.exe");
   await writeFile(artifactPath, fakeWindowsX64Executable());
   t.after(() => rm(root, { recursive: true, force: true }));

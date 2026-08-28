@@ -116,6 +116,7 @@ export {
   createApprovalGrantSubjectFromPrompt,
   createPermissionBroker,
   createPermissionApprovalPrompt,
+  PERMISSION_REQUEST_MAX_APPROVAL_DELAY_MS,
 } from "./permission-broker.js";
 export type {
   CreateApprovalGrantSubjectOptions,
@@ -139,6 +140,7 @@ export type {
 export {
   createPermissionApprovalSession,
   inspectPermissionApprovalSession,
+  PERMISSION_APPROVAL_SESSION_MAX_LIFETIME_MS,
   resolvePermissionApprovalSession,
 } from "./permission-approval-session.js";
 export type {

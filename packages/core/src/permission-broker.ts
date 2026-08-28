@@ -44,6 +44,7 @@ import { CoreBoundaryError } from "./errors.js";
 
 const PERMISSION_REQUEST_MAX_BYTES = 1_048_576;
 const APPROVAL_PUBLIC_KEY_MAX_BYTES = 16_384;
+export const PERMISSION_REQUEST_MAX_APPROVAL_DELAY_MS = 300_000;
 const MAX_SCOPE_PATHS = 256;
 const MAX_SCOPE_OBJECTS = 256;
 const MAX_SCOPE_DESTINATIONS = 32;
@@ -1913,11 +1914,15 @@ class PermissionBrokerImplementation implements PermissionBroker {
       (minimum, grant) => Math.min(minimum, Date.parse(grant.budgets.expiresAt)),
       Date.parse(normalized.challenge.deadlineAt),
     );
+    const leaseExpiry = Math.min(
+      grantExpiry,
+      dispatchNow + normalized.challenge.budgets.maxDurationMs,
+    );
     const lease = new PermissionAuthorizationLeaseImplementation(
       normalized.challenge,
       validated.map(({ grantId }) => grantId).sort(compareCanonicalText),
       new Date(now).toISOString(),
-      new Date(grantExpiry).toISOString(),
+      new Date(leaseExpiry).toISOString(),
       normalized.mutationPotential,
       this.#now,
       (requestDigest) => this.#uncertainRequests.add(requestDigest),
@@ -1998,6 +2003,17 @@ class PermissionBrokerImplementation implements PermissionBroker {
       );
     }
     const workflow = normalizeWorkflow(record["workflow"], this.#registry, commandId);
+    const workflowStep =
+      workflow === undefined
+        ? undefined
+        : this.#registry.workflows
+            .find(({ id }) => id === workflow.id)
+            ?.steps.find(({ id }) => id === workflow.stepId);
+    const approvalRequired = command.permissions.some(
+      (permission) =>
+        !AUTOMATIC_PERMISSIONS.has(permission) ||
+        (permission === "test-build" && workflowStep?.approvalCheckpoint),
+    );
     const feature = validateFeature(
       record["featureContract"],
       this.#registry,
@@ -2043,11 +2059,18 @@ class PermissionBrokerImplementation implements PermissionBroker {
     }
     const deadlineAt = canonicalTimestamp(record["deadlineAt"], "$request.deadlineAt");
     const deadline = Date.parse(deadlineAt);
-    if (deadline <= now || deadline - now > budgets.maxDurationMs) {
+    const maximumDeadlineDelay =
+      budgets.maxDurationMs +
+      (approvalRequired ? PERMISSION_REQUEST_MAX_APPROVAL_DELAY_MS : 0);
+    if (
+      !Number.isSafeInteger(maximumDeadlineDelay) ||
+      deadline <= now ||
+      deadline - now > maximumDeadlineDelay
+    ) {
       throw boundaryError(
         "permission-budget-exceeded",
         "$request.deadlineAt",
-        "deadline is expired or exceeds the requested duration budget",
+        "deadline is expired or exceeds the bounded admission and execution window",
       );
     }
     if (
@@ -2094,12 +2117,6 @@ class PermissionBrokerImplementation implements PermissionBroker {
             id: feature.featureId,
             contractDigest: computeFeatureContractApprovalDigest(feature),
           });
-    const workflowStep =
-      workflow === undefined
-        ? undefined
-        : this.#registry.workflows
-            .find(({ id }) => id === workflow.id)
-            ?.steps.find(({ id }) => id === workflow.stepId);
     const permissionEntries = Object.freeze(
       [...command.permissions]
         .sort(compareCanonicalText)

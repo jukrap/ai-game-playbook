@@ -580,6 +580,47 @@ test("session creation rejects registry drift and incomplete grant terms", () =>
   );
 });
 
+test("approval session lifetime is bounded independently from execution duration", () => {
+  assert.equal(core.PERMISSION_APPROVAL_SESSION_MAX_LIFETIME_MS, 300_000);
+  const selectedRegistry = createRegistry();
+  const now = () => initialNow;
+  const broker = createBroker(selectedRegistry, now);
+  const deadlineAt = new Date(
+    initialNow + core.PERMISSION_APPROVAL_SESSION_MAX_LIFETIME_MS + 30_000,
+  ).toISOString();
+  const authorizationRequest = request({ deadlineAt });
+  const base = {
+    broker,
+    registry: selectedRegistry,
+    request: authorizationRequest,
+    hostId: "host.codex-local",
+    expiresAt: new Date(
+      initialNow + core.PERMISSION_APPROVAL_SESSION_MAX_LIFETIME_MS,
+    ).toISOString(),
+    grantTerms: [
+      {
+        permission: "install",
+        expiresAt: deadlineAt,
+        maxUses: 1,
+      },
+    ],
+    now,
+  };
+
+  const session = core.createPermissionApprovalSession(base);
+  assert.equal(session.presentation.session.expiresAt, base.expiresAt);
+  assert.throws(
+    () =>
+      core.createPermissionApprovalSession({
+        ...base,
+        expiresAt: new Date(
+          initialNow + core.PERMISSION_APPROVAL_SESSION_MAX_LIFETIME_MS + 1,
+        ).toISOString(),
+      }),
+    expectCoreError("permission-approval-session-invalid"),
+  );
+});
+
 test("commands without explicit approval never create an approval session", () => {
   const selectedRegistry = createRegistry();
   const now = () => initialNow;

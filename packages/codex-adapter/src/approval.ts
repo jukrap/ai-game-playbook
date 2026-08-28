@@ -5,6 +5,7 @@ import type {
 import { approvalSessionResponseSchema } from "@ai-game-playbook/contracts";
 import {
   inspectPermissionApprovalSession,
+  PERMISSION_APPROVAL_SESSION_MAX_LIFETIME_MS,
   resolvePermissionApprovalSession,
   withLocalApprovalGrantSigner,
   type ApprovalGrantSigner,
@@ -18,7 +19,8 @@ import { isProxy } from "node:util/types";
 import { CodexApprovalBoundaryError } from "./errors.js";
 
 export const CODEX_APPROVAL_HOST_ID = "host.codex-local" as const;
-export const CODEX_APPROVAL_MAX_WAIT_MS = 300_000;
+export const CODEX_APPROVAL_MAX_WAIT_MS: number =
+  PERMISSION_APPROVAL_SESSION_MAX_LIFETIME_MS;
 
 export type CodexApprovalPresentationHandler = (
   presentation: PermissionApprovalSessionPresentation,

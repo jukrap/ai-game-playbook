@@ -55,6 +55,8 @@ Approval presentation, signing, and final authorization remain separate boundari
 
 The private local host runner derives signer expiry and use count from the exact approval-session challenge, wraps presentation and authorization in that scoped lifetime, and leaves the caller-owned key open. The presenter receives neither the key nor the signer. Durable operation dispatch, status, and recovery are not connected to this runner yet.
 
+The permission broker separates approval admission from execution duration. Explicit approvals may wait for at most five minutes, while the resulting authorization lease is still capped from authorization time by the registered execution budget and the request's absolute deadline. Automatic permission paths retain their original execution-only deadline bound.
+
 ## Current read path
 
 1. Parse only a registered public command and its declared flags.

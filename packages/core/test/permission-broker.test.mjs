@@ -567,6 +567,108 @@ test("explicit approvals are exact, signed, single-use, and consumed atomically"
   );
 });
 
+test("approval admission delay is separate from the bounded execution lease", () => {
+  assert.equal(core.PERMISSION_REQUEST_MAX_APPROVAL_DELAY_MS, 300_000);
+  let currentNow = now;
+  const broker = createBroker({ now: () => currentNow });
+  const deadlineAt = new Date(
+    now + core.PERMISSION_REQUEST_MAX_APPROVAL_DELAY_MS + 30_000,
+  ).toISOString();
+  const networkRequest = request("provider.fetch", {
+    scope: scope({ destinations: ["https://api.example.com"], paths: [] }),
+    deadlineAt,
+  });
+  const pending = broker.authorize(networkRequest, []);
+  assert.equal(pending.status, "approval-required");
+
+  currentNow = now + 290_000;
+  const grant = signedGrant(pending.challenge, "network", {
+    approvedAt: new Date(currentNow).toISOString(),
+    expiresAt: deadlineAt,
+  });
+  const authorized = broker.authorize(networkRequest, [grant]);
+  assert.equal(authorized.status, "authorized");
+  assert.equal(
+    authorized.lease.expiresAt,
+    new Date(currentNow + networkRequest.budgets.maxDurationMs).toISOString(),
+  );
+  authorized.lease.settle({
+    outcome: "cancelled",
+    mutationUncertain: false,
+    actual: {
+      changedPaths: [],
+      changedBytes: 0,
+      objectIds: [],
+      destinations: [],
+      dataClasses: [],
+      changeKinds: [],
+      publishTargets: [],
+      durationMs: 0,
+      outputBytes: 0,
+      repairCycles: 0,
+    },
+  });
+
+  const shortBroker = createBroker();
+  const shortDeadlineAt = new Date(now + 10_000).toISOString();
+  const shortRequest = request("provider.fetch", {
+    scope: scope({ destinations: ["https://api.example.com"], paths: [] }),
+    deadlineAt: shortDeadlineAt,
+  });
+  const shortPending = shortBroker.authorize(shortRequest, []);
+  assert.equal(shortPending.status, "approval-required");
+  const shortGrant = signedGrant(shortPending.challenge, "network", {
+    approvedAt: new Date(now).toISOString(),
+    expiresAt: shortDeadlineAt,
+  });
+  const shortAuthorization = shortBroker.authorize(shortRequest, [shortGrant]);
+  assert.equal(shortAuthorization.status, "authorized");
+  assert.equal(shortAuthorization.lease.expiresAt, shortDeadlineAt);
+  shortAuthorization.lease.settle({
+    outcome: "cancelled",
+    mutationUncertain: false,
+    actual: {
+      changedPaths: [],
+      changedBytes: 0,
+      objectIds: [],
+      destinations: [],
+      dataClasses: [],
+      changeKinds: [],
+      publishTargets: [],
+      durationMs: 0,
+      outputBytes: 0,
+      repairCycles: 0,
+    },
+  });
+
+  assert.throws(
+    () =>
+      createBroker().authorize(
+        request("provider.fetch", {
+          scope: scope({
+            destinations: ["https://api.example.com"],
+            paths: [],
+          }),
+          deadlineAt: new Date(
+            now + core.PERMISSION_REQUEST_MAX_APPROVAL_DELAY_MS + 30_001,
+          ).toISOString(),
+        }),
+        [],
+      ),
+    expectCoreError("permission-budget-exceeded"),
+  );
+  assert.throws(
+    () =>
+      createBroker().authorize(
+        request("project.inspect", {
+          deadlineAt: new Date(now + 30_001).toISOString(),
+        }),
+        [],
+      ),
+    expectCoreError("permission-budget-exceeded"),
+  );
+});
+
 test("wrong project, expired approvals, and budget expansion fail closed", () => {
   const broker = createBroker();
   assert.throws(

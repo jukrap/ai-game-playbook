@@ -39,6 +39,7 @@ import {
 
 const SIGNATURE_PATTERN = /^[A-Za-z0-9_-]{86}$/u;
 const MAX_APPROVAL_TERMS = 32;
+export const PERMISSION_APPROVAL_SESSION_MAX_LIFETIME_MS = 300_000;
 
 export interface PermissionApprovalGrantTermOptions {
   readonly permission: PermissionClass;
@@ -647,11 +648,15 @@ export function createPermissionApprovalSession(
   );
   const sessionExpiry = Date.parse(expiresAt);
   const requestDeadline = Date.parse(pending.challenge.deadlineAt);
-  if (sessionExpiry <= created || sessionExpiry >= requestDeadline) {
+  if (
+    sessionExpiry <= created ||
+    sessionExpiry >= requestDeadline ||
+    sessionExpiry - created > PERMISSION_APPROVAL_SESSION_MAX_LIFETIME_MS
+  ) {
     throw sessionError(
       "permission-approval-session-invalid",
       "$options.expiresAt",
-      "session expiry must follow creation and precede the request deadline",
+      "session expiry must stay within its bounded lifetime and precede the request deadline",
     );
   }
   const sessionId = randomUUID();

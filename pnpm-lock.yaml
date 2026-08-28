@@ -59,6 +59,9 @@ importers:
       '@ai-game-playbook/mcp':
         specifier: workspace:*
         version: link:../mcp
+      '@ai-game-playbook/pack-runtime':
+        specifier: workspace:*
+        version: link:../pack-runtime
       '@ai-game-playbook/registry':
         specifier: workspace:*
         version: link:../registry

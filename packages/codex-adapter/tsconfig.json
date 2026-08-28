@@ -9,6 +9,7 @@
     { "path": "../contracts" },
     { "path": "../registry" },
     { "path": "../core" },
+    { "path": "../pack-runtime" },
     { "path": "../skill-runtime" },
     { "path": "../mcp" }
   ],

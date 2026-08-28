@@ -40,7 +40,7 @@ A generated surface is descriptive until a matching handler and runtime boundary
 | `evidence` | Process and test outcome normalization plus limited retained-artifact assessment |
 | `cli` | Nine source-built plan-only, read-only, or static commands |
 | `mcp` | Opt-in project-bound read-only STDIO tools selected from registry metadata |
-| `codex-adapter` | Write-free project setup and skill target planning plus private host-owned approval presentation and signer lifetime |
+| `codex-adapter` | Write-free project setup and skill target planning plus private one-shot approval, managed-skill dispatch, status, and recovery assessment |
 | `godot-adapter` | Static public Godot reports and private fail-closed host-tool preflight foundations |
 
 Unity and Unreal adapters and all project bridges remain planned.
@@ -53,7 +53,9 @@ A finite internal reconciliation path can now close that retained checkpoint whe
 
 Approval presentation, signing, and final authorization remain separate boundaries. The core can import one caller-supplied canonical Ed25519 key into a same-process handle, derive its broker trust binding, and issue short, use-limited signer capabilities. A scoped-use helper closes a signer after its callback resolves or rejects, including when the callback retained or closed the handle itself. It performs no key-file I/O and provides no durable key store.
 
-The private local host runner derives signer expiry and use count from the exact approval-session challenge, wraps presentation and authorization in that scoped lifetime, and leaves the caller-owned key open. The presenter receives neither the key nor the signer. Durable operation dispatch, status, and recovery are not connected to this runner yet.
+The private local host path derives signer expiry and use count from the exact approval session, then binds that session, the prepared managed-skill plan, project identity, and signing-key identity to one same-process operation handle. Approval is presented at most once. An approval immediately enters durable dispatch in the same call; denial, cancellation, expiry, copied handles, changed keys, concurrent calls, and repeat calls cannot reach mutation. A no-op uses neither approval nor mutation authority. The caller-owned key remains open, and the presenter receives neither the key nor the signer.
+
+That private path also provides bounded, read-only lookup of a durable workflow head by project and run identity. Recovery assessment compares a stable transaction journal with the current project state and checks that the workflow head did not change during the assessment. It does not replay the original operation or finalize recovery. No public CLI or MCP command invokes the dispatcher or these recovery boundaries.
 
 The permission broker separates approval admission from execution duration. Explicit approvals may wait for at most five minutes, while the resulting authorization lease is still capped from authorization time by the registered execution budget and the request's absolute deadline. Automatic permission paths retain their original execution-only deadline bound.
 

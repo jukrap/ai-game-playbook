@@ -18,6 +18,7 @@ test("the Codex adapter is private and keeps a one-way workspace boundary", asyn
     "@ai-game-playbook/contracts": "workspace:*",
     "@ai-game-playbook/core": "workspace:*",
     "@ai-game-playbook/mcp": "workspace:*",
+    "@ai-game-playbook/pack-runtime": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
     "@ai-game-playbook/skill-runtime": "workspace:*",
   });
@@ -32,6 +33,7 @@ test("the Codex adapter is private and keeps a one-way workspace boundary", asyn
     { path: "../contracts" },
     { path: "../registry" },
     { path: "../core" },
+    { path: "../pack-runtime" },
     { path: "../skill-runtime" },
     { path: "../mcp" },
   ]);

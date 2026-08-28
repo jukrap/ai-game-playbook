@@ -1,9 +1,11 @@
 export {
   CodexApprovalBoundaryError,
+  CodexManagedSkillBoundaryError,
   CodexSetupBoundaryError,
 } from "./errors.js";
 export type {
   CodexApprovalBoundaryErrorCode,
+  CodexManagedSkillBoundaryErrorCode,
   CodexSetupBoundaryErrorCode,
 } from "./errors.js";
 export {
@@ -35,3 +37,21 @@ export type {
   CreateCodexProjectSetupPlanOptions,
 } from "./setup.js";
 export { CODEX_MCP_ENTRY_MAX_BYTES } from "./runtime-entry.js";
+export {
+  CODEX_MANAGED_SKILL_APPROVAL_MAX_WAIT_MS,
+  CODEX_MANAGED_SKILL_APPROVAL_MIN_WAIT_MS,
+  inspectCodexManagedSkillInstallationRecovery,
+  prepareCodexManagedSkillInstallation,
+  queryCodexManagedSkillInstallationStatus,
+  runCodexManagedSkillInstallation,
+} from "./managed-skill-operation.js";
+export type {
+  CodexManagedSkillInstallationHead,
+  CodexManagedSkillInstallationQueryRequest,
+  CodexManagedSkillInstallationRecovery,
+  CodexManagedSkillInstallationRunResult,
+  CodexManagedSkillInstallationStatus,
+  PrepareCodexManagedSkillInstallationRequest,
+  PreparedCodexManagedSkillInstallation,
+  RunCodexManagedSkillInstallationRequest,
+} from "./managed-skill-operation.js";

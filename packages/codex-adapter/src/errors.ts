@@ -38,3 +38,21 @@ export class CodexApprovalBoundaryError extends Error {
     this.code = code;
   }
 }
+
+export type CodexManagedSkillBoundaryErrorCode =
+  | "codex-managed-skill-operation-active"
+  | "codex-managed-skill-operation-invalid"
+  | "codex-managed-skill-operation-settled"
+  | "codex-managed-skill-plan-conflicted"
+  | "codex-managed-skill-signing-key-mismatch"
+  | "codex-managed-skill-status-mismatch";
+
+export class CodexManagedSkillBoundaryError extends Error {
+  readonly code: CodexManagedSkillBoundaryErrorCode;
+
+  constructor(code: CodexManagedSkillBoundaryErrorCode, message: string) {
+    super(message);
+    this.name = "CodexManagedSkillBoundaryError";
+    this.code = code;
+  }
+}

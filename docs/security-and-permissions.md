@@ -44,11 +44,15 @@ The core now also has a private in-memory local signer. It imports only a caller
 
 A scoped signer-use boundary closes the lease after its callback resolves or rejects. Returning, retaining, or directly closing the signer inside the callback cannot keep it usable after that boundary settles. The private local host runner takes the exact expiry and signature count from the original approval session, uses this scoped boundary around presentation and authorization, and leaves the caller-owned key open for an explicit later lifecycle decision.
 
+One private managed-skill operation now binds the prepared plan, approval session, project identity, run identity, and signing-key identity to an in-process handle. The handle contains no key, lease, absolute path, or transferable authority. It can be invoked once: approval dispatches the exact plan immediately in the same call, while denial, cancellation, expiry, a copied handle, a different key, a concurrent invocation, or a repeated invocation stops before another effect. The original operation is never retried automatically.
+
+After interruption, a bounded read-only query can report the durable workflow head. A separate read-only recovery assessment compares the transaction journal and project state twice and rejects a workflow head that changes during inspection. It may report that no transaction exists, but it cannot resume the original operation or write a recovery decision. Recovery finalization remains a separately authorized internal workflow.
+
 Approval waiting and execution time now have separate bounds. A request that needs explicit approval may reserve up to five minutes for admission in addition to its registered execution duration. Automatic requests gain no extra delay. Once approval succeeds, the authorization lease ends at the earliest of the grant expiry, the absolute request deadline, or the authorization time plus the execution budget. Approval therefore cannot silently consume the execution budget or enlarge it.
 
 The runtime does not generate, read, write, or persist signing keys. Key paths and private material never enter the presenter, prompt, session data, snapshot, receipt, or bounded error. Durable key storage, rotation, backup, and operating-system access controls remain unimplemented.
 
-These pieces are internal integration boundaries, not a user interface or an MCP elicitation implementation. No public command currently renders the prompt or accepts an approval, and the read-only MCP tool catalog is unchanged. Internal pack recovery and its first finite evidence-reconciliation path have bounded cancellation and durable closure, but public installation and recovery remain unavailable until the host runner also owns operation dispatch, durable workflow status, and recovery entry points end to end.
+These pieces are internal integration boundaries, not a user interface or an MCP elicitation implementation. No public command renders the prompt or accepts an approval, and the read-only MCP tool catalog is unchanged. The private host path now owns one managed-skill add operation through approval, dispatch, durable status, and read-only recovery assessment. Public installation and recovery remain unavailable; recovery execution still requires its separate internal approval and cannot be reached through this host path.
 
 ## Stop conditions
 

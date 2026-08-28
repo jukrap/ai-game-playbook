@@ -33,6 +33,18 @@ export type {
   ApprovalPromptPermission,
 } from "./approval-prompt-contracts.js";
 export {
+  approvalSessionChallengeSchema,
+  approvalSessionResponseSchema,
+  computeApprovalSessionChallengeDigest,
+} from "./approval-session-contracts.js";
+export type {
+  ApprovalSessionChallenge,
+  ApprovalSessionChallengeDigestInput,
+  ApprovalSessionDecision,
+  ApprovalSessionGrantTerm,
+  ApprovalSessionResponse,
+} from "./approval-session-contracts.js";
+export {
   DOCTOR_CHECK_STATUSES,
   computeDoctorStatus,
   doctorReportSchema,

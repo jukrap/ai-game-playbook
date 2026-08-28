@@ -1,6 +1,8 @@
 import {
   approvalGrantSchema,
   approvalPromptSchema,
+  approvalSessionChallengeSchema,
+  approvalSessionResponseSchema,
   assetProvenanceSchema,
   computePackManifestDigest,
   doctorReportSchema,
@@ -1826,6 +1828,8 @@ const definition: RegistryDefinition = Object.freeze({
   schemas: Object.freeze([
     approvalGrantSchema,
     approvalPromptSchema,
+    approvalSessionChallengeSchema,
+    approvalSessionResponseSchema,
     assetProvenanceSchema,
     doctorRequestSchema,
     doctorReportSchema,

@@ -286,6 +286,7 @@ interface GrantUsage {
 }
 
 const preparedChallenges = new WeakSet<object>();
+const permissionBrokerInstances = new WeakSet<object>();
 const approvalPromptChallenges = new WeakMap<
   object,
   PermissionAuthorizationChallenge
@@ -325,6 +326,22 @@ export function assertAuthorizedPermissionDecision(
       "permission-lease-state-invalid",
       "$authorization",
       "authorization decision must be produced by a permission broker in this process",
+    );
+  }
+}
+
+export function assertPermissionBroker(
+  value: unknown,
+): asserts value is PermissionBroker {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    !permissionBrokerInstances.has(value)
+  ) {
+    throw boundaryError(
+      "invalid-permission-broker-options",
+      "$broker",
+      "permission broker must be produced by this process",
     );
   }
 }
@@ -2231,5 +2248,7 @@ export function createPermissionBroker(
       "expected permission broker options",
     );
   }
-  return Object.freeze(new PermissionBrokerImplementation(options));
+  const broker = new PermissionBrokerImplementation(options);
+  permissionBrokerInstances.add(broker);
+  return Object.freeze(broker);
 }

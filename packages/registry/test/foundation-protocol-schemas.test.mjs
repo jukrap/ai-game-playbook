@@ -10,6 +10,8 @@ import { validFoundationProtocolFixtures } from "./fixtures/foundation-protocols
 const expectedIds = [
   "approval-grant",
   "approval-prompt",
+  "approval-session-challenge",
+  "approval-session-response",
   "build-artifact-evidence",
   "doctor-report",
   "doctor-request",
@@ -105,6 +107,38 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       {
         ...fixtures["approval-prompt"],
         input: { secret: "must-not-be-presented" },
+      },
+    ],
+    [
+      "approval-session-challenge",
+      {
+        ...fixtures["approval-session-challenge"],
+        grantTerms: [
+          ...fixtures["approval-session-challenge"].grantTerms,
+          {
+            ...fixtures["approval-session-challenge"].grantTerms[0],
+            grantId: "approval.session.second.install",
+          },
+        ],
+      },
+    ],
+    [
+      "approval-session-challenge",
+      {
+        ...fixtures["approval-session-challenge"],
+        grantTerms: [
+          {
+            ...fixtures["approval-session-challenge"].grantTerms[0],
+            maxUses: 2,
+          },
+        ],
+      },
+    ],
+    [
+      "approval-session-response",
+      {
+        ...fixtures["approval-session-response"],
+        signature: "must-not-be-present",
       },
     ],
     [

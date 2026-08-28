@@ -34,6 +34,10 @@ The control plane now defines an internal, host-neutral `ApprovalPrompt` contrac
 
 The prompt has no field for raw command input, an absolute project root, credentials, a signature, or an approval key. Its digest detects changes to the displayed authority but is not itself permission to execute. A validated serialized copy can be rendered, but only the original in-process prompt remains linked to the broker challenge that can produce an unsigned grant subject. The resulting grant still requires a trusted signature and exact broker validation.
 
+The core also has an internal one-shot approval session. Its serializable challenge binds one host ID, the prompt and request digests, a presentation deadline, and exact grant expiry and use terms. A host response can only approve, deny, or cancel that exact session. It contains no command input, grant, signature, or key material. The host receives a validated immutable prompt copy; only the original in-process session handle retains the request, prompt authority, and broker binding.
+
+After an approval response is accepted, the session cannot return to pending. An external signer receives only each exact grant digest, and the resulting signed grants go back to the original broker for full request validation. Denial, cancellation, and expiry never invoke the signer. A signer or broker failure after approval terminates the session as failed, so retry requires a new session and a new decision. A host's own tool prompt and a future MCP elicitation are additional presentation boundaries, not substitutes for this grant check.
+
 No public command currently renders this prompt or accepts an approval. Internal pack recovery and its first finite evidence-reconciliation path have bounded cancellation and durable closure, but public installation and recovery remain unavailable until a host approval path carries those boundaries end to end.
 
 ## Stop conditions

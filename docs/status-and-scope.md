@@ -25,6 +25,8 @@ Internal recovery finalization now uses a recovery-run identity separate from th
 
 The first internal evidence-reconciliation provider can now close that retained one-step pack-recovery checkpoint from an exact stable closure proof. Reconciliation has a separate run, approval, and receipt, observes the current checkpoint head and target-receipt state, and records no original attempt or target receipt-chain entry. It never replays the pack mutation. This provider is private and does not cover multi-step, rollback, process, editor, or general engine workflows.
 
+An internal one-shot approval session now carries an exact prompt through approval, denial, cancellation, expiry, external digest signing, and final broker validation. Serialized presentation data has no authority, and an accepted approval cannot be replayed after signing or authorization fails. No public renderer, signing-key store, CLI mutation route, or MCP mutation route uses this session yet.
+
 ## What is not available
 
 There is no installable or published package. The following product capabilities do not exist yet:

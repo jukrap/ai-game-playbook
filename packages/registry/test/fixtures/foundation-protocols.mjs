@@ -1107,6 +1107,31 @@ export const validFoundationProtocolFixtures = {
     ],
     promptDigest: secondDigest,
   },
+  "approval-session-challenge": {
+    schemaVersion: "1.0.0",
+    sessionId: "018f6f35-2c9e-7d1a-8a4b-123456789abe",
+    hostId: "host.codex-local",
+    promptDigest: secondDigest,
+    requestDigest: digest,
+    createdAt: startedAt,
+    expiresAt: "2026-08-26T01:02:03.000Z",
+    grantTerms: [
+      {
+        grantId: "approval.session.install",
+        permission: "install",
+        expiresAt: "2026-08-26T01:03:03.000Z",
+        maxUses: 1,
+      },
+    ],
+    sessionDigest: digest,
+  },
+  "approval-session-response": {
+    schemaVersion: "1.0.0",
+    sessionId: "018f6f35-2c9e-7d1a-8a4b-123456789abe",
+    sessionDigest: digest,
+    promptDigest: secondDigest,
+    decision: "approved",
+  },
   "resolved-workflow-plan": {
     schemaVersion: "1.0.0",
     registryDigest: digest,

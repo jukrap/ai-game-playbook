@@ -32,6 +32,10 @@ import {
 } from "./run-engine-contracts.js";
 import { approvalGrantSchema } from "./approval-contracts.js";
 import { approvalPromptSchema } from "./approval-prompt-contracts.js";
+import {
+  approvalSessionChallengeSchema,
+  approvalSessionResponseSchema,
+} from "./approval-session-contracts.js";
 import { taskRoutingSelectionSchema } from "./routing-contracts.js";
 import {
   doctorReportSchema,
@@ -133,6 +137,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
   Object.freeze({
     "approval-grant": approvalGrantSchema,
     "approval-prompt": approvalPromptSchema,
+    "approval-session-challenge": approvalSessionChallengeSchema,
+    "approval-session-response": approvalSessionResponseSchema,
     "build-artifact-evidence": buildArtifactEvidenceSchema,
     "doctor-report": doctorReportSchema,
     "doctor-request": doctorRequestSchema,

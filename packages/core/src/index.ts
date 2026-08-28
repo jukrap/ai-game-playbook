@@ -86,6 +86,7 @@ export {
 } from "./process-runner.js";
 export {
   assertAuthorizedPermissionDecision,
+  assertPermissionBroker,
   assertPermissionSettlement,
   createApprovalGrantSubject,
   createApprovalGrantSubjectFromPrompt,
@@ -111,6 +112,22 @@ export type {
   TrustedApprovalKey,
   UnsignedApprovalGrant,
 } from "./permission-broker.js";
+export {
+  createPermissionApprovalSession,
+  inspectPermissionApprovalSession,
+  resolvePermissionApprovalSession,
+} from "./permission-approval-session.js";
+export type {
+  ApprovalGrantSigner,
+  CreatePermissionApprovalSessionOptions,
+  PermissionApprovalGrantTermOptions,
+  PermissionApprovalSession,
+  PermissionApprovalSessionFailure,
+  PermissionApprovalSessionPresentation,
+  PermissionApprovalSessionResolution,
+  PermissionApprovalSessionSnapshot,
+  PermissionApprovalSessionStatus,
+} from "./permission-approval-session.js";
 export type {
   BoundedProcessLimits,
   BoundedProcessOutcome,

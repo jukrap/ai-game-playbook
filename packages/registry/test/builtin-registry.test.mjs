@@ -533,6 +533,8 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   for (const approvalSchema of [
     contracts.approvalGrantSchema,
     contracts.approvalPromptSchema,
+    contracts.approvalSessionChallengeSchema,
+    contracts.approvalSessionResponseSchema,
   ]) {
     assert.equal(
       registry.BUILTIN_REGISTRY.schemas.some(

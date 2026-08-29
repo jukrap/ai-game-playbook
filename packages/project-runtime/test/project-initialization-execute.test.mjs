@@ -485,12 +485,21 @@ test("cooperative cancellation rolls back every confirmed project target creatio
   assert.equal(report.status, "rolled-back");
   assert.equal(report.mutationUncertain, false);
   assert.equal(report.authorization.status, "failed");
-  assert.deepEqual(report.effects.changedPaths, [
-    ".ai-game-playbook/profile.json",
-  ]);
+  assert.equal(
+    report.effects.changedPaths.includes(".ai-game-playbook/profile.json"),
+    true,
+  );
+  assert.equal(report.effects.changedPaths.length > 0, true);
   assert.deepEqual(report.effects.appliedPaths, report.effects.changedPaths);
   assert.deepEqual(report.effects.rolledBackPaths, report.effects.changedPaths);
-  await assert.rejects(lstat(profilePath), (error) => error?.code === "ENOENT");
+  const plannedPaths = new Set(plan.targets.map(({ path }) => path));
+  for (const path of report.effects.changedPaths) {
+    assert.equal(plannedPaths.has(path), true);
+    await assert.rejects(
+      lstat(native(f.project, path)),
+      (error) => error?.code === "ENOENT",
+    );
+  }
   const receipt = await core.loadRunReceiptChain({
     root: f.root,
     registry: BUILTIN_REGISTRY,

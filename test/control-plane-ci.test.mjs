@@ -7,6 +7,7 @@ const controlPlaneWorkflowPath = new URL(
   import.meta.url,
 );
 const docsWorkflowPath = new URL("../.github/workflows/docs.yml", import.meta.url);
+const packageManifestPath = new URL("../package.json", import.meta.url);
 
 test("control-plane CI runs the same locked verification on Windows and Linux", () => {
   const workflow = readFileSync(controlPlaneWorkflowPath, "utf8");
@@ -56,4 +57,15 @@ test("repository workflows do not persist checkout credentials", () => {
     assert.doesNotMatch(workflow, /pull_request_target/);
     assert.match(workflow, /node-version: 22\.23\.2/);
   }
+});
+
+test("Windows containment integration tests run one native scenario at a time", () => {
+  const packageManifest = JSON.parse(readFileSync(packageManifestPath, "utf8"));
+  const verification = packageManifest.scripts?.["provider:windows:verify"];
+
+  assert.equal(typeof verification, "string");
+  assert.match(
+    verification,
+    /node --test --test-concurrency=1 packages\/windows-containment-provider\/test\/\*\.test\.mjs packages\/godot-adapter\/test\/contained-headless-admission\.test\.mjs$/,
+  );
 });

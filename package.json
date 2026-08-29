@@ -23,7 +23,7 @@
     "plan:write": "node scripts/generate-foundation-plan.mjs --write",
     "provider:windows:build": "dotnet publish packages/windows-containment-provider/native/AiGamePlaybook.WindowsContainment.csproj --configuration Release --runtime win-x64 --self-contained true --output packages/windows-containment-provider/dist/native/win-x64",
     "provider:windows:fixture:build": "dotnet publish packages/windows-containment-provider/test-native/GodotFixture/AiGamePlaybook.GodotFixture.csproj --configuration Release --runtime win-x64 --self-contained true --output packages/windows-containment-provider/dist/test-native/win-x64",
-    "provider:windows:verify": "pnpm run build && pnpm run provider:windows:build && pnpm run provider:windows:fixture:build && node --test packages/windows-containment-provider/test/*.test.mjs packages/godot-adapter/test/contained-headless-admission.test.mjs",
+    "provider:windows:verify": "pnpm run build && pnpm run provider:windows:build && pnpm run provider:windows:fixture:build && node --test --test-concurrency=1 packages/windows-containment-provider/test/*.test.mjs packages/godot-adapter/test/contained-headless-admission.test.mjs",
     "test": "node --test --test-concurrency=4 \"test/*.test.mjs\" \"packages/*/test/*.test.mjs\"",
     "typecheck": "tsc -b --pretty false",
     "verify": "pnpm run typecheck && pnpm run plan:check && pnpm run test && pnpm run docs:test && pnpm run docs:check"

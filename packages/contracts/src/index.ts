@@ -371,6 +371,33 @@ export type {
   GodotHeadlessPreflightReport,
 } from "./godot-headless-preflight-contracts.js";
 export {
+  GODOT_DETERMINISTIC_REPLAY_IDLE_TIMEOUT_MS,
+  GODOT_DETERMINISTIC_REPLAY_INVOCATION_DIGEST,
+  GODOT_DETERMINISTIC_REPLAY_MAX_EVENTS,
+  GODOT_DETERMINISTIC_REPLAY_MAX_LINE_BYTES,
+  GODOT_DETERMINISTIC_REPLAY_MAX_OUTPUT_BYTES,
+  GODOT_DETERMINISTIC_REPLAY_OUTPUT_PREFIX,
+  GODOT_DETERMINISTIC_REPLAY_PROCESS_TIMEOUT_MS,
+  GODOT_DETERMINISTIC_REPLAY_TERMINATION_GRACE_MS,
+  assertGodotDeterministicReplayTranscriptSemantics,
+  computeGodotDeterministicReplayStateHash,
+  computeGodotDeterministicReplayTranscriptDigest,
+  godotDeterministicReplayTranscriptSchema,
+} from "./godot-deterministic-replay-contracts.js";
+export type {
+  GodotDeterministicReplayFailedEvent,
+  GodotDeterministicReplayFailureCode,
+  GodotDeterministicReplayOracleEvent,
+  GodotDeterministicReplayPassedEvent,
+  GodotDeterministicReplayStartedEvent,
+  GodotDeterministicReplayStateEntry,
+  GodotDeterministicReplayStateValue,
+  GodotDeterministicReplayTerminalEvent,
+  GodotDeterministicReplayTranscript,
+  GodotDeterministicReplayTranscriptDigestInput,
+  GodotDeterministicReplayWireAttestation,
+} from "./godot-deterministic-replay-contracts.js";
+export {
   PROCESS_CONTAINMENT_POLICY_DIGEST,
   PROCESS_CONTAINMENT_REQUIREMENTS,
   assertProcessContainmentAssessmentReportSemantics,

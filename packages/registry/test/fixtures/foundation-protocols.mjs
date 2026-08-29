@@ -1,6 +1,7 @@
 import {
   ENGINE_OPERATION_KINDS,
   ENGINE_SNAPSHOT_EXCLUSION_POLICY_DIGEST,
+  GODOT_DETERMINISTIC_REPLAY_INVOCATION_DIGEST,
   GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
   PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS,
   PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
@@ -685,6 +686,42 @@ export const validFoundationProtocolFixtures = {
       settledAt: endedAt,
     },
     probeDigest: secondDigest,
+  },
+  "godot-deterministic-replay-transcript": {
+    schemaVersion: "1.0.0",
+    invocationDigest: GODOT_DETERMINISTIC_REPLAY_INVOCATION_DIGEST,
+    expectationDigest: digest,
+    wire: {
+      outputDigest: secondDigest,
+      bytes: 256,
+      eventCount: 3,
+      lineEnding: "lf",
+    },
+    started: {
+      event: "replay-started",
+      scenarioId: "scenario.graybox.core",
+      scenarioDigest: digest,
+      seed: "graybox-core-v1",
+    },
+    oracles: [
+      {
+        event: "oracle-passed",
+        oracleId: "oracle.graybox.win",
+        terminal: true,
+        tick: 431,
+        state: [
+          { path: "game.won", value: true },
+          { path: "hud.collectible-count", value: 2 },
+        ],
+        stateHash: secondDigest,
+      },
+    ],
+    terminal: {
+      event: "replay-passed",
+      tick: 431,
+      scenarioDigest: digest,
+    },
+    transcriptDigest: secondDigest,
   },
   "godot-headless-preflight-request": {
     schemaVersion: "1.0.0",

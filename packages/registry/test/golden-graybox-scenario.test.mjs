@@ -47,6 +47,12 @@ test("the builtin registry binds both graybox scenario schemas", async () => {
     registeredSchemas.get(contracts.playtestScenarioBindingSchema.schemaId),
     contracts.playtestScenarioBindingSchema.digest,
   );
+  assert.equal(
+    registeredSchemas.get(
+      contracts.godotDeterministicReplayTranscriptSchema.schemaId,
+    ),
+    contracts.godotDeterministicReplayTranscriptSchema.digest,
+  );
   assert.deepEqual(
     registry.validateRegisteredContractValue(
       registry.BUILTIN_REGISTRY,

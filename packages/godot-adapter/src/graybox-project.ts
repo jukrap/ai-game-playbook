@@ -502,6 +502,7 @@ function assertStaticStructure(files: ReadonlyMap<string, string>): void {
       "func save_game(",
       "func load_game(",
       "func state_value(",
+      '"--agpb-replay" in OS.get_cmdline_user_args()',
       'FileAccess.get_file_as_string("res://scenario.json")',
     ],
     "Godot graybox gameplay source is missing a required behavior boundary.",

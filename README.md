@@ -16,13 +16,13 @@ This repository contains an early control plane, not a finished game-development
 | --- | --- |
 | CLI | Nine plan-only, read-only, or static inspection commands |
 | Project inspection | Bounded Godot, Unity, and Unreal marker and profile checks |
-| Godot | Static public status, an exact-manifest graybox project source, and a private exact-version contained startup path; no public engine launch |
+| Godot | Static public status, an exact-manifest graybox project source, bounded replay transcript validation, and a private exact-version contained startup path; no public engine launch |
 | Skills | Twelve capability-first game-development skills with exact packaged artifacts |
 | MCP | An opt-in, project-bound, read-only STDIO runtime for selected tools |
 | Windows containment | Disposable AppContainer qualification and a one-shot, snapshot-bound process run from staged copies; no public dispatcher |
 | Safety foundation | Typed contracts, registry checks, bounded permissions and workflows, receipts, and managed lifecycle primitives |
 
-The tracked Godot graybox source contains movement, camera, collision, collectibles, HUD state, save and load, a win state, deterministic input replay, and state tracing. Its exact file set, hashes, scenario binding, and required project structure are checked without starting an engine. This is static source-integrity evidence only: an installed Godot release has not parsed or run the project, captured a gameplay frame, exercised a save cycle, or exported a build.
+The tracked Godot graybox source contains movement, camera, collision, collectibles, HUD state, save and load, a win state, deterministic input replay, and state tracing. Its exact file set, hashes, scenario binding, and required project structure are checked without starting an engine. A separate bounded parser binds a fixed replay invocation to the scenario, every expected oracle, state hashes, terminal event, and process exit category; empty, partial, duplicated, malformed, oversized, or contradictory transcripts fail closed. These are implementation and static-integrity checks only: an installed Godot release has not parsed or run the project, produced such a transcript, captured a gameplay frame, exercised a save cycle, or exported a build.
 
 No installable package is published. The CLI does not edit a game project, install skills, control an editor, run a game, produce a build, or export evidence. All live-engine capabilities and support grades remain planned.
 

@@ -1,5 +1,24 @@
 export { GodotAdapterBoundaryError } from "./errors.js";
 export {
+  GODOT_DETERMINISTIC_REPLAY_OUTPUT_PREFIX,
+  classifyGodotDeterministicReplayResult,
+  createGodotDeterministicReplayExpectation,
+  parseGodotDeterministicReplayOutput,
+} from "./deterministic-replay-result.js";
+export type {
+  GodotDeterministicReplayExpectation,
+  GodotDeterministicReplayInputExpectation,
+  GodotDeterministicReplayOracleExpectation,
+  GodotDeterministicReplayOutput,
+  GodotDeterministicReplayOutputAttestation,
+  GodotDeterministicReplayOutputInvalidCode,
+  GodotDeterministicReplayResult,
+  GodotDeterministicReplayResultCode,
+  GodotDeterministicReplayResultStatus,
+  InvalidGodotDeterministicReplayOutput,
+  ParsedGodotDeterministicReplayOutput,
+} from "./deterministic-replay-result.js";
+export {
   GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST,
   GODOT_GRAYBOX_SCENARIO_DIGEST,
   GODOT_GRAYBOX_TARGET_VERSION,

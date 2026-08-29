@@ -38,7 +38,7 @@ The grade belongs to a capability and environment. An adapter can be `headless` 
 
 The current public path checks one Godot project candidate and compares its major and minor version hint with the pinned `4.7.2` target. It reports the common operation catalog, but every operation remains planned.
 
-The repository also contains an exact-manifest Godot `4.7.2` graybox project source. Its static verifier binds the fixed files, hashes, project and scene settings, scripts, copied scenario, replay entry points, and `planned` support state. This produces `implemented` static evidence with `liveValidated: false`; it does not prove that Godot can parse, start, play, capture, save, or export the project.
+The repository also contains an exact-manifest Godot `4.7.2` graybox project source. Its static verifier binds the fixed files, hashes, project and scene settings, scripts, copied scenario, replay entry points, and `planned` support state. A bounded transcript parser separately checks the fixed invocation, scenario identity, complete oracle set, timing, state fields and hashes, terminal event, and process exit agreement. These produce implementation and static evidence with `liveValidated: false`; they do not prove that Godot can parse, start, play, capture, save, or export the project.
 
 Private foundations can discover bounded executable candidates and probe an exact version only with narrow host-tool permission. A Windows provider first qualifies its isolation policy with disposable probes and a fixed synthetic launch. One successful witness can then be bound to exact read-only project and executable snapshots.
 

@@ -19,6 +19,8 @@ The repository builds a private pnpm workspace and an `agpb` executable from sou
 
 All nine commands avoid project writes, engine launch, editor control, network access, and software installation. Human and JSON output share the same validated result and exit category.
 
+A tracked Godot `4.7.2` graybox project source covers movement, camera, collision, collectibles, HUD state, save and load, a win state, deterministic input replay, and state tracing. An exact manifest and adapter tests bind its file set, hashes, scenario semantics, required structure, and fixed `planned` support state. This is source-integrity evidence only; an installed Godot release has not parsed or run the project.
+
 The repository also contains typed contracts, one validated registry, and bounded project, process, permission, and workflow primitives. Receipt, artifact, managed-pack, MCP, and host-setup foundations are present too. A private one-shot host operation can create or retain the fixed control layout and the non-owned shared `.agents/skills` parent with rollback and durable evidence. The twelve packaged skills are bound to one digest-checked experimental pack. A second private operation covers exact install approval, stale-plan revalidation, one project-write lane, compare-and-swap ownership, checkpoints, receipts, content-addressed terminal transaction evidence, rollback, and recovery barriers. These pieces are foundations unless a public command above exposes them.
 
 Internal recovery finalization now uses a recovery-run identity separate from the original pack transaction. It requires fresh approval, revalidates the transaction under one project-write lane, and returns success only when journal closure, content-addressed closure evidence, a `RunReceipt`, and the terminal workflow checkpoint agree. If evidence retention fails after the transaction closes, no success is returned and the started checkpoint remains for later reconciliation. The runtime does not retry that mutation.
@@ -48,7 +50,7 @@ There is no installable or published package. The following product capabilities
 - a concrete approval UI, durable signing-key storage, or key rotation;
 - a live Godot, Unity, or Unreal engine bridge;
 - editor connection, scene or asset mutation, game input, or runtime capture;
-- engine tests, a playable golden project, build or export execution;
+- engine tests, a live-validated playable golden project, build or export execution;
 - evidence list, show, export, or release publication.
 
 Internal Godot discovery and contained preflight code does not change this status. The public compiled catalog remains empty. The private route can run only an exact-version, approval-bound, fixed headless invocation from staged copies, and it has been verified only with a purpose-built fixture. No installed Godot release, playable frame, deterministic input, runtime capture, or target export has been retained, so live-engine support remains unestablished.

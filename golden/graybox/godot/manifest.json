@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectId": "golden.graybox.godot",
+  "engine": {
+    "id": "godot",
+    "version": "4.7.2",
+    "releaseStatus": "stable"
+  },
+  "mainScene": "scenes/main.tscn",
+  "scenario": {
+    "path": "scenario.json",
+    "digest": "sha256:4bce945905093f746939b6b8f1c6183d0795f2f74b533763970aeed5be4e6c0f"
+  },
+  "features": [
+    "camera-follow",
+    "collision",
+    "collectible",
+    "deterministic-input-replay",
+    "hud-counter",
+    "movement",
+    "save-load",
+    "state-trace",
+    "win-state"
+  ],
+  "files": [
+    {
+      "path": "project.godot",
+      "role": "project-settings",
+      "bytes": 638,
+      "digest": "sha256:77146b9e6411088e5de954ae4c460faa2e6395882797ade7c564651b97ce2d28"
+    },
+    {
+      "path": "scenario.json",
+      "role": "scenario",
+      "bytes": 7467,
+      "digest": "sha256:77dce4e164cdb5243f9491c82870369058fe4aa15321f158bba0baaec5027641"
+    },
+    {
+      "path": "scenes/main.tscn",
+      "role": "scene",
+      "bytes": 190,
+      "digest": "sha256:1406507a8219cb52c2e965352f373c031dfff5143fd2a52e43c28c23e2ab7722"
+    },
+    {
+      "path": "scripts/graybox_game.gd",
+      "role": "gameplay-script",
+      "bytes": 11711,
+      "digest": "sha256:6fcb37b029f19f783c49ac8b1c0b4864f3bc52a7c2d5d6912b860193c5116aa3"
+    },
+    {
+      "path": "scripts/graybox_replay.gd",
+      "role": "replay-script",
+      "bytes": 6098,
+      "digest": "sha256:7a48568e5f89dc4747ff33672042547d8ea0a1830f05e5c2706219720c4a617d"
+    }
+  ],
+  "sourceDigest": "sha256:71c0af1a893a17988a73481324cbd74b242fa8143ca109efd222d670475132cd",
+  "support": {
+    "grade": "planned",
+    "evidenceGrade": "implemented",
+    "liveValidated": false
+  }
+}

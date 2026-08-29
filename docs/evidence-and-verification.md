@@ -79,10 +79,12 @@ The shared 3D graybox is the first cross-engine behavior target. It contains mov
 
 The [tracked core scenario](../golden/graybox/scenario.json) fixes the first engine-neutral movement, camera, collision, collectible, HUD, and win-state oracles together with its input sequence, budgets, required evidence, and canonical digest. Automated tests witness the definition and drift checks only. The fixture does not claim that any engine, runtime frame, save cycle, or packaged build has passed.
 
+The [Godot source manifest](../golden/graybox/godot/manifest.json) binds a Godot `4.7.2` project source to that scenario. The source includes movement and camera control, collision geometry, two collectibles, a HUD counter, save and load, a win state, fixed-tick input replay, oracle evaluation, and a SHA-256 state trace. Static verification rejects missing, extra, reordered, or modified files and checks required project, scene, script, and scenario structure. Passing it yields `implemented` static evidence only; the project has not yet been parsed or run by Godot.
+
 Each adapter must run the same player-visible scenarios while preserving engine-specific build and test evidence. A static scene, successful compilation, or editor screenshot does not complete the task.
 
 ## Support decisions
 
 Support is promoted per capability only when every required evidence item exists at the required grade. Missing identity, incomplete tests, non-runtime captures, unavailable build startup, or absent rollback remains an explicit gap.
 
-The current public Godot reports contain only `documented` operation entries and static project observations. They do not establish live-engine evidence.
+The current public Godot reports contain only `documented` operation entries and static project observations. The separate graybox integrity report is not a public engine operation and carries only `implemented` static evidence. Neither establishes live-engine evidence.

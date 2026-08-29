@@ -8,7 +8,7 @@
 
 | Engine | Static project inspection | Engine-specific public report | Live editor or runtime | Current grade |
 | --- | --- | --- | --- | --- |
-| Godot | Markers, profile, and version hint | Status and fourteen planned operation entries | Unavailable | `planned` |
+| Godot | Markers, profile, version hint, and exact graybox source integrity | Status and fourteen planned operation entries | Unavailable | `planned` |
 | Unity | Markers, profile, and lockfile signal | Unavailable | Unavailable | `planned` |
 | Unreal Engine | Markers and profile | Unavailable | Unavailable | `planned` |
 
@@ -37,6 +37,8 @@ The grade belongs to a capability and environment. An adapter can be `headless` 
 ## Godot
 
 The current public path checks one Godot project candidate and compares its major and minor version hint with the pinned `4.7.2` target. It reports the common operation catalog, but every operation remains planned.
+
+The repository also contains an exact-manifest Godot `4.7.2` graybox project source. Its static verifier binds the fixed files, hashes, project and scene settings, scripts, copied scenario, replay entry points, and `planned` support state. This produces `implemented` static evidence with `liveValidated: false`; it does not prove that Godot can parse, start, play, capture, save, or export the project.
 
 Private foundations can discover bounded executable candidates and probe an exact version only with narrow host-tool permission. A Windows provider first qualifies its isolation policy with disposable probes and a fixed synthetic launch. One successful witness can then be bound to exact read-only project and executable snapshots.
 

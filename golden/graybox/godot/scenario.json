@@ -1,0 +1,298 @@
+{
+  "schemaVersion": "1.0.0",
+  "scenarioId": "scenario.graybox.core",
+  "version": "1.0.0",
+  "initialState": {
+    "sceneId": "scene.graybox.main",
+    "seed": "graybox-core-v1",
+    "resetProcedure": "reset.fresh-profile"
+  },
+  "clock": {
+    "kind": "fixed-tick",
+    "rateHz": 60,
+    "warmupTicks": 30,
+    "maximumTicks": 720
+  },
+  "inputs": [
+    {
+      "sequence": 0,
+      "tick": 30,
+      "device": "keyboard",
+      "action": "move.forward",
+      "phase": "pressed"
+    },
+    {
+      "sequence": 1,
+      "tick": 90,
+      "device": "keyboard",
+      "action": "move.forward",
+      "phase": "released"
+    },
+    {
+      "sequence": 2,
+      "tick": 100,
+      "device": "mouse",
+      "action": "camera.look",
+      "phase": "axis",
+      "value": ["0.250000", "0"]
+    },
+    {
+      "sequence": 3,
+      "tick": 120,
+      "device": "keyboard",
+      "action": "move.right",
+      "phase": "pressed"
+    },
+    {
+      "sequence": 4,
+      "tick": 190,
+      "device": "keyboard",
+      "action": "move.right",
+      "phase": "released"
+    },
+    {
+      "sequence": 5,
+      "tick": 200,
+      "device": "keyboard",
+      "action": "interact",
+      "phase": "pressed"
+    },
+    {
+      "sequence": 6,
+      "tick": 201,
+      "device": "keyboard",
+      "action": "interact",
+      "phase": "released"
+    },
+    {
+      "sequence": 7,
+      "tick": 300,
+      "device": "keyboard",
+      "action": "move.forward",
+      "phase": "pressed"
+    },
+    {
+      "sequence": 8,
+      "tick": 420,
+      "device": "keyboard",
+      "action": "move.forward",
+      "phase": "released"
+    },
+    {
+      "sequence": 9,
+      "tick": 430,
+      "device": "keyboard",
+      "action": "interact",
+      "phase": "pressed"
+    },
+    {
+      "sequence": 10,
+      "tick": 431,
+      "device": "keyboard",
+      "action": "interact",
+      "phase": "released"
+    }
+  ],
+  "checkpoints": [
+    {
+      "oracleId": "oracle.graybox.initial",
+      "atTick": 30,
+      "assertions": [
+        {
+          "path": "camera.active",
+          "operator": "eq",
+          "expected": { "kind": "boolean", "value": true }
+        },
+        {
+          "path": "collectibles.remaining",
+          "operator": "eq",
+          "expected": { "kind": "integer", "value": "2" }
+        },
+        {
+          "path": "game.won",
+          "operator": "eq",
+          "expected": { "kind": "boolean", "value": false }
+        },
+        {
+          "path": "hud.collectible-count",
+          "operator": "eq",
+          "expected": { "kind": "integer", "value": "0" }
+        },
+        { "path": "player.position.x", "operator": "exists" },
+        { "path": "player.position.y", "operator": "exists" },
+        { "path": "player.position.z", "operator": "exists" }
+      ],
+      "stateHashFields": [
+        "camera.active",
+        "collectibles.remaining",
+        "game.won",
+        "hud.collectible-count",
+        "player.position.x",
+        "player.position.y",
+        "player.position.z"
+      ],
+      "onFailureArtifacts": [
+        "artifact.runtime-frame",
+        "artifact.runtime-log",
+        "artifact.state-trace"
+      ]
+    },
+    {
+      "oracleId": "oracle.graybox.movement-camera",
+      "withinTicks": { "firstTick": 31, "lastTick": 119 },
+      "assertions": [
+        {
+          "path": "camera.active",
+          "operator": "eq",
+          "expected": { "kind": "boolean", "value": true }
+        },
+        {
+          "path": "camera.target-player",
+          "operator": "eq",
+          "expected": { "kind": "boolean", "value": true }
+        },
+        {
+          "path": "player.distance-from-start",
+          "operator": "gt",
+          "expected": { "kind": "decimal", "value": "0.500000" }
+        }
+      ],
+      "stateHashFields": [
+        "camera.active",
+        "camera.target-player",
+        "player.distance-from-start"
+      ],
+      "onFailureArtifacts": [
+        "artifact.runtime-frame",
+        "artifact.runtime-log",
+        "artifact.state-trace"
+      ]
+    },
+    {
+      "oracleId": "oracle.graybox.collision",
+      "atTick": 190,
+      "assertions": [
+        {
+          "path": "collision.blocked-path-held",
+          "operator": "eq",
+          "expected": { "kind": "boolean", "value": true }
+        },
+        {
+          "path": "player.blocked-axis-position",
+          "operator": "within",
+          "expected": { "kind": "decimal", "value": "4.000000" },
+          "tolerance": "0.050000"
+        },
+        {
+          "path": "player.penetration-depth",
+          "operator": "lte",
+          "expected": { "kind": "decimal", "value": "0.001000" }
+        }
+      ],
+      "stateHashFields": [
+        "collision.blocked-path-held",
+        "player.blocked-axis-position",
+        "player.penetration-depth"
+      ],
+      "onFailureArtifacts": [
+        "artifact.runtime-frame",
+        "artifact.runtime-log",
+        "artifact.state-trace"
+      ]
+    },
+    {
+      "oracleId": "oracle.graybox.first-collectible",
+      "withinTicks": { "firstTick": 200, "lastTick": 260 },
+      "assertions": [
+        {
+          "path": "collectibles.first-present",
+          "operator": "eq",
+          "expected": { "kind": "boolean", "value": false }
+        },
+        {
+          "path": "collectibles.remaining",
+          "operator": "eq",
+          "expected": { "kind": "integer", "value": "1" }
+        },
+        {
+          "path": "game.score",
+          "operator": "eq",
+          "expected": { "kind": "integer", "value": "1" }
+        },
+        {
+          "path": "hud.collectible-count",
+          "operator": "eq",
+          "expected": { "kind": "integer", "value": "1" }
+        }
+      ],
+      "stateHashFields": [
+        "collectibles.first-present",
+        "collectibles.remaining",
+        "game.score",
+        "hud.collectible-count"
+      ],
+      "onFailureArtifacts": [
+        "artifact.runtime-frame",
+        "artifact.runtime-log",
+        "artifact.state-trace"
+      ]
+    }
+  ],
+  "terminal": [
+    {
+      "oracleId": "oracle.graybox.win",
+      "withinTicks": { "firstTick": 431, "lastTick": 720 },
+      "assertions": [
+        {
+          "path": "collectibles.remaining",
+          "operator": "eq",
+          "expected": { "kind": "integer", "value": "0" }
+        },
+        {
+          "path": "game.score",
+          "operator": "eq",
+          "expected": { "kind": "integer", "value": "2" }
+        },
+        {
+          "path": "game.won",
+          "operator": "eq",
+          "expected": { "kind": "boolean", "value": true }
+        },
+        {
+          "path": "hud.collectible-count",
+          "operator": "eq",
+          "expected": { "kind": "integer", "value": "2" }
+        },
+        {
+          "path": "player.control-enabled",
+          "operator": "eq",
+          "expected": { "kind": "boolean", "value": true }
+        }
+      ],
+      "stateHashFields": [
+        "collectibles.remaining",
+        "game.score",
+        "game.won",
+        "hud.collectible-count",
+        "player.control-enabled"
+      ],
+      "onFailureArtifacts": [
+        "artifact.runtime-frame",
+        "artifact.runtime-log",
+        "artifact.state-trace"
+      ]
+    }
+  ],
+  "requiredArtifacts": [
+    "artifact.input-replay",
+    "artifact.runtime-frame",
+    "artifact.runtime-log",
+    "artifact.state-trace"
+  ],
+  "budgets": {
+    "wallClockMs": 30000,
+    "outputBytes": 1048576,
+    "screenshots": 1,
+    "repairCycles": 0
+  }
+}

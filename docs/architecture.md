@@ -42,14 +42,16 @@ A generated surface is descriptive until a matching handler and runtime boundary
 | `cli` | Nine source-built plan-only, read-only, or static commands |
 | `mcp` | Opt-in project-bound read-only STDIO tools selected from registry metadata |
 | `codex-adapter` | Write-free project setup planning plus private one-shot approval for project initialization and managed-skill installation, with read-only recovery assessment |
-| `godot-adapter` | Static public Godot reports plus private exact-version approval, contained startup, cancellation, and receipt settlement |
+| `godot-adapter` | Static public Godot reports, exact graybox source integrity, and private exact-version approval, contained startup, cancellation, and receipt settlement |
 | `windows-containment-provider` | Windows x64 artifact identity, disposable qualification, exact snapshot admission, staged AppContainer execution, bounded cancellation, and path-free reports |
 
-The `golden/graybox/` tree is not a runtime package. It stores the engine-neutral scenario that future engine projects must satisfy. Run-specific feature and project identities live in a separate `PlaytestScenarioBinding`, so they cannot change the shared behavior definition. Contract tests bind the scenario schema, semantic rules, and canonical digest; this does not count as live-engine evidence.
+The `golden/graybox/` tree is not a runtime package. Its root scenario defines the engine-neutral behavior that every engine project must satisfy. Run-specific feature and project identities live in a separate `PlaytestScenarioBinding`, so they cannot change that shared definition. Contract tests bind the scenario schema, semantic rules, and canonical digest.
+
+The `golden/graybox/godot/` tree contains a Godot `4.7.2` project source with one exact manifest. The Godot adapter verifies the fixed file set, byte counts, file and aggregate digests, project settings, scene and script boundaries, copied scenario semantics, deterministic replay entry points, and fixed `planned` support state. A passing report records `implemented` static evidence with `liveValidated: false`; it is not parser, runtime, capture, save-cycle, or export evidence.
 
 The common `EngineAdapter` factory requires exactly one handler for each of the fourteen lifecycle operations and returns an immutable same-process authority. Dispatch makes bounded immutable copies of plain request and result data, rejects cancellation before a handler starts, and checks request, operation, project, and session correlation. Registry schema validation is still required at the workflow boundary before dispatch and before evidence promotion. These conformance checks establish interface behavior only; they do not make an engine operation available.
 
-Unity and Unreal adapters and all project bridges remain planned.
+Unity and Unreal adapters, and supported project bridges for all engines, remain planned.
 
 The Windows containment package derives its descriptor and local catalog digest from the exact packaged x64 artifact. A one-use self-test handle binds the artifact, descriptor, project identity digest, challenge, and deadline. The native test runs only disposable state and produces a short-lived same-process witness after every probe and cleanup check passes.
 

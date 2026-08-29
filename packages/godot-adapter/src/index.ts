@@ -1,4 +1,19 @@
 export { GodotAdapterBoundaryError } from "./errors.js";
+export {
+  GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST,
+  GODOT_GRAYBOX_SCENARIO_DIGEST,
+  GODOT_GRAYBOX_TARGET_VERSION,
+  verifyGodotGrayboxProjectBundle,
+} from "./graybox-project.js";
+export type {
+  GodotGrayboxFeature,
+  GodotGrayboxProjectManifest,
+  GodotGrayboxProjectReport,
+  GodotGrayboxSourceDescriptor,
+  GodotGrayboxSourceRole,
+  GodotGrayboxSourceText,
+  VerifyGodotGrayboxProjectBundleRequest,
+} from "./graybox-project.js";
 export { runGodotEngineCapabilities } from "./capabilities.js";
 export {
   GODOT_EXECUTABLE_DISCOVERY_COMMAND_ID,

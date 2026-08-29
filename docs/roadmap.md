@@ -16,6 +16,7 @@ The repository now has:
 - separate private one-shot project-initialization and managed-skill operations with approval, durable dispatch, and read-only recovery inspection;
 - private pack recovery closure and finite evidence reconciliation;
 - a source-built Windows x64 AppContainer and Job Object qualification path plus one-shot snapshot admission, staged Godot-process dispatch, bounded caller cancellation, permission settlement, and retained receipts;
+- an exact-manifest Godot `4.7.2` graybox project source with static file, scenario, replay, and support-state integrity checks;
 - paired English and Korean public documentation with structural checks.
 
 The contained process path has passed success, injected-failure, timeout, and running-process cancellation cases with a purpose-built fixture. Cancellation waits for native process-tree settlement and cleanup before retaining its receipt. This checkpoint does not include an installable package, an installed Godot validation, or a live engine loop.
@@ -32,11 +33,11 @@ The private initialization-to-skill-install sequence now passes success, denial,
 
 ## Stage 2: Godot alpha
 
-- validate the existing contained startup path against an installed, pinned Godot release and the shared graybox project;
+- validate the existing contained startup path against an installed, pinned Godot release and the tracked graybox project source;
 - connect the validated provider to a supported project-bound host path while keeping public dispatch closed until user-facing approval and evidence inspection are complete;
 - require the exact admitted Godot executable and project identities at every dispatch and restart;
-- add the thin GDScript bridge and bounded command schema;
-- build the shared 3D graybox with movement, camera, collision, collectible, HUD, save and load, and win state;
+- finish and live-validate the thin GDScript bridge and bounded command schema;
+- parse and run the existing 3D graybox with movement, camera, collision, collectibles, HUD, save and load, and win state;
 - run script checks, tests, deterministic input, logs, runtime capture, restart, and Windows export;
 - retain complete receipts and promote each required capability only from matching evidence.
 

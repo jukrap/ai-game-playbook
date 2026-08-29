@@ -9,12 +9,16 @@ const keyId = "approval.host-tool-local";
 const { publicKey, privateKey } = generateKeyPairSync("ed25519");
 const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
 
+export function hostToolAuthorizationWindowMs(maxDurationMs) {
+  return core.PERMISSION_REQUEST_MAX_APPROVAL_DELAY_MS + maxDurationMs;
+}
+
 export function authorizeHostTool({
   plan,
   createRequest,
   maxOutputBytes,
   maxDurationMs = 10_000,
-  authorizationWindowMs = maxDurationMs + 5_000,
+  authorizationWindowMs = hostToolAuthorizationWindowMs(maxDurationMs),
 }) {
   const now = Date.now();
   const deadlineAt = new Date(now + authorizationWindowMs).toISOString();

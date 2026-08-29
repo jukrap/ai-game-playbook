@@ -12,7 +12,10 @@ import * as core from "@ai-game-playbook/core";
 import * as registry from "@ai-game-playbook/registry";
 import * as provider from "@ai-game-playbook/windows-containment-provider";
 import * as godot from "../dist/index.js";
-import { authorizeHostTool } from "./host-tool-approval.mjs";
+import {
+  authorizeHostTool,
+  hostToolAuthorizationWindowMs,
+} from "./host-tool-approval.mjs";
 
 const artifactPath = fileURLToPath(
   new URL(
@@ -31,6 +34,14 @@ const nativeAvailable =
   process.arch === "x64" &&
   existsSync(artifactPath) &&
   existsSync(fixturePath);
+
+test("host tool approval window preserves admission delay before execution", () => {
+  const executionDurationMs = 10_000;
+  assert.equal(
+    hostToolAuthorizationWindowMs(executionDurationMs),
+    core.PERMISSION_REQUEST_MAX_APPROVAL_DELAY_MS + executionDurationMs,
+  );
+});
 
 function expectGodotError(code) {
   return (error) =>

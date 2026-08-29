@@ -2,7 +2,7 @@
   "name": "@ai-game-playbook/engine-common",
   "version": "0.0.0",
   "private": true,
-  "description": "Identity-bound engine execution snapshots for AI Game Playbook.",
+  "description": "Identity-bound engine adapter lifecycle and execution snapshots for AI Game Playbook.",
   "license": "UNLICENSED",
   "type": "module",
   "exports": {

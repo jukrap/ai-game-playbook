@@ -1,4 +1,10 @@
 export type EngineCommonBoundaryErrorCode =
+  | "engine-adapter-definition-invalid"
+  | "engine-adapter-authority-invalid"
+  | "engine-adapter-invocation-invalid"
+  | "engine-adapter-operation-invalid"
+  | "engine-adapter-cancelled-before-start"
+  | "engine-adapter-result-mismatch"
   | "engine-snapshot-request-invalid"
   | "engine-snapshot-project-invalid"
   | "engine-snapshot-project-drift"

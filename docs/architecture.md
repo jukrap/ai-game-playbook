@@ -34,7 +34,7 @@ A generated surface is descriptive until a matching handler and runtime boundary
 | `contracts` | Versioned schemas and semantic validation |
 | `registry` | Descriptor validation, deterministic routing, generation, and digests |
 | `core` | Project identity, safe paths, compare-and-swap writes, process bounds, permission, scoped in-memory approval signing, workflow, receipts, and artifact foundations |
-| `engine-common` | Bounded path-free project and executable snapshots plus one-use private source handoff |
+| `engine-common` | Immutable same-process adapter lifecycle and correlation checks, plus bounded path-free snapshots and one-use private source handoff |
 | `project-runtime` | Static project inspection and private initialization foundations |
 | `pack-runtime` | Read-only pack inspection plus private ownership, transaction, durable dispatch, recovery, and evidence-reconciliation foundations |
 | `skill-runtime` | Packaged skill validation, target inspection, and write-free managed-pack preflight |
@@ -46,6 +46,8 @@ A generated surface is descriptive until a matching handler and runtime boundary
 | `windows-containment-provider` | Windows x64 artifact identity, disposable qualification, exact snapshot admission, staged AppContainer execution, bounded cancellation, and path-free reports |
 
 The `golden/graybox/` tree is not a runtime package. It stores the engine-neutral scenario that future engine projects must satisfy. Run-specific feature and project identities live in a separate `PlaytestScenarioBinding`, so they cannot change the shared behavior definition. Contract tests bind the scenario schema, semantic rules, and canonical digest; this does not count as live-engine evidence.
+
+The common `EngineAdapter` factory requires exactly one handler for each of the fourteen lifecycle operations and returns an immutable same-process authority. Dispatch makes bounded immutable copies of plain request and result data, rejects cancellation before a handler starts, and checks request, operation, project, and session correlation. Registry schema validation is still required at the workflow boundary before dispatch and before evidence promotion. These conformance checks establish interface behavior only; they do not make an engine operation available.
 
 Unity and Unreal adapters and all project bridges remain planned.
 

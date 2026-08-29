@@ -90,6 +90,83 @@ test("captures one bounded path-free project and executable snapshot authority",
   );
 });
 
+test("attests one exact caller-declared source manifest without exposing snapshot paths", async (t) => {
+  const context = await fixture(t);
+  const binding = await engineCommon.captureEngineExecutionSnapshots(
+    request(context),
+  );
+  const expected = {
+    directories: ["", "scenes"],
+    files: [
+      {
+        path: "project.godot",
+        digest: contracts.sha256Digest("config_version=5\n"),
+        bytes: Buffer.byteLength("config_version=5\n"),
+      },
+      {
+        path: "scenes/main.tscn",
+        digest: contracts.sha256Digest("[gd_scene format=3]\n"),
+        bytes: Buffer.byteLength("[gd_scene format=3]\n"),
+      },
+    ],
+  };
+
+  await assert.doesNotReject(
+    engineCommon.assertEngineExecutionSourceManifest({
+      binding,
+      root: context.root,
+      executable: context.executable,
+      expected,
+    }),
+  );
+  await assert.rejects(
+    engineCommon.assertEngineExecutionSourceManifest({
+      binding,
+      root: context.root,
+      executable: context.executable,
+      expected: {
+        directories: expected.directories,
+        files: expected.files.slice(0, 1),
+      },
+    }),
+    expectEngineError("engine-snapshot-source-mismatch"),
+  );
+  await assert.rejects(
+    engineCommon.assertEngineExecutionSourceManifest({
+      binding,
+      root: context.root,
+      executable: context.executable,
+      expected: {
+        directories: expected.directories,
+        files: expected.files.map((entry, index) =>
+          index === 0 ? { ...entry, bytes: entry.bytes + 1 } : entry,
+        ),
+      },
+    }),
+    expectEngineError("engine-snapshot-source-mismatch"),
+  );
+
+  let invoked = false;
+  const hostileExpected = { directories: expected.directories };
+  Object.defineProperty(hostileExpected, "files", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return expected.files;
+    },
+  });
+  await assert.rejects(
+    engineCommon.assertEngineExecutionSourceManifest({
+      binding,
+      root: context.root,
+      executable: context.executable,
+      expected: hostileExpected,
+    }),
+    expectEngineError("engine-snapshot-source-mismatch"),
+  );
+  assert.equal(invoked, false);
+});
+
 test("rejects project drift after capture", async (t) => {
   const context = await fixture(t);
   const binding = await engineCommon.captureEngineExecutionSnapshots(

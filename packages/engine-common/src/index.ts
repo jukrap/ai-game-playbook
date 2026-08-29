@@ -18,12 +18,14 @@ export type {
   EngineAdapterOperations,
 } from "./adapter.js";
 export {
+  assertEngineExecutionSourceManifest,
   assertEngineExecutionSnapshotAuthority,
   captureEngineExecutionSnapshots,
   consumeEngineExecutionSourceHandoff,
   issueEngineExecutionSourceHandoff,
 } from "./snapshots.js";
 export type {
+  AssertEngineExecutionSourceManifestRequest,
   AssertEngineExecutionSnapshotAuthorityRequest,
   CaptureEngineExecutionSnapshotsRequest,
   EngineExecutionSourceFileEntry,

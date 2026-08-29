@@ -31,6 +31,7 @@ const expectedIds = [
   "engine-session-identity",
   "engine-status-report",
   "engine-status-request",
+  "godot-deterministic-replay-report",
   "godot-deterministic-replay-transcript",
   "godot-executable-discovery-report",
   "godot-executable-discovery-request",

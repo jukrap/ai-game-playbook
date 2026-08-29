@@ -61,6 +61,14 @@ export interface AssertEngineExecutionSnapshotAuthorityRequest {
   readonly executable: BoundProcessExecutable;
 }
 
+export interface AssertEngineExecutionSourceManifestRequest
+  extends AssertEngineExecutionSnapshotAuthorityRequest {
+  readonly expected: {
+    readonly directories: readonly string[];
+    readonly files: readonly EngineExecutionSourceFileEntry[];
+  };
+}
+
 export interface EngineExecutionSourceFileEntry {
   readonly path: string;
   readonly digest: Sha256Digest;
@@ -216,6 +224,160 @@ function assertionRequest(
     binding: record["binding"] as EngineExecutionSnapshotBinding,
     root: record["root"] as CanonicalProjectRoot,
     executable: record["executable"] as BoundProcessExecutable,
+  });
+}
+
+function denseDataArray(
+  value: unknown,
+  maximumEntries: number,
+): readonly unknown[] | undefined {
+  if (
+    !Array.isArray(value) ||
+    isProxy(value) ||
+    value.length > maximumEntries ||
+    Reflect.ownKeys(value).length !== value.length + 1
+  ) {
+    return undefined;
+  }
+  const result: unknown[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (
+      descriptor === undefined ||
+      !("value" in descriptor) ||
+      descriptor.enumerable !== true
+    ) {
+      return undefined;
+    }
+    result.push(descriptor.value);
+  }
+  return result;
+}
+
+function canonicalExpectedPath(value: unknown, allowRoot: boolean): string | undefined {
+  if (typeof value !== "string") return undefined;
+  if (allowRoot && value === "") return value;
+  const segments = value.split("/");
+  try {
+    return relativePath(segments) === value ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function sourceManifestRequest(
+  value: unknown,
+): AssertEngineExecutionSourceManifestRequest {
+  const record = exactDataRecord(value, [
+    "binding",
+    "root",
+    "executable",
+    "expected",
+  ]);
+  const expected = exactDataRecord(record?.["expected"], [
+    "directories",
+    "files",
+  ]);
+  const directoryValues = denseDataArray(
+    expected?.["directories"],
+    ENGINE_SNAPSHOT_MAX_DIRECTORIES,
+  );
+  const fileValues = denseDataArray(
+    expected?.["files"],
+    ENGINE_SNAPSHOT_MAX_FILES,
+  );
+  if (
+    record === undefined ||
+    expected === undefined ||
+    directoryValues === undefined ||
+    fileValues === undefined ||
+    directoryValues.length < 1 ||
+    fileValues.length < 1
+  ) {
+    return fail(
+      "engine-snapshot-source-mismatch",
+      "Expected engine source manifest is outside the bounded plain-data contract.",
+    );
+  }
+
+  const directories: string[] = [];
+  const foldedPaths = new Set<string>();
+  for (const value of directoryValues) {
+    const path = canonicalExpectedPath(value, true);
+    if (
+      path === undefined ||
+      foldedPaths.has(path.toLowerCase()) ||
+      (directories.length === 0 ? path !== "" : path === "") ||
+      (directories.length > 0 &&
+        compareCanonicalText(directories.at(-1) ?? "", path) >= 0)
+    ) {
+      return fail(
+        "engine-snapshot-source-mismatch",
+        "Expected engine source directories are not one canonical ordered set.",
+      );
+    }
+    directories.push(path);
+    foldedPaths.add(path.toLowerCase());
+  }
+
+  const files: EngineExecutionSourceFileEntry[] = [];
+  let totalBytes = 0;
+  for (const value of fileValues) {
+    const entry = exactDataRecord(value, ["path", "digest", "bytes"]);
+    const path = canonicalExpectedPath(entry?.["path"], false);
+    const bytes = entry?.["bytes"];
+    const parent = path?.includes("/")
+      ? path.slice(0, path.lastIndexOf("/"))
+      : "";
+    if (
+      entry === undefined ||
+      path === undefined ||
+      !isSha256Digest(entry["digest"]) ||
+      !Number.isSafeInteger(bytes) ||
+      (bytes as number) < 0 ||
+      (bytes as number) > ENGINE_SNAPSHOT_MAX_FILE_BYTES ||
+      !directories.includes(parent) ||
+      foldedPaths.has(path.toLowerCase()) ||
+      (files.length > 0 &&
+        compareCanonicalText(files.at(-1)?.path ?? "", path) >= 0)
+    ) {
+      return fail(
+        "engine-snapshot-source-mismatch",
+        "Expected engine source files are not one canonical ordered set.",
+      );
+    }
+    totalBytes += bytes as number;
+    if (
+      !Number.isSafeInteger(totalBytes) ||
+      totalBytes > ENGINE_SNAPSHOT_MAX_TOTAL_BYTES
+    ) {
+      return fail(
+        "engine-snapshot-source-mismatch",
+        "Expected engine source bytes exceed the snapshot boundary.",
+      );
+    }
+    const parsed = Object.freeze({
+      path,
+      digest: entry["digest"],
+      bytes: bytes as number,
+    });
+    files.push(parsed);
+    foldedPaths.add(path.toLowerCase());
+  }
+  if (totalBytes < 1) {
+    return fail(
+      "engine-snapshot-source-mismatch",
+      "Expected engine source manifest must contain non-empty aggregate bytes.",
+    );
+  }
+  return Object.freeze({
+    binding: record["binding"] as EngineExecutionSnapshotBinding,
+    root: record["root"] as CanonicalProjectRoot,
+    executable: record["executable"] as BoundProcessExecutable,
+    expected: Object.freeze({
+      directories: Object.freeze(directories),
+      files: Object.freeze(files),
+    }),
   });
 }
 
@@ -821,6 +983,48 @@ export async function assertEngineExecutionSnapshotAuthority(
     return fail(
       "engine-snapshot-project-drift",
       "Project manifest no longer matches the captured snapshot.",
+    );
+  }
+}
+
+export async function assertEngineExecutionSourceManifest(
+  value: unknown,
+): Promise<void> {
+  const request = sourceManifestRequest(value);
+  await assertEngineExecutionSnapshotAuthority({
+    binding: request.binding,
+    root: request.root,
+    executable: request.executable,
+  });
+  const authority = snapshotAuthorities.get(request.binding);
+  if (authority === undefined) {
+    return fail(
+      "engine-snapshot-authority-invalid",
+      "Expected engine source manifest lost its snapshot authority.",
+    );
+  }
+  const expected = request.expected;
+  const actual = authority.manifest;
+  const directoriesMatch =
+    expected.directories.length === actual.directories.length &&
+    expected.directories.every(
+      (entry, index) => entry === actual.directories[index],
+    );
+  const filesMatch =
+    expected.files.length === actual.files.length &&
+    expected.files.every((entry, index) => {
+      const observed = actual.files[index];
+      return (
+        observed !== undefined &&
+        entry.path === observed.path &&
+        entry.digest === observed.digest &&
+        entry.bytes === observed.bytes
+      );
+    });
+  if (!directoriesMatch || !filesMatch) {
+    return fail(
+      "engine-snapshot-source-mismatch",
+      "Captured engine source does not match the exact expected manifest.",
     );
   }
 }

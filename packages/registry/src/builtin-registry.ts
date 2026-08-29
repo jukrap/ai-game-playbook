@@ -11,6 +11,9 @@ import {
   engineCapabilitiesRequestSchema,
   engineStatusReportSchema,
   engineStatusRequestSchema,
+  GODOT_DETERMINISTIC_REPLAY_COMMAND_TIMEOUT_MS,
+  GODOT_DETERMINISTIC_REPLAY_MAX_OUTPUT_BYTES,
+  GODOT_DETERMINISTIC_REPLAY_TERMINATION_GRACE_MS,
   GODOT_HEADLESS_PREFLIGHT_COMMAND_TIMEOUT_MS,
   GODOT_HEADLESS_PREFLIGHT_MAX_OUTPUT_BYTES,
   GODOT_HEADLESS_PREFLIGHT_TERMINATION_GRACE_MS,
@@ -20,6 +23,7 @@ import {
   godotExecutableDiscoveryRequestSchema,
   godotHeadlessPreflightReportSchema,
   godotHeadlessPreflightRequestSchema,
+  godotDeterministicReplayReportSchema,
   godotDeterministicReplayTranscriptSchema,
   godotVersionProbeReportSchema,
   godotVersionProbeRequestSchema,
@@ -665,6 +669,68 @@ const engineVersionProbeCommand: CommandDescriptor = Object.freeze({
     export: "runGodotVersionProbe",
     digest: parseSha256Digest(
       "sha256:de01f617326dec440551a99f6b5ad1701411921cd4b98020874ddb48fce811aa",
+    ),
+  }),
+});
+
+const engineDeterministicReplayCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("engine.deterministic-replay"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Run one identity-bound Godot graybox scenario through contained deterministic replay.",
+  cli: Object.freeze({
+    path: Object.freeze(["internal", "engine", "deterministic-replay"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: playtestScenarioSchema.schemaId,
+    digest: playtestScenarioSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: godotDeterministicReplayReportSchema.schemaId,
+    digest: godotDeterministicReplayReportSchema.digest,
+  }),
+  capabilities: Object.freeze([
+    parseStableId("engine.deterministic-replay"),
+  ]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>([
+    "read-project",
+    "host-tool-inspection",
+    "test-build",
+  ]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "process",
+      scope: "godot-deterministic-replay",
+      boundary: "local",
+    }),
+  ]),
+  lane: "build-bound",
+  timeoutMs: GODOT_DETERMINISTIC_REPLAY_COMMAND_TIMEOUT_MS,
+  cancellation: Object.freeze({
+    mode: "process-tree",
+    graceMs: GODOT_DETERMINISTIC_REPLAY_TERMINATION_GRACE_MS,
+  }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: GODOT_DETERMINISTIC_REPLAY_COMMAND_TIMEOUT_MS,
+    maxOutputBytes: GODOT_DETERMINISTIC_REPLAY_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([
+    parseStableId("godot-deterministic-replay"),
+    parseStableId("run-receipt"),
+  ]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/godot-adapter",
+    export: "runGodotDeterministicReplay",
+    digest: parseSha256Digest(
+      "sha256:53268cac9d23f67b8f5d37ce5daec0af61334d6e9d6172e95db96a218c92d27b",
     ),
   }),
 });
@@ -1622,6 +1688,47 @@ function createProjectSkillsPack(
 
 const projectSkillsPack = createProjectSkillsPack(builtinSkills);
 
+const godotDeterministicReplayWorkflow: WorkflowDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId("workflow.godot-deterministic-replay"),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Execute one bounded Godot graybox scenario and retain its replay receipt.",
+  input: Object.freeze({
+    schemaId: playtestScenarioSchema.schemaId,
+    digest: playtestScenarioSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: godotDeterministicReplayReportSchema.schemaId,
+    digest: godotDeterministicReplayReportSchema.digest,
+  }),
+  supportedStages: supportedStages(),
+  steps: Object.freeze([
+    Object.freeze({
+      id: parseStableId("step.godot-deterministic-replay"),
+      commandId: parseStableId("engine.deterministic-replay"),
+      dependsOn: Object.freeze([]),
+      onFailure: "blocked" as const,
+      approvalCheckpoint: false,
+    }),
+  ]),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: GODOT_DETERMINISTIC_REPLAY_COMMAND_TIMEOUT_MS,
+    maxOutputBytes: GODOT_DETERMINISTIC_REPLAY_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  resumePolicy: "never",
+  terminalOracle:
+    "The scenario transcript, contained engine report, permission settlement, and retained receipt must agree without promoting engine support.",
+  requiredEvidence: Object.freeze([
+    parseStableId("godot-deterministic-replay"),
+    parseStableId("run-receipt"),
+  ]),
+});
+
 const godotHeadlessPreflightWorkflow: WorkflowDescriptor = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   id: parseStableId("workflow.godot-headless-preflight"),
@@ -1844,6 +1951,7 @@ const definition: RegistryDefinition = Object.freeze({
     godotExecutableDiscoveryReportSchema,
     godotHeadlessPreflightRequestSchema,
     godotHeadlessPreflightReportSchema,
+    godotDeterministicReplayReportSchema,
     godotDeterministicReplayTranscriptSchema,
     godotVersionProbeRequestSchema,
     godotVersionProbeReportSchema,
@@ -1880,6 +1988,7 @@ const definition: RegistryDefinition = Object.freeze({
   commands: Object.freeze([
     doctorCommand,
     engineCapabilitiesCommand,
+    engineDeterministicReplayCommand,
     engineExecutableDiscoveryCommand,
     engineHeadlessPreflightCommand,
     engineStatusCommand,
@@ -1899,6 +2008,7 @@ const definition: RegistryDefinition = Object.freeze({
   skills: builtinSkills,
   roleLenses: Object.freeze([]),
   workflows: Object.freeze([
+    godotDeterministicReplayWorkflow,
     godotHeadlessPreflightWorkflow,
     packAddWorkflow,
     packRecoveryWorkflow,

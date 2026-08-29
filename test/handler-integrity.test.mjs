@@ -10,6 +10,11 @@ test("runtime command handler metadata attests each exact compiled module", asyn
     ["doctor", "cli", "doctor.js"],
     ["engine.capabilities", "godot-adapter", "capabilities.js"],
     [
+      "engine.deterministic-replay",
+      "godot-adapter",
+      "contained-deterministic-replay.js",
+    ],
+    [
       "engine.executable-discovery",
       "godot-adapter",
       "executable-discovery.js",

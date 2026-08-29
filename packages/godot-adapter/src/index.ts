@@ -23,6 +23,7 @@ export {
   GODOT_GRAYBOX_SCENARIO_DIGEST,
   GODOT_GRAYBOX_TARGET_VERSION,
   verifyGodotGrayboxProjectBundle,
+  verifyGodotGrayboxProjectRoot,
 } from "./graybox-project.js";
 export type {
   GodotGrayboxFeature,
@@ -32,6 +33,7 @@ export type {
   GodotGrayboxSourceRole,
   GodotGrayboxSourceText,
   VerifyGodotGrayboxProjectBundleRequest,
+  VerifyGodotGrayboxProjectRootRequest,
 } from "./graybox-project.js";
 export { runGodotEngineCapabilities } from "./capabilities.js";
 export {
@@ -114,3 +116,18 @@ export type {
   ReadyGodotContainedHeadlessAdmission,
   RunGodotContainedHeadlessRequest,
 } from "./contained-headless-admission.js";
+export {
+  assertPreparedGodotContainedDeterministicReplay,
+  consumeGodotContainedDeterministicReplayTranscript,
+  createGodotContainedDeterministicReplayAuthorizationRequest,
+  isGodotContainedDeterministicReplayRunRequest,
+  prepareGodotContainedDeterministicReplay,
+  runGodotContainedDeterministicReplay,
+  runGodotDeterministicReplay,
+} from "./contained-deterministic-replay.js";
+export type {
+  CreateGodotContainedDeterministicReplayAuthorizationRequest,
+  PrepareGodotContainedDeterministicReplayRequest,
+  PreparedGodotContainedDeterministicReplay,
+  RunGodotContainedDeterministicReplayRequest,
+} from "./contained-deterministic-replay.js";

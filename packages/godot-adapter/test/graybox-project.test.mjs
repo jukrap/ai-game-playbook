@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import * as contracts from "@ai-game-playbook/contracts";
+import * as core from "@ai-game-playbook/core";
+import * as engineCommon from "@ai-game-playbook/engine-common";
 import * as godot from "../dist/index.js";
 
 const projectRoot = new URL("../../../golden/graybox/godot/", import.meta.url);
@@ -68,6 +73,65 @@ test("canonical Godot graybox source binds one exact static project", async () =
   assert.equal(Object.isFrozen(report.features), true);
   assert.equal(Object.isFrozen(report.engine), true);
   assert.equal(Object.isFrozen(report.support), true);
+});
+
+async function rootVerificationContext(project) {
+  const root = await core.canonicalizeProjectRoot(project);
+  const executable = await core.bindProcessExecutable({
+    path: process.execPath,
+    maxBytes: contracts.ENGINE_SNAPSHOT_MAX_FILE_BYTES,
+    allowedEnvironmentKeys: [],
+  });
+  const binding = await engineCommon.captureEngineExecutionSnapshots({
+    root,
+    executable,
+    engine: "godot",
+    projectInspectionDigest: contracts.digestCanonicalJson({
+      project: "golden-graybox",
+    }),
+  });
+  return { root, executable, binding };
+}
+
+test("canonical Godot graybox root matches the complete execution snapshot", async () => {
+  const context = await rootVerificationContext(fileURLToPath(projectRoot));
+  const report = await godot.verifyGodotGrayboxProjectRoot(context);
+
+  assert.equal(report.projectId, "golden.graybox.godot");
+  assert.equal(report.fileCount, 5);
+  assert.equal(report.manifestDigest, godot.GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST);
+});
+
+test("Godot graybox root rejects undeclared snapshot source and request accessors", async (t) => {
+  const sandbox = await mkdtemp(join(tmpdir(), "agpb-godot-graybox-root-"));
+  const project = join(sandbox, "project");
+  await cp(fileURLToPath(projectRoot), project, { recursive: true });
+  await writeFile(join(project, "undeclared.gd"), "extends Node\n");
+  t.after(() => rm(sandbox, { recursive: true, force: true }));
+  const context = await rootVerificationContext(project);
+
+  await assert.rejects(
+    godot.verifyGodotGrayboxProjectRoot(context),
+    expectGodotError("godot-graybox-source-drift"),
+  );
+
+  let invoked = false;
+  const hostile = {
+    binding: context.binding,
+    executable: context.executable,
+  };
+  Object.defineProperty(hostile, "root", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return context.root;
+    },
+  });
+  await assert.rejects(
+    godot.verifyGodotGrayboxProjectRoot(hostile),
+    expectGodotError("godot-graybox-request-invalid"),
+  );
+  assert.equal(invoked, false);
 });
 
 test("Godot project carries the exact engine-neutral scenario", async () => {

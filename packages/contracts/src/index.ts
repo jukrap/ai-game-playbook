@@ -398,6 +398,29 @@ export type {
   GodotDeterministicReplayWireAttestation,
 } from "./godot-deterministic-replay-contracts.js";
 export {
+  GODOT_DETERMINISTIC_REPLAY_COMMAND_TIMEOUT_MS,
+  GODOT_DETERMINISTIC_REPLAY_OUTPUT_INVALID_CODES,
+  GODOT_DETERMINISTIC_REPLAY_REPORT_CODES,
+  assertGodotDeterministicReplayReportSemantics,
+  computeGodotDeterministicReplayReportDigest,
+  godotDeterministicReplayReportSchema,
+} from "./godot-deterministic-replay-report-contracts.js";
+export type {
+  GodotDeterministicReplayAuthorization,
+  GodotDeterministicReplayContainmentBinding,
+  GodotDeterministicReplayEngineRunEvidence,
+  GodotDeterministicReplayOutputInvalidCode,
+  GodotDeterministicReplayReceiptPointer,
+  GodotDeterministicReplayRejectedTranscriptSummary,
+  GodotDeterministicReplayReport,
+  GodotDeterministicReplayReportCode,
+  GodotDeterministicReplayReportDigestInput,
+  GodotDeterministicReplayReportStatus,
+  GodotDeterministicReplayTranscriptSummary,
+  GodotDeterministicReplayUnavailableTranscriptSummary,
+  GodotDeterministicReplayValidatedTranscriptSummary,
+} from "./godot-deterministic-replay-report-contracts.js";
+export {
   PROCESS_CONTAINMENT_POLICY_DIGEST,
   PROCESS_CONTAINMENT_REQUIREMENTS,
   assertProcessContainmentAssessmentReportSemantics,

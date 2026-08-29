@@ -1,5 +1,6 @@
 import {
   checkPlaytestScenarioSemantics,
+  compareCanonicalText,
   computePlaytestScenarioDigest,
   digestCanonicalJson,
   isSha256Digest,
@@ -9,9 +10,18 @@ import {
   type Sha256Digest,
 } from "@ai-game-playbook/contracts";
 import {
+  assertProjectRootIdentity,
+  readFileHandleBounded,
+  resolveProjectPath,
+  type BoundProcessExecutable,
+  type CanonicalProjectRoot,
+} from "@ai-game-playbook/core";
+import { assertEngineExecutionSourceManifest } from "@ai-game-playbook/engine-common";
+import {
   BUILTIN_REGISTRY,
   validateRegisteredContractValue,
 } from "@ai-game-playbook/registry";
+import { open } from "node:fs/promises";
 import { isProxy } from "node:util/types";
 
 import { GodotAdapterBoundaryError } from "./errors.js";
@@ -80,6 +90,12 @@ export interface VerifyGodotGrayboxProjectBundleRequest {
   readonly files: readonly GodotGrayboxSourceText[];
 }
 
+export interface VerifyGodotGrayboxProjectRootRequest {
+  readonly root: CanonicalProjectRoot;
+  readonly binding: import("@ai-game-playbook/contracts").EngineExecutionSnapshotBinding;
+  readonly executable: BoundProcessExecutable;
+}
+
 export interface GodotGrayboxProjectReport {
   readonly schemaVersion: "1.0.0";
   readonly projectId: "golden.graybox.godot";
@@ -96,6 +112,7 @@ export interface GodotGrayboxProjectReport {
 
 const maximumSourceFileBytes = 1_048_576;
 const maximumSourceBundleBytes = 4_194_304;
+const maximumManifestBytes = 262_144;
 const disallowedTextControls = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u;
 
 const expectedFeatures = Object.freeze([
@@ -678,4 +695,207 @@ export function verifyGodotGrayboxProjectBundle(
     features: manifest.features,
     support: manifest.support,
   });
+}
+
+function rootRequest(value: unknown): VerifyGodotGrayboxProjectRootRequest {
+  const record = dataRecord(
+    value,
+    ["root", "binding", "executable"],
+    "godot-graybox-request-invalid",
+    "Godot graybox root verification requires exact runtime identities.",
+  );
+  return Object.freeze({
+    root: record["root"] as CanonicalProjectRoot,
+    binding:
+      record["binding"] as import("@ai-game-playbook/contracts").EngineExecutionSnapshotBinding,
+    executable: record["executable"] as BoundProcessExecutable,
+  });
+}
+
+async function readStableProjectText(
+  root: CanonicalProjectRoot,
+  path: string,
+  maximumBytes: number,
+): Promise<string> {
+  let before;
+  try {
+    before = await resolveProjectPath(root, path, {
+      existence: "required",
+      expectedType: "file",
+    });
+  } catch {
+    return fail(
+      "godot-graybox-source-invalid",
+      "Godot graybox source path is missing or unsafe.",
+    );
+  }
+  let handle;
+  try {
+    handle = await open(before.absolutePath, "r");
+  } catch {
+    return fail(
+      "godot-graybox-source-invalid",
+      "Godot graybox source file could not be opened safely.",
+    );
+  }
+  let bytes: Buffer | undefined;
+  let readError: unknown;
+  try {
+    const first = await handle.stat({ bigint: true });
+    const observed = await readFileHandleBounded(handle, maximumBytes);
+    bytes = observed;
+    const second = await handle.stat({ bigint: true });
+    if (
+      !first.isFile() ||
+      !second.isFile() ||
+      first.dev !== second.dev ||
+      first.ino !== second.ino ||
+      first.size !== second.size ||
+      first.mtimeNs !== second.mtimeNs ||
+      first.ctimeNs !== second.ctimeNs ||
+      first.size !== BigInt(observed.byteLength)
+    ) {
+      return fail(
+        "godot-graybox-source-drift",
+        "Godot graybox source changed while it was read.",
+      );
+    }
+  } catch (error) {
+    readError = error;
+  }
+  try {
+    await handle.close();
+  } catch (error) {
+    readError ??= error;
+  }
+  if (readError instanceof GodotAdapterBoundaryError) {
+    throw readError;
+  }
+  if (readError !== undefined || bytes === undefined) {
+    return fail(
+      "godot-graybox-source-invalid",
+      "Godot graybox source bytes could not be read and closed safely.",
+    );
+  }
+  let after;
+  try {
+    after = await resolveProjectPath(root, path, {
+      existence: "required",
+      expectedType: "file",
+    });
+  } catch {
+    return fail(
+      "godot-graybox-source-drift",
+      "Godot graybox source identity changed after it was read.",
+    );
+  }
+  if (
+    before.absolutePath !== after.absolutePath ||
+    before.targetIdentity?.device !== after.targetIdentity?.device ||
+    before.targetIdentity?.inode !== after.targetIdentity?.inode
+  ) {
+    return fail(
+      "godot-graybox-source-drift",
+      "Godot graybox source identity changed after it was read.",
+    );
+  }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return fail(
+      "godot-graybox-source-invalid",
+      "Godot graybox source is not valid UTF-8 text.",
+    );
+  }
+}
+
+function expectedSnapshotDirectories(
+  paths: readonly string[],
+): readonly string[] {
+  const directories = new Set<string>([""]);
+  for (const path of paths) {
+    const segments = path.split("/");
+    for (let index = 1; index < segments.length; index += 1) {
+      directories.add(segments.slice(0, index).join("/"));
+    }
+  }
+  return Object.freeze([...directories].sort(compareCanonicalText));
+}
+
+export async function verifyGodotGrayboxProjectRoot(
+  value: unknown,
+): Promise<GodotGrayboxProjectReport> {
+  const request = rootRequest(value);
+  try {
+    await assertProjectRootIdentity(request.root);
+  } catch {
+    return fail(
+      "godot-graybox-source-drift",
+      "Godot graybox project root lost its runtime identity.",
+    );
+  }
+  const manifestText = await readStableProjectText(
+    request.root,
+    "manifest.json",
+    maximumManifestBytes,
+  );
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(manifestText);
+  } catch {
+    return fail(
+      "godot-graybox-manifest-invalid",
+      "Godot graybox manifest is not valid JSON.",
+    );
+  }
+  const files = Object.freeze(
+    await Promise.all(
+      expectedFiles.map(async ({ path }) =>
+        Object.freeze({
+          path,
+          text: await readStableProjectText(
+            request.root,
+            path,
+            maximumSourceFileBytes,
+          ),
+        }),
+      ),
+    ),
+  );
+  const parsedManifest = manifest as GodotGrayboxProjectManifest;
+  const report = verifyGodotGrayboxProjectBundle({
+    manifest: parsedManifest,
+    files,
+  });
+  const snapshotFiles = Object.freeze(
+    [
+      Object.freeze({
+        path: "manifest.json",
+        digest: sha256Digest(Buffer.from(manifestText, "utf8")),
+        bytes: Buffer.byteLength(manifestText, "utf8"),
+      }),
+      ...parsedManifest.files.map(({ path, digest, bytes }) =>
+        Object.freeze({ path, digest, bytes }),
+      ),
+    ].sort((left, right) => compareCanonicalText(left.path, right.path)),
+  );
+  try {
+    await assertEngineExecutionSourceManifest({
+      binding: request.binding,
+      root: request.root,
+      executable: request.executable,
+      expected: {
+        directories: expectedSnapshotDirectories(
+          snapshotFiles.map(({ path }) => path),
+        ),
+        files: snapshotFiles,
+      },
+    });
+  } catch {
+    return fail(
+      "godot-graybox-source-drift",
+      "Godot graybox snapshot contains missing, changed, or undeclared source.",
+    );
+  }
+  return report;
 }

@@ -172,6 +172,10 @@ export type {
   AssessProcessContainmentRequest,
 } from "./process-containment.js";
 export {
+  BoundedFileReadLimitError,
+  readFileHandleBounded,
+} from "./bounded-file-read.js";
+export {
   PROCESS_CONTAINMENT_PROVIDER_CATALOG_DIGEST,
   inspectProcessContainmentProviderCatalog,
 } from "./process-containment-provider-catalog.js";

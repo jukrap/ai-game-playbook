@@ -14,6 +14,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     [
       "doctor",
       "engine.capabilities",
+      "engine.deterministic-replay",
       "engine.executable-discovery",
       "engine.headless-preflight",
       "engine.status",
@@ -35,7 +36,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     registry.BUILTIN_REGISTRY.commands.some(
       ({ id }) => id === "engine.deterministic-replay",
     ),
-    false,
+    true,
   );
   assert.equal(
     registry.BUILTIN_REGISTRY_SURFACES.cli.data.commands.some(
@@ -339,6 +340,61 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   assert.equal(headlessPreflight.handler.export, "runGodotHeadlessPreflight");
   assert.match(headlessPreflight.handler.digest, digestPattern);
 
+  const deterministicReplay = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === "engine.deterministic-replay",
+  );
+  assert.notEqual(deterministicReplay, undefined);
+  assert.equal(deterministicReplay.lifecycle, "internal");
+  assert.deepEqual(deterministicReplay.cli, {
+    path: ["internal", "engine", "deterministic-replay"],
+    aliases: [],
+  });
+  assert.deepEqual(deterministicReplay.capabilities, [
+    "engine.deterministic-replay",
+  ]);
+  assert.deepEqual(deterministicReplay.permissions, [
+    "read-project",
+    "host-tool-inspection",
+    "test-build",
+  ]);
+  assert.deepEqual(deterministicReplay.sideEffects, [
+    {
+      kind: "process",
+      scope: "godot-deterministic-replay",
+      boundary: "local",
+    },
+  ]);
+  assert.equal(deterministicReplay.lane, "build-bound");
+  assert.equal(
+    deterministicReplay.timeoutMs,
+    contracts.GODOT_DETERMINISTIC_REPLAY_COMMAND_TIMEOUT_MS,
+  );
+  assert.deepEqual(deterministicReplay.cancellation, {
+    mode: "process-tree",
+    graceMs: contracts.GODOT_DETERMINISTIC_REPLAY_TERMINATION_GRACE_MS,
+  });
+  assert.deepEqual(deterministicReplay.retry, {
+    mode: "never",
+    maxAttempts: 1,
+  });
+  assert.equal(
+    deterministicReplay.input.schemaId,
+    contracts.playtestScenarioSchema.schemaId,
+  );
+  assert.equal(
+    deterministicReplay.output.schemaId,
+    contracts.godotDeterministicReplayReportSchema.schemaId,
+  );
+  assert.equal(
+    deterministicReplay.handler.package,
+    "@ai-game-playbook/godot-adapter",
+  );
+  assert.equal(
+    deterministicReplay.handler.export,
+    "runGodotDeterministicReplay",
+  );
+  assert.match(deterministicReplay.handler.digest, digestPattern);
+
   const versionProbe = registry.BUILTIN_REGISTRY.commands.find(
     ({ id }) => id === "engine.version-probe",
   );
@@ -608,6 +664,7 @@ test("the builtin registry binds internal operations to finite workflow steps", 
     registry.BUILTIN_REGISTRY.workflows.map(({ id }) => id),
     [
       "workflow.evidence-reconciliation",
+      "workflow.godot-deterministic-replay",
       "workflow.godot-headless-preflight",
       "workflow.pack-add",
       "workflow.pack-recover",
@@ -653,6 +710,39 @@ test("the builtin registry binds internal operations to finite workflow steps", 
     contracts.isResolvedWorkflowPlanDigestValid(plan),
     true,
   );
+
+  const replay = registry.BUILTIN_REGISTRY.workflows.find(
+    ({ id }) => id === "workflow.godot-deterministic-replay",
+  );
+  assert.notEqual(replay, undefined);
+  assert.equal(replay.lifecycle, "internal");
+  assert.equal(replay.input.schemaId, contracts.playtestScenarioSchema.schemaId);
+  assert.equal(
+    replay.output.schemaId,
+    contracts.godotDeterministicReplayReportSchema.schemaId,
+  );
+  assert.deepEqual(replay.steps, [
+    {
+      id: "step.godot-deterministic-replay",
+      commandId: "engine.deterministic-replay",
+      dependsOn: [],
+      onFailure: "blocked",
+      approvalCheckpoint: false,
+    },
+  ]);
+  assert.deepEqual(replay.requiredEvidence, [
+    "godot-deterministic-replay",
+    "run-receipt",
+  ]);
+  const replayPlan = registry.resolveWorkflowPlan(
+    registry.BUILTIN_REGISTRY,
+    replay.id,
+    "vertical-slice",
+  );
+  assert.equal(replayPlan.steps.length, 1);
+  assert.equal(replayPlan.steps[0].command.id, "engine.deterministic-replay");
+  assert.equal(replayPlan.steps[0].command.lane, "build-bound");
+  assert.equal(contracts.isResolvedWorkflowPlanDigestValid(replayPlan), true);
 
   const initialization = registry.BUILTIN_REGISTRY.workflows.find(
     ({ id }) => id === "workflow.project-initialization",

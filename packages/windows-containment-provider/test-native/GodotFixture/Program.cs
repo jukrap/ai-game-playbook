@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace AiGamePlaybook.GodotFixture;
 
@@ -56,16 +58,14 @@ internal static class Program
         string behaviorPath = Path.Combine(project, "fixture-behavior.txt");
         string behavior = File.Exists(behaviorPath)
             ? (await File.ReadAllTextAsync(behaviorPath)).Trim()
-            : "success";
+            : replay ? "replay-success" : "success";
         Directory.CreateDirectory(Path.GetDirectoryName(log)!);
         if (replay)
         {
             string replayPath = Path.Combine(project, "fixture-replay.txt");
-            if (!File.Exists(replayPath))
-            {
-                return 67;
-            }
-            string transcript = await File.ReadAllTextAsync(replayPath);
+            string transcript = File.Exists(replayPath)
+                ? await File.ReadAllTextAsync(replayPath)
+                : await BuildReplayTranscriptAsync(project);
             switch (behavior)
             {
                 case "replay-success":
@@ -181,6 +181,105 @@ internal static class Program
             default:
                 return 66;
         }
+    }
+
+    private static async Task<string> BuildReplayTranscriptAsync(string project)
+    {
+        string scenarioPath = Path.Combine(project, "scenario.json");
+        string manifestPath = Path.Combine(project, "manifest.json");
+        if (!File.Exists(scenarioPath) || !File.Exists(manifestPath))
+        {
+            return string.Empty;
+        }
+
+        using JsonDocument scenario = JsonDocument.Parse(
+            await File.ReadAllTextAsync(scenarioPath));
+        using JsonDocument manifest = JsonDocument.Parse(
+            await File.ReadAllTextAsync(manifestPath));
+        JsonElement root = scenario.RootElement;
+        string scenarioId = root.GetProperty("scenarioId").GetString()!;
+        string scenarioDigest = manifest.RootElement
+            .GetProperty("scenario")
+            .GetProperty("digest")
+            .GetString()!;
+        string seed = root
+            .GetProperty("initialState")
+            .GetProperty("seed")
+            .GetString()!;
+        StringBuilder transcript = new();
+        AppendEvent(transcript, new Dictionary<string, object?>
+        {
+            ["event"] = "replay-started",
+            ["scenarioId"] = scenarioId,
+            ["scenarioDigest"] = scenarioDigest,
+            ["seed"] = seed,
+        });
+
+        int terminalTick = 0;
+        foreach ((JsonElement oracle, bool terminal) in ReplayOracles(root))
+        {
+            int tick = OracleTick(oracle);
+            terminalTick = terminal ? Math.Max(terminalTick, tick) : terminalTick;
+            List<Dictionary<string, object?>> state = [];
+            int value = 0;
+            foreach (JsonElement path in oracle.GetProperty("stateHashFields").EnumerateArray())
+            {
+                state.Add(new Dictionary<string, object?>
+                {
+                    ["path"] = path.GetString()!,
+                    ["value"] = value,
+                });
+                value += 1;
+            }
+            string stateJson = JsonSerializer.Serialize(state);
+            string stateHash = "sha256:" + Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(stateJson))).ToLowerInvariant();
+            AppendEvent(transcript, new Dictionary<string, object?>
+            {
+                ["event"] = "oracle-passed",
+                ["oracleId"] = oracle.GetProperty("oracleId").GetString()!,
+                ["terminal"] = terminal,
+                ["tick"] = tick,
+                ["state"] = state,
+                ["stateHash"] = stateHash,
+            });
+        }
+        AppendEvent(transcript, new Dictionary<string, object?>
+        {
+            ["event"] = "replay-passed",
+            ["tick"] = terminalTick,
+            ["scenarioDigest"] = scenarioDigest,
+        });
+        return transcript.ToString();
+    }
+
+    private static IEnumerable<(JsonElement Oracle, bool Terminal)> ReplayOracles(
+        JsonElement scenario)
+    {
+        foreach (JsonElement oracle in scenario.GetProperty("checkpoints").EnumerateArray())
+        {
+            yield return (oracle, false);
+        }
+        foreach (JsonElement oracle in scenario.GetProperty("terminal").EnumerateArray())
+        {
+            yield return (oracle, true);
+        }
+    }
+
+    private static int OracleTick(JsonElement oracle)
+    {
+        return oracle.TryGetProperty("atTick", out JsonElement atTick)
+            ? atTick.GetInt32()
+            : oracle.GetProperty("withinTicks").GetProperty("firstTick").GetInt32();
+    }
+
+    private static void AppendEvent(
+        StringBuilder transcript,
+        Dictionary<string, object?> value)
+    {
+        transcript.Append("AGPB_GRAYBOX ");
+        transcript.Append(JsonSerializer.Serialize(value));
+        transcript.Append('\n');
     }
 
     private static bool IsAppContainer()

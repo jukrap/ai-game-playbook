@@ -14,6 +14,7 @@ export type EngineCommonBoundaryErrorCode =
   | "engine-snapshot-file-invalid"
   | "engine-snapshot-executable-invalid"
   | "engine-snapshot-authority-invalid"
+  | "engine-snapshot-source-mismatch"
   | "engine-snapshot-authority-consumed"
   | "engine-snapshot-handoff-invalid"
   | "engine-snapshot-handoff-budget-exceeded";

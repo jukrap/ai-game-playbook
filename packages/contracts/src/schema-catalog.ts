@@ -84,6 +84,7 @@ import {
   godotHeadlessPreflightRequestSchema,
 } from "./godot-headless-preflight-contracts.js";
 import { godotDeterministicReplayTranscriptSchema } from "./godot-deterministic-replay-contracts.js";
+import { godotDeterministicReplayReportSchema } from "./godot-deterministic-replay-report-contracts.js";
 import {
   processContainmentAssessmentReportSchema,
   processContainmentAssessmentRequestSchema,
@@ -177,6 +178,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "godot-executable-discovery-request": godotExecutableDiscoveryRequestSchema,
     "godot-headless-preflight-report": godotHeadlessPreflightReportSchema,
     "godot-headless-preflight-request": godotHeadlessPreflightRequestSchema,
+    "godot-deterministic-replay-report":
+      godotDeterministicReplayReportSchema,
     "godot-deterministic-replay-transcript":
       godotDeterministicReplayTranscriptSchema,
     "godot-version-probe-report": godotVersionProbeReportSchema,

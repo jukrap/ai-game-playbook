@@ -101,6 +101,9 @@ import {
   processContainmentEngineAdmissionSchema,
 } from "./process-containment-engine-admission-contracts.js";
 import {
+  processContainmentEngineExecutionProfileSchema,
+} from "./process-containment-engine-execution-profile-contracts.js";
+import {
   processContainmentEngineRunReportSchema,
   processContainmentEngineRunRequestSchema,
 } from "./process-containment-engine-run-contracts.js";
@@ -215,6 +218,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
       processContainmentAssessmentRequestSchema,
     "process-containment-engine-admission":
       processContainmentEngineAdmissionSchema,
+    "process-containment-engine-execution-profile":
+      processContainmentEngineExecutionProfileSchema,
     "process-containment-engine-run-report":
       processContainmentEngineRunReportSchema,
     "process-containment-engine-run-request":

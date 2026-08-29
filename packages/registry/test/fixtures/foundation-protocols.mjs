@@ -2,6 +2,7 @@ import {
   ENGINE_OPERATION_KINDS,
   ENGINE_SNAPSHOT_EXCLUSION_POLICY_DIGEST,
   GODOT_DETERMINISTIC_REPLAY_INVOCATION_DIGEST,
+  GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE,
   GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
   PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS,
   PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
@@ -908,6 +909,8 @@ export const validFoundationProtocolFixtures = {
     evidenceGrade: "locally-executed",
     admissionDigest: digest,
   },
+  "process-containment-engine-execution-profile":
+    GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE,
   "process-containment-engine-run-request": containmentEngineRunRequest,
   "process-containment-engine-run-report": {
     schemaVersion: "1.0.0",

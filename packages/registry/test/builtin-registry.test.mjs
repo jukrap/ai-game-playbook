@@ -31,6 +31,24 @@ test("the builtin runtime registry exposes only implemented commands", () => {
       "workflow.evidence-reconcile",
     ],
   );
+  assert.equal(
+    registry.BUILTIN_REGISTRY.commands.some(
+      ({ id }) => id === "engine.deterministic-replay",
+    ),
+    false,
+  );
+  assert.equal(
+    registry.BUILTIN_REGISTRY_SURFACES.cli.data.commands.some(
+      ({ id }) => id === "engine.deterministic-replay",
+    ),
+    false,
+  );
+  assert.equal(
+    registry.BUILTIN_REGISTRY_SURFACES.mcp.data.tools.some(
+      ({ commandId }) => commandId === "engine.deterministic-replay",
+    ),
+    false,
+  );
 
   const packAdd = registry.BUILTIN_REGISTRY.commands.find(
     ({ id }) => id === "pack.add",

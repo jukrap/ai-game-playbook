@@ -710,6 +710,28 @@ export type {
   ProcessContainmentEngineAdmissionDigestInput,
 } from "./process-containment-engine-admission-contracts.js";
 export {
+  GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE,
+  GODOT_DETERMINISTIC_REPLAY_ENGINE_RUN_MAX_REPORT_DURATION_MS,
+  GODOT_DETERMINISTIC_REPLAY_ENGINE_RUN_PROFILE_DIGEST,
+  GODOT_DETERMINISTIC_REPLAY_ENGINE_RUN_PROFILE_ID,
+  GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE,
+  PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES,
+  PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
+  assertProcessContainmentEngineExecutionProfileSemantics,
+  computeProcessContainmentEngineExecutionProfileContractDigest,
+  getProcessContainmentEngineExecutionProfile,
+  processContainmentEngineExecutionProfileSchema,
+} from "./process-containment-engine-execution-profile-contracts.js";
+export type {
+  ProcessContainmentEngineExecutionOperationId,
+  ProcessContainmentEngineExecutionProfile,
+  ProcessContainmentEngineExecutionProfileDigestInput,
+  ProcessContainmentEngineExecutionProfileId,
+  ProcessContainmentEngineExecutionProfileLaunch,
+  ProcessContainmentEngineExecutionProfileLimits,
+  ProcessContainmentEngineExecutionProfileOutput,
+} from "./process-containment-engine-execution-profile-contracts.js";
+export {
   PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS,
   PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
   PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES,

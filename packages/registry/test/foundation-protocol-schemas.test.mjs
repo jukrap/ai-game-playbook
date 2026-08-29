@@ -54,6 +54,7 @@ const expectedIds = [
   "process-containment-assessment-report",
   "process-containment-assessment-request",
   "process-containment-engine-admission",
+  "process-containment-engine-execution-profile",
   "process-containment-engine-run-report",
   "process-containment-engine-run-request",
   "process-containment-launch-report",
@@ -118,6 +119,24 @@ test("Godot preflight schemas accept qualified path-free execution evidence", ()
     }),
     false,
   );
+});
+
+test("engine execution profile schema accepts only registered launch tuples", () => {
+  const ajv = validator();
+  const validate = ajv.compile(
+    contracts.FOUNDATION_PROTOCOL_SCHEMAS[
+      "process-containment-engine-execution-profile"
+    ].schema,
+  );
+  for (const profile of contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES) {
+    assert.equal(validate(profile), true, JSON.stringify(validate.errors));
+  }
+
+  const changed = structuredClone(
+    contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE,
+  );
+  changed.limits.idleTimeoutMs += 1;
+  assert.equal(validate(changed), false);
 });
 
 test("foundation protocol schemas are complete, versioned, and strictly valid", () => {
@@ -707,6 +726,26 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       {
         ...fixtures["process-containment-engine-admission"],
         decision: "block",
+      },
+    ],
+    [
+      "process-containment-engine-execution-profile",
+      {
+        ...fixtures["process-containment-engine-execution-profile"],
+        launch: {
+          ...fixtures["process-containment-engine-execution-profile"].launch,
+          arguments: ["--headless", "--caller-selected"],
+        },
+      },
+    ],
+    [
+      "process-containment-engine-execution-profile",
+      {
+        ...fixtures["process-containment-engine-execution-profile"],
+        output: {
+          ...fixtures["process-containment-engine-execution-profile"].output,
+          retainRawOutput: true,
+        },
       },
     ],
     [

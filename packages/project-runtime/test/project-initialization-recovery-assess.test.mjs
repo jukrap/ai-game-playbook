@@ -810,7 +810,7 @@ test("an uncertain initialization preserves matching receipt uncertainty as reco
   const policiesPath = join(project, ".ai-game-playbook", "policies");
   const userFile = join(policiesPath, "user-owned.txt");
   const interfere = (async () => {
-    await waitForPath(policiesPath);
+    await waitForPath(policiesPath, 15_000);
     await writeFile(userFile, "preserve me\n", "utf8");
     controller.abort();
   })();

@@ -14,6 +14,9 @@ if (!workflowText.includes('- "scripts/check-docs.test.mjs"')) {
 if (!workflowText.includes('- "generated/foundation-plan.json"')) {
   throw new Error("documentation CI must watch the generated foundation plan");
 }
+if (!workflowText.includes('- "golden/graybox/**"')) {
+  throw new Error("documentation CI must watch the graybox contract assets");
+}
 
 const plannedSurfaceArtifact = JSON.parse(readFileSync(join(sourceRoot, "docs", "planned-surface.json"), "utf8"));
 if (plannedSurfaceArtifact.schemaVersion !== "1" || Object.hasOwn(plannedSurfaceArtifact, "$schema")) {
@@ -27,6 +30,7 @@ function createFixture() {
   cpSync(join(sourceRoot, "README.ko.md"), join(fixtureRoot, "README.ko.md"));
   cpSync(join(sourceRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
   cpSync(join(sourceRoot, "generated"), join(fixtureRoot, "generated"), { recursive: true });
+  cpSync(join(sourceRoot, "golden"), join(fixtureRoot, "golden"), { recursive: true });
   cpSync(join(sourceRoot, "scripts", "check-docs.mjs"), join(fixtureRoot, "scripts", "check-docs.mjs"));
   return fixtureRoot;
 }

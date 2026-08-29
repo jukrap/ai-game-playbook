@@ -1692,6 +1692,82 @@ export const validFoundationProtocolFixtures = {
     divergenceCount: 0,
     completedAt: endedAt,
   },
+  "playtest-scenario": {
+    schemaVersion: "1.0.0",
+    scenarioId: "scenario.graybox.core",
+    version: "1.0.0",
+    initialState: {
+      sceneId: "scene.graybox.main",
+      seed: "graybox-core-v1",
+      resetProcedure: "reset.fresh-profile",
+    },
+    clock: {
+      kind: "fixed-tick",
+      rateHz: 60,
+      warmupTicks: 30,
+      maximumTicks: 720,
+    },
+    inputs: [
+      {
+        sequence: 0,
+        tick: 30,
+        device: "keyboard",
+        action: "move.forward",
+        phase: "pressed",
+      },
+      {
+        sequence: 1,
+        tick: 31,
+        device: "gamepad",
+        action: "move.axis",
+        phase: "axis",
+        value: ["-0.250000", "0"],
+      },
+    ],
+    checkpoints: [
+      {
+        oracleId: "oracle.graybox.initial",
+        atTick: 30,
+        assertions: [
+          {
+            path: "player.position.x",
+            operator: "exists",
+          },
+        ],
+        stateHashFields: ["player.position.x"],
+        onFailureArtifacts: ["artifact.runtime-log"],
+      },
+    ],
+    terminal: [
+      {
+        oracleId: "oracle.graybox.win",
+        withinTicks: { firstTick: 430, lastTick: 720 },
+        assertions: [
+          {
+            path: "game.won",
+            operator: "eq",
+            expected: { kind: "boolean", value: true },
+          },
+        ],
+        stateHashFields: ["game.won"],
+        onFailureArtifacts: ["artifact.runtime-frame"],
+      },
+    ],
+    requiredArtifacts: ["artifact.input-replay", "artifact.runtime-frame"],
+    budgets: {
+      wallClockMs: 30000,
+      outputBytes: 1048576,
+      screenshots: 1,
+      repairCycles: 0,
+    },
+  },
+  "playtest-scenario-binding": {
+    schemaVersion: "1.0.0",
+    bindingId: "binding.graybox.godot",
+    scenarioDigest: digest,
+    featureContractDigest: secondDigest,
+    projectProfileDigest: digest,
+  },
   "build-artifact-evidence": {
     schemaVersion: "1.0.0",
     artifactDigest: digest,

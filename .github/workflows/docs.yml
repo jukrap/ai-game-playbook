@@ -5,6 +5,7 @@ on:
     paths:
       - "README*.md"
       - "docs/**"
+      - "golden/graybox/**"
       - "generated/foundation-plan.json"
       - "scripts/check-docs.mjs"
       - "scripts/check-docs.test.mjs"
@@ -14,6 +15,7 @@ on:
     paths:
       - "README*.md"
       - "docs/**"
+      - "golden/graybox/**"
       - "generated/foundation-plan.json"
       - "scripts/check-docs.mjs"
       - "scripts/check-docs.test.mjs"

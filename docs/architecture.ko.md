@@ -1,6 +1,6 @@
 ---
 source: docs/architecture.md
-source_sha256: 662a6566bf229d6d678ad4dc59816af1faff23863509f4095db1df60d0fc280b
+source_sha256: b03e735e31423ed3d89f10774f8275d681d7b845aa8371d73495a69616409b9e
 translated_at: 2026-08-29
 ---
 # 아키텍처
@@ -49,6 +49,8 @@ flowchart TD
 | `codex-adapter` | 쓰기 없는 프로젝트 설정 계획과 비공개 프로젝트 초기화·관리 스킬 설치 일회성 승인, 읽기 전용 복구 판단 |
 | `godot-adapter` | 공개 정적 Godot 보고와 비공개 정확 버전 승인·격리 시작·취소·영수증 정산 |
 | `windows-containment-provider` | Windows x64 산출물 식별, 폐기 가능한 검증, 정확한 스냅샷 입장권, AppContainer 복사본 실행, 제한된 취소, 경로 없는 보고 |
+
+`golden/graybox/`는 실행 패키지가 아닙니다. 앞으로 만들 엔진별 프로젝트가 충족해야 할 엔진 중립 시나리오를 보관합니다. 실행마다 달라지는 기능·프로젝트 식별 정보는 별도 `PlaytestScenarioBinding`에 두므로 공통 행동 정의를 바꾸지 않습니다. 계약 테스트는 시나리오의 스키마, 의미 규칙, 고정 해시를 묶어 검사하지만 이를 실엔진 증거로 인정하지 않습니다.
 
 Unity·Unreal 어댑터와 모든 프로젝트 브리지는 아직 계획 단계입니다.
 

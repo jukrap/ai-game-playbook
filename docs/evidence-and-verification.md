@@ -1,6 +1,6 @@
 # Evidence and Verification
 
-> Status: receipt, artifact, and result-normalization foundations exist. Public evidence queries, export, and live-engine verification remain planned.
+> Status: receipt, artifact, result-normalization, and engine-neutral scenario foundations exist. Public evidence queries, export, and live-engine verification remain planned.
 
 [한국어](evidence-and-verification.ko.md) · [Documentation](README.md)
 
@@ -53,6 +53,10 @@ A reproducible run identifies the project, engine, version, build, renderer, sce
 
 Runtime capture also records the run, input, state, engine, renderer, scene, camera, and file digest. Editor viewports, direct state injection, and static images are labeled separately from an actual playthrough.
 
+The `PlaytestScenario` contract bounds tick-relative input, state assertions, required artifacts, and execution budgets. Digital input has one canonical representation, axis values use bounded decimal strings, and state values are explicitly typed so engines do not silently disagree about numeric serialization. Schema and semantic checks reject ambiguous timing, reordered or duplicate input, noncanonical assertion and evidence sets, and out-of-budget ticks. The reusable scenario carries no engine-specific project identity. A separate `PlaytestScenarioBinding` binds its digest to the exact feature contract and project profile selected for a run.
+
+Tick semantics are exact. Ticks before `warmupTicks` receive no scripted input, and `warmupTicks` is the first eligible input tick. At tick N, events for N are applied in sequence order immediately before simulation step N. An `atTick` oracle samples immediately after that step. A `withinTicks` oracle samples after every step from `firstTick` through `lastTick`, both inclusive, and succeeds on the first matching sample.
+
 Required scenarios for the shared graybox include success, failure, restart, save, load, and win-state paths. Repeating the same initial state and input must either reproduce the result or report divergence.
 
 ## Artifact integrity
@@ -72,6 +76,8 @@ Editor and packaged-player results are not interchangeable. Report averages, per
 ## Golden tasks
 
 The shared 3D graybox is the first cross-engine behavior target. It contains movement, camera, collision, a collectible, HUD count, save and load, and a win state.
+
+The [tracked core scenario](../golden/graybox/scenario.json) fixes the first engine-neutral movement, camera, collision, collectible, HUD, and win-state oracles together with its input sequence, budgets, required evidence, and canonical digest. Automated tests witness the definition and drift checks only. The fixture does not claim that any engine, runtime frame, save cycle, or packaged build has passed.
 
 Each adapter must run the same player-visible scenarios while preserving engine-specific build and test evidence. A static scene, successful compilation, or editor screenshot does not complete the task.
 

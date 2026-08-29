@@ -621,6 +621,33 @@ export type {
   RuntimeFrameOrigin,
 } from "./engine-evidence-contracts.js";
 export {
+  PLAYTEST_SCENARIO_MAX_ASSERTIONS,
+  PLAYTEST_SCENARIO_MAX_INPUTS,
+  PLAYTEST_SCENARIO_MAX_ORACLES,
+  PLAYTEST_SCENARIO_MAX_OUTPUT_BYTES,
+  PLAYTEST_SCENARIO_MAX_RATE_HZ,
+  PLAYTEST_SCENARIO_MAX_SCREENSHOTS,
+  PLAYTEST_SCENARIO_MAX_TICKS,
+  PLAYTEST_SCENARIO_MAX_WALL_CLOCK_MS,
+  computePlaytestScenarioBindingDigest,
+  computePlaytestScenarioDigest,
+  playtestScenarioBindingSchema,
+  playtestScenarioSchema,
+} from "./playtest-scenario-contracts.js";
+export type {
+  PlaytestClockKind,
+  PlaytestInputDevice,
+  PlaytestInputEvent,
+  PlaytestInputPhase,
+  PlaytestInputValue,
+  PlaytestScenario,
+  PlaytestScenarioBinding,
+  PlaytestStateValue,
+  StateAssertion,
+  StateAssertionOperator,
+  StateOracle,
+} from "./playtest-scenario-contracts.js";
+export {
   ENGINE_SNAPSHOT_EXCLUDED_TOP_LEVEL_ENTRIES,
   ENGINE_SNAPSHOT_EXCLUSION_POLICY_DIGEST,
   ENGINE_SNAPSHOT_MAX_DIRECTORIES,
@@ -799,6 +826,7 @@ export {
   checkEngineCapabilityReportSemantics,
   checkFeatureContractSemantics,
   checkInputReplayTraceSemantics,
+  checkPlaytestScenarioSemantics,
   checkResolvedWorkflowPlanSemantics,
   checkRunHandleSemantics,
   checkRunReceiptSemantics,

@@ -48,6 +48,8 @@ const expectedIds = [
   "pack-operation-output",
   "pack-recovery-input",
   "pack-recovery-output",
+  "playtest-scenario",
+  "playtest-scenario-binding",
   "process-containment-assessment-report",
   "process-containment-assessment-request",
   "process-containment-engine-admission",
@@ -528,6 +530,77 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
           { ...fixtures["input-replay-trace"].events[0], value: 1 },
         ],
       },
+    ],
+    [
+      "playtest-scenario-binding",
+      {
+        ...fixtures["playtest-scenario-binding"],
+        scenarioDigest: "sha256:ABC",
+      },
+    ],
+    [
+      "playtest-scenario",
+      {
+        ...fixtures["playtest-scenario"],
+        inputs: [
+          {
+            ...fixtures["playtest-scenario"].inputs[0],
+            value: "1",
+          },
+        ],
+      },
+    ],
+    [
+      "playtest-scenario",
+      (() => {
+        const invalid = structuredClone(fixtures["playtest-scenario"]);
+        invalid.inputs[0].phase = "axis";
+        return invalid;
+      })(),
+    ],
+    [
+      "playtest-scenario",
+      (() => {
+        const invalid = structuredClone(fixtures["playtest-scenario"]);
+        invalid.inputs[1].value = ["-0.000000", "0"];
+        return invalid;
+      })(),
+    ],
+    [
+      "playtest-scenario",
+      (() => {
+        const invalid = structuredClone(fixtures["playtest-scenario"]);
+        invalid.terminal[0].assertions[0] = {
+          path: "game.score",
+          operator: "within",
+          expected: { kind: "integer", value: "2" },
+          tolerance: "-0.100000",
+        };
+        return invalid;
+      })(),
+    ],
+    [
+      "playtest-scenario",
+      (() => {
+        const invalid = structuredClone(fixtures["playtest-scenario"]);
+        invalid.checkpoints[0].assertions[0].expected = {
+          kind: "boolean",
+          value: true,
+        };
+        return invalid;
+      })(),
+    ],
+    [
+      "playtest-scenario",
+      (() => {
+        const invalid = structuredClone(fixtures["playtest-scenario"]);
+        invalid.terminal[0].assertions[0] = {
+          path: "game.won",
+          operator: "gt",
+          expected: { kind: "text", value: "true" },
+        };
+        return invalid;
+      })(),
     ],
     [
       "input-replay-trace",

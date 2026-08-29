@@ -27,6 +27,7 @@ test("control-plane CI runs the same locked verification on Windows and Linux", 
   assert.match(workflow, /run: pnpm audit\n/);
   assert.doesNotMatch(workflow, /pnpm audit --prod/);
   assert.match(workflow, /run: pnpm run ci:check-clean/);
+  assert.equal(workflow.match(/- "golden\/graybox\/\*\*"/g)?.length, 2);
   assert.match(workflow, /- "generated\/\*\*"/);
   assert.match(workflow, /- "docs\/planned-surface\.json"/);
   assert.equal(workflow.match(/- "global\.json"/g)?.length, 2);

@@ -12,6 +12,10 @@ import {
 } from "./approval-contracts.js";
 import { compareCanonicalText } from "./canonical-json.js";
 import type { InputReplayTrace } from "./engine-evidence-contracts.js";
+import type {
+  PlaytestScenario,
+  StateOracle,
+} from "./playtest-scenario-contracts.js";
 import type { EngineCapabilityReport } from "./project-engine-contracts.js";
 import type { RunHandle } from "./run-engine-contracts.js";
 import {
@@ -46,6 +50,17 @@ export type ContractSemanticIssueCode =
   | "input-replay-event-order-invalid"
   | "input-replay-event-overlap"
   | "input-replay-oracle-contradiction"
+  | "playtest-artifact-order-invalid"
+  | "playtest-input-duplicate"
+  | "playtest-input-order-invalid"
+  | "playtest-input-tick-invalid"
+  | "playtest-oracle-assertion-duplicate"
+  | "playtest-oracle-assertion-order-invalid"
+  | "playtest-oracle-field-order-invalid"
+  | "playtest-oracle-hash-coverage-invalid"
+  | "playtest-oracle-identity-collision"
+  | "playtest-oracle-tolerance-invalid"
+  | "playtest-oracle-window-invalid"
   | "engine-capability-duplicate-id"
   | "engine-capability-duplicate-operation"
   | "engine-capability-future-observation"
@@ -580,6 +595,196 @@ export function checkInputReplayTraceSemantics(
         "input-replay-oracle-contradiction",
         "/divergenceCount",
         "A passing deterministic replay cannot report divergence.",
+      ),
+    );
+  }
+
+  return freezeIssues(issues);
+}
+
+function checkPlaytestOracleSemantics(
+  oracle: StateOracle,
+  path: string,
+  maximumTicks: number,
+  oracleIds: Set<string>,
+  issues: ContractSemanticIssue[],
+): void {
+  if (oracleIds.has(oracle.oracleId)) {
+    issues.push(
+      issue(
+        "playtest-oracle-identity-collision",
+        `${path}/oracleId`,
+        "Oracle IDs must be unique across checkpoint and terminal sets.",
+      ),
+    );
+  }
+  oracleIds.add(oracle.oracleId);
+
+  if (
+    (oracle.atTick === undefined) === (oracle.withinTicks === undefined) ||
+    (oracle.atTick !== undefined && oracle.atTick > maximumTicks) ||
+    (oracle.withinTicks !== undefined &&
+      (oracle.withinTicks.firstTick > oracle.withinTicks.lastTick ||
+        oracle.withinTicks.lastTick > maximumTicks))
+  ) {
+    issues.push(
+      issue(
+        "playtest-oracle-window-invalid",
+        oracle.atTick === undefined ? `${path}/withinTicks` : `${path}/atTick`,
+        "Oracle timing is inclusive, ordered, and inside the scenario clock.",
+      ),
+    );
+  }
+
+  const assertionIdentities = new Set<string>();
+  const stateHashFields = new Set(oracle.stateHashFields);
+  const orderedAssertionIdentities: string[] = [];
+  for (const [index, assertion] of oracle.assertions.entries()) {
+    const identity = `${assertion.path}\u0000${assertion.operator}`;
+    orderedAssertionIdentities.push(identity);
+    if (assertionIdentities.has(identity)) {
+      issues.push(
+        issue(
+          "playtest-oracle-assertion-duplicate",
+          `${path}/assertions/${index}`,
+          "An oracle may assert a path and operator only once.",
+        ),
+      );
+    }
+    assertionIdentities.add(identity);
+    if (!stateHashFields.has(assertion.path)) {
+      issues.push(
+        issue(
+          "playtest-oracle-hash-coverage-invalid",
+          `${path}/assertions/${index}/path`,
+          "Every asserted state path must be covered by the oracle state hash.",
+        ),
+      );
+    }
+    if (
+      assertion.operator === "within" &&
+      assertion.tolerance !== undefined &&
+      /^0(?:\.0+)?$/u.test(assertion.tolerance)
+    ) {
+      issues.push(
+        issue(
+          "playtest-oracle-tolerance-invalid",
+          `${path}/assertions/${index}/tolerance`,
+          "A within assertion requires a positive tolerance.",
+        ),
+      );
+    }
+  }
+
+  if (!isStrictlyCanonical(orderedAssertionIdentities)) {
+    issues.push(
+      issue(
+        "playtest-oracle-assertion-order-invalid",
+        `${path}/assertions`,
+        "Oracle assertions must be sorted by state path and operator.",
+      ),
+    );
+  }
+
+  if (
+    !isStrictlyCanonical(oracle.stateHashFields) ||
+    !isStrictlyCanonical(oracle.onFailureArtifacts)
+  ) {
+    issues.push(
+      issue(
+        "playtest-oracle-field-order-invalid",
+        path,
+        "Oracle state fields and failure artifacts must be sorted and unique.",
+      ),
+    );
+  }
+}
+
+export function checkPlaytestScenarioSemantics(
+  scenario: PlaytestScenario,
+): readonly ContractSemanticIssue[] {
+  const issues: ContractSemanticIssue[] = [];
+  const eventIdentities = new Set<string>();
+  let previousTick: number | undefined;
+
+  if (scenario.clock.warmupTicks >= scenario.clock.maximumTicks) {
+    issues.push(
+      issue(
+        "playtest-input-tick-invalid",
+        "/clock/warmupTicks",
+        "Warm-up must end before the scenario tick budget.",
+      ),
+    );
+  }
+
+  for (const [index, event] of scenario.inputs.entries()) {
+    const path = `/inputs/${index}`;
+    if (
+      event.sequence !== index ||
+      (previousTick !== undefined && event.tick < previousTick)
+    ) {
+      issues.push(
+        issue(
+          "playtest-input-order-invalid",
+          path,
+          "Input events must use contiguous sequence numbers in nondecreasing tick order.",
+        ),
+      );
+    }
+    previousTick = event.tick;
+
+    if (
+      event.tick < scenario.clock.warmupTicks ||
+      event.tick > scenario.clock.maximumTicks
+    ) {
+      issues.push(
+        issue(
+          "playtest-input-tick-invalid",
+          `${path}/tick`,
+          "Input events must occur after warm-up and inside the scenario tick budget.",
+        ),
+      );
+    }
+
+    const identity = `${event.tick}\u0000${event.device}\u0000${event.action}\u0000${event.phase}`;
+    if (eventIdentities.has(identity)) {
+      issues.push(
+        issue(
+          "playtest-input-duplicate",
+          path,
+          "An input phase may occur only once for one device and action at a tick.",
+        ),
+      );
+    }
+    eventIdentities.add(identity);
+  }
+
+  const oracleIds = new Set<string>();
+  for (const [index, oracle] of scenario.checkpoints.entries()) {
+    checkPlaytestOracleSemantics(
+      oracle,
+      `/checkpoints/${index}`,
+      scenario.clock.maximumTicks,
+      oracleIds,
+      issues,
+    );
+  }
+  for (const [index, oracle] of scenario.terminal.entries()) {
+    checkPlaytestOracleSemantics(
+      oracle,
+      `/terminal/${index}`,
+      scenario.clock.maximumTicks,
+      oracleIds,
+      issues,
+    );
+  }
+
+  if (!isStrictlyCanonical(scenario.requiredArtifacts)) {
+    issues.push(
+      issue(
+        "playtest-artifact-order-invalid",
+        "/requiredArtifacts",
+        "Required artifacts must be sorted and unique.",
       ),
     );
   }

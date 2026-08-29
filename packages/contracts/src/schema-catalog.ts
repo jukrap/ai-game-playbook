@@ -14,6 +14,10 @@ import {
   runtimeFrameEvidenceSchema,
 } from "./engine-evidence-contracts.js";
 import {
+  playtestScenarioBindingSchema,
+  playtestScenarioSchema,
+} from "./playtest-scenario-contracts.js";
+import {
   engineExecutableSnapshotSchema,
   engineExecutionSnapshotBindingSchema,
   engineProjectSnapshotSchema,
@@ -181,6 +185,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "pack-operation-output": packOperationCommandOutputSchema,
     "pack-recovery-input": packRecoveryCommandInputSchema,
     "pack-recovery-output": packRecoveryCommandOutputSchema,
+    "playtest-scenario-binding": playtestScenarioBindingSchema,
+    "playtest-scenario": playtestScenarioSchema,
     "project-inspect-report": projectInspectReportSchema,
     "project-inspect-request": projectInspectRequestSchema,
     "project-initialization-command-input":

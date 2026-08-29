@@ -18,9 +18,12 @@ const expectedIds = [
   "engine-capabilities-report",
   "engine-capabilities-request",
   "engine-diagnostic",
+  "engine-executable-snapshot",
+  "engine-execution-snapshot-binding",
   "engine-operation-request",
   "engine-operation-result",
   "engine-project-identity",
+  "engine-project-snapshot",
   "engine-session-identity",
   "engine-status-report",
   "engine-status-request",
@@ -43,6 +46,7 @@ const expectedIds = [
   "pack-recovery-output",
   "process-containment-assessment-report",
   "process-containment-assessment-request",
+  "process-containment-engine-admission",
   "process-containment-launch-report",
   "process-containment-launch-request",
   "process-containment-provider-descriptor",
@@ -568,6 +572,34 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       {
         ...fixtures["process-containment-assessment-report"],
         decision: "allow",
+      },
+    ],
+    [
+      "engine-executable-snapshot",
+      {
+        ...fixtures["engine-executable-snapshot"],
+        bytes: contracts.ENGINE_SNAPSHOT_MAX_FILE_BYTES + 1,
+      },
+    ],
+    [
+      "engine-project-snapshot",
+      {
+        ...fixtures["engine-project-snapshot"],
+        totalBytes: contracts.ENGINE_SNAPSHOT_MAX_TOTAL_BYTES + 1,
+      },
+    ],
+    [
+      "process-containment-engine-admission",
+      {
+        ...fixtures["process-containment-engine-admission"],
+        decision: "block",
+      },
+    ],
+    [
+      "process-containment-engine-admission",
+      {
+        ...fixtures["process-containment-engine-admission"],
+        engine: "phaser",
       },
     ],
     [

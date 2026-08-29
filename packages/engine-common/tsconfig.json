@@ -7,12 +7,7 @@
   },
   "references": [
     { "path": "../contracts" },
-    { "path": "../registry" },
-    { "path": "../core" },
-    { "path": "../engine-common" },
-    { "path": "../evidence" },
-    { "path": "../project-runtime" },
-    { "path": "../windows-containment-provider" }
+    { "path": "../core" }
   ],
   "include": ["src/**/*.ts"]
 }

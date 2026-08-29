@@ -87,6 +87,18 @@ export interface WindowsContainedSyntheticLaunchWitness {
   readonly expiresAt: string;
 }
 
+export interface WindowsContainedSyntheticLaunchWitnessAuthority {
+  readonly runtime: WindowsContainmentProviderRuntime;
+  readonly providerDescriptorDigest: Sha256Digest;
+  readonly providerCatalogDigest: Sha256Digest;
+  readonly projectRootIdentityDigest: Sha256Digest;
+  readonly projectSnapshotDigest: Sha256Digest;
+  readonly executableSnapshotDigest: Sha256Digest;
+  readonly requestDigest: Sha256Digest;
+  readonly reportDigest: Sha256Digest;
+  readonly expiresAt: string;
+}
+
 interface PreparedAuthority {
   readonly runtime: WindowsContainmentProviderRuntime;
   readonly runtimeAuthority: WindowsContainmentProviderRuntimeAuthority;
@@ -103,6 +115,11 @@ interface ReportAuthority {
   readonly requestDigest: Sha256Digest;
   readonly expiresAt: string;
   consumed: boolean;
+}
+
+interface WitnessAuthority
+  extends WindowsContainedSyntheticLaunchWitnessAuthority {
+  admissionClaimed: boolean;
 }
 
 interface NativeProcessResult {
@@ -136,7 +153,7 @@ interface NativeLaunchReport {
 
 const preparedAuthorities = new WeakMap<object, PreparedAuthority>();
 const reportAuthorities = new WeakMap<object, ReportAuthority>();
-const witnessAuthorities = new WeakSet<object>();
+const witnessAuthorities = new WeakMap<object, WitnessAuthority>();
 
 function fail(
   code:
@@ -1062,24 +1079,92 @@ export function consumeWindowsContainedSyntheticLaunchReport(
     reportDigest: report.reportDigest,
     expiresAt: authority.expiresAt,
   });
-  witnessAuthorities.add(witness);
+  witnessAuthorities.set(witness, {
+    runtime,
+    providerDescriptorDigest: witness.providerDescriptorDigest,
+    providerCatalogDigest: witness.providerCatalogDigest,
+    projectRootIdentityDigest: witness.projectRootIdentityDigest,
+    projectSnapshotDigest: witness.projectSnapshotDigest,
+    executableSnapshotDigest: witness.executableSnapshotDigest,
+    requestDigest: witness.requestDigest,
+    reportDigest: witness.reportDigest,
+    expiresAt: witness.expiresAt,
+    admissionClaimed: false,
+  });
   return witness;
 }
 
-export function assertWindowsContainedSyntheticLaunchWitness(
+function requireWindowsContainedSyntheticLaunchWitnessAuthority(
   witness: WindowsContainedSyntheticLaunchWitness,
-): void {
+): WitnessAuthority {
+  const authority =
+    witness !== null && typeof witness === "object"
+      ? witnessAuthorities.get(witness)
+      : undefined;
   if (
-    witness === null ||
-    typeof witness !== "object" ||
-    !witnessAuthorities.has(witness)
+    authority === undefined ||
+    witness.schemaVersion !== "1.0.0" ||
+    witness.providerDescriptorDigest !== authority.providerDescriptorDigest ||
+    witness.providerCatalogDigest !== authority.providerCatalogDigest ||
+    witness.projectRootIdentityDigest !== authority.projectRootIdentityDigest ||
+    witness.projectSnapshotDigest !== authority.projectSnapshotDigest ||
+    witness.executableSnapshotDigest !== authority.executableSnapshotDigest ||
+    witness.requestDigest !== authority.requestDigest ||
+    witness.reportDigest !== authority.reportDigest ||
+    witness.expiresAt !== authority.expiresAt
   ) {
     return fail(
       "launch-witness-invalid",
       "Contained launch witness was not created by this process.",
     );
   }
-  if (Date.now() >= Date.parse(witness.expiresAt)) {
+  if (authority.admissionClaimed) {
+    return fail(
+      "launch-witness-consumed",
+      "Contained launch witness was already claimed by an engine admission.",
+    );
+  }
+  if (Date.now() >= Date.parse(authority.expiresAt)) {
     return fail("launch-expired", "Contained launch witness has expired.");
   }
+  return authority;
+}
+
+export function assertWindowsContainedSyntheticLaunchWitness(
+  witness: WindowsContainedSyntheticLaunchWitness,
+): void {
+  requireWindowsContainedSyntheticLaunchWitnessAuthority(witness);
+}
+
+export function claimWindowsContainedSyntheticLaunchWitnessForEngineAdmission(
+  witness: WindowsContainedSyntheticLaunchWitness,
+  runtime: WindowsContainmentProviderRuntime,
+  projectRootIdentityDigest: Sha256Digest,
+): WindowsContainedSyntheticLaunchWitnessAuthority {
+  requireWindowsContainmentProviderRuntimeAuthority(runtime);
+  const authority =
+    requireWindowsContainedSyntheticLaunchWitnessAuthority(witness);
+  if (
+    authority.runtime !== runtime ||
+    authority.providerDescriptorDigest !== runtime.descriptor.descriptorDigest ||
+    authority.providerCatalogDigest !== runtime.catalogDigest ||
+    authority.projectRootIdentityDigest !== projectRootIdentityDigest
+  ) {
+    return fail(
+      "launch-witness-invalid",
+      "Contained launch witness does not match the engine admission authority.",
+    );
+  }
+  authority.admissionClaimed = true;
+  return Object.freeze({
+    runtime: authority.runtime,
+    providerDescriptorDigest: authority.providerDescriptorDigest,
+    providerCatalogDigest: authority.providerCatalogDigest,
+    projectRootIdentityDigest: authority.projectRootIdentityDigest,
+    projectSnapshotDigest: authority.projectSnapshotDigest,
+    executableSnapshotDigest: authority.executableSnapshotDigest,
+    requestDigest: authority.requestDigest,
+    reportDigest: authority.reportDigest,
+    expiresAt: authority.expiresAt,
+  });
 }

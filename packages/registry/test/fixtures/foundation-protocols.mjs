@@ -1,5 +1,6 @@
 import {
   ENGINE_OPERATION_KINDS,
+  ENGINE_SNAPSHOT_EXCLUSION_POLICY_DIGEST,
   GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
   PROCESS_CONTAINMENT_LAUNCH_MAX_DURATION_MS,
   PROCESS_CONTAINMENT_LAUNCH_MAX_OUTPUT_BYTES,
@@ -118,6 +119,37 @@ const containmentLaunchRequest = {
     maxProcesses: 1,
   },
 };
+const engineProjectSnapshot = {
+  schemaVersion: "1.0.0",
+  kind: "bounded-read-only-source",
+  engine: "godot",
+  projectRootIdentityDigest: digest,
+  projectInspectionDigest: secondDigest,
+  manifestDigest: digest,
+  exclusionPolicyDigest: ENGINE_SNAPSHOT_EXCLUSION_POLICY_DIGEST,
+  fileCount: 2,
+  directoryCount: 2,
+  totalBytes: 128,
+  capturedAt: startedAt,
+  snapshotDigest: secondDigest,
+};
+const engineExecutableSnapshot = {
+  schemaVersion: "1.0.0",
+  kind: "identity-bound-executable",
+  engine: "godot",
+  executableDigest: digest,
+  executableIdentityDigest: secondDigest,
+  bytes: 4_096,
+  capturedAt: startedAt,
+  snapshotDigest: digest,
+};
+const engineExecutionSnapshotBinding = {
+  schemaVersion: "1.0.0",
+  engine: "godot",
+  project: engineProjectSnapshot,
+  executable: engineExecutableSnapshot,
+  bindingDigest: secondDigest,
+};
 const capabilityExecution = {
   detect: "static",
   negotiate: "static",
@@ -208,6 +240,9 @@ export const validFoundationProtocolFixtures = {
       },
     ],
   },
+  "engine-executable-snapshot": engineExecutableSnapshot,
+  "engine-execution-snapshot-binding": engineExecutionSnapshotBinding,
+  "engine-project-snapshot": engineProjectSnapshot,
   "pack-list-request": {
     schemaVersion: "1.0.0",
     projectRoot: "D:\\games\\sample",
@@ -749,6 +784,33 @@ export const validFoundationProtocolFixtures = {
     checkedAt: startedAt,
     evidenceGrade: "implemented",
     assessmentDigest: digest,
+  },
+  "process-containment-engine-admission": {
+    schemaVersion: "1.0.0",
+    admissionId: "018f6f35-2c9e-7d1a-8a4b-123456789ad2",
+    providerDescriptorDigest: digest,
+    providerCatalogDigest: secondDigest,
+    host: { platform: "windows", architecture: "x64" },
+    engine: "godot",
+    workload: "engine-project-process",
+    policyDigest: PROCESS_CONTAINMENT_POLICY_DIGEST,
+    qualification: {
+      syntheticLaunchRequestDigest: digest,
+      syntheticLaunchReportDigest: secondDigest,
+      expiresAt: "2026-08-26T01:02:33.000Z",
+    },
+    operationId: "engine.headless-preflight",
+    invocationDigest: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+    snapshotBindingDigest: engineExecutionSnapshotBinding.bindingDigest,
+    projectRootIdentityDigest:
+      engineProjectSnapshot.projectRootIdentityDigest,
+    projectSnapshotDigest: engineProjectSnapshot.snapshotDigest,
+    executableSnapshotDigest: engineExecutableSnapshot.snapshotDigest,
+    issuedAt: startedAt,
+    expiresAt: "2026-08-26T01:02:20.000Z",
+    decision: "qualified",
+    evidenceGrade: "locally-executed",
+    admissionDigest: digest,
   },
   "process-containment-launch-request": containmentLaunchRequest,
   "process-containment-launch-report": {

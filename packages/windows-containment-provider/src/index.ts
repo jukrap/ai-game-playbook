@@ -33,5 +33,14 @@ export type {
   RunWindowsContainedSyntheticLaunchRequest,
   WindowsContainedSyntheticLaunchWitness,
 } from "./launch.js";
+export {
+  assertWindowsContainedEngineAdmission,
+  claimWindowsContainedEngineAdmissionForDispatch,
+  createWindowsContainedEngineAdmission,
+} from "./admission.js";
+export type {
+  AssertWindowsContainedEngineAdmissionRequest,
+  CreateWindowsContainedEngineAdmissionRequest,
+} from "./admission.js";
 export { WindowsContainmentProviderError } from "./errors.js";
 export type { WindowsContainmentProviderErrorCode } from "./errors.js";

@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import * as contracts from "@ai-game-playbook/contracts";
+import * as core from "@ai-game-playbook/core";
+import * as engineCommon from "@ai-game-playbook/engine-common";
 import * as provider from "../dist/index.js";
 
 const artifactPath = fileURLToPath(
@@ -26,12 +31,25 @@ function expectProviderError(code) {
 test(
   "fresh self-test authority admits one bounded synthetic contained launch",
   { skip: !nativeAvailable, timeout: 60_000 },
-  async () => {
+  async (t) => {
+    const sandbox = await mkdtemp(join(tmpdir(), "agpb-engine-admission-"));
+    const project = join(sandbox, "project");
+    await mkdir(join(project, "scenes"), { recursive: true });
+    await writeFile(join(project, "project.godot"), "config_version=5\n");
+    await writeFile(
+      join(project, "scenes", "main.tscn"),
+      "[gd_scene format=3]\n",
+    );
+    t.after(() => rm(sandbox, { recursive: true, force: true }));
+    const root = await core.canonicalizeProjectRoot(project);
+    const executable = await core.bindProcessExecutable({
+      path: process.execPath,
+      maxBytes: contracts.ENGINE_SNAPSHOT_MAX_FILE_BYTES,
+      allowedEnvironmentKeys: [],
+    });
     const runtime =
       await provider.loadPackagedWindowsContainmentProviderRuntime();
-    const projectRootIdentityDigest = contracts.digestCanonicalJson({
-      project: "contained-launch-fixture",
-    });
+    const projectRootIdentityDigest = root.identityDigest;
     const selfTestPlan = provider.prepareWindowsContainmentSelfTest({
       runtime,
       projectRootIdentityDigest,
@@ -147,6 +165,97 @@ test(
     await assert.rejects(
       provider.runWindowsContainedSyntheticLaunch({ prepared }),
       expectProviderError("launch-consumed"),
+    );
+
+    const binding = await engineCommon.captureEngineExecutionSnapshots({
+      root,
+      executable,
+      engine: "godot",
+      projectInspectionDigest: contracts.digestCanonicalJson({
+        engine: "godot",
+        project: "inspected",
+      }),
+    });
+    const admission =
+      await provider.createWindowsContainedEngineAdmission({
+        runtime,
+        launchWitness: witness,
+        binding,
+        root,
+        executable,
+        operationId: "engine.headless-preflight",
+        invocationDigest:
+          contracts.GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+      });
+    assert.doesNotThrow(() =>
+      contracts.assertProcessContainmentEngineAdmissionSemantics(admission),
+    );
+    assert.equal(admission.engine, "godot");
+    assert.equal(admission.snapshotBindingDigest, binding.bindingDigest);
+    assert.equal(admission.projectRootIdentityDigest, root.identityDigest);
+    assert.equal(JSON.stringify(admission).includes(project), false);
+    await assert.doesNotReject(
+      provider.assertWindowsContainedEngineAdmission({
+        admission,
+        runtime,
+        binding,
+        root,
+        executable,
+        operationId: "engine.headless-preflight",
+        invocationDigest:
+          contracts.GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+      }),
+    );
+    await assert.rejects(
+      provider.assertWindowsContainedEngineAdmission({
+        admission: structuredClone(admission),
+        runtime,
+        binding,
+        root,
+        executable,
+        operationId: "engine.headless-preflight",
+        invocationDigest:
+          contracts.GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+      }),
+      expectProviderError("engine-admission-invalid"),
+    );
+    await assert.rejects(
+      provider.createWindowsContainedEngineAdmission({
+        runtime,
+        launchWitness: witness,
+        binding,
+        root,
+        executable,
+        operationId: "engine.headless-preflight",
+        invocationDigest:
+          contracts.GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+      }),
+      expectProviderError("launch-witness-consumed"),
+    );
+    await assert.doesNotReject(
+      provider.claimWindowsContainedEngineAdmissionForDispatch({
+        admission,
+        runtime,
+        binding,
+        root,
+        executable,
+        operationId: "engine.headless-preflight",
+        invocationDigest:
+          contracts.GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+      }),
+    );
+    await assert.rejects(
+      provider.claimWindowsContainedEngineAdmissionForDispatch({
+        admission,
+        runtime,
+        binding,
+        root,
+        executable,
+        operationId: "engine.headless-preflight",
+        invocationDigest:
+          contracts.GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+      }),
+      expectProviderError("engine-admission-consumed"),
     );
   },
 );

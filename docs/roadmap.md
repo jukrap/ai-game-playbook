@@ -32,9 +32,9 @@ The private initialization-to-skill-install sequence now passes success, denial,
 
 ## Stage 2: Godot alpha
 
-- replace the synthetic fixture with exact read-only Godot project and executable snapshots without widening the fixed launch boundary;
+- turn the short-lived exact snapshot admission into a contained Godot dispatch without widening the fixed qualification boundary;
 - register the validated provider through a project-bound core admission path while keeping public dispatch closed until evidence and approval are connected;
-- admit exact Godot executable and project identities;
+- require the exact admitted Godot executable and project identities at every dispatch and restart;
 - add the thin GDScript bridge and bounded command schema;
 - build the shared 3D graybox with movement, camera, collision, collectible, HUD, save and load, and win state;
 - run script checks, tests, deterministic input, logs, runtime capture, restart, and Windows export;

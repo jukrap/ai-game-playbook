@@ -14,15 +14,19 @@ test("the Godot adapter is private and keeps a one-way runtime boundary", async 
   assert.deepEqual(packageJson.dependencies, {
     "@ai-game-playbook/contracts": "workspace:*",
     "@ai-game-playbook/core": "workspace:*",
+    "@ai-game-playbook/engine-common": "workspace:*",
     "@ai-game-playbook/evidence": "workspace:*",
     "@ai-game-playbook/project-runtime": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
+    "@ai-game-playbook/windows-containment-provider": "workspace:*",
   });
   assert.deepEqual(tsconfig.references, [
     { path: "../contracts" },
     { path: "../registry" },
     { path: "../core" },
+    { path: "../engine-common" },
     { path: "../evidence" },
     { path: "../project-runtime" },
+    { path: "../windows-containment-provider" },
   ]);
 });

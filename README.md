@@ -19,7 +19,7 @@ This repository contains an early control plane, not a finished game-development
 | Godot | Static project status and a documented operation catalog; no engine launch |
 | Skills | Twelve capability-first game-development skills with exact packaged artifacts |
 | MCP | An opt-in, project-bound, read-only STDIO runtime for selected tools |
-| Windows containment | Disposable AppContainer self-test and one-shot synthetic launch; no user project or engine launch |
+| Windows containment | Disposable AppContainer self-test, one-shot synthetic launch, and private path-free admission binding; no user-project or engine process launch |
 | Safety foundation | Typed contracts, registry checks, bounded permissions and workflows, receipts, and managed lifecycle primitives |
 
 No installable package is published. The CLI does not edit a game project, install skills, control an editor, run a game, produce a build, or export evidence. All live-engine capabilities and support grades remain planned.
@@ -45,7 +45,7 @@ pnpm run agpb -- engine status --engine godot --project <project-path>
 
 Add `--json` to an implemented command for canonical machine-readable output. Commands return a nonzero exit code for invalid use, blocking findings, cancellation, uncertainty, or an internal failure. The [CLI guide](docs/cli.md) lists every available and planned command.
 
-The containment verification is an opt-in developer check for Windows x64 and requires .NET SDK `10.0.400`. It first tests the isolation policy, then uses that fresh result to admit one fixed synthetic read-only workload against a new disposable snapshot. The API is private, accepts no arbitrary command or user-project path, and does not establish engine support.
+The containment verification is an opt-in developer check for Windows x64 and requires .NET SDK `10.0.400`. It first tests the isolation policy, then uses that fresh result to admit one fixed synthetic read-only workload against a new disposable snapshot. A successful launch witness can then be bound once to an exact read-only project manifest and executable identity in a short-lived, path-free internal admission. The synthetic launcher still accepts no arbitrary command or user-project path, and the Godot integration exposes no process-dispatch route. This does not establish engine support.
 
 ## Engine support
 

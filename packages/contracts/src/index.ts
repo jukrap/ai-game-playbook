@@ -615,6 +615,41 @@ export type {
   RuntimeFrameOrigin,
 } from "./engine-evidence-contracts.js";
 export {
+  ENGINE_SNAPSHOT_EXCLUDED_TOP_LEVEL_ENTRIES,
+  ENGINE_SNAPSHOT_EXCLUSION_POLICY_DIGEST,
+  ENGINE_SNAPSHOT_MAX_DIRECTORIES,
+  ENGINE_SNAPSHOT_MAX_FILES,
+  ENGINE_SNAPSHOT_MAX_FILE_BYTES,
+  ENGINE_SNAPSHOT_MAX_TOTAL_BYTES,
+  assertEngineExecutableSnapshotSemantics,
+  assertEngineExecutionSnapshotBindingSemantics,
+  assertEngineProjectSnapshotSemantics,
+  computeEngineExecutableSnapshotDigest,
+  computeEngineExecutionSnapshotBindingDigest,
+  computeEngineProjectSnapshotDigest,
+  engineExecutableSnapshotSchema,
+  engineExecutionSnapshotBindingSchema,
+  engineProjectSnapshotSchema,
+} from "./engine-execution-snapshot-contracts.js";
+export type {
+  EngineExecutableSnapshot,
+  EngineExecutableSnapshotDigestInput,
+  EngineExecutionSnapshotBinding,
+  EngineExecutionSnapshotBindingDigestInput,
+  EngineProjectSnapshot,
+  EngineProjectSnapshotDigestInput,
+} from "./engine-execution-snapshot-contracts.js";
+export {
+  PROCESS_CONTAINMENT_ENGINE_ADMISSION_MAX_VALIDITY_MS,
+  assertProcessContainmentEngineAdmissionSemantics,
+  computeProcessContainmentEngineAdmissionDigest,
+  processContainmentEngineAdmissionSchema,
+} from "./process-containment-engine-admission-contracts.js";
+export type {
+  ProcessContainmentEngineAdmission,
+  ProcessContainmentEngineAdmissionDigestInput,
+} from "./process-containment-engine-admission-contracts.js";
+export {
   assetProvenanceSchema,
   computeFeatureContractApprovalDigest,
   computeRunReceiptDigest,

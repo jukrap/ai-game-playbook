@@ -113,6 +113,31 @@ test("artifact boundary rejects relative paths, non-PE data, and accessors", asy
   assert.equal(getterCalled, false);
 });
 
+test("engine admission parsing never invokes accessors", async () => {
+  let getterCalled = false;
+  const hostile = {
+    launchWitness: null,
+    binding: null,
+    root: null,
+    executable: null,
+    operationId: "engine.headless-preflight",
+    invocationDigest: contracts.GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+  };
+  Object.defineProperty(hostile, "runtime", {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return null;
+    },
+  });
+
+  await assert.rejects(
+    provider.createWindowsContainedEngineAdmission(hostile),
+    expectProviderError("invalid-engine-admission-request"),
+  );
+  assert.equal(getterCalled, false);
+});
+
 test("prepared self-test binds project, provider, catalog, challenge, and expiry", async (t) => {
   const { artifactPath } = await fixture(t);
   const runtime = await createWindowsContainmentProviderRuntime({

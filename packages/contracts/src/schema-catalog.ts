@@ -14,6 +14,11 @@ import {
   runtimeFrameEvidenceSchema,
 } from "./engine-evidence-contracts.js";
 import {
+  engineExecutableSnapshotSchema,
+  engineExecutionSnapshotBindingSchema,
+  engineProjectSnapshotSchema,
+} from "./engine-execution-snapshot-contracts.js";
+import {
   roleLensDescriptorSchema,
   skillDescriptorSchema,
   workflowDescriptorSchema,
@@ -88,6 +93,9 @@ import {
   processContainmentLaunchRequestSchema,
 } from "./process-containment-launch-contracts.js";
 import {
+  processContainmentEngineAdmissionSchema,
+} from "./process-containment-engine-admission-contracts.js";
+import {
   packDoctorReportSchema,
   packDoctorRequestSchema,
   packListReportSchema,
@@ -148,6 +156,9 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "doctor-request": doctorRequestSchema,
     "engine-capabilities-report": engineCapabilitiesReportSchema,
     "engine-capabilities-request": engineCapabilitiesRequestSchema,
+    "engine-executable-snapshot": engineExecutableSnapshotSchema,
+    "engine-execution-snapshot-binding": engineExecutionSnapshotBindingSchema,
+    "engine-project-snapshot": engineProjectSnapshotSchema,
     "engine-status-report": engineStatusReportSchema,
     "engine-status-request": engineStatusRequestSchema,
     "godot-executable-discovery-report": godotExecutableDiscoveryReportSchema,
@@ -189,6 +200,8 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
       processContainmentAssessmentReportSchema,
     "process-containment-assessment-request":
       processContainmentAssessmentRequestSchema,
+    "process-containment-engine-admission":
+      processContainmentEngineAdmissionSchema,
     "process-containment-provider-descriptor":
       processContainmentProviderDescriptorSchema,
     "process-containment-launch-report":

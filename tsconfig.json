@@ -5,6 +5,7 @@
     { "path": "./packages/windows-containment-provider" },
     { "path": "./packages/registry" },
     { "path": "./packages/core" },
+    { "path": "./packages/engine-common" },
     { "path": "./packages/project-runtime" },
     { "path": "./packages/godot-adapter" },
     { "path": "./packages/skill-runtime" },

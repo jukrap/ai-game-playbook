@@ -15,6 +15,15 @@ test("workspace packages stay private and follow the foundation dependency direc
   const core = await readJson(
     new URL("../packages/core/package.json", import.meta.url),
   );
+  const engineCommon = await readJson(
+    new URL("../packages/engine-common/package.json", import.meta.url),
+  );
+  const windowsContainmentProvider = await readJson(
+    new URL(
+      "../packages/windows-containment-provider/package.json",
+      import.meta.url,
+    ),
+  );
   const evidence = await readJson(
     new URL("../packages/evidence/package.json", import.meta.url),
   );
@@ -62,6 +71,19 @@ test("workspace packages stay private and follow the foundation dependency direc
     "@ai-game-playbook/contracts": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
   });
+  assert.equal(engineCommon.private, true);
+  assert.equal(engineCommon.license, "UNLICENSED");
+  assert.deepEqual(engineCommon.dependencies, {
+    "@ai-game-playbook/contracts": "workspace:*",
+    "@ai-game-playbook/core": "workspace:*",
+  });
+  assert.equal(windowsContainmentProvider.private, true);
+  assert.equal(windowsContainmentProvider.license, "UNLICENSED");
+  assert.deepEqual(windowsContainmentProvider.dependencies, {
+    "@ai-game-playbook/contracts": "workspace:*",
+    "@ai-game-playbook/core": "workspace:*",
+    "@ai-game-playbook/engine-common": "workspace:*",
+  });
   assert.equal(evidence.private, true);
   assert.equal(evidence.license, "UNLICENSED");
   assert.deepEqual(evidence.dependencies, {
@@ -96,9 +118,11 @@ test("workspace packages stay private and follow the foundation dependency direc
   assert.deepEqual(godotAdapter.dependencies, {
     "@ai-game-playbook/contracts": "workspace:*",
     "@ai-game-playbook/core": "workspace:*",
+    "@ai-game-playbook/engine-common": "workspace:*",
     "@ai-game-playbook/evidence": "workspace:*",
     "@ai-game-playbook/project-runtime": "workspace:*",
     "@ai-game-playbook/registry": "workspace:*",
+    "@ai-game-playbook/windows-containment-provider": "workspace:*",
   });
   assert.equal(cli.private, true);
   assert.equal(cli.license, "UNLICENSED");
@@ -153,6 +177,15 @@ test("package-local compiler paths are not inherited from the root config", asyn
   const core = await readJson(
     new URL("../packages/core/tsconfig.json", import.meta.url),
   );
+  const engineCommon = await readJson(
+    new URL("../packages/engine-common/tsconfig.json", import.meta.url),
+  );
+  const windowsContainmentProvider = await readJson(
+    new URL(
+      "../packages/windows-containment-provider/tsconfig.json",
+      import.meta.url,
+    ),
+  );
   const evidence = await readJson(
     new URL("../packages/evidence/tsconfig.json", import.meta.url),
   );
@@ -176,6 +209,11 @@ test("package-local compiler paths are not inherited from the root config", asyn
   assert.equal(contracts.compilerOptions.rootDir, "src");
   assert.equal(registry.compilerOptions.rootDir, "src");
   assert.equal(core.compilerOptions.rootDir, "src");
+  assert.equal(engineCommon.compilerOptions.rootDir, "src");
+  assert.equal(
+    windowsContainmentProvider.compilerOptions.rootDir,
+    "src",
+  );
   assert.equal(evidence.compilerOptions.rootDir, "src");
   assert.equal(packRuntime.compilerOptions.rootDir, "src");
   assert.equal(skillRuntime.compilerOptions.rootDir, "src");

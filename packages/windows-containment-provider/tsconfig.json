@@ -5,6 +5,10 @@
     "rootDir": "src",
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
-  "references": [{ "path": "../contracts" }],
+  "references": [
+    { "path": "../contracts" },
+    { "path": "../core" },
+    { "path": "../engine-common" }
+  ],
   "include": ["src/**/*.ts"]
 }

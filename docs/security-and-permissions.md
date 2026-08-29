@@ -108,13 +108,15 @@ One fresh witness can be consumed by a private synthetic-launch path. The path c
 
 Failed and uncertain settlement are distinct. An unconfirmed process, unreadable post-run snapshot, artifact drift, malformed native result, or uncertain cleanup cannot produce launch authority and is never promoted to success.
 
+One successful synthetic-launch witness can be consumed once to create a short-lived engine admission. The admission revalidates the exact same-process project root and executable authority, scans bounded project source twice, rejects links and portable path collisions, and binds the resulting path-free digests to one operation and invocation. Fixed local-state directories are excluded, but source drift or an executable change invalidates the admission. The admission is preparation authority only; no engine-process dispatcher consumes it yet.
+
 ## Processes and editors
 
 Process authority binds the executable content and identity, start information, project, command, policy, and budget. PID, process name, port, or window title alone is insufficient.
 
 Output, duration, child processes, cancellation, and termination settlement are bounded. A process result does not imply that inner tests or gameplay passed. Editor-bound work uses one lane per project and requires an exact session identity after reload or restart.
 
-The compiled containment catalog used by the Godot adapter and public runtime remains empty. The private synthetic launch is not registered as project-process authority there. Godot project startup preflight therefore blocks before launch.
+The compiled containment catalog used by the public runtime remains empty. A private Godot preparation path can bind an original version report to the short-lived admission, but it returns `godot-headless-contained-dispatch-unimplemented` and starts no engine process. Public Godot startup therefore remains blocked before launch.
 
 ## MCP limits
 

@@ -38,7 +38,7 @@ The grade belongs to a capability and environment. An adapter can be `headless` 
 
 The current public path checks one Godot project candidate and compares its major and minor version hint with the pinned `4.7.2` target. It reports the common operation catalog, but every operation remains planned.
 
-Private foundations can discover bounded executable candidates and probe an exact version only with narrow host-tool permission. A separate Windows provider can run only its built-in synthetic workload on disposable state. It is not registered in the Godot admission catalog, so project startup remains blocked. This code is not a live adapter.
+Private foundations can discover bounded executable candidates and probe an exact version only with narrow host-tool permission. A separate Windows provider runs only its built-in synthetic workload on disposable state. One successful witness can be bound to exact read-only project and executable snapshots, and the original Godot version report can prepare a short-lived admission. No dispatcher consumes that admission: it returns `godot-headless-contained-dispatch-unimplemented`, the public catalog stays empty, and project startup remains blocked. This code is not a live adapter.
 
 The first alpha must run the full loop on the shared graybox project. It covers script validation, headless tests, actual game startup, and deterministic input. It also preserves logs, runtime capture, save and load results, win-state verification, and a Windows export.
 

@@ -19,7 +19,11 @@ export type WindowsContainmentProviderErrorCode =
   | "launch-process-failed"
   | "launch-output-invalid"
   | "launch-witness-invalid"
-  | "launch-witness-consumed";
+  | "launch-witness-consumed"
+  | "invalid-engine-admission-request"
+  | "engine-admission-invalid"
+  | "engine-admission-expired"
+  | "engine-admission-consumed";
 
 export class WindowsContainmentProviderError extends Error {
   readonly code: WindowsContainmentProviderErrorCode;

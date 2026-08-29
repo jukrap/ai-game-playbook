@@ -64,3 +64,12 @@ export type {
   PreparedGodotHeadlessPreflight,
   RunGodotHeadlessPreflightRequest,
 } from "./headless-preflight.js";
+export {
+  assertPreparedGodotContainedHeadlessAdmission,
+  prepareGodotContainedHeadlessAdmissionFromVersionProbe,
+} from "./contained-headless-admission.js";
+export type {
+  GodotContainedHeadlessAdmissionBlocker,
+  PrepareGodotContainedHeadlessAdmissionFromVersionProbeRequest,
+  PreparedGodotContainedHeadlessAdmission,
+} from "./contained-headless-admission.js";

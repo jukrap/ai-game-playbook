@@ -15,10 +15,10 @@ The repository now has:
 - a bounded read-only MCP runtime and write-free host setup planning;
 - separate private one-shot project-initialization and managed-skill operations with approval, durable dispatch, and read-only recovery inspection;
 - private pack recovery closure and finite evidence reconciliation;
-- a source-built Windows x64 AppContainer and Job Object qualification path plus one-shot snapshot admission, staged Godot-process dispatch, permission settlement, and retained receipts;
+- a source-built Windows x64 AppContainer and Job Object qualification path plus one-shot snapshot admission, staged Godot-process dispatch, bounded caller cancellation, permission settlement, and retained receipts;
 - paired English and Korean public documentation with structural checks.
 
-The contained process path has passed success and injected-failure cases with a purpose-built fixture. This checkpoint does not include an installable package, an installed Godot validation, or a live engine loop.
+The contained process path has passed success, injected-failure, timeout, and running-process cancellation cases with a purpose-built fixture. Cancellation waits for native process-tree settlement and cleanup before retaining its receipt. This checkpoint does not include an installable package, an installed Godot validation, or a live engine loop.
 
 ## Stage 1: safe public execution
 

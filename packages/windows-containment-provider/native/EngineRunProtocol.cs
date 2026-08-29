@@ -68,6 +68,7 @@ internal static partial class EngineRunProtocol
             "schemaVersion",
             "operation",
             "runId",
+            "cancellationId",
             "requestDigest",
             "entryArtifactDigest",
             "admissionDigest",
@@ -109,6 +110,7 @@ internal static partial class EngineRunProtocol
         string schemaVersion = RequiredString(properties, "schemaVersion", 20);
         string operation = RequiredString(properties, "operation", 80);
         string runId = RequiredString(properties, "runId", 36);
+        string cancellationId = RequiredString(properties, "cancellationId", 36);
         string requestDigest = RequiredDigest(properties, "requestDigest");
         string entryArtifactDigest = RequiredDigest(properties, "entryArtifactDigest");
         string admissionDigest = RequiredDigest(properties, "admissionDigest");
@@ -178,6 +180,11 @@ internal static partial class EngineRunProtocol
             || operation != "godot-engine-run"
             || !Guid.TryParseExact(runId, "D", out Guid parsedRunId)
             || !string.Equals(parsedRunId.ToString("D"), runId, StringComparison.Ordinal)
+            || !Guid.TryParseExact(cancellationId, "D", out Guid parsedCancellationId)
+            || !string.Equals(
+                parsedCancellationId.ToString("D"),
+                cancellationId,
+                StringComparison.Ordinal)
             || policyDigest != PolicyDigest
             || profileId != ProfileId
             || profileDigest != ProfileDigest
@@ -212,6 +219,7 @@ internal static partial class EngineRunProtocol
             schemaVersion,
             operation,
             runId,
+            cancellationId,
             requestDigest,
             entryArtifactDigest,
             admissionDigest,
@@ -529,6 +537,7 @@ internal sealed record NativeEngineRunRequest(
     string SchemaVersion,
     string Operation,
     string RunId,
+    string CancellationId,
     string RequestDigest,
     string EntryArtifactDigest,
     string AdmissionDigest,

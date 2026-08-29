@@ -31,6 +31,7 @@ internal static class EngineRunRunner
         IntPtr job = IntPtr.Zero;
         IntPtr process = IntPtr.Zero;
         IntPtr thread = IntPtr.Zero;
+        EventWaitHandle? cancellationEvent = null;
         bool profileCreated = false;
         bool profileRemoved = true;
         bool ownedRootCreated = false;
@@ -40,6 +41,7 @@ internal static class EngineRunRunner
         bool processAssignedToJob = false;
         bool terminationRequested = false;
         bool terminationConfirmed = true;
+        string terminationCause = "none";
         bool observationUncertain = false;
         bool sourceProjectPreserved = false;
         bool sourceExecutablePreserved = false;
@@ -55,6 +57,10 @@ internal static class EngineRunRunner
 
         try
         {
+            cancellationEvent = EngineRunCancellationControl.Create(
+                request.RunId,
+                request.RequestDigest,
+                request.CancellationId);
             if (Directory.Exists(ownedRoot) || File.Exists(ownedRoot))
             {
                 throw new InvalidOperationException("owned-root-collision");
@@ -68,6 +74,7 @@ internal static class EngineRunRunner
             {
                 throw new InvalidOperationException("source-snapshot-drift");
             }
+            ThrowIfCancellationRequested(cancellationEvent);
 
             int profileResult = NativeMethods.CreateAppContainerProfile(
                 profileName,
@@ -99,9 +106,10 @@ internal static class EngineRunRunner
                 request.SourceExecutablePath,
                 stagedExecutable,
                 request.SourceExecutableDigest,
-                request.SourceExecutableBytes);
+                request.SourceExecutableBytes,
+                cancellationEvent);
             WindowsProcess.GrantReadExecute(ownedRoot, sid);
-            await CopyProjectAsync(request, stagedProject);
+            await CopyProjectAsync(request, stagedProject, cancellationEvent);
 
             stagedProjectBaselinePreserved = ProjectMatches(request, stagedProject);
             stagedExecutableBaselinePreserved = ExecutableMatches(
@@ -123,6 +131,7 @@ internal static class EngineRunRunner
             {
                 throw new InvalidOperationException("staging-verification-failed");
             }
+            ThrowIfCancellationRequested(cancellationEvent);
             if (DateTimeOffset.UtcNow >= request.StartDeadline)
             {
                 throw new TimeoutException("start-window-exhausted");
@@ -167,9 +176,30 @@ internal static class EngineRunRunner
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "process-resume-failed");
             }
 
-            uint wait = NativeMethods.WaitForSingleObject(process, (uint)request.EngineTimeoutMs);
-            if (wait == NativeMethods.WaitTimeout)
+            uint wait = NativeMethods.WaitForMultipleObjects(
+                2,
+                new[]
+                {
+                    process,
+                    cancellationEvent.SafeWaitHandle.DangerousGetHandle(),
+                },
+                false,
+                (uint)request.EngineTimeoutMs);
+            if (wait == NativeMethods.WaitObject0 + 1)
             {
+                terminationCause = "caller-cancelled";
+                terminationRequested = true;
+                if (!NativeMethods.TerminateJobObject(job, 125))
+                {
+                    observationUncertain = true;
+                }
+                wait = NativeMethods.WaitForSingleObject(
+                    process,
+                    (uint)request.TerminationGraceMs);
+            }
+            else if (wait == NativeMethods.WaitTimeout)
+            {
+                terminationCause = "engine-timeout";
                 terminationRequested = true;
                 if (!NativeMethods.TerminateJobObject(job, 124))
                 {
@@ -178,6 +208,10 @@ internal static class EngineRunRunner
                 wait = NativeMethods.WaitForSingleObject(
                     process,
                     (uint)request.TerminationGraceMs);
+            }
+            else if (wait != NativeMethods.WaitObject0)
+            {
+                observationUncertain = true;
             }
             terminationConfirmed = wait == NativeMethods.WaitObject0;
             if (!terminationConfirmed)
@@ -206,6 +240,10 @@ internal static class EngineRunRunner
                 request.SourceExecutableBytes);
             profileBudgetPreserved = ProfileWithinBudget(profileRoot, request.MaxProfileBytes);
         }
+        catch (OperationCanceledException)
+        {
+            terminationCause = "caller-cancelled";
+        }
         catch
         {
             if (processStarted)
@@ -220,10 +258,19 @@ internal static class EngineRunRunner
                 uint wait = NativeMethods.WaitForSingleObject(process, 0);
                 if (wait == NativeMethods.WaitTimeout)
                 {
+                    if (terminationCause == "none")
+                    {
+                        terminationCause = cancellationEvent?.WaitOne(0) == true
+                            ? "caller-cancelled"
+                            : "safety-boundary";
+                    }
                     terminationRequested = true;
+                    uint terminationExitCode = terminationCause == "caller-cancelled"
+                        ? 125u
+                        : 124u;
                     bool terminated = processAssignedToJob && job != IntPtr.Zero
-                        ? NativeMethods.TerminateJobObject(job, 124)
-                        : NativeMethods.TerminateProcess(process, 124);
+                        ? NativeMethods.TerminateJobObject(job, terminationExitCode)
+                        : NativeMethods.TerminateProcess(process, terminationExitCode);
                     terminationConfirmed = terminated
                         && NativeMethods.WaitForSingleObject(
                             process,
@@ -233,6 +280,20 @@ internal static class EngineRunRunner
                         observationUncertain = true;
                     }
                 }
+            }
+            try
+            {
+                sourceProjectPreserved = ProjectMatches(request, request.SourceProjectRoot);
+                sourceExecutablePreserved = ExecutableMatches(
+                    request.SourceExecutablePath,
+                    request.SourceExecutableDigest,
+                    request.SourceExecutableBytes);
+            }
+            catch
+            {
+                sourceProjectPreserved = false;
+                sourceExecutablePreserved = false;
+                observationUncertain = true;
             }
             if (job != IntPtr.Zero)
             {
@@ -269,6 +330,7 @@ internal static class EngineRunRunner
             {
                 ownedRootRemoved = WindowsProcess.DeleteOwnedFixture(ownedRoot);
             }
+            cancellationEvent?.Dispose();
         }
 
         bool childProcessStarted = (accounting?.TotalProcesses ?? 0) > request.MaxProcesses;
@@ -300,6 +362,7 @@ internal static class EngineRunRunner
             && accounting.ActiveProcesses == 0
             && !output.Truncated
             && !terminationRequested
+            && terminationCause == "none"
             && terminationConfirmed
             && sourceProjectPreserved
             && sourceExecutablePreserved
@@ -308,11 +371,29 @@ internal static class EngineRunRunner
             && profileBudgetPreserved
             && !childProcessStarted
             && cleanup == "complete";
+        bool cancelled =
+            terminationCause == "caller-cancelled"
+            && terminationConfirmed
+            && sourceProjectPreserved
+            && sourceExecutablePreserved
+            && profileBudgetPreserved
+            && !childProcessStarted
+            && !output.Truncated
+            && cleanup == "complete"
+            && (!processStarted
+                || (processExitCode is not null
+                    && accounting is not null
+                    && accounting.TotalProcesses == request.MaxProcesses
+                    && accounting.ActiveProcesses == 0
+                    && stagedProjectBaselinePreserved
+                    && stagedExecutableBaselinePreserved));
         string outcome = observationUncertain
             ? "uncertain"
-            : succeeded
-                ? "succeeded"
-                : "failed";
+            : cancelled
+                ? "cancelled"
+                : succeeded
+                    ? "succeeded"
+                    : "failed";
 
         DateTimeOffset completed = Protocol.TruncateToMilliseconds(DateTimeOffset.UtcNow);
         if (completed < started)
@@ -344,7 +425,10 @@ internal static class EngineRunRunner
                 processStarted ? accounting?.TotalProcesses : 0,
                 processStarted ? accounting?.ActiveProcesses : 0),
             output,
-            new NativeEngineRunTermination(terminationRequested, terminationConfirmed),
+            new NativeEngineRunTermination(
+                terminationRequested,
+                terminationConfirmed,
+                terminationCause),
             new NativeEngineRunEffects(
                 sourceProjectPreserved,
                 sourceExecutablePreserved,
@@ -360,6 +444,7 @@ internal static class EngineRunRunner
         {
             "succeeded" => 0,
             "failed" => 2,
+            "cancelled" => 4,
             _ => 3,
         };
         return new NativeEngineRunResult(report, exitCode);
@@ -367,17 +452,25 @@ internal static class EngineRunRunner
 
     private static async Task CopyProjectAsync(
         NativeEngineRunRequest request,
-        string destinationRoot)
+        string destinationRoot,
+        EventWaitHandle cancellationEvent)
     {
         foreach (string directory in request.ProjectDirectories.Skip(1))
         {
+            ThrowIfCancellationRequested(cancellationEvent);
             Directory.CreateDirectory(ResolveRelative(destinationRoot, directory));
         }
         foreach (NativeEngineRunFile file in request.ProjectFiles)
         {
+            ThrowIfCancellationRequested(cancellationEvent);
             string source = ResolveRelative(request.SourceProjectRoot, file.Path);
             string destination = ResolveRelative(destinationRoot, file.Path);
-            await CopyExpectedFileAsync(source, destination, file.Digest, file.Bytes);
+            await CopyExpectedFileAsync(
+                source,
+                destination,
+                file.Digest,
+                file.Bytes,
+                cancellationEvent);
         }
     }
 
@@ -385,7 +478,8 @@ internal static class EngineRunRunner
         string source,
         string destination,
         string expectedDigest,
-        int expectedBytes)
+        int expectedBytes,
+        EventWaitHandle cancellationEvent)
     {
         if (!RegularFileMatches(source, expectedDigest, expectedBytes))
         {
@@ -407,7 +501,17 @@ internal static class EngineRunRunner
             128 * 1024,
             FileOptions.SequentialScan))
         {
-            await input.CopyToAsync(output);
+            byte[] buffer = new byte[128 * 1024];
+            while (true)
+            {
+                ThrowIfCancellationRequested(cancellationEvent);
+                int bytesRead = await input.ReadAsync(buffer);
+                if (bytesRead == 0)
+                {
+                    break;
+                }
+                await output.WriteAsync(buffer.AsMemory(0, bytesRead));
+            }
             await output.FlushAsync();
         }
         if (
@@ -415,6 +519,15 @@ internal static class EngineRunRunner
             || !RegularFileMatches(destination, expectedDigest, expectedBytes))
         {
             throw new InvalidOperationException("copied-file-drift");
+        }
+    }
+
+    private static void ThrowIfCancellationRequested(
+        EventWaitHandle cancellationEvent)
+    {
+        if (cancellationEvent.WaitOne(0))
+        {
+            throw new OperationCanceledException("caller-cancelled");
         }
     }
 
@@ -659,7 +772,10 @@ internal sealed record NativeEngineRunOutput(
     int ObservedBytes,
     bool Truncated);
 
-internal sealed record NativeEngineRunTermination(bool Requested, bool Confirmed);
+internal sealed record NativeEngineRunTermination(
+    bool Requested,
+    bool Confirmed,
+    string Cause);
 
 internal sealed record NativeEngineRunEffects(
     bool SourceProjectPreserved,

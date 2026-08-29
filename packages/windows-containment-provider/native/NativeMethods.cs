@@ -254,6 +254,13 @@ internal static class NativeMethods
     internal static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    internal static extern uint WaitForMultipleObjects(
+        uint count,
+        IntPtr[] handles,
+        [MarshalAs(UnmanagedType.Bool)] bool waitAll,
+        uint milliseconds);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GetExitCodeProcess(IntPtr process, out uint exitCode);
 

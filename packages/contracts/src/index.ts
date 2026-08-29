@@ -686,6 +686,7 @@ export type {
   ProcessContainmentEngineRunReportDigestInput,
   ProcessContainmentEngineRunRequest,
   ProcessContainmentEngineRunTermination,
+  ProcessContainmentEngineRunTerminationCause,
 } from "./process-containment-engine-run-contracts.js";
 export {
   assetProvenanceSchema,

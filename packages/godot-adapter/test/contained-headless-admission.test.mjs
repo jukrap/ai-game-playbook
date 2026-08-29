@@ -387,3 +387,59 @@ test(
     );
   },
 );
+
+test(
+  "post-dispatch cancellation waits for native cleanup and retains a cancelled receipt",
+  { skip: !nativeAvailable, timeout: 120_000 },
+  async (t) => {
+    const context = await readyContainedRun(t, "hang");
+    const projectBefore = await readFile(
+      join(context.project, "project.godot"),
+      "utf8",
+    );
+    const controller = new AbortController();
+    const cancellationTimer = setTimeout(() => controller.abort(), 4_000);
+    const report = await godot.runGodotContainedHeadless({
+      plan: context.plan,
+      authorization: context.approval.decision,
+      signal: controller.signal,
+    });
+    clearTimeout(cancellationTimer);
+
+    assert.equal(report.status, "cancelled");
+    assert.equal(report.code, "godot-headless-engine-run-cancelled");
+    assert.equal(report.engineRun.outcome, "cancelled");
+    assert.deepEqual(report.engineRun.termination, {
+      requested: true,
+      confirmed: true,
+      cause: "caller-cancelled",
+    });
+    assert.equal(report.engineRun.effects.cleanup, "complete");
+    assert.equal(report.authorization.status, "cancelled");
+    assert.equal(report.authorization.mutationUncertain, false);
+    assert.equal(context.approval.decision.lease.state, "settled");
+    assert.doesNotThrow(() =>
+      contracts.assertGodotHeadlessPreflightReportSemantics(report),
+    );
+
+    const loaded = await core.loadRunReceiptChain({
+      root: context.root,
+      registry: registry.BUILTIN_REGISTRY,
+      runId: context.plan.runId,
+      projectId: context.plan.project.id,
+      projectIdentityDigest: context.root.identityDigest,
+      workflowId: context.plan.workflow.id,
+      resolvedPlanDigest: context.plan.workflow.resolvedPlanDigest,
+      maxArtifactBytes: 0,
+    });
+    assert.equal(loaded.receipts[0].status, "cancelled");
+    assert.equal(loaded.receipts[0].outcomes.outer.status, "cancelled");
+    assert.equal(loaded.receipts[0].outcomes.outer.timedOut, false);
+    assert.equal(loaded.receipts[0].outcomes.inner.status, "cancelled");
+    assert.equal(loaded.receipts[0].mutation.status, "none");
+    assert.equal(
+      await readFile(join(context.project, "project.godot"), "utf8"),
+      projectBefore,
+    );
+  },
+);

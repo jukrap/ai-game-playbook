@@ -905,7 +905,7 @@ export const validFoundationProtocolFixtures = {
       observedBytes: 128,
       truncated: false,
     },
-    termination: { requested: false, confirmed: true },
+    termination: { requested: false, confirmed: true, cause: "none" },
     effects: {
       sourceProjectPreserved: true,
       sourceExecutablePreserved: true,
@@ -1824,7 +1824,7 @@ export const validContainedGodotPreflightReportFixture = {
       observedBytes: 16,
       truncated: false,
     },
-    termination: { requested: false, confirmed: true },
+    termination: { requested: false, confirmed: true, cause: "none" },
     effects: {
       sourceProjectPreserved: true,
       sourceExecutablePreserved: true,

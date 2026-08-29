@@ -40,6 +40,15 @@ internal static class Program
                 Protocol.WriteJson(result.Report);
                 return result.ExitCode;
             }
+            if (args.Length == 1 && args[0] == "godot-engine-cancel")
+            {
+                NativeEngineRunCancellationRequest request =
+                    await EngineRunCancellationProtocol.ReadRequestAsync();
+                NativeEngineRunCancellationResult result =
+                    await EngineRunCancellationRunner.RunAsync(request);
+                Protocol.WriteJson(result.Report);
+                return result.ExitCode;
+            }
             if (args.Length > 1 && args[0] == "synthetic-workload")
             {
                 return await SyntheticPayload.RunAsync(args[1..]);

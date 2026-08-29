@@ -107,7 +107,14 @@ export interface ProcessContainmentEngineRunRequest {
 export type ProcessContainmentEngineRunOutcome =
   | "succeeded"
   | "failed"
+  | "cancelled"
   | "uncertain";
+
+export type ProcessContainmentEngineRunTerminationCause =
+  | "none"
+  | "engine-timeout"
+  | "caller-cancelled"
+  | "safety-boundary";
 
 export interface ProcessContainmentEngineRunProcessObservation {
   readonly started: boolean;
@@ -127,6 +134,7 @@ export interface ProcessContainmentEngineRunOutputObservation {
 export interface ProcessContainmentEngineRunTermination {
   readonly requested: boolean;
   readonly confirmed: boolean;
+  readonly cause: ProcessContainmentEngineRunTerminationCause;
 }
 
 export interface ProcessContainmentEngineRunEffects {
@@ -488,12 +496,16 @@ function validateTermination(
 ): ProcessContainmentEngineRunTermination {
   const termination = dataObject(
     value,
-    ["requested", "confirmed"],
+    ["requested", "confirmed", "cause"],
     "process containment engine run termination is outside the contract",
   );
   if (
     typeof ownValue(termination, "requested") !== "boolean" ||
-    typeof ownValue(termination, "confirmed") !== "boolean"
+    typeof ownValue(termination, "confirmed") !== "boolean" ||
+    (ownValue(termination, "cause") !== "none" &&
+      ownValue(termination, "cause") !== "engine-timeout" &&
+      ownValue(termination, "cause") !== "caller-cancelled" &&
+      ownValue(termination, "cause") !== "safety-boundary")
   ) {
     throw new TypeError(
       "process containment engine run termination is outside the contract",
@@ -606,6 +618,7 @@ function validateReportInput(
     ) ||
     (outcome !== "succeeded" &&
       outcome !== "failed" &&
+      outcome !== "cancelled" &&
       outcome !== "uncertain") ||
     typeof mutationUncertain !== "boolean"
   ) {
@@ -623,7 +636,16 @@ function validateReportInput(
       (Date.parse(process.startedAt) < startedMs ||
         Date.parse(process.startedAt) > completedMs ||
         Date.parse(process.startedAt) > Date.parse(request.startDeadline))) ||
-    (!process.started && (termination.requested || !termination.confirmed))
+    (!process.started && (termination.requested || !termination.confirmed)) ||
+    (termination.requested && termination.cause === "none") ||
+    (!termination.requested &&
+      termination.cause !== "none" &&
+      !(termination.cause === "caller-cancelled" && !process.started)) ||
+    ((termination.cause === "engine-timeout" ||
+      termination.cause === "safety-boundary") &&
+      !process.started) ||
+    (termination.cause === "caller-cancelled" &&
+      process.started !== termination.requested)
   ) {
     throw new TypeError(
       "process containment engine run timing is outside the contract",
@@ -649,6 +671,7 @@ function validateReportInput(
     process.activeProcesses === 0 &&
     !output.truncated &&
     !termination.requested &&
+    termination.cause === "none" &&
     termination.confirmed &&
     effects.sourceProjectPreserved &&
     effects.sourceExecutablePreserved &&
@@ -658,6 +681,25 @@ function validateReportInput(
     !effects.networkConnectionEstablished &&
     !effects.childProcessStarted &&
     effects.cleanup === "complete";
+  const cancelled =
+    termination.cause === "caller-cancelled" &&
+    termination.confirmed &&
+    effects.sourceProjectPreserved &&
+    effects.sourceExecutablePreserved &&
+    effects.profileBudgetPreserved &&
+    !effects.networkConnectionEstablished &&
+    !effects.childProcessStarted &&
+    effects.cleanup === "complete" &&
+    !output.truncated &&
+    (process.started
+      ? process.exitCode !== null &&
+        process.totalProcesses === request.limits.maxProcesses &&
+        process.activeProcesses === 0 &&
+        effects.stagedProjectBaselinePreserved &&
+        effects.stagedExecutableBaselinePreserved
+      : process.exitCode === null &&
+        process.totalProcesses === 0 &&
+        process.activeProcesses === 0);
   const failureSignal =
     !process.started ||
     process.exitCode !== 0 ||
@@ -665,11 +707,13 @@ function validateReportInput(
     !effects.stagedProjectBaselinePreserved ||
     !effects.stagedExecutableBaselinePreserved ||
     !effects.profileBudgetPreserved ||
-    termination.requested;
+    termination.cause === "engine-timeout" ||
+    termination.cause === "safety-boundary";
   if (
     (outcome === "succeeded" && (!success || mutationUncertain)) ||
     (outcome === "failed" &&
-      (!failureSignal || uncertaintySignal || mutationUncertain)) ||
+      (!failureSignal || cancelled || uncertaintySignal || mutationUncertain)) ||
+    (outcome === "cancelled" && (!cancelled || mutationUncertain)) ||
     (outcome === "uncertain" && (!uncertaintySignal || !mutationUncertain))
   ) {
     throw new TypeError(
@@ -932,8 +976,17 @@ const terminationSchema = closedObject(
   {
     requested: { type: "boolean" },
     confirmed: { type: "boolean" },
+    cause: {
+      type: "string",
+      enum: [
+        "none",
+        "engine-timeout",
+        "caller-cancelled",
+        "safety-boundary",
+      ],
+    },
   },
-  ["requested", "confirmed"],
+  ["requested", "confirmed", "cause"],
 );
 
 const effectsSchema = closedObject(
@@ -994,7 +1047,10 @@ const reportProperties = {
   output: outputSchema,
   termination: terminationSchema,
   effects: effectsSchema,
-  outcome: { type: "string", enum: ["succeeded", "failed", "uncertain"] },
+  outcome: {
+    type: "string",
+    enum: ["succeeded", "failed", "cancelled", "uncertain"],
+  },
   mutationUncertain: { type: "boolean" },
   reportDigest: reference("sha256Digest"),
 };

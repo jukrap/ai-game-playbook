@@ -891,6 +891,10 @@ function knownContainedRunRequest(value: unknown): value is RunGodotContainedHea
   );
 }
 
+function cancellationRequested(signal: AbortSignal | null): boolean {
+  return signal?.aborted === true;
+}
+
 export function isGodotContainedHeadlessRunRequest(
   value: unknown,
 ): value is RunGodotContainedHeadlessRequest {
@@ -976,9 +980,10 @@ function settle(
 
 function receiptStatus(
   settlement: PermissionSettlement,
-): "succeeded" | "failed" | "uncertain" {
+): "succeeded" | "failed" | "cancelled" | "uncertain" {
   if (settlement.status === "succeeded") return "succeeded";
   if (settlement.status === "failed") return "failed";
+  if (settlement.status === "cancelled") return "cancelled";
   return "uncertain";
 }
 
@@ -1024,7 +1029,9 @@ function runReceiptFrom(
       ? ("passed" as const)
       : status === "failed"
         ? ("failed" as const)
-        : ("uncertain" as const);
+        : status === "cancelled"
+          ? ("cancelled" as const)
+          : ("uncertain" as const);
   const exitCode = engineRun?.process.exitCode;
   const body = {
     schemaVersion: runReceiptSchema.version,
@@ -1082,8 +1089,7 @@ function runReceiptFrom(
         ...(typeof exitCode === "number" ? { exitCode } : {}),
         timedOut:
           engineRun !== undefined &&
-          engineRun.termination.requested &&
-          engineRun.process.exitCode === null,
+          engineRun.termination.cause === "engine-timeout",
       },
       inner: {
         status: componentStatus,
@@ -1101,7 +1107,12 @@ function runReceiptFrom(
     artifacts: Object.freeze([]),
     diagnostics: Object.freeze([
       {
-        severity: status === "succeeded" ? ("info" as const) : ("error" as const),
+        severity:
+          status === "succeeded"
+            ? ("info" as const)
+            : status === "cancelled"
+              ? ("warning" as const)
+              : ("error" as const),
         code,
         message,
         redacted: true,
@@ -1180,6 +1191,7 @@ function finalCode(
   settlement: PermissionSettlement,
 ):
   | "godot-headless-engine-process-failed"
+  | "godot-headless-engine-run-cancelled"
   | "godot-headless-engine-run-uncertain"
   | "godot-headless-preflight-passed" {
   if (settlement.status === "succeeded") {
@@ -1187,6 +1199,9 @@ function finalCode(
   }
   if (settlement.status === "failed") {
     return "godot-headless-engine-process-failed";
+  }
+  if (settlement.status === "cancelled") {
+    return "godot-headless-engine-run-cancelled";
   }
   return "godot-headless-engine-run-uncertain";
 }
@@ -1199,12 +1214,6 @@ function preflightReportFrom(
   receipt: RunReceipt,
   stored: Awaited<ReturnType<typeof persistRunReceipt>>,
 ): GodotHeadlessPreflightReport {
-  if (settlement.status === "cancelled") {
-    return fail(
-      "godot-contained-settlement-invalid",
-      "A completed Godot contained run cannot retain a cancelled settlement.",
-    );
-  }
   const status = receiptStatus(settlement);
   const code = finalCode(settlement);
   const digestInput: GodotHeadlessPreflightDigestInput = deepFreeze({
@@ -1292,7 +1301,7 @@ export async function runGodotContainedHeadless(
   value: unknown,
 ): Promise<GodotHeadlessPreflightReport> {
   const request = validateRunRequest(value);
-  if (request.signal?.aborted === true) {
+  if (cancellationRequested(request.signal)) {
     settle(request.authorization, "cancelled", false, 0, 0, false);
     return fail(
       "godot-contained-cancelled-before-admission",
@@ -1324,16 +1333,26 @@ export async function runGodotContainedHeadless(
   try {
     report = await runWindowsContainedGodotEngine({
       prepared: request.authority.preparedRun,
+      signal: request.signal,
     });
   } catch (error) {
     const endedMs = Math.max(dispatchStartedMs, Date.now());
+    const cancelledBeforeNativeReport =
+      cancellationRequested(request.signal) &&
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "engine-run-cancelled-before-start";
     const mutationUncertain =
       error instanceof Error &&
       "mutationUncertain" in error &&
       error.mutationUncertain === true;
     const settlement = settle(
       request.authorization,
-      mutationUncertain ? "uncertain" : "failed",
+      cancelledBeforeNativeReport
+        ? "cancelled"
+        : mutationUncertain
+          ? "uncertain"
+          : "failed",
       mutationUncertain,
       endedMs - dispatchStartedMs,
       0,
@@ -1351,13 +1370,17 @@ export async function runGodotContainedHeadless(
       approvalIds,
       timing,
       code,
-      mutationUncertain
+      cancelledBeforeNativeReport
+        ? "Contained startup was cancelled before a native process report was available."
+        : mutationUncertain
         ? "Contained startup ended without a trustworthy final process report."
         : "Contained startup failed before a process report was retained.",
     );
     await retainReceipt(request.authority, receipt, mutationUncertain);
     throw new GodotAdapterBoundaryError(
-      mutationUncertain
+      cancelledBeforeNativeReport
+        ? "godot-contained-execution-cancelled"
+        : mutationUncertain
         ? "godot-contained-execution-uncertain"
         : "godot-contained-execution-failed",
       "Godot contained execution did not return a trustworthy final report.",
@@ -1419,7 +1442,9 @@ export async function runGodotContainedHeadless(
       ? "Contained Godot startup completed within its approved safety boundary."
       : status === "failed"
         ? "Contained Godot startup completed with a process failure."
-        : "Contained Godot startup ended with uncertain effects or an exceeded authority boundary.";
+        : status === "cancelled"
+          ? "Contained Godot startup was cancelled after native cleanup completed."
+          : "Contained Godot startup ended with uncertain effects or an exceeded authority boundary.";
   const receipt = runReceiptFrom(
     request.plan,
     settlement,

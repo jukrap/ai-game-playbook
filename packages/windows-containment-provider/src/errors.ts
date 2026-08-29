@@ -27,6 +27,7 @@ export type WindowsContainmentProviderErrorCode =
   | "invalid-engine-run-request"
   | "engine-run-consumed"
   | "engine-run-expired"
+  | "engine-run-cancelled-before-start"
   | "engine-run-process-failed"
   | "engine-run-output-invalid";
 

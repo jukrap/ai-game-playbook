@@ -98,6 +98,7 @@ function successfulReportInput(runRequest = request()) {
     termination: {
       requested: false,
       confirmed: true,
+      cause: "none",
     },
     effects: {
       sourceProjectPreserved: true,
@@ -217,6 +218,9 @@ test("only a clean settled engine run can report succeeded", () => {
     (candidate) => {
       candidate.termination.confirmed = false;
     },
+    (candidate) => {
+      candidate.termination.cause = "caller-cancelled";
+    },
   ]) {
     const forged = structuredClone(succeeded);
     mutate(forged);
@@ -255,6 +259,7 @@ test("safe failure and uncertain settlement remain distinguishable", () => {
   uncertainInput.process.activeProcesses = null;
   uncertainInput.termination.requested = true;
   uncertainInput.termination.confirmed = false;
+  uncertainInput.termination.cause = "engine-timeout";
   uncertainInput.effects.sourceProjectPreserved = false;
   uncertainInput.effects.cleanup = "uncertain";
   uncertainInput.outcome = "uncertain";
@@ -273,6 +278,59 @@ test("safe failure and uncertain settlement remain distinguishable", () => {
       contracts.computeProcessContainmentEngineRunReportDigest(input);
     contracts.assertProcessContainmentEngineRunReportSemantics(mislabeled);
   }, TypeError);
+});
+
+test("confirmed caller cancellation remains distinct from failure and uncertainty", () => {
+  const runningInput = successfulReportInput();
+  runningInput.process.exitCode = 125;
+  runningInput.termination.requested = true;
+  runningInput.termination.cause = "caller-cancelled";
+  runningInput.outcome = "cancelled";
+  const running = report(runningInput);
+  assert.doesNotThrow(() =>
+    contracts.assertProcessContainmentEngineRunReportSemantics(running),
+  );
+
+  const stagingInput = successfulReportInput();
+  stagingInput.process.started = false;
+  stagingInput.process.startedAt = null;
+  stagingInput.process.exitCode = null;
+  stagingInput.process.totalProcesses = 0;
+  stagingInput.process.activeProcesses = 0;
+  stagingInput.output.capturedBytes = 0;
+  stagingInput.output.observedBytes = 0;
+  stagingInput.termination.cause = "caller-cancelled";
+  stagingInput.effects.stagedProjectBaselinePreserved = false;
+  stagingInput.effects.stagedExecutableBaselinePreserved = false;
+  stagingInput.outcome = "cancelled";
+  const staging = report(stagingInput);
+  assert.doesNotThrow(() =>
+    contracts.assertProcessContainmentEngineRunReportSemantics(staging),
+  );
+
+  for (const mutate of [
+    (candidate) => {
+      candidate.termination.confirmed = false;
+    },
+    (candidate) => {
+      candidate.effects.cleanup = "incomplete";
+    },
+    (candidate) => {
+      candidate.mutationUncertain = true;
+    },
+    (candidate) => {
+      candidate.termination.cause = "engine-timeout";
+    },
+  ]) {
+    const forged = structuredClone(running);
+    mutate(forged);
+    assert.throws(() => {
+      const { schemaVersion: _version, reportDigest: _digest, ...input } = forged;
+      forged.reportDigest =
+        contracts.computeProcessContainmentEngineRunReportDigest(input);
+      contracts.assertProcessContainmentEngineRunReportSemantics(forged);
+    }, TypeError);
+  }
 });
 
 test("engine run contract rejects accessors without invoking them", () => {

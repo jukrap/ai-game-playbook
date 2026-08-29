@@ -68,6 +68,7 @@ export type GodotHeadlessPreflightBlocker =
 export type GodotHeadlessPreflightCode =
   | GodotHeadlessPreflightBlocker
   | "godot-headless-engine-process-failed"
+  | "godot-headless-engine-run-cancelled"
   | "godot-headless-engine-run-uncertain"
   | "godot-headless-preflight-passed";
 
@@ -127,6 +128,7 @@ export interface GodotHeadlessPreflightAuthorization {
   readonly status:
     | "succeeded"
     | "failed"
+    | "cancelled"
     | "uncertain"
     | "scope-violation";
   readonly mutationUncertain: boolean;
@@ -168,6 +170,11 @@ export interface GodotHeadlessPreflightEngineRunEvidence {
   readonly termination: {
     readonly requested: boolean;
     readonly confirmed: boolean;
+    readonly cause:
+      | "none"
+      | "engine-timeout"
+      | "caller-cancelled"
+      | "safety-boundary";
   };
   readonly effects: {
     readonly sourceProjectPreserved: boolean;
@@ -179,7 +186,7 @@ export interface GodotHeadlessPreflightEngineRunEvidence {
     readonly childProcessStarted: boolean;
     readonly cleanup: "complete" | "incomplete" | "uncertain";
   };
-  readonly outcome: "succeeded" | "failed" | "uncertain";
+  readonly outcome: "succeeded" | "failed" | "cancelled" | "uncertain";
   readonly mutationUncertain: boolean;
 }
 
@@ -249,9 +256,10 @@ export interface GodotHeadlessPreflightBlockedDigestInput
 export interface GodotHeadlessPreflightExecutedDigestInput
   extends GodotHeadlessPreflightDigestBase {
   readonly containment: GodotHeadlessPreflightQualifiedContainmentBinding;
-  readonly status: "succeeded" | "failed" | "uncertain";
+  readonly status: "succeeded" | "failed" | "cancelled" | "uncertain";
   readonly code:
     | "godot-headless-engine-process-failed"
+    | "godot-headless-engine-run-cancelled"
     | "godot-headless-engine-run-uncertain"
     | "godot-headless-preflight-passed";
   readonly blockers: readonly GodotHeadlessPreflightBlocker[];
@@ -539,6 +547,7 @@ function validateExecutionEvidence(
     !isSha256Digest(value["executableSnapshotDigest"]) ||
     (value["outcome"] !== "succeeded" &&
       value["outcome"] !== "failed" &&
+      value["outcome"] !== "cancelled" &&
       value["outcome"] !== "uncertain") ||
     typeof value["mutationUncertain"] !== "boolean" ||
     value["requestDigest"] !== containment.runRequestDigest ||
@@ -589,9 +598,13 @@ function validateExecutionEvidence(
   const termination = value["termination"];
   if (
     !record(termination) ||
-    !exactKeys(termination, ["confirmed", "requested"]) ||
+    !exactKeys(termination, ["cause", "confirmed", "requested"]) ||
     typeof termination["requested"] !== "boolean" ||
-    typeof termination["confirmed"] !== "boolean"
+    typeof termination["confirmed"] !== "boolean" ||
+    (termination["cause"] !== "none" &&
+      termination["cause"] !== "engine-timeout" &&
+      termination["cause"] !== "caller-cancelled" &&
+      termination["cause"] !== "safety-boundary")
   ) {
     throw new TypeError("Godot headless engine run termination evidence is invalid");
   }
@@ -623,6 +636,9 @@ function validateExecutionEvidence(
       process["totalProcesses"] !== 1 ||
       process["activeProcesses"] !== 0 ||
       output["truncated"] !== false ||
+      termination["requested"] !== false ||
+      termination["confirmed"] !== true ||
+      termination["cause"] !== "none" ||
       effects["sourceProjectPreserved"] !== true ||
       effects["sourceExecutablePreserved"] !== true ||
       effects["stagedProjectBaselinePreserved"] !== true ||
@@ -636,6 +652,32 @@ function validateExecutionEvidence(
   }
   if (value["outcome"] === "uncertain" && !value["mutationUncertain"]) {
     throw new TypeError("Godot headless engine run uncertainty is contradictory");
+  }
+  if (
+    value["outcome"] === "cancelled" &&
+    (value["mutationUncertain"] ||
+      termination["cause"] !== "caller-cancelled" ||
+      termination["confirmed"] !== true ||
+      effects["sourceProjectPreserved"] !== true ||
+      effects["sourceExecutablePreserved"] !== true ||
+      effects["profileBudgetPreserved"] !== true ||
+      effects["networkConnectionEstablished"] !== false ||
+      effects["childProcessStarted"] !== false ||
+      effects["cleanup"] !== "complete" ||
+      output["truncated"] !== false ||
+      (process["started"] === true
+        ? termination["requested"] !== true ||
+          process["exitCode"] === null ||
+          process["totalProcesses"] !== 1 ||
+          process["activeProcesses"] !== 0 ||
+          effects["stagedProjectBaselinePreserved"] !== true ||
+          effects["stagedExecutableBaselinePreserved"] !== true
+        : termination["requested"] !== false ||
+          process["exitCode"] !== null ||
+          process["totalProcesses"] !== 0 ||
+          process["activeProcesses"] !== 0))
+  ) {
+    throw new TypeError("Godot headless engine run cancellation is contradictory");
   }
   return value as unknown as GodotHeadlessPreflightEngineRunEvidence;
 }
@@ -680,6 +722,7 @@ function validateDigestInput(input: GodotHeadlessPreflightDigestInput): void {
     (input.status !== "blocked" &&
       input.status !== "succeeded" &&
       input.status !== "failed" &&
+      input.status !== "cancelled" &&
       input.status !== "uncertain") ||
     typeof input.mutationPerformed !== "boolean" ||
     typeof input.externalProcessStarted !== "boolean" ||
@@ -787,6 +830,7 @@ function validateDigestInput(input: GodotHeadlessPreflightDigestInput): void {
     !isSha256Digest(authorization.requestDigest) ||
     (authorization.status !== "succeeded" &&
       authorization.status !== "failed" &&
+      authorization.status !== "cancelled" &&
       authorization.status !== "uncertain" &&
       authorization.status !== "scope-violation") ||
     typeof authorization.mutationUncertain !== "boolean" ||
@@ -868,13 +912,17 @@ function validateDigestInput(input: GodotHeadlessPreflightDigestInput): void {
         ? "succeeded"
         : authorization.status === "failed"
           ? "failed"
-          : "uncertain";
+          : authorization.status === "cancelled"
+            ? "cancelled"
+            : "uncertain";
     const expectedCode =
       expectedStatus === "succeeded"
         ? "godot-headless-preflight-passed"
         : expectedStatus === "failed"
           ? "godot-headless-engine-process-failed"
-          : "godot-headless-engine-run-uncertain";
+          : expectedStatus === "cancelled"
+            ? "godot-headless-engine-run-cancelled"
+            : "godot-headless-engine-run-uncertain";
     if (
       input.status !== expectedStatus ||
       input.code !== expectedCode ||
@@ -896,7 +944,8 @@ function validateDigestInput(input: GodotHeadlessPreflightDigestInput): void {
           !engineRun.mutationUncertain ||
           authorization.violations.length !== 0)) ||
       ((authorization.status === "succeeded" ||
-        authorization.status === "failed") &&
+        authorization.status === "failed" ||
+        authorization.status === "cancelled") &&
         (authorization.mutationUncertain ||
           authorization.violations.length !== 0))
     ) {
@@ -1119,6 +1168,7 @@ const code = enumSchema([
   "godot-headless-containment-unavailable",
   "godot-headless-version-unverified",
   "godot-headless-engine-process-failed",
+  "godot-headless-engine-run-cancelled",
   "godot-headless-engine-run-uncertain",
   "godot-headless-preflight-passed",
 ]);
@@ -1158,6 +1208,7 @@ const authorization = closedObject(
     status: enumSchema([
       "succeeded",
       "failed",
+      "cancelled",
       "uncertain",
       "scope-violation",
     ]),
@@ -1255,8 +1306,14 @@ const engineRunTermination = closedObject(
   {
     requested: { type: "boolean" },
     confirmed: { type: "boolean" },
+    cause: enumSchema([
+      "none",
+      "engine-timeout",
+      "caller-cancelled",
+      "safety-boundary",
+    ]),
   },
-  ["requested", "confirmed"],
+  ["requested", "confirmed", "cause"],
 );
 
 const engineRunEffects = closedObject(
@@ -1295,7 +1352,7 @@ const engineRun = closedObject(
     output: engineRunOutput,
     termination: engineRunTermination,
     effects: engineRunEffects,
-    outcome: enumSchema(["succeeded", "failed", "uncertain"]),
+    outcome: enumSchema(["succeeded", "failed", "cancelled", "uncertain"]),
     mutationUncertain: { type: "boolean" },
   },
   [
@@ -1330,7 +1387,13 @@ const reportProperties = {
   frameBudget: { const: GODOT_HEADLESS_PREFLIGHT_FRAME_BUDGET },
   invocationDigest: { const: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST },
   containment: containmentBinding,
-  status: enumSchema(["blocked", "succeeded", "failed", "uncertain"]),
+  status: enumSchema([
+    "blocked",
+    "succeeded",
+    "failed",
+    "cancelled",
+    "uncertain",
+  ]),
   code,
   blockers: boundedArray(blocker, { minimum: 0, maximum: 2, unique: true }),
   preconditions,

@@ -177,6 +177,27 @@ test(
 );
 
 test(
+  "native engine cancellation protocol rejects duplicate and undeclared fields",
+  { skip: !nativeAvailable },
+  () => {
+    assertProtocolFailure(
+      invoke(
+        '{"schemaVersion":"1.0.0","schemaVersion":"1.0.0"}\n',
+        "godot-engine-cancel",
+      ),
+      "request-duplicate-field",
+    );
+    assertProtocolFailure(
+      invoke(
+        '{"schemaVersion":"1.0.0","unknown":true}\n',
+        "godot-engine-cancel",
+      ),
+      "request-shape-invalid",
+    );
+  },
+);
+
+test(
   "native internal workloads refuse execution outside AppContainer",
   { skip: !nativeAvailable },
   () => {

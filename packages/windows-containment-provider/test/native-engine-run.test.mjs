@@ -164,11 +164,15 @@ test(
         await assert.rejects(
           provider.runWindowsContainedGodotEngine({
             prepared: structuredClone(prepared),
+            signal: null,
           }),
           expectProviderError("invalid-engine-run-request"),
         );
       }
-      const report = await provider.runWindowsContainedGodotEngine({ prepared });
+      const report = await provider.runWindowsContainedGodotEngine({
+        prepared,
+        signal: null,
+      });
       assert.equal(report.outcome, expectedOutcome, behavior);
       assert.doesNotThrow(() =>
         contracts.assertProcessContainmentEngineRunReportSemantics(report),
@@ -194,15 +198,56 @@ test(
       if (behavior === "hang") {
         assert.equal(report.termination.requested, true);
         assert.equal(report.termination.confirmed, true);
+        assert.equal(report.termination.cause, "engine-timeout");
       }
       if (behavior === "spawn-child") {
         assert.equal(report.effects.childProcessStarted, false);
         assert.equal(report.process.totalProcesses, 1);
       }
       await assert.rejects(
-        provider.runWindowsContainedGodotEngine({ prepared }),
+        provider.runWindowsContainedGodotEngine({ prepared, signal: null }),
         expectProviderError("engine-run-consumed"),
       );
     }
+
+    const preCancelledPlan = await prepareRun(context, "success");
+    const preCancelledController = new AbortController();
+    preCancelledController.abort();
+    await assert.rejects(
+      provider.runWindowsContainedGodotEngine({
+        prepared: preCancelledPlan,
+        signal: preCancelledController.signal,
+      }),
+      expectProviderError("engine-run-cancelled-before-start"),
+    );
+    await assert.rejects(
+      provider.runWindowsContainedGodotEngine({
+        prepared: preCancelledPlan,
+        signal: null,
+      }),
+      expectProviderError("engine-run-consumed"),
+    );
+
+    const cancellationPlan = await prepareRun(context, "hang");
+    const controller = new AbortController();
+    const cancellationTimer = setTimeout(() => controller.abort(), 4_000);
+    const cancelled = await provider.runWindowsContainedGodotEngine({
+      prepared: cancellationPlan,
+      signal: controller.signal,
+    });
+    clearTimeout(cancellationTimer);
+    assert.equal(cancelled.outcome, "cancelled");
+    assert.deepEqual(cancelled.termination, {
+      requested: true,
+      confirmed: true,
+      cause: "caller-cancelled",
+    });
+    assert.equal(cancelled.effects.sourceProjectPreserved, true);
+    assert.equal(cancelled.effects.sourceExecutablePreserved, true);
+    assert.equal(cancelled.effects.cleanup, "complete");
+    assert.equal(cancelled.mutationUncertain, false);
+    assert.doesNotThrow(() =>
+      contracts.assertProcessContainmentEngineRunReportSemantics(cancelled),
+    );
   },
 );

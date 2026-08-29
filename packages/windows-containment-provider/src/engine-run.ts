@@ -41,6 +41,7 @@ import {
   issueEngineExecutionSourceHandoff,
 } from "@ai-game-playbook/engine-common";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { dirname, isAbsolute, relative } from "node:path";
 
 import {
@@ -59,6 +60,8 @@ import { safeWindowsContainmentProviderEnvironment } from "./self-test.js";
 const NATIVE_ENGINE_RUN_MAX_INPUT_BYTES = 4 * 1024 * 1024;
 const NATIVE_ENGINE_RUN_MAX_OUTPUT_BYTES = 256 * 1024;
 const NATIVE_ENGINE_RUN_MAX_ERROR_BYTES = 16 * 1024;
+const NATIVE_ENGINE_RUN_CANCELLATION_WAIT_MS = 2_000;
+const NATIVE_ENGINE_RUN_CANCELLATION_PROCESS_TIMEOUT_MS = 3_000;
 const NATIVE_ENGINE_RUN_PROCESS_TIMEOUT_MS =
   PROCESS_CONTAINMENT_ENGINE_RUN_MAX_REPORT_DURATION_MS + 5_000;
 const uuidPattern =
@@ -83,6 +86,7 @@ export interface PreparedWindowsContainedGodotEngineRun {
 
 export interface RunWindowsContainedGodotEngineRequest {
   readonly prepared: PreparedWindowsContainedGodotEngineRun;
+  readonly signal: AbortSignal | null;
 }
 
 interface PreparedAuthority {
@@ -126,7 +130,7 @@ interface NativeEngineRunReport {
   readonly output: ProcessContainmentEngineRunOutputObservation;
   readonly termination: ProcessContainmentEngineRunTermination;
   readonly effects: ProcessContainmentEngineRunEffects;
-  readonly outcome: "succeeded" | "failed" | "uncertain";
+  readonly outcome: "succeeded" | "failed" | "cancelled" | "uncertain";
   readonly mutationUncertain: boolean;
 }
 
@@ -138,6 +142,7 @@ function fail(
     | "invalid-engine-run-request"
     | "engine-run-consumed"
     | "engine-run-expired"
+    | "engine-run-cancelled-before-start"
     | "engine-run-process-failed"
     | "engine-run-output-invalid",
   message: string,
@@ -226,12 +231,19 @@ function preparationRequest(
 function runRequest(value: unknown): RunWindowsContainedGodotEngineRequest {
   const record = exactRecord(
     value,
-    ["prepared"],
+    ["prepared", "signal"],
     "invalid-engine-run-request",
     "Contained Godot run requires one exact prepared authority.",
   );
+  if (record["signal"] !== null && !(record["signal"] instanceof AbortSignal)) {
+    return fail(
+      "invalid-engine-run-request",
+      "Contained Godot cancellation signal is outside the runtime boundary.",
+    );
+  }
   return Object.freeze({
     prepared: record["prepared"] as PreparedWindowsContainedGodotEngineRun,
+    signal: record["signal"] as AbortSignal | null,
   });
 }
 
@@ -353,9 +365,134 @@ export async function prepareWindowsContainedGodotEngineRun(
   return prepared;
 }
 
+async function signalNativeEngineCancellation(
+  authority: WindowsContainmentProviderRuntimeAuthority,
+  runId: string,
+  requestDigest: Sha256Digest,
+  cancellationId: string,
+): Promise<boolean> {
+  const expiresAt = new Date(
+    Date.now() + NATIVE_ENGINE_RUN_CANCELLATION_WAIT_MS,
+  ).toISOString();
+  const input = `${JSON.stringify({
+    schemaVersion: "1.0.0",
+    operation: "godot-engine-cancel",
+    runId,
+    requestDigest,
+    entryArtifactDigest: authority.artifactDigest,
+    cancellationId,
+    expiresAt,
+  })}\n`;
+  return await new Promise<boolean>((resolve) => {
+    const child = spawn(authority.artifactPath, ["godot-engine-cancel"], {
+      cwd: dirname(authority.artifactPath),
+      detached: false,
+      env: safeWindowsContainmentProviderEnvironment(),
+      shell: false,
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
+    let invalid = false;
+    let settled = false;
+    const finish = (acknowledged: boolean): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(acknowledged);
+    };
+    const timer = setTimeout(() => {
+      invalid = true;
+      child.kill();
+      child.stdin.destroy();
+      child.stdout.destroy();
+      child.stderr.destroy();
+      child.unref();
+      finish(false);
+    }, NATIVE_ENGINE_RUN_CANCELLATION_PROCESS_TIMEOUT_MS);
+    timer.unref();
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdoutBytes += chunk.byteLength;
+      if (stdoutBytes <= NATIVE_ENGINE_RUN_MAX_ERROR_BYTES) {
+        stdout.push(Buffer.from(chunk));
+      } else {
+        invalid = true;
+        child.kill();
+      }
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderrBytes += chunk.byteLength;
+      if (stderrBytes <= NATIVE_ENGINE_RUN_MAX_ERROR_BYTES) {
+        stderr.push(Buffer.from(chunk));
+      } else {
+        invalid = true;
+        child.kill();
+      }
+    });
+    child.once("error", () => finish(false));
+    child.once("close", (exitCode, signal) => {
+      if (
+        invalid ||
+        signal !== null ||
+        exitCode !== 0 ||
+        Buffer.concat(stderr).toString("utf8").trim().length !== 0
+      ) {
+        finish(false);
+        return;
+      }
+      try {
+        const lines = new TextDecoder("utf-8", { fatal: true })
+          .decode(Buffer.concat(stdout))
+          .trim()
+          .split(/\r?\n/u);
+        if (lines.length !== 1 || lines[0] === undefined) {
+          finish(false);
+          return;
+        }
+        const report = exactRecord(
+          JSON.parse(lines[0]) as unknown,
+          [
+            "schemaVersion",
+            "operation",
+            "runId",
+            "requestDigest",
+            "entryArtifactDigest",
+            "cancellationId",
+            "acknowledged",
+          ],
+          "engine-run-output-invalid",
+          "Native cancellation acknowledgement is outside the protocol.",
+        );
+        finish(
+          report["schemaVersion"] === "1.0.0" &&
+            report["operation"] === "godot-engine-cancel" &&
+            report["runId"] === runId &&
+            report["requestDigest"] === requestDigest &&
+            report["entryArtifactDigest"] === authority.artifactDigest &&
+            report["cancellationId"] === cancellationId &&
+            report["acknowledged"] === true,
+        );
+      } catch {
+        finish(false);
+      }
+    });
+    child.stdin.on("error", () => {
+      // Process close/error observation decides the bounded outcome.
+    });
+    child.stdin.end(input, "utf8");
+  }).catch(() => false);
+}
+
 async function runNativeEngine(
   authority: WindowsContainmentProviderRuntimeAuthority,
   input: string,
+  runId: string,
+  requestDigest: Sha256Digest,
+  cancellationId: string,
+  signal: AbortSignal | null,
 ): Promise<NativeProcessResult> {
   return await new Promise<NativeProcessResult>((resolve, reject) => {
     const child = spawn(authority.artifactPath, ["godot-engine-run"], {
@@ -374,12 +511,31 @@ async function runNativeEngine(
     let timedOut = false;
     let settled = false;
     let terminationTimer: NodeJS.Timeout | undefined;
+    let hardStopTimer: NodeJS.Timeout | undefined;
+    let cancellationTask: Promise<boolean> | undefined;
     let timer: NodeJS.Timeout;
-    const finish = (result: NativeProcessResult): void => {
+    const requestCancellation = (): Promise<boolean> => {
+      cancellationTask ??= signalNativeEngineCancellation(
+        authority,
+        runId,
+        requestDigest,
+        cancellationId,
+      );
+      return cancellationTask;
+    };
+    const abortListener = (): void => {
+      void requestCancellation();
+    };
+    const finish = async (result: NativeProcessResult): Promise<void> => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       if (terminationTimer !== undefined) clearTimeout(terminationTimer);
+      if (hardStopTimer !== undefined) clearTimeout(hardStopTimer);
+      signal?.removeEventListener("abort", abortListener);
+      if (cancellationTask !== undefined) {
+        await cancellationTask;
+      }
       resolve(result);
     };
     const finishBuffered = (
@@ -387,7 +543,7 @@ async function runNativeEngine(
       signal: NodeJS.Signals | null,
     ): void => {
       try {
-        finish({
+        void finish({
           exitCode,
           signal,
           stdout: new TextDecoder("utf-8", { fatal: true }).decode(
@@ -411,13 +567,17 @@ async function runNativeEngine(
     };
     const requestTermination = (): void => {
       if (terminationTimer !== undefined || settled) return;
-      child.kill();
+      void requestCancellation();
       terminationTimer = setTimeout(() => {
-        child.stdin.destroy();
-        child.stdout.destroy();
-        child.stderr.destroy();
-        child.unref();
-        finishBuffered(null, null);
+        child.kill();
+        hardStopTimer = setTimeout(() => {
+          child.stdin.destroy();
+          child.stdout.destroy();
+          child.stderr.destroy();
+          child.unref();
+          finishBuffered(null, null);
+        }, PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS);
+        hardStopTimer.unref();
       }, PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS);
       terminationTimer.unref();
     };
@@ -446,22 +606,34 @@ async function runNativeEngine(
     });
     child.once("error", (error) => {
       if (settled) return;
+      if (terminationTimer !== undefined) {
+        // The emergency timer still owns bounded settlement after a failed kill.
+        return;
+      }
       settled = true;
       clearTimeout(timer);
       if (terminationTimer !== undefined) clearTimeout(terminationTimer);
-      reject(
-        new WindowsContainmentProviderError(
-          "engine-run-process-failed",
-          `Native engine run process failed before settlement: ${error instanceof Error ? error.name : "Error"}.`,
-          child.pid !== undefined,
-        ),
+      if (hardStopTimer !== undefined) clearTimeout(hardStopTimer);
+      signal?.removeEventListener("abort", abortListener);
+      const failure = new WindowsContainmentProviderError(
+        "engine-run-process-failed",
+        `Native engine run process failed before settlement: ${error instanceof Error ? error.name : "Error"}.`,
+        child.pid !== undefined,
       );
+      void (async () => {
+        if (cancellationTask !== undefined) {
+          await cancellationTask;
+        }
+        reject(failure);
+      })();
     });
     child.once("close", (exitCode, signal) => finishBuffered(exitCode, signal));
     child.stdin.on("error", () => {
       // Process close/error observation decides the bounded outcome.
     });
     child.stdin.end(input, "utf8");
+    signal?.addEventListener("abort", abortListener, { once: true });
+    if (signal?.aborted === true) abortListener();
   });
 }
 
@@ -559,14 +731,18 @@ function parseNativeTermination(
 ): ProcessContainmentEngineRunTermination {
   const record = exactRecord(
     value,
-    ["requested", "confirmed"],
+    ["requested", "confirmed", "cause"],
     "engine-run-output-invalid",
     "Native engine termination observation is outside the protocol.",
     true,
   );
   if (
     typeof record["requested"] !== "boolean" ||
-    typeof record["confirmed"] !== "boolean"
+    typeof record["confirmed"] !== "boolean" ||
+    (record["cause"] !== "none" &&
+      record["cause"] !== "engine-timeout" &&
+      record["cause"] !== "caller-cancelled" &&
+      record["cause"] !== "safety-boundary")
   ) {
     return fail(
       "engine-run-output-invalid",
@@ -577,6 +753,7 @@ function parseNativeTermination(
   return Object.freeze({
     requested: record["requested"],
     confirmed: record["confirmed"],
+    cause: record["cause"],
   });
 }
 
@@ -679,6 +856,7 @@ function parseNativeReport(
     !integer(record["durationMs"], 0, PROCESS_CONTAINMENT_ENGINE_RUN_MAX_REPORT_DURATION_MS) ||
     (record["outcome"] !== "succeeded" &&
       record["outcome"] !== "failed" &&
+      record["outcome"] !== "cancelled" &&
       record["outcome"] !== "uncertain") ||
     typeof record["mutationUncertain"] !== "boolean"
   ) {
@@ -732,6 +910,12 @@ export async function runWindowsContainedGodotEngine(
     return fail("engine-run-consumed", "Contained Godot run was already consumed.");
   }
   authority.consumed = true;
+  if (input.signal?.aborted === true) {
+    return fail(
+      "engine-run-cancelled-before-start",
+      "Contained Godot run was cancelled before native dispatch.",
+    );
+  }
   try {
     assertProcessContainmentEngineRunRequestSemantics(input.prepared.request);
   } catch {
@@ -786,10 +970,12 @@ export async function runWindowsContainedGodotEngine(
     );
   }
   const source = consumeEngineExecutionSourceHandoff(handoff);
+  const cancellationId = randomUUID();
   const nativeRequest = {
     schemaVersion: "1.0.0",
     operation: "godot-engine-run",
     runId: request.runId,
+    cancellationId,
     requestDigest: authority.requestDigest,
     entryArtifactDigest: authority.runtimeAuthority.artifactDigest,
     admissionDigest: request.admissionDigest,
@@ -833,7 +1019,14 @@ export async function runWindowsContainedGodotEngine(
       "Private source manifest exceeds the bounded native protocol.",
     );
   }
-  const result = await runNativeEngine(authority.runtimeAuthority, nativeInput);
+  const result = await runNativeEngine(
+    authority.runtimeAuthority,
+    nativeInput,
+    request.runId,
+    authority.requestDigest,
+    cancellationId,
+    input.signal,
+  );
   if (result.overflowed || result.timedOut || result.signal !== null) {
     return fail(
       "engine-run-process-failed",
@@ -865,7 +1058,14 @@ export async function runWindowsContainedGodotEngine(
     );
   }
   const native = parseNativeReport(parsed, authority, request);
-  const expectedExit = native.outcome === "succeeded" ? 0 : native.outcome === "failed" ? 2 : 3;
+  const expectedExit =
+    native.outcome === "succeeded"
+      ? 0
+      : native.outcome === "failed"
+        ? 2
+        : native.outcome === "cancelled"
+          ? 4
+          : 3;
   if (result.exitCode !== expectedExit) {
     return fail(
       "engine-run-output-invalid",

@@ -42,5 +42,14 @@ export type {
   AssertWindowsContainedEngineAdmissionRequest,
   CreateWindowsContainedEngineAdmissionRequest,
 } from "./admission.js";
+export {
+  prepareWindowsContainedGodotEngineRun,
+  runWindowsContainedGodotEngine,
+} from "./engine-run.js";
+export type {
+  PreparedWindowsContainedGodotEngineRun,
+  PrepareWindowsContainedGodotEngineRunRequest,
+  RunWindowsContainedGodotEngineRequest,
+} from "./engine-run.js";
 export { WindowsContainmentProviderError } from "./errors.js";
 export type { WindowsContainmentProviderErrorCode } from "./errors.js";

@@ -5,7 +5,11 @@ import * as contracts from "@ai-game-playbook/contracts";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 
-import { validFoundationProtocolFixtures } from "./fixtures/foundation-protocols.mjs";
+import {
+  validContainedGodotPreflightReportFixture,
+  validContainedGodotPreflightRequestFixture,
+  validFoundationProtocolFixtures,
+} from "./fixtures/foundation-protocols.mjs";
 
 const expectedIds = [
   "approval-grant",
@@ -47,6 +51,8 @@ const expectedIds = [
   "process-containment-assessment-report",
   "process-containment-assessment-request",
   "process-containment-engine-admission",
+  "process-containment-engine-run-report",
+  "process-containment-engine-run-request",
   "process-containment-launch-report",
   "process-containment-launch-request",
   "process-containment-provider-descriptor",
@@ -76,6 +82,40 @@ function validator() {
   addFormats(ajv, { mode: "full" });
   return ajv;
 }
+
+test("Godot preflight schemas accept qualified path-free execution evidence", () => {
+  const ajv = validator();
+  const request = ajv.compile(
+    contracts.FOUNDATION_PROTOCOL_SCHEMAS[
+      "godot-headless-preflight-request"
+    ].schema,
+  );
+  const report = ajv.compile(
+    contracts.FOUNDATION_PROTOCOL_SCHEMAS[
+      "godot-headless-preflight-report"
+    ].schema,
+  );
+  assert.equal(
+    request(validContainedGodotPreflightRequestFixture),
+    true,
+    JSON.stringify(request.errors),
+  );
+  assert.equal(
+    report(validContainedGodotPreflightReportFixture),
+    true,
+    JSON.stringify(report.errors),
+  );
+  assert.equal(
+    report({
+      ...validContainedGodotPreflightReportFixture,
+      engineRun: {
+        ...validContainedGodotPreflightReportFixture.engineRun,
+        sourceProjectRoot: "C:\\forbidden",
+      },
+    }),
+    false,
+  );
+});
 
 test("foundation protocol schemas are complete, versioned, and strictly valid", () => {
   assert.deepEqual(
@@ -593,6 +633,31 @@ test("foundation protocol schemas reject unsafe lifecycle and evidence shapes", 
       {
         ...fixtures["process-containment-engine-admission"],
         decision: "block",
+      },
+    ],
+    [
+      "process-containment-engine-run-request",
+      {
+        ...fixtures["process-containment-engine-run-request"],
+        projectRoot: "D:\\forbidden",
+      },
+    ],
+    [
+      "process-containment-engine-run-request",
+      {
+        ...fixtures["process-containment-engine-run-request"],
+        limits: {
+          ...fixtures["process-containment-engine-run-request"].limits,
+          maxProjectFiles:
+            contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES + 1,
+        },
+      },
+    ],
+    [
+      "process-containment-engine-run-report",
+      {
+        ...fixtures["process-containment-engine-run-report"],
+        rawLog: "forbidden",
       },
     ],
     [

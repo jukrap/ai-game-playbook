@@ -9,9 +9,15 @@ const keyId = "approval.host-tool-local";
 const { publicKey, privateKey } = generateKeyPairSync("ed25519");
 const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
 
-export function authorizeHostTool({ plan, createRequest, maxOutputBytes }) {
+export function authorizeHostTool({
+  plan,
+  createRequest,
+  maxOutputBytes,
+  maxDurationMs = 10_000,
+  authorizationWindowMs = maxDurationMs + 5_000,
+}) {
   const now = Date.now();
-  const deadlineAt = new Date(now + 9_000).toISOString();
+  const deadlineAt = new Date(now + authorizationWindowMs).toISOString();
   const request = createRequest({ plan, deadlineAt });
   const broker = core.createPermissionBroker({
     registry: registry.BUILTIN_REGISTRY,
@@ -22,7 +28,7 @@ export function authorizeHostTool({ plan, createRequest, maxOutputBytes }) {
       budgets: {
         maxChangedFiles: 0,
         maxChangedBytes: 0,
-        maxDurationMs: 10_000,
+        maxDurationMs,
         maxOutputBytes,
         maxRepairCycles: 0,
       },
@@ -37,7 +43,7 @@ export function authorizeHostTool({ plan, createRequest, maxOutputBytes }) {
     grantId: "approval.host-tool-inspection",
     permission: "host-tool-inspection",
     approvedAt: new Date(now - 1_000).toISOString(),
-    expiresAt: new Date(now + 8_000).toISOString(),
+    expiresAt: new Date(now + authorizationWindowMs - 1_000).toISOString(),
     maxUses: 1,
   });
   const signature = sign(

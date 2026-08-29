@@ -1,6 +1,6 @@
 # Status and Scope
 
-> Status: early source-built foundation. Public commands are write-free, Windows x64 containment verification includes an internal synthetic launch, every engine support grade is `planned`, and no package is published.
+> Status: early source-built foundation. Public commands are write-free, a private Windows x64 contained-process path is fixture-tested, every engine support grade is `planned`, and no package is published.
 
 [한국어](status-and-scope.ko.md) · [Documentation](README.md)
 
@@ -33,9 +33,11 @@ The core also has a private in-memory local signer for that path. It imports a c
 
 The local host runner now connects exact project initialization and managed-skill add to durable dispatch and read-only recovery inspection. Recovery execution, evidence reconciliation, pack update or removal, and every engine mutation remain disconnected from the host path.
 
-A separate Windows x64 package builds one native containment artifact. Its opt-in self-test proves bounded file denial, owned loopback network denial, child-process denial, process-count limits, termination settlement, and exact cleanup on disposable state. A fresh successful witness can then authorize one fixed synthetic read-only launch. That launch binds path-free disposable snapshots, a challenge, invocation and output digests, time and output budgets, one process, termination, and cleanup. A successful launch witness can be consumed once more to bind exact read-only user-project and executable snapshots to one short-lived internal admission. The internal workload refuses to run outside AppContainer, and copied plans, reports, witnesses, snapshots, or admissions carry no authority.
+A separate Windows x64 package builds one native containment artifact. Its opt-in self-test proves bounded file denial, owned loopback network denial, child-process denial, process-count limits, termination settlement, and exact cleanup on disposable state. A fresh successful witness can then authorize one fixed synthetic read-only launch. That launch binds path-free disposable snapshots, a challenge, invocation and output digests, time and output budgets, one process, termination, and cleanup. A successful launch witness can be consumed once more to bind exact read-only user-project and executable snapshots to one short-lived internal admission. Copied plans, reports, witnesses, snapshots, admissions, and source handoffs carry no reusable authority.
 
-This package has no public command or MCP tool. The synthetic launch accepts neither a user-project path nor an arbitrary executable, command, environment, or network target. It is not registered in the core provider catalog and cannot start an engine.
+For an exact target-version Godot report, a private approval-bound route can consume that admission once. It stages the admitted manifest and executable in disposable roots, starts one fixed headless invocation in a zero-capability AppContainer, and retains a path-free process report and `RunReceipt`. Its success and bounded-failure cases are exercised with a purpose-built fixture. The source project remains outside the AppContainer and is rechecked after execution.
+
+This package has no public command or MCP tool. It accepts no arbitrary command, environment, network target, or source write authority. It is not registered in the public provider catalog, and no installed Godot release or graybox loop has been verified.
 
 ## What is not available
 
@@ -49,7 +51,7 @@ There is no installable or published package. The following product capabilities
 - engine tests, a playable golden project, build or export execution;
 - evidence list, show, export, or release publication.
 
-Internal Godot discovery and preflight code does not change this status. The public compiled catalog remains empty. A private Godot preparation can bind the locally executed synthetic qualification to exact read-only user-project and executable snapshots, but it yields only a blocked `godot-headless-contained-dispatch-unimplemented` plan. No user-project process or engine is launched, so live-engine support remains unestablished.
+Internal Godot discovery and contained preflight code does not change this status. The public compiled catalog remains empty. The private route can run only an exact-version, approval-bound, fixed headless invocation from staged copies, and it has been verified only with a purpose-built fixture. No installed Godot release, playable frame, deterministic input, runtime capture, or target export has been retained, so live-engine support remains unestablished.
 
 ## Product scope
 

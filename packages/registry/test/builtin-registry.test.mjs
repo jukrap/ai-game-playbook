@@ -286,16 +286,25 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     },
   ]);
   assert.equal(headlessPreflight.lane, "build-bound");
-  assert.equal(headlessPreflight.timeoutMs, 10_000);
+  assert.equal(
+    headlessPreflight.timeoutMs,
+    contracts.GODOT_HEADLESS_PREFLIGHT_COMMAND_TIMEOUT_MS,
+  );
   assert.deepEqual(headlessPreflight.cancellation, {
     mode: "process-tree",
-    graceMs: 1_000,
+    graceMs: contracts.GODOT_HEADLESS_PREFLIGHT_TERMINATION_GRACE_MS,
   });
   assert.deepEqual(headlessPreflight.retry, { mode: "never", maxAttempts: 1 });
   assert.equal(headlessPreflight.budgets.maxChangedFiles, 0);
   assert.equal(headlessPreflight.budgets.maxChangedBytes, 0);
-  assert.equal(headlessPreflight.budgets.maxDurationMs, 10_000);
-  assert.equal(headlessPreflight.budgets.maxOutputBytes, 1_048_576);
+  assert.equal(
+    headlessPreflight.budgets.maxDurationMs,
+    contracts.GODOT_HEADLESS_PREFLIGHT_COMMAND_TIMEOUT_MS,
+  );
+  assert.equal(
+    headlessPreflight.budgets.maxOutputBytes,
+    contracts.GODOT_HEADLESS_PREFLIGHT_MAX_OUTPUT_BYTES,
+  );
   assert.equal(headlessPreflight.budgets.maxRepairCycles, 0);
   assert.equal(
     headlessPreflight.input.schemaId,

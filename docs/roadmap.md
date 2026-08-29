@@ -1,6 +1,6 @@
 # Roadmap
 
-> Status: the source-built control-plane foundation and Windows x64 containment verification are active. Engine adapters, public mutation, release packaging, and verified golden projects remain ahead.
+> Status: the source-built control plane and private Windows x64 contained-process path are active. Installed-engine validation, public mutation, release packaging, and verified golden projects remain ahead.
 
 [한국어](roadmap.ko.md) · [Documentation](README.md)
 
@@ -14,11 +14,11 @@ The repository now has:
 - twelve packaged capability-first skills;
 - a bounded read-only MCP runtime and write-free host setup planning;
 - separate private one-shot project-initialization and managed-skill operations with approval, durable dispatch, and read-only recovery inspection;
-- private pack recovery closure, finite evidence reconciliation, and Godot preflight foundations;
-- a source-built Windows x64 AppContainer and Job Object self-test plus a one-shot, snapshot-bound synthetic contained launch;
+- private pack recovery closure and finite evidence reconciliation;
+- a source-built Windows x64 AppContainer and Job Object qualification path plus one-shot snapshot admission, staged Godot-process dispatch, permission settlement, and retained receipts;
 - paired English and Korean public documentation with structural checks.
 
-This checkpoint does not include an installable package or a live engine loop.
+The contained process path has passed success and injected-failure cases with a purpose-built fixture. This checkpoint does not include an installable package, an installed Godot validation, or a live engine loop.
 
 ## Stage 1: safe public execution
 
@@ -32,8 +32,8 @@ The private initialization-to-skill-install sequence now passes success, denial,
 
 ## Stage 2: Godot alpha
 
-- turn the short-lived exact snapshot admission into a contained Godot dispatch without widening the fixed qualification boundary;
-- register the validated provider through a project-bound core admission path while keeping public dispatch closed until evidence and approval are connected;
+- validate the existing contained startup path against an installed, pinned Godot release and the shared graybox project;
+- connect the validated provider to a supported project-bound host path while keeping public dispatch closed until user-facing approval and evidence inspection are complete;
 - require the exact admitted Godot executable and project identities at every dispatch and restart;
 - add the thin GDScript bridge and bounded command schema;
 - build the shared 3D graybox with movement, camera, collision, collectible, HUD, save and load, and win state;

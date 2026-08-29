@@ -1,6 +1,6 @@
 # AI Game Playbook
 
-> Status: source-built control-plane foundation. Nine write-free CLI commands, twelve packaged skills, and a Windows x64 containment self-test with an internal synthetic launch exist; no package or live-engine adapter is released.
+> Status: source-built control-plane foundation. Nine write-free CLI commands, twelve packaged skills, and a private Windows x64 contained-process path exist; no package or live-engine adapter is released.
 
 [한국어](README.ko.md)
 
@@ -16,10 +16,10 @@ This repository contains an early control plane, not a finished game-development
 | --- | --- |
 | CLI | Nine plan-only, read-only, or static inspection commands |
 | Project inspection | Bounded Godot, Unity, and Unreal marker and profile checks |
-| Godot | Static project status and a documented operation catalog; no engine launch |
+| Godot | Static public status plus a private exact-version contained startup path tested with a fixture; no public engine launch |
 | Skills | Twelve capability-first game-development skills with exact packaged artifacts |
 | MCP | An opt-in, project-bound, read-only STDIO runtime for selected tools |
-| Windows containment | Disposable AppContainer self-test, one-shot synthetic launch, and private path-free admission binding; no user-project or engine process launch |
+| Windows containment | Disposable AppContainer qualification and a one-shot, snapshot-bound process run from staged copies; no public dispatcher |
 | Safety foundation | Typed contracts, registry checks, bounded permissions and workflows, receipts, and managed lifecycle primitives |
 
 No installable package is published. The CLI does not edit a game project, install skills, control an editor, run a game, produce a build, or export evidence. All live-engine capabilities and support grades remain planned.
@@ -45,7 +45,9 @@ pnpm run agpb -- engine status --engine godot --project <project-path>
 
 Add `--json` to an implemented command for canonical machine-readable output. Commands return a nonzero exit code for invalid use, blocking findings, cancellation, uncertainty, or an internal failure. The [CLI guide](docs/cli.md) lists every available and planned command.
 
-The containment verification is an opt-in developer check for Windows x64 and requires .NET SDK `10.0.400`. It first tests the isolation policy, then uses that fresh result to admit one fixed synthetic read-only workload against a new disposable snapshot. A successful launch witness can then be bound once to an exact read-only project manifest and executable identity in a short-lived, path-free internal admission. The synthetic launcher still accepts no arbitrary command or user-project path, and the Godot integration exposes no process-dispatch route. This does not establish engine support.
+The containment verification is an opt-in developer check for Windows x64 and requires .NET SDK `10.0.400`. It first tests the isolation policy, then runs one fixed synthetic workload to qualify the exact native provider. A successful witness can be bound once to an exact read-only project manifest and executable identity. The private dispatcher then stages those admitted bytes in disposable roots, starts one fixed Godot headless invocation in a zero-capability AppContainer and one-process Job Object, and retains a path-free result and `RunReceipt`.
+
+This route is not available through the public CLI or MCP runtime. Its success and fault paths have been exercised with a purpose-built executable fixture, not an installed Godot release or the graybox project. It accepts no arbitrary command, environment, network destination, or source write authority. Godot support therefore remains `planned`.
 
 ## Engine support
 

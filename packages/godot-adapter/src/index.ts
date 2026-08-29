@@ -66,10 +66,17 @@ export type {
 } from "./headless-preflight.js";
 export {
   assertPreparedGodotContainedHeadlessAdmission,
+  createGodotContainedHeadlessAuthorizationRequest,
+  isGodotContainedHeadlessRunRequest,
   prepareGodotContainedHeadlessAdmissionFromVersionProbe,
+  runGodotContainedHeadless,
 } from "./contained-headless-admission.js";
 export type {
+  BlockedGodotContainedHeadlessAdmission,
+  CreateGodotContainedHeadlessAuthorizationRequest,
   GodotContainedHeadlessAdmissionBlocker,
   PrepareGodotContainedHeadlessAdmissionFromVersionProbeRequest,
   PreparedGodotContainedHeadlessAdmission,
+  ReadyGodotContainedHeadlessAdmission,
+  RunGodotContainedHeadlessRequest,
 } from "./contained-headless-admission.js";

@@ -23,7 +23,12 @@ export type WindowsContainmentProviderErrorCode =
   | "invalid-engine-admission-request"
   | "engine-admission-invalid"
   | "engine-admission-expired"
-  | "engine-admission-consumed";
+  | "engine-admission-consumed"
+  | "invalid-engine-run-request"
+  | "engine-run-consumed"
+  | "engine-run-expired"
+  | "engine-run-process-failed"
+  | "engine-run-output-invalid";
 
 export class WindowsContainmentProviderError extends Error {
   readonly code: WindowsContainmentProviderErrorCode;

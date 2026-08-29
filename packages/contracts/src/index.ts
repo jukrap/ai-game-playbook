@@ -357,10 +357,16 @@ export {
 } from "./godot-headless-preflight-contracts.js";
 export type {
   GodotHeadlessPreflightAuthorization,
+  GodotHeadlessPreflightBlockedContainmentBinding,
+  GodotHeadlessPreflightBlockedDigestInput,
   GodotHeadlessPreflightBlocker,
+  GodotHeadlessPreflightCode,
   GodotHeadlessPreflightCommandInput,
   GodotHeadlessPreflightContainmentBinding,
   GodotHeadlessPreflightDigestInput,
+  GodotHeadlessPreflightEngineRunEvidence,
+  GodotHeadlessPreflightExecutedDigestInput,
+  GodotHeadlessPreflightQualifiedContainmentBinding,
   GodotHeadlessPreflightReceiptPointer,
   GodotHeadlessPreflightReport,
 } from "./godot-headless-preflight-contracts.js";
@@ -649,6 +655,38 @@ export type {
   ProcessContainmentEngineAdmission,
   ProcessContainmentEngineAdmissionDigestInput,
 } from "./process-containment-engine-admission-contracts.js";
+export {
+  PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_REPORT_DURATION_MS,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_START_VALIDITY_MS,
+  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
+  PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS,
+  assertProcessContainmentEngineRunReportSemantics,
+  assertProcessContainmentEngineRunRequestSemantics,
+  computeProcessContainmentEngineRunReportDigest,
+  computeProcessContainmentEngineRunRequestDigest,
+  processContainmentEngineRunReportSchema,
+  processContainmentEngineRunRequestSchema,
+} from "./process-containment-engine-run-contracts.js";
+export type {
+  ProcessContainmentEngineRunEffects,
+  ProcessContainmentEngineRunLimits,
+  ProcessContainmentEngineRunOutcome,
+  ProcessContainmentEngineRunOutputObservation,
+  ProcessContainmentEngineRunProcessObservation,
+  ProcessContainmentEngineRunReport,
+  ProcessContainmentEngineRunReportDigestInput,
+  ProcessContainmentEngineRunRequest,
+  ProcessContainmentEngineRunTermination,
+} from "./process-containment-engine-run-contracts.js";
 export {
   assetProvenanceSchema,
   computeFeatureContractApprovalDigest,

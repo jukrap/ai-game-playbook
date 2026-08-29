@@ -5,6 +5,12 @@ import {
   ENGINE_SNAPSHOT_MAX_FILES,
   ENGINE_SNAPSHOT_MAX_FILE_BYTES,
   ENGINE_SNAPSHOT_MAX_TOTAL_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
   assertEngineExecutionSnapshotBindingSemantics,
   compareCanonicalText,
   computeEngineExecutableSnapshotDigest,
@@ -56,19 +62,45 @@ export interface AssertEngineExecutionSnapshotAuthorityRequest {
   readonly executable: BoundProcessExecutable;
 }
 
-interface FileManifestEntry {
+export interface EngineExecutionSourceFileEntry {
   readonly path: string;
   readonly digest: Sha256Digest;
   readonly bytes: number;
 }
 
-interface ProjectManifest {
+export interface EngineExecutionSourceManifest {
   readonly directories: readonly string[];
-  readonly files: readonly FileManifestEntry[];
+  readonly files: readonly EngineExecutionSourceFileEntry[];
   readonly manifestDigest: Sha256Digest;
   readonly fileCount: number;
   readonly directoryCount: number;
   readonly totalBytes: number;
+}
+
+export interface IssueEngineExecutionSourceHandoffRequest {
+  readonly binding: EngineExecutionSnapshotBinding;
+  readonly root: CanonicalProjectRoot;
+  readonly executable: BoundProcessExecutable;
+  readonly profileId: typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID;
+}
+
+export interface EngineExecutionSourceHandoff {
+  readonly profileId: typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID;
+  readonly profileDigest: typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST;
+  readonly bindingDigest: Sha256Digest;
+  readonly projectSnapshotDigest: Sha256Digest;
+  readonly executableSnapshotDigest: Sha256Digest;
+  readonly manifestDigest: Sha256Digest;
+  readonly handoffDigest: Sha256Digest;
+}
+
+export interface EngineExecutionSourceMaterial {
+  readonly binding: EngineExecutionSnapshotBinding;
+  readonly root: CanonicalProjectRoot;
+  readonly executable: BoundProcessExecutable;
+  readonly profileId: typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID;
+  readonly profileDigest: typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST;
+  readonly manifest: EngineExecutionSourceManifest;
 }
 
 interface SnapshotAuthority {
@@ -76,6 +108,7 @@ interface SnapshotAuthority {
   readonly executable: BoundProcessExecutable;
   readonly engine: EngineId;
   readonly projectInspectionDigest: Sha256Digest;
+  readonly manifest: EngineExecutionSourceManifest;
   readonly manifestDigest: Sha256Digest;
   readonly projectSnapshotDigest: Sha256Digest;
   readonly executableSnapshotDigest: Sha256Digest;
@@ -88,6 +121,11 @@ interface PendingDirectory {
 }
 
 const snapshotAuthorities = new WeakMap<object, SnapshotAuthority>();
+const claimedSnapshotBindings = new WeakSet<object>();
+const sourceHandoffMaterials = new WeakMap<
+  object,
+  EngineExecutionSourceMaterial
+>();
 const fileReadChunkBytes = 64 * 1024;
 const excludedTopLevel = new Set(
   ENGINE_SNAPSHOT_EXCLUDED_TOP_LEVEL_ENTRIES.map((entry) => entry.toLowerCase()),
@@ -174,6 +212,32 @@ function assertionRequest(
     binding: record["binding"] as EngineExecutionSnapshotBinding,
     root: record["root"] as CanonicalProjectRoot,
     executable: record["executable"] as BoundProcessExecutable,
+  });
+}
+
+function handoffRequest(
+  value: unknown,
+): IssueEngineExecutionSourceHandoffRequest {
+  const record = exactDataRecord(value, [
+    "binding",
+    "root",
+    "executable",
+    "profileId",
+  ]);
+  if (
+    record === undefined ||
+    record["profileId"] !== PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID
+  ) {
+    return fail(
+      "engine-snapshot-handoff-invalid",
+      "Engine source handoff requires one exact fixed-profile request.",
+    );
+  }
+  return Object.freeze({
+    binding: record["binding"] as EngineExecutionSnapshotBinding,
+    root: record["root"] as CanonicalProjectRoot,
+    executable: record["executable"] as BoundProcessExecutable,
+    profileId: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
   });
 }
 
@@ -323,7 +387,7 @@ async function snapshotFile(
   absolutePath: string,
   path: string,
   expected: BigIntStats,
-): Promise<FileManifestEntry> {
+): Promise<EngineExecutionSourceFileEntry> {
   let handle: FileHandle;
   try {
     handle = await open(absolutePath, "r");
@@ -333,7 +397,7 @@ async function snapshotFile(
       "Project file became unavailable during snapshot capture.",
     );
   }
-  let result: FileManifestEntry | undefined;
+  let result: EngineExecutionSourceFileEntry | undefined;
   let operationError: unknown;
   try {
     const before = await handle.stat({ bigint: true });
@@ -396,7 +460,7 @@ async function snapshotFile(
 
 function manifestDigest(
   directories: readonly string[],
-  files: readonly FileManifestEntry[],
+  files: readonly EngineExecutionSourceFileEntry[],
 ): Sha256Digest {
   return digestCanonicalJson({
     domain: "ai-game-playbook/engine-project-source-manifest",
@@ -407,9 +471,11 @@ function manifestDigest(
   });
 }
 
-async function scanProject(root: CanonicalProjectRoot): Promise<ProjectManifest> {
+async function scanProject(
+  root: CanonicalProjectRoot,
+): Promise<EngineExecutionSourceManifest> {
   const directories: string[] = [""];
-  const files: FileManifestEntry[] = [];
+  const files: EngineExecutionSourceFileEntry[] = [];
   const portableNames = new Set<string>();
   const pending: PendingDirectory[] = [
     Object.freeze({ absolutePath: root.canonicalPath, segments: Object.freeze([]) }),
@@ -526,7 +592,10 @@ async function scanProject(root: CanonicalProjectRoot): Promise<ProjectManifest>
   });
 }
 
-function sameManifest(left: ProjectManifest, right: ProjectManifest): boolean {
+function sameManifest(
+  left: EngineExecutionSourceManifest,
+  right: EngineExecutionSourceManifest,
+): boolean {
   return (
     left.manifestDigest === right.manifestDigest &&
     left.fileCount === right.fileCount &&
@@ -537,7 +606,7 @@ function sameManifest(left: ProjectManifest, right: ProjectManifest): boolean {
 
 async function stableProjectManifest(
   root: CanonicalProjectRoot,
-): Promise<ProjectManifest> {
+): Promise<EngineExecutionSourceManifest> {
   await assertProjectRootIdentity(root);
   const first = await scanProject(root);
   await assertProjectRootIdentity(root);
@@ -598,7 +667,7 @@ export async function captureEngineExecutionSnapshots(
       "Executable is outside the host or byte boundary for engine snapshots.",
     );
   }
-  let manifest: ProjectManifest;
+  let manifest: EngineExecutionSourceManifest;
   try {
     manifest = await stableProjectManifest(request.root);
   } catch (error) {
@@ -665,6 +734,7 @@ export async function captureEngineExecutionSnapshots(
       executable: request.executable,
       engine: request.engine,
       projectInspectionDigest: request.projectInspectionDigest,
+      manifest,
       manifestDigest: manifest.manifestDigest,
       projectSnapshotDigest: project.snapshotDigest,
       executableSnapshotDigest: executable.snapshotDigest,
@@ -706,7 +776,7 @@ export async function assertEngineExecutionSnapshotAuthority(
       "Snapshot binding no longer matches its same-process authority.",
     );
   }
-  let manifest: ProjectManifest;
+  let manifest: EngineExecutionSourceManifest;
   try {
     await assertProcessExecutableIdentity(request.executable);
   } catch {
@@ -743,4 +813,120 @@ export async function assertEngineExecutionSnapshotAuthority(
       "Project manifest no longer matches the captured snapshot.",
     );
   }
+}
+
+function sourceHandoffBudgetIsValid(
+  authority: SnapshotAuthority,
+): boolean {
+  return (
+    authority.manifest.fileCount <=
+      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES &&
+    authority.manifest.directoryCount <=
+      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES &&
+    authority.manifest.totalBytes <=
+      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES &&
+    authority.manifest.files.every(
+      (file) =>
+        file.bytes <= PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
+    )
+  );
+}
+
+export async function issueEngineExecutionSourceHandoff(
+  value: unknown,
+): Promise<EngineExecutionSourceHandoff> {
+  const request = handoffRequest(value);
+  const authority =
+    request.binding !== null && typeof request.binding === "object"
+      ? snapshotAuthorities.get(request.binding)
+      : undefined;
+  if (
+    authority === undefined ||
+    authority.root !== request.root ||
+    authority.executable !== request.executable ||
+    authority.engine !== "godot" ||
+    request.binding.engine !== "godot"
+  ) {
+    return fail(
+      "engine-snapshot-authority-invalid",
+      "Source handoff lacks the exact same-process Godot snapshot authority.",
+    );
+  }
+  try {
+    assertEngineExecutionSnapshotBindingSemantics(request.binding);
+  } catch {
+    return fail(
+      "engine-snapshot-authority-invalid",
+      "Source handoff binding no longer matches its contract digest.",
+    );
+  }
+  if (snapshotMismatch(request.binding, authority)) {
+    return fail(
+      "engine-snapshot-authority-invalid",
+      "Source handoff binding no longer matches its runtime authority.",
+    );
+  }
+  if (claimedSnapshotBindings.has(request.binding)) {
+    return fail(
+      "engine-snapshot-authority-consumed",
+      "Source snapshot authority has already been claimed for execution.",
+    );
+  }
+  claimedSnapshotBindings.add(request.binding);
+  if (!sourceHandoffBudgetIsValid(authority)) {
+    return fail(
+      "engine-snapshot-handoff-budget-exceeded",
+      "Source snapshot exceeds the fixed engine-run staging budget.",
+    );
+  }
+
+  await assertEngineExecutionSnapshotAuthority({
+    binding: request.binding,
+    root: request.root,
+    executable: request.executable,
+  });
+
+  const handoffInput = Object.freeze({
+    profileId: request.profileId,
+    profileDigest: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+    bindingDigest: request.binding.bindingDigest,
+    projectSnapshotDigest: request.binding.project.snapshotDigest,
+    executableSnapshotDigest: request.binding.executable.snapshotDigest,
+    manifestDigest: authority.manifest.manifestDigest,
+  });
+  const handoff: EngineExecutionSourceHandoff = Object.freeze({
+    ...handoffInput,
+    handoffDigest: digestCanonicalJson({
+      domain: "ai-game-playbook/private-engine-source-handoff",
+      version: "1.0.0",
+      ...handoffInput,
+    }),
+  });
+  const material: EngineExecutionSourceMaterial = Object.freeze({
+    binding: request.binding,
+    root: request.root,
+    executable: request.executable,
+    profileId: request.profileId,
+    profileDigest: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+    manifest: authority.manifest,
+  });
+  sourceHandoffMaterials.set(handoff, material);
+  return handoff;
+}
+
+export function consumeEngineExecutionSourceHandoff(
+  handoff: unknown,
+): EngineExecutionSourceMaterial {
+  const material =
+    handoff !== null && typeof handoff === "object"
+      ? sourceHandoffMaterials.get(handoff)
+      : undefined;
+  if (material === undefined) {
+    return fail(
+      "engine-snapshot-handoff-invalid",
+      "Engine source handoff is invalid, cloned, or already consumed.",
+    );
+  }
+  sourceHandoffMaterials.delete(handoff as object);
+  return material;
 }

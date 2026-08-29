@@ -47,7 +47,7 @@ function report() {
       exactTargetMatch: false,
     },
     mode: "dynamic-main-scene",
-    frameBudget: 2,
+    frameBudget: contracts.GODOT_HEADLESS_PREFLIGHT_FRAME_BUDGET,
     invocationDigest: contracts.GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
     containment: containment(),
     status: "blocked",
@@ -208,4 +208,21 @@ test("Godot headless preflight containment request digest cannot be rebound", ()
     },
     TypeError,
   );
+});
+
+test("Godot headless preflight semantics reject accessors without invoking them", () => {
+  let called = false;
+  const value = report();
+  Object.defineProperty(value, "status", {
+    enumerable: true,
+    get() {
+      called = true;
+      return "blocked";
+    },
+  });
+  assert.throws(
+    () => contracts.assertGodotHeadlessPreflightReportSemantics(value),
+    TypeError,
+  );
+  assert.equal(called, false);
 });

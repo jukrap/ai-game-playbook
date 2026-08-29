@@ -192,3 +192,144 @@ test("request parsing never invokes accessors", async (t) => {
   );
   assert.equal(called, false);
 });
+
+test("issues and consumes one frozen private source handoff", async (t) => {
+  const context = await fixture(t);
+  const binding = await engineCommon.captureEngineExecutionSnapshots(
+    request(context),
+  );
+
+  const handoff = await engineCommon.issueEngineExecutionSourceHandoff({
+    binding,
+    root: context.root,
+    executable: context.executable,
+    profileId: contracts.PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
+  });
+
+  assert.equal(Object.isFrozen(handoff), true);
+  assert.equal(handoff.bindingDigest, binding.bindingDigest);
+  assert.equal(JSON.stringify(handoff).includes(context.project), false);
+  assert.equal(JSON.stringify(handoff).includes("project.godot"), false);
+  assert.throws(
+    () =>
+      engineCommon.consumeEngineExecutionSourceHandoff(
+        structuredClone(handoff),
+      ),
+    expectEngineError("engine-snapshot-handoff-invalid"),
+  );
+
+  const source = engineCommon.consumeEngineExecutionSourceHandoff(handoff);
+  assert.equal(source.root, context.root);
+  assert.equal(source.executable, context.executable);
+  assert.equal(source.binding, binding);
+  assert.deepEqual(
+    source.manifest.files.map((entry) => entry.path),
+    ["project.godot", "scenes/main.tscn"],
+  );
+  assert.equal(Object.isFrozen(source), true);
+  assert.equal(Object.isFrozen(source.manifest), true);
+  assert.equal(Object.isFrozen(source.manifest.directories), true);
+  assert.equal(Object.isFrozen(source.manifest.files), true);
+  assert.equal(Object.isFrozen(source.manifest.files[0]), true);
+
+  assert.throws(
+    () => engineCommon.consumeEngineExecutionSourceHandoff(handoff),
+    expectEngineError("engine-snapshot-handoff-invalid"),
+  );
+  await assert.rejects(
+    engineCommon.issueEngineExecutionSourceHandoff({
+      binding,
+      root: context.root,
+      executable: context.executable,
+      profileId: contracts.PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
+    }),
+    expectEngineError("engine-snapshot-authority-consumed"),
+  );
+});
+
+test("burns the source authority when drift is found during handoff", async (t) => {
+  const context = await fixture(t);
+  const binding = await engineCommon.captureEngineExecutionSnapshots(
+    request(context),
+  );
+  await writeFile(join(context.project, "project.godot"), "changed=true\n");
+  const handoffRequest = {
+    binding,
+    root: context.root,
+    executable: context.executable,
+    profileId: contracts.PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
+  };
+
+  await assert.rejects(
+    engineCommon.issueEngineExecutionSourceHandoff(handoffRequest),
+    expectEngineError("engine-snapshot-project-drift"),
+  );
+  await assert.rejects(
+    engineCommon.issueEngineExecutionSourceHandoff(handoffRequest),
+    expectEngineError("engine-snapshot-authority-consumed"),
+  );
+});
+
+test("rejects handoff profiles and budgets outside the fixed boundary", async (t) => {
+  const profileContext = await fixture(t);
+  const profileBinding = await engineCommon.captureEngineExecutionSnapshots(
+    request(profileContext),
+  );
+  await assert.rejects(
+    engineCommon.issueEngineExecutionSourceHandoff({
+      binding: profileBinding,
+      root: profileContext.root,
+      executable: profileContext.executable,
+      profileId: "godot-editor-v1",
+    }),
+    expectEngineError("engine-snapshot-handoff-invalid"),
+  );
+
+  const budgetContext = await fixture(t);
+  await writeFile(
+    join(budgetContext.project, "oversized.bin"),
+    Buffer.alloc(
+      contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES + 1,
+      0x61,
+    ),
+  );
+  const budgetBinding = await engineCommon.captureEngineExecutionSnapshots(
+    request(budgetContext),
+  );
+  await assert.rejects(
+    engineCommon.issueEngineExecutionSourceHandoff({
+      binding: budgetBinding,
+      root: budgetContext.root,
+      executable: budgetContext.executable,
+      profileId: contracts.PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
+    }),
+    expectEngineError("engine-snapshot-handoff-budget-exceeded"),
+  );
+});
+
+test("handoff request parsing never invokes accessors", async (t) => {
+  const context = await fixture(t);
+  const binding = await engineCommon.captureEngineExecutionSnapshots(
+    request(context),
+  );
+  let called = false;
+  const hostile = {
+    binding,
+    root: context.root,
+    executable: context.executable,
+    profileId: contracts.PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
+  };
+  Object.defineProperty(hostile, "profileId", {
+    enumerable: true,
+    get() {
+      called = true;
+      return contracts.PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID;
+    },
+  });
+
+  await assert.rejects(
+    engineCommon.issueEngineExecutionSourceHandoff(hostile),
+    expectEngineError("engine-snapshot-handoff-invalid"),
+  );
+  assert.equal(called, false);
+});

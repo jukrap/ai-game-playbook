@@ -721,7 +721,7 @@ const engineHeadlessPreflightCommand: CommandDescriptor = Object.freeze({
     package: "@ai-game-playbook/godot-adapter",
     export: "runGodotHeadlessPreflight",
     digest: parseSha256Digest(
-      "sha256:a6b50edc3a2dd2961a03b092370f047bb1975236e5c3bd352aaffff7c1a113ef",
+      "sha256:0157d8a91bd747ab8071759c89b1ce149bbbf6e167b29d143c2d81257322bbe4",
     ),
   }),
 });
@@ -1653,7 +1653,7 @@ const godotHeadlessPreflightWorkflow: WorkflowDescriptor = Object.freeze({
   }),
   resumePolicy: "never",
   terminalOracle:
-    "The command must retain a blocked receipt without launching Godot until filesystem, network, and child-process containment are enforced.",
+    "The command must retain either a fail-closed blocked receipt or a path-free contained startup receipt, and must not promote engine support without an installed Godot validation run.",
   requiredEvidence: Object.freeze([
     parseStableId("godot-headless-preflight"),
     parseStableId("run-receipt"),

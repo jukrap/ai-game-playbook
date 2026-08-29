@@ -1,6 +1,6 @@
 # Architecture
 
-> Status: the Node.js/TypeScript control-plane foundation and Windows x64 containment verification are source-built. Public engine mutation, live bridges, and evidence export are not implemented.
+> Status: the Node.js/TypeScript control-plane foundation and a private Windows x64 contained-process path are source-built. Public engine mutation, live bridges, and evidence export are not implemented.
 
 [한국어](architecture.ko.md) · [Documentation](README.md)
 
@@ -34,7 +34,7 @@ A generated surface is descriptive until a matching handler and runtime boundary
 | `contracts` | Versioned schemas and semantic validation |
 | `registry` | Descriptor validation, deterministic routing, generation, and digests |
 | `core` | Project identity, safe paths, compare-and-swap writes, process bounds, permission, scoped in-memory approval signing, workflow, receipts, and artifact foundations |
-| `engine-common` | Bounded path-free project and executable snapshots with same-process authority |
+| `engine-common` | Bounded path-free project and executable snapshots plus one-use private source handoff |
 | `project-runtime` | Static project inspection and private initialization foundations |
 | `pack-runtime` | Read-only pack inspection plus private ownership, transaction, durable dispatch, recovery, and evidence-reconciliation foundations |
 | `skill-runtime` | Packaged skill validation, target inspection, and write-free managed-pack preflight |
@@ -42,8 +42,8 @@ A generated surface is descriptive until a matching handler and runtime boundary
 | `cli` | Nine source-built plan-only, read-only, or static commands |
 | `mcp` | Opt-in project-bound read-only STDIO tools selected from registry metadata |
 | `codex-adapter` | Write-free project setup planning plus private one-shot approval for project initialization and managed-skill installation, with read-only recovery assessment |
-| `godot-adapter` | Static public Godot reports, fail-closed host-tool preflight, and private blocked contained-admission preparation |
-| `windows-containment-provider` | Windows x64 artifact identity, disposable isolation self-test, one-shot synthetic launch, and exact snapshot admission authority |
+| `godot-adapter` | Static public Godot reports plus private exact-version approval, contained startup, and receipt settlement |
+| `windows-containment-provider` | Windows x64 artifact identity, disposable qualification, exact snapshot admission, staged AppContainer execution, and path-free reports |
 
 Unity and Unreal adapters and all project bridges remain planned.
 
@@ -53,7 +53,9 @@ That witness can be claimed once by a private synthetic-launch API. Preparation 
 
 After synthetic qualification, a second internal boundary can consume the successful launch witness once and bind it to an exact read-only engine project manifest, exact executable content and identity, operation, invocation, provider digests, and a deadline of at most 30 seconds. The project scan rejects links and portable path collisions, enforces file, directory, and byte budgets, and excludes only a fixed set of local-state directories. Its serialized contracts contain digests and counts, not paths. Creating or checking this admission starts no engine process.
 
-The Godot adapter can turn an original same-process version report and this admission into a short-lived blocked preparation. It rechecks the project, executable, workflow, and provider authority, then reports `godot-headless-contained-dispatch-unimplemented`. The core provider catalog remains empty, and no public command, MCP tool, arbitrary executable, or engine-process dispatcher can reach this path. It is safety groundwork, not live-engine support.
+The Godot adapter combines that admission with the original same-process exact-version report. A version mismatch stays blocked. An exact target match can produce one approval request and one-use private execution authority. Immediately before dispatch, the provider rechecks every identity, consumes the source handoff, copies the admitted manifest and executable into disposable private roots, and starts only the fixed headless main-scene invocation in a zero-capability AppContainer. Time, output, profile growth, and process count are bounded; source, staged baseline, termination, and cleanup observations determine success, failure, or uncertainty.
+
+The adapter settles the permission lease and retains a `RunReceipt` for a returned process report. Public contracts and receipts contain identities, digests, counts, timing, and redacted diagnostics rather than source paths or log bodies. Success, process failure, staged mutation, output overflow, profile overflow, timeout, and child-process denial have been exercised with a purpose-built fixture. An installed Godot release and the graybox project have not been validated. The public provider catalog remains empty, so neither CLI nor MCP can dispatch this path and no support grade is promoted.
 
 The registry binds all twelve packaged skills to one digest-bound experimental pack. An internal preflight evaluates an `add` operation against project identity, installed state, exact file digests, and direct skill-directory ownership. A separate private dispatcher can execute a fresh ready plan only with exact install approval and the project-write lane. It revalidates the plan before admission, uses compare-and-swap ownership and rollback, and retains workflow checkpoints, a run receipt, and content-addressed terminal transaction evidence. Copied, stale, cancelled, unapproved, or conflicted plans stop before managed mutation. No public command invokes this path.
 

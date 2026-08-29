@@ -99,6 +99,7 @@ function authorize(plan) {
     plan,
     createRequest: godot.createGodotHeadlessPreflightAuthorizationRequest,
     maxOutputBytes: contracts.GODOT_HEADLESS_PREFLIGHT_MAX_OUTPUT_BYTES,
+    maxDurationMs: contracts.GODOT_HEADLESS_PREFLIGHT_COMMAND_TIMEOUT_MS,
   });
 }
 

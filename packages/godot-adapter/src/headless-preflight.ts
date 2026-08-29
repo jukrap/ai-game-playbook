@@ -20,9 +20,9 @@ import {
   parseStableId,
   runReceiptSchema,
   type ExecutionBudgets,
+  type GodotHeadlessPreflightBlockedContainmentBinding,
   type GodotHeadlessPreflightBlocker,
   type GodotHeadlessPreflightCommandInput,
-  type GodotHeadlessPreflightContainmentBinding,
   type GodotHeadlessPreflightDigestInput,
   type GodotHeadlessPreflightReport,
   type GodotVersionProbeReport,
@@ -57,6 +57,10 @@ import {
 import { randomUUID } from "node:crypto";
 
 import { GodotAdapterBoundaryError } from "./errors.js";
+import {
+  isGodotContainedHeadlessRunRequest,
+  runGodotContainedHeadless,
+} from "./contained-headless-admission.js";
 import { runGodotEngineStatusWithExecutable } from "./status.js";
 import {
   boundGodotVersionProbeRuntime,
@@ -107,7 +111,7 @@ export interface PreparedGodotHeadlessPreflight {
     readonly status: GodotVersionProbeReport["status"];
     readonly exactTargetMatch: boolean;
   };
-  readonly containment: GodotHeadlessPreflightContainmentBinding;
+  readonly containment: GodotHeadlessPreflightBlockedContainmentBinding;
   readonly input: GodotHeadlessPreflightCommandInput;
   readonly planDigest: Sha256Digest;
 }
@@ -302,7 +306,7 @@ function runtimeContainmentDecision(
 
 function containmentBindingFrom(
   report: ProcessContainmentAssessmentReport,
-): GodotHeadlessPreflightContainmentBinding {
+): GodotHeadlessPreflightBlockedContainmentBinding {
   return Object.freeze({
     assessmentDigest: report.assessmentDigest,
     requestDigest: report.requestDigest,
@@ -316,11 +320,11 @@ function containmentBindingFrom(
 async function assertContainmentWitness(
   report: ProcessContainmentAssessmentReport,
   root: CanonicalProjectRoot,
-): Promise<GodotHeadlessPreflightContainmentBinding> {
+): Promise<GodotHeadlessPreflightBlockedContainmentBinding> {
   if (runtimeContainmentDecision(report) !== "block") {
     fail(
-      "godot-headless-contained-dispatch-unimplemented",
-      "Godot headless contained process dispatch is not implemented for this assessment decision.",
+      "godot-headless-containment-witness-invalid",
+      "The blocked Godot preparation path requires one exact fail-closed assessment.",
     );
   }
   try {
@@ -1087,7 +1091,7 @@ function reportFrom(
   return validated;
 }
 
-export async function runGodotHeadlessPreflight(
+async function runBlockedGodotHeadlessPreflight(
   value: unknown,
 ): Promise<GodotHeadlessPreflightReport> {
   const request = validateRunRequest(value);
@@ -1169,4 +1173,13 @@ export async function runGodotHeadlessPreflight(
     approvalIds,
     blockers,
   );
+}
+
+export async function runGodotHeadlessPreflight(
+  value: unknown,
+): Promise<GodotHeadlessPreflightReport> {
+  if (isGodotContainedHeadlessRunRequest(value)) {
+    return runGodotContainedHeadless(value);
+  }
+  return runBlockedGodotHeadlessPreflight(value);
 }

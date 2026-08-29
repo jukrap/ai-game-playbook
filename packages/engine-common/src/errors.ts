@@ -7,7 +7,10 @@ export type EngineCommonBoundaryErrorCode =
   | "engine-snapshot-link-rejected"
   | "engine-snapshot-file-invalid"
   | "engine-snapshot-executable-invalid"
-  | "engine-snapshot-authority-invalid";
+  | "engine-snapshot-authority-invalid"
+  | "engine-snapshot-authority-consumed"
+  | "engine-snapshot-handoff-invalid"
+  | "engine-snapshot-handoff-budget-exceeded";
 
 export class EngineCommonBoundaryError extends Error {
   readonly code: EngineCommonBoundaryErrorCode;

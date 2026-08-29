@@ -37,7 +37,20 @@ internal static class Program
                     await EngineRunProtocol.ReadRequestAsync();
                 NativeEngineRunResult result =
                     await EngineRunRunner.RunAsync(request);
-                Protocol.WriteJson(result.Report);
+                if (request.OperationId == EngineRunProtocol.ReplayOperationId)
+                {
+                    Protocol.WriteJson(new NativeEngineReplayEnvelope(
+                        "1.0.0",
+                        "godot-engine-replay-envelope",
+                        result.Report,
+                        result.TranscriptBytes is null
+                            ? null
+                            : Convert.ToBase64String(result.TranscriptBytes)));
+                }
+                else
+                {
+                    Protocol.WriteJson(result.Report);
+                }
                 return result.ExitCode;
             }
             if (args.Length == 1 && args[0] == "godot-engine-cancel")

@@ -24,19 +24,28 @@ internal static class Program
         {
             return 0;
         }
-        if (
-            args.Length != 8
-            || args[0] != "--headless"
-            || args[1] != "--path"
-            || args[3] != "--quit-after"
-            || args[4] != "1"
-            || args[5] != "--log-file"
-            || args[7] != "--no-header")
+        bool preflight =
+            args.Length == 8
+            && args[0] == "--headless"
+            && args[1] == "--path"
+            && args[3] == "--quit-after"
+            && args[4] == "1"
+            && args[5] == "--log-file"
+            && args[7] == "--no-header";
+        bool replay =
+            args.Length == 8
+            && args[0] == "--headless"
+            && args[1] == "--path"
+            && args[3] == "--log-file"
+            && args[5] == "--no-header"
+            && args[6] == "--"
+            && args[7] == "--agpb-replay";
+        if (!preflight && !replay)
         {
             return 64;
         }
         string project = args[2];
-        string log = args[6];
+        string log = preflight ? args[6] : args[4];
         if (
             !Path.IsPathFullyQualified(project)
             || !Path.IsPathFullyQualified(log)
@@ -49,6 +58,70 @@ internal static class Program
             ? (await File.ReadAllTextAsync(behaviorPath)).Trim()
             : "success";
         Directory.CreateDirectory(Path.GetDirectoryName(log)!);
+        if (replay)
+        {
+            string replayPath = Path.Combine(project, "fixture-replay.txt");
+            if (!File.Exists(replayPath))
+            {
+                return 67;
+            }
+            string transcript = await File.ReadAllTextAsync(replayPath);
+            switch (behavior)
+            {
+                case "replay-success":
+                    await File.WriteAllTextAsync(log, transcript, new UTF8Encoding(false));
+                    return 0;
+                case "replay-fail":
+                    await File.WriteAllTextAsync(log, transcript, new UTF8Encoding(false));
+                    return 2;
+                case "replay-mutate-staged":
+                    await File.AppendAllTextAsync(
+                        Path.Combine(project, "project.godot"),
+                        "changed=true\n",
+                        new UTF8Encoding(false));
+                    await File.WriteAllTextAsync(log, transcript, new UTF8Encoding(false));
+                    return 0;
+                case "replay-idle":
+                    await File.WriteAllTextAsync(
+                        log,
+                        "AGPB_GRAYBOX {\"event\":\"replay-started\"}\n",
+                        new UTF8Encoding(false));
+                    await Task.Delay(TimeSpan.FromSeconds(30));
+                    return 0;
+                case "replay-activity":
+                    await File.WriteAllTextAsync(
+                        log,
+                        "AGPB_GRAYBOX {\"event\":\"heartbeat-0\"}\n",
+                        new UTF8Encoding(false));
+                    await Task.Delay(TimeSpan.FromSeconds(8));
+                    await File.AppendAllTextAsync(
+                        log,
+                        "AGPB_GRAYBOX {\"event\":\"heartbeat-1\"}\n",
+                        new UTF8Encoding(false));
+                    await Task.Delay(TimeSpan.FromSeconds(8));
+                    await File.AppendAllTextAsync(
+                        log,
+                        "AGPB_GRAYBOX {\"event\":\"heartbeat-2\"}\n",
+                        new UTF8Encoding(false));
+                    return 0;
+                case "replay-line-overflow":
+                    await File.WriteAllTextAsync(
+                        log,
+                        $"AGPB_GRAYBOX {new string('x', 66 * 1024)}\n",
+                        new UTF8Encoding(false));
+                    return 0;
+                case "replay-event-overflow":
+                    await File.WriteAllTextAsync(
+                        log,
+                        string.Concat(
+                            Enumerable.Range(0, 2_051).Select(
+                                index => $"AGPB_GRAYBOX {{\"event\":\"event-{index}\"}}\n")),
+                        new UTF8Encoding(false));
+                    return 0;
+                default:
+                    return 66;
+            }
+        }
         switch (behavior)
         {
             case "success":

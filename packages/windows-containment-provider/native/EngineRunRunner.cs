@@ -1,7 +1,9 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace AiGamePlaybook.WindowsContainment;
 
@@ -54,6 +56,7 @@ internal static class EngineRunRunner
         string? stagedProject = null;
         string? logPath = null;
         NativeEngineRunOutput output = EmptyOutput();
+        byte[]? transcriptBytes = null;
 
         try
         {
@@ -143,18 +146,7 @@ internal static class EngineRunRunner
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "job-create-failed");
             }
             WindowsProcess.ConfigureJob(job);
-            string[] command =
-            {
-                stagedExecutable,
-                "--headless",
-                "--path",
-                stagedProject,
-                "--quit-after",
-                "1",
-                "--log-file",
-                logPath,
-                "--no-header",
-            };
+            string[] command = BuildEngineCommand(request, stagedExecutable, stagedProject, logPath);
             IReadOnlyDictionary<string, string> environment =
                 WindowsProcess.BuildContainedEnvironment(profileRoot, profileTemp);
             (process, thread) = WindowsProcess.CreateContainedProcess(
@@ -176,16 +168,19 @@ internal static class EngineRunRunner
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "process-resume-failed");
             }
 
-            uint wait = NativeMethods.WaitForMultipleObjects(
-                2,
-                new[]
-                {
-                    process,
-                    cancellationEvent.SafeWaitHandle.DangerousGetHandle(),
-                },
-                false,
-                (uint)request.EngineTimeoutMs);
-            if (wait == NativeMethods.WaitObject0 + 1)
+            EngineWaitResult engineWait = WaitForEngine(
+                request,
+                process,
+                cancellationEvent,
+                logPath);
+            uint wait = engineWait.ProcessExited
+                ? NativeMethods.WaitObject0
+                : NativeMethods.WaitTimeout;
+            if (engineWait.Uncertain)
+            {
+                observationUncertain = true;
+            }
+            else if (engineWait.Cause == "caller-cancelled")
             {
                 terminationCause = "caller-cancelled";
                 terminationRequested = true;
@@ -197,11 +192,12 @@ internal static class EngineRunRunner
                     process,
                     (uint)request.TerminationGraceMs);
             }
-            else if (wait == NativeMethods.WaitTimeout)
+            else if (engineWait.Cause is "engine-timeout" or "idle-timeout")
             {
-                terminationCause = "engine-timeout";
+                terminationCause = engineWait.Cause;
                 terminationRequested = true;
-                if (!NativeMethods.TerminateJobObject(job, 124))
+                uint timeoutExitCode = terminationCause == "idle-timeout" ? 123u : 124u;
+                if (!NativeMethods.TerminateJobObject(job, timeoutExitCode))
                 {
                     observationUncertain = true;
                 }
@@ -209,7 +205,7 @@ internal static class EngineRunRunner
                     process,
                     (uint)request.TerminationGraceMs);
             }
-            else if (wait != NativeMethods.WaitObject0)
+            else if (!engineWait.ProcessExited)
             {
                 observationUncertain = true;
             }
@@ -227,7 +223,9 @@ internal static class EngineRunRunner
                 processExitCode = unchecked((int)nativeExitCode);
             }
             accounting = WindowsProcess.QueryJobAccounting(job);
-            output = ReadBoundedLog(logPath, request.MaxOutputBytes, request.MaxProfileBytes);
+            CapturedEngineLog capturedLog = ReadBoundedLog(logPath, request);
+            output = capturedLog.Output;
+            transcriptBytes = capturedLog.TranscriptBytes;
             stagedProjectBaselinePreserved = ProjectMatches(request, stagedProject);
             stagedExecutableBaselinePreserved = ExecutableMatches(
                 stagedExecutable,
@@ -267,7 +265,9 @@ internal static class EngineRunRunner
                     terminationRequested = true;
                     uint terminationExitCode = terminationCause == "caller-cancelled"
                         ? 125u
-                        : 124u;
+                        : terminationCause == "idle-timeout"
+                            ? 123u
+                            : 124u;
                     bool terminated = processAssignedToJob && job != IntPtr.Zero
                         ? NativeMethods.TerminateJobObject(job, terminationExitCode)
                         : NativeMethods.TerminateProcess(process, terminationExitCode);
@@ -361,6 +361,8 @@ internal static class EngineRunRunner
             && accounting?.TotalProcesses == 1
             && accounting.ActiveProcesses == 0
             && !output.Truncated
+            && (request.OperationId != EngineRunProtocol.ReplayOperationId
+                || transcriptBytes is not null)
             && !terminationRequested
             && terminationCause == "none"
             && terminationConfirmed
@@ -410,8 +412,12 @@ internal static class EngineRunRunner
             request.AdmissionDigest,
             request.ProviderDescriptorDigest,
             request.ProviderCatalogDigest,
+            request.OperationId,
             request.ProfileDigest,
+            request.ProfileContractDigest,
+            request.ProfileCatalogDigest,
             request.InvocationDigest,
+            request.InputBindingDigest,
             request.SnapshotBindingDigest,
             request.ProjectSnapshotDigest,
             request.ExecutableSnapshotDigest,
@@ -447,7 +453,143 @@ internal static class EngineRunRunner
             "cancelled" => 4,
             _ => 3,
         };
-        return new NativeEngineRunResult(report, exitCode);
+        bool cleanReplayTranscript =
+            request.OperationId == EngineRunProtocol.ReplayOperationId
+            && terminationCause == "none"
+            && terminationConfirmed
+            && !output.Truncated
+            && processExitCode is 0 or 2
+            && sourceProjectPreserved
+            && sourceExecutablePreserved
+            && stagedProjectBaselinePreserved
+            && stagedExecutableBaselinePreserved
+            && profileBudgetPreserved
+            && !childProcessStarted
+            && cleanup == "complete"
+            && !observationUncertain;
+        return new NativeEngineRunResult(
+            report,
+            exitCode,
+            cleanReplayTranscript ? transcriptBytes : null);
+    }
+
+    private static string[] BuildEngineCommand(
+        NativeEngineRunRequest request,
+        string executable,
+        string project,
+        string logPath)
+    {
+        if (request.OperationId == EngineRunProtocol.PreflightOperationId)
+        {
+            return new[]
+            {
+                executable,
+                "--headless",
+                "--path",
+                project,
+                "--quit-after",
+                "1",
+                "--log-file",
+                logPath,
+                "--no-header",
+            };
+        }
+        if (request.OperationId == EngineRunProtocol.ReplayOperationId)
+        {
+            return new[]
+            {
+                executable,
+                "--headless",
+                "--path",
+                project,
+                "--log-file",
+                logPath,
+                "--no-header",
+                "--",
+                "--agpb-replay",
+            };
+        }
+        throw new ProtocolException("request-value-invalid");
+    }
+
+    private static EngineWaitResult WaitForEngine(
+        NativeEngineRunRequest request,
+        IntPtr process,
+        EventWaitHandle cancellationEvent,
+        string logPath)
+    {
+        var elapsed = Stopwatch.StartNew();
+        long lastActivityMs = 0;
+        EngineLogActivity priorActivity = ObserveLogActivity(logPath);
+        bool enforceIdle = request.OperationId == EngineRunProtocol.ReplayOperationId;
+        IntPtr[] handles =
+        {
+            process,
+            cancellationEvent.SafeWaitHandle.DangerousGetHandle(),
+        };
+
+        while (true)
+        {
+            long elapsedMs = elapsed.ElapsedMilliseconds;
+            if (elapsedMs >= request.ProcessTimeoutMs)
+            {
+                return new EngineWaitResult(false, "engine-timeout", false);
+            }
+            if (enforceIdle && elapsedMs - lastActivityMs >= request.IdleTimeoutMs)
+            {
+                return new EngineWaitResult(false, "idle-timeout", false);
+            }
+
+            long remaining = request.ProcessTimeoutMs - elapsedMs;
+            if (enforceIdle)
+            {
+                remaining = Math.Min(
+                    remaining,
+                    request.IdleTimeoutMs - (elapsedMs - lastActivityMs));
+            }
+            uint waitMs = checked((uint)Math.Max(1, Math.Min(100, remaining)));
+            uint wait = NativeMethods.WaitForMultipleObjects(
+                2,
+                handles,
+                false,
+                waitMs);
+            if (wait == NativeMethods.WaitObject0)
+            {
+                return new EngineWaitResult(true, "none", false);
+            }
+            if (wait == NativeMethods.WaitObject0 + 1)
+            {
+                return new EngineWaitResult(false, "caller-cancelled", false);
+            }
+            if (wait != NativeMethods.WaitTimeout)
+            {
+                return new EngineWaitResult(false, "safety-boundary", true);
+            }
+
+            EngineLogActivity currentActivity = ObserveLogActivity(logPath);
+            if (currentActivity != priorActivity)
+            {
+                priorActivity = currentActivity;
+                lastActivityMs = elapsed.ElapsedMilliseconds;
+            }
+        }
+    }
+
+    private static EngineLogActivity ObserveLogActivity(string path)
+    {
+        try
+        {
+            if (!File.Exists(path) || HasReparsePoint(path))
+            {
+                return new EngineLogActivity(false, 0, 0);
+            }
+            var info = new FileInfo(path);
+            return new EngineLogActivity(true, info.Length, info.LastWriteTimeUtc.Ticks);
+        }
+        catch
+        {
+            return new EngineLogActivity(false, 0, 0);
+        }
     }
 
     private static async Task CopyProjectAsync(
@@ -682,24 +824,25 @@ internal static class EngineRunRunner
         }
     }
 
-    private static NativeEngineRunOutput ReadBoundedLog(
+    private static CapturedEngineLog ReadBoundedLog(
         string path,
-        int maximumOutputBytes,
-        int maximumObservedBytes)
+        NativeEngineRunRequest request)
     {
         try
         {
             if (!File.Exists(path))
             {
-                return EmptyOutput();
+                return new CapturedEngineLog(EmptyOutput(), null);
             }
             if (HasReparsePoint(path))
             {
-                return new NativeEngineRunOutput(EmptyDigest(), 0, 1, true);
+                return new CapturedEngineLog(
+                    new NativeEngineRunOutput(EmptyDigest(), 0, 1, true),
+                    null);
             }
             long length = new FileInfo(path).Length;
-            int observed = checked((int)Math.Min(length, maximumObservedBytes));
-            int captured = Math.Min(observed, maximumOutputBytes);
+            int observed = checked((int)Math.Min(length, request.MaxProfileBytes));
+            int captured = Math.Min(observed, request.MaxOutputBytes);
             byte[] bytes = new byte[captured];
             using FileStream stream = new(
                 path,
@@ -720,15 +863,84 @@ internal static class EngineRunRunner
             }
             if (offset != captured)
             {
-                return new NativeEngineRunOutput(EmptyDigest(), 0, 1, true);
+                return new CapturedEngineLog(
+                    new NativeEngineRunOutput(EmptyDigest(), 0, 1, true),
+                    null);
             }
             string digest = $"sha256:{Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant()}";
-            return new NativeEngineRunOutput(digest, captured, observed, observed > captured);
+            bool truncated = observed > captured;
+            if (
+                request.OperationId == EngineRunProtocol.ReplayOperationId
+                && !truncated
+                && !ReplayOutputWithinBounds(bytes, request))
+            {
+                if (observed == 0)
+                {
+                    return new CapturedEngineLog(
+                        new NativeEngineRunOutput(digest, 0, 0, false),
+                        null);
+                }
+                return new CapturedEngineLog(
+                    new NativeEngineRunOutput(
+                        EmptyDigest(),
+                        0,
+                        observed,
+                        true),
+                    null);
+            }
+            var output = new NativeEngineRunOutput(digest, captured, observed, truncated);
+            return new CapturedEngineLog(
+                output,
+                request.OperationId == EngineRunProtocol.ReplayOperationId && !truncated
+                    ? bytes
+                    : null);
         }
         catch
         {
-            return new NativeEngineRunOutput(EmptyDigest(), 0, 1, true);
+            return new CapturedEngineLog(
+                new NativeEngineRunOutput(EmptyDigest(), 0, 1, true),
+                null);
         }
+    }
+
+    private static bool ReplayOutputWithinBounds(
+        byte[] bytes,
+        NativeEngineRunRequest request)
+    {
+        if (
+            bytes.Length == 0
+            || bytes[^1] != (byte)'\n'
+            || request.OutputPrefix is null
+            || request.MaxLineBytes is null
+            || request.MaxEvents is null)
+        {
+            return false;
+        }
+        byte[] prefix = Encoding.UTF8.GetBytes(request.OutputPrefix);
+        int start = 0;
+        int events = 0;
+        for (int index = 0; index < bytes.Length; index += 1)
+        {
+            if (bytes[index] != (byte)'\n')
+            {
+                continue;
+            }
+            int end = index > start && bytes[index - 1] == (byte)'\r'
+                ? index - 1
+                : index;
+            int lineBytes = end - start;
+            events += 1;
+            if (
+                lineBytes < prefix.Length
+                || lineBytes > request.MaxLineBytes.Value
+                || events > request.MaxEvents.Value
+                || !bytes.AsSpan(start, prefix.Length).SequenceEqual(prefix))
+            {
+                return false;
+            }
+            start = index + 1;
+        }
+        return start == bytes.Length && events > 0;
     }
 
     private static NativeEngineRunOutput EmptyOutput() =>
@@ -758,6 +970,20 @@ internal sealed record CapturedProject(
     IReadOnlyList<string> Directories,
     IReadOnlyList<NativeEngineRunFile> Files,
     int TotalBytes);
+
+internal readonly record struct EngineWaitResult(
+    bool ProcessExited,
+    string Cause,
+    bool Uncertain);
+
+internal readonly record struct EngineLogActivity(
+    bool Exists,
+    long Length,
+    long LastWriteTicks);
+
+internal sealed record CapturedEngineLog(
+    NativeEngineRunOutput Output,
+    byte[]? TranscriptBytes);
 
 internal sealed record NativeEngineRunProcess(
     bool Started,
@@ -796,8 +1022,12 @@ internal sealed record NativeEngineRunReport(
     string AdmissionDigest,
     string ProviderDescriptorDigest,
     string ProviderCatalogDigest,
+    string OperationId,
     string ProfileDigest,
+    string ProfileContractDigest,
+    string ProfileCatalogDigest,
     string InvocationDigest,
+    string? InputBindingDigest,
     string SnapshotBindingDigest,
     string ProjectSnapshotDigest,
     string ExecutableSnapshotDigest,
@@ -811,4 +1041,13 @@ internal sealed record NativeEngineRunReport(
     string Outcome,
     bool MutationUncertain);
 
-internal sealed record NativeEngineRunResult(NativeEngineRunReport Report, int ExitCode);
+internal sealed record NativeEngineRunResult(
+    NativeEngineRunReport Report,
+    int ExitCode,
+    byte[]? TranscriptBytes);
+
+internal sealed record NativeEngineReplayEnvelope(
+    string SchemaVersion,
+    string Operation,
+    NativeEngineRunReport Report,
+    string? TranscriptBase64);

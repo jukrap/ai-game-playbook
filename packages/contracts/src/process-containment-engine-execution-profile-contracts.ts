@@ -29,27 +29,27 @@ import {
   GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
 } from "./godot-headless-preflight-contracts.js";
 import {
-  PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_REPORT_DURATION_MS,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_START_VALIDITY_MS,
-  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
-  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
-  PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS,
-} from "./process-containment-engine-run-contracts.js";
-import {
   closedObject,
   contractRoot,
   enumSchema,
   reference,
 } from "./schema-fragments.js";
 import { isStableId } from "./stable-id.js";
+
+export const PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID =
+  "godot-headless-preflight-v1" as const;
+export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_START_VALIDITY_MS = 30_000;
+export const PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS = 10_000;
+export const PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS = 2_000;
+export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES = 262_144;
+export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES = 1;
+export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES = 1_024;
+export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES = 1_024;
+export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES =
+  16_777_216;
+export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES = 33_554_432;
+export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES = 67_108_864;
+export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_REPORT_DURATION_MS = 42_000;
 
 export const GODOT_DETERMINISTIC_REPLAY_ENGINE_RUN_PROFILE_ID =
   "godot-deterministic-replay-v1" as const;
@@ -399,6 +399,21 @@ const replayArguments: readonly string[] = Object.freeze([
   "--",
   "--agpb-replay",
 ]);
+
+export const PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST: Sha256Digest =
+  digestCanonicalJson({
+    domain: "ai-game-playbook/process-containment-engine-run-profile",
+    version: "1.0.0",
+    id: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
+    engine: "godot",
+    operationId: "engine.headless-preflight",
+    invocationDigest: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+    arguments: preflightArguments,
+    callerArguments: "denied",
+    callerEnvironment: "denied",
+    networkCapabilities: "none",
+    projectSource: "disposable-copy",
+  });
 
 export const GODOT_DETERMINISTIC_REPLAY_ENGINE_RUN_PROFILE_DIGEST: Sha256Digest =
   digestCanonicalJson({

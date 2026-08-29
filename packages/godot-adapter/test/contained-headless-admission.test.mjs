@@ -400,7 +400,7 @@ test(
 );
 
 test(
-  "post-dispatch cancellation waits for native cleanup and retains a cancelled receipt",
+  "in-flight cancellation waits for native cleanup and retains a cancelled receipt",
   { skip: !nativeAvailable, timeout: 120_000 },
   async (t) => {
     const context = await readyContainedRun(t, "hang");
@@ -420,11 +420,12 @@ test(
     assert.equal(report.status, "cancelled");
     assert.equal(report.code, "godot-headless-engine-run-cancelled");
     assert.equal(report.engineRun.outcome, "cancelled");
-    assert.deepEqual(report.engineRun.termination, {
-      requested: true,
-      confirmed: true,
-      cause: "caller-cancelled",
-    });
+    assert.equal(report.engineRun.termination.cause, "caller-cancelled");
+    assert.equal(report.engineRun.termination.confirmed, true);
+    assert.equal(
+      report.engineRun.termination.requested,
+      report.engineRun.process.started,
+    );
     assert.equal(report.engineRun.effects.cleanup, "complete");
     assert.equal(report.authorization.status, "cancelled");
     assert.equal(report.authorization.mutationUncertain, false);

@@ -1,25 +1,13 @@
 import {
-  GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
-  PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_REPORT_DURATION_MS,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_START_VALIDITY_MS,
-  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
-  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
-  PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS,
+  GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE,
+  GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE,
+  PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
   PROCESS_CONTAINMENT_POLICY_DIGEST,
   assertProcessContainmentEngineRunReportSemantics,
   assertProcessContainmentEngineRunRequestSemantics,
   computeProcessContainmentEngineRunReportDigest,
   computeProcessContainmentEngineRunRequestDigest,
   isSha256Digest,
-  parseStableId,
   type EngineExecutionSnapshotBinding,
   type ProcessContainmentEngineAdmission,
   type ProcessContainmentEngineRunEffects,
@@ -29,6 +17,8 @@ import {
   type ProcessContainmentEngineRunReportDigestInput,
   type ProcessContainmentEngineRunRequest,
   type ProcessContainmentEngineRunTermination,
+  type ProcessContainmentEngineExecutionProfile,
+  type ProcessContainmentEngineExecutionProfileId,
   type Sha256Digest,
 } from "@ai-game-playbook/contracts";
 import {
@@ -41,8 +31,9 @@ import {
   issueEngineExecutionSourceHandoff,
 } from "@ai-game-playbook/engine-common";
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, isAbsolute, relative } from "node:path";
+import { isProxy } from "node:util/types";
 
 import {
   assertWindowsContainmentProviderArtifactIdentity,
@@ -59,15 +50,13 @@ import { safeWindowsContainmentProviderEnvironment } from "./self-test.js";
 
 const NATIVE_ENGINE_RUN_MAX_INPUT_BYTES = 4 * 1024 * 1024;
 const NATIVE_ENGINE_RUN_MAX_OUTPUT_BYTES = 256 * 1024;
+const NATIVE_ENGINE_REPLAY_MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
 const NATIVE_ENGINE_RUN_MAX_ERROR_BYTES = 16 * 1024;
 const NATIVE_ENGINE_RUN_CANCELLATION_WAIT_MS = 2_000;
 const NATIVE_ENGINE_RUN_CANCELLATION_PROCESS_TIMEOUT_MS = 3_000;
-const NATIVE_ENGINE_RUN_PROCESS_TIMEOUT_MS =
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_REPORT_DURATION_MS + 5_000;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const timestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
-const commandId = parseStableId("engine.headless-preflight");
 
 export interface PrepareWindowsContainedGodotEngineRunRequest {
   readonly runtime: WindowsContainmentProviderRuntime;
@@ -76,6 +65,11 @@ export interface PrepareWindowsContainedGodotEngineRunRequest {
   readonly root: CanonicalProjectRoot;
   readonly executable: BoundProcessExecutable;
   readonly runId: string;
+}
+
+export interface PrepareWindowsContainedGodotReplayRunRequest
+  extends PrepareWindowsContainedGodotEngineRunRequest {
+  readonly expectationDigest: Sha256Digest;
 }
 
 export interface PreparedWindowsContainedGodotEngineRun {
@@ -89,6 +83,29 @@ export interface RunWindowsContainedGodotEngineRequest {
   readonly signal: AbortSignal | null;
 }
 
+export type PreparedWindowsContainedGodotReplayRun =
+  PreparedWindowsContainedGodotEngineRun;
+
+export type RunWindowsContainedGodotReplayRequest =
+  RunWindowsContainedGodotEngineRequest;
+
+export interface WindowsContainedGodotReplayExecution {
+  readonly schemaVersion: "1.0.0";
+  readonly report: ProcessContainmentEngineRunReport;
+  readonly transcript:
+    | {
+        readonly status: "available";
+        readonly digest: Sha256Digest;
+        readonly bytes: number;
+      }
+    | { readonly status: "unavailable" };
+}
+
+interface ContainedEngineRunResult {
+  readonly report: ProcessContainmentEngineRunReport;
+  readonly transcript?: string;
+}
+
 interface PreparedAuthority {
   readonly runtime: WindowsContainmentProviderRuntime;
   readonly runtimeAuthority: WindowsContainmentProviderRuntimeAuthority;
@@ -96,6 +113,8 @@ interface PreparedAuthority {
   readonly binding: EngineExecutionSnapshotBinding;
   readonly root: CanonicalProjectRoot;
   readonly executable: BoundProcessExecutable;
+  readonly profile: ProcessContainmentEngineExecutionProfile;
+  readonly inputBindingDigest: Sha256Digest | null;
   readonly requestDigest: Sha256Digest;
   consumed: boolean;
 }
@@ -118,8 +137,12 @@ interface NativeEngineRunReport {
   readonly admissionDigest: Sha256Digest;
   readonly providerDescriptorDigest: Sha256Digest;
   readonly providerCatalogDigest: Sha256Digest;
+  readonly operationId: ProcessContainmentEngineRunRequest["operationId"];
   readonly profileDigest: Sha256Digest;
+  readonly profileContractDigest: Sha256Digest;
+  readonly profileCatalogDigest: Sha256Digest;
   readonly invocationDigest: Sha256Digest;
+  readonly inputBindingDigest: Sha256Digest | null;
   readonly snapshotBindingDigest: Sha256Digest;
   readonly projectSnapshotDigest: Sha256Digest;
   readonly executableSnapshotDigest: Sha256Digest;
@@ -134,7 +157,17 @@ interface NativeEngineRunReport {
   readonly mutationUncertain: boolean;
 }
 
+interface ReplayTranscriptAttestation {
+  readonly process: ProcessContainmentEngineRunProcessObservation;
+  readonly output: ProcessContainmentEngineRunOutputObservation;
+  readonly termination: ProcessContainmentEngineRunTermination;
+  readonly effects: ProcessContainmentEngineRunEffects;
+  readonly outcome: "succeeded" | "failed" | "cancelled" | "uncertain";
+  readonly mutationUncertain: boolean;
+}
+
 const preparedAuthorities = new WeakMap<object, PreparedAuthority>();
+const replayTranscripts = new WeakMap<object, string>();
 
 function fail(
   code:
@@ -162,6 +195,7 @@ function exactRecord(
     value === null ||
     typeof value !== "object" ||
     Array.isArray(value) ||
+    isProxy(value) ||
     Object.getPrototypeOf(value) !== Object.prototype ||
     Object.getOwnPropertySymbols(value).length > 0
   ) {
@@ -228,6 +262,44 @@ function preparationRequest(
   });
 }
 
+function replayPreparationRequest(
+  value: unknown,
+): PrepareWindowsContainedGodotReplayRunRequest {
+  const record = exactRecord(
+    value,
+    [
+      "runtime",
+      "admission",
+      "binding",
+      "root",
+      "executable",
+      "runId",
+      "expectationDigest",
+    ],
+    "invalid-engine-run-request",
+    "Contained Godot replay preparation contains undeclared fields.",
+  );
+  if (
+    typeof record["runId"] !== "string" ||
+    !uuidPattern.test(record["runId"]) ||
+    !isSha256Digest(record["expectationDigest"])
+  ) {
+    return fail(
+      "invalid-engine-run-request",
+      "Contained Godot replay requires canonical run and expectation identities.",
+    );
+  }
+  return Object.freeze({
+    runtime: record["runtime"] as WindowsContainmentProviderRuntime,
+    admission: record["admission"] as ProcessContainmentEngineAdmission,
+    binding: record["binding"] as EngineExecutionSnapshotBinding,
+    root: record["root"] as CanonicalProjectRoot,
+    executable: record["executable"] as BoundProcessExecutable,
+    runId: record["runId"],
+    expectationDigest: record["expectationDigest"],
+  });
+}
+
 function runRequest(value: unknown): RunWindowsContainedGodotEngineRequest {
   const record = exactRecord(
     value,
@@ -251,6 +323,29 @@ export async function prepareWindowsContainedGodotEngineRun(
   value: unknown,
 ): Promise<PreparedWindowsContainedGodotEngineRun> {
   const input = preparationRequest(value);
+  return await prepareWindowsContainedGodotEngineRunForProfile(
+    input,
+    GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE,
+    null,
+  );
+}
+
+export async function prepareWindowsContainedGodotReplayRun(
+  value: unknown,
+): Promise<PreparedWindowsContainedGodotReplayRun> {
+  const input = replayPreparationRequest(value);
+  return await prepareWindowsContainedGodotEngineRunForProfile(
+    input,
+    GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE,
+    input.expectationDigest,
+  );
+}
+
+async function prepareWindowsContainedGodotEngineRunForProfile(
+  input: PrepareWindowsContainedGodotEngineRunRequest,
+  profile: ProcessContainmentEngineExecutionProfile,
+  inputBindingDigest: Sha256Digest | null,
+): Promise<PreparedWindowsContainedGodotEngineRun> {
   if (process.platform !== "win32" || process.arch !== "x64") {
     return fail(
       "provider-host-unsupported",
@@ -272,13 +367,13 @@ export async function prepareWindowsContainedGodotEngineRun(
     binding: input.binding,
     root: input.root,
     executable: input.executable,
-    operationId: commandId,
-    invocationDigest: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+    operationId: profile.operationId,
+    invocationDigest: profile.invocationDigest,
   });
   if (
     input.admission.engine !== "godot" ||
-    input.admission.operationId !== "engine.headless-preflight" ||
-    input.admission.invocationDigest !== GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST ||
+    input.admission.operationId !== profile.operationId ||
+    input.admission.invocationDigest !== profile.invocationDigest ||
     input.admission.snapshotBindingDigest !== input.binding.bindingDigest ||
     input.admission.projectSnapshotDigest !== input.binding.project.snapshotDigest ||
     input.admission.executableSnapshotDigest !==
@@ -291,7 +386,7 @@ export async function prepareWindowsContainedGodotEngineRun(
   }
   const issuedMs = Date.now();
   const deadlineMs = Math.min(
-    issuedMs + PROCESS_CONTAINMENT_ENGINE_RUN_MAX_START_VALIDITY_MS,
+    issuedMs + profile.limits.startValidityMs,
     Date.parse(input.admission.expiresAt),
   );
   if (deadlineMs <= issuedMs) {
@@ -308,11 +403,15 @@ export async function prepareWindowsContainedGodotEngineRun(
     workload: "engine-project-process",
     policyDigest: PROCESS_CONTAINMENT_POLICY_DIGEST,
     profile: {
-      id: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
-      digest: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+      id: profile.profileId,
+      digest: profile.profileDigest,
+      contractDigest: profile.contractDigest,
+      catalogDigest:
+        PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
     },
-    operationId: commandId,
-    invocationDigest: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+    operationId: profile.operationId,
+    invocationDigest: profile.invocationDigest,
+    inputBindingDigest,
     snapshotBindingDigest: input.binding.bindingDigest,
     project: {
       rootIdentityDigest: input.root.identityDigest,
@@ -330,20 +429,7 @@ export async function prepareWindowsContainedGodotEngineRun(
     },
     issuedAt: new Date(issuedMs).toISOString(),
     startDeadline: new Date(deadlineMs).toISOString(),
-    limits: {
-      engineTimeoutMs: PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS,
-      maxOutputBytes: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
-      terminationGraceMs:
-        PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS,
-      maxProcesses: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES,
-      maxProjectFiles: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
-      maxProjectDirectories:
-        PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
-      maxProjectFileBytes:
-        PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
-      maxProjectBytes: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
-      maxProfileBytes: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES,
-    },
+    limits: { ...profile.limits },
   });
   assertProcessContainmentEngineRunRequestSemantics(request);
   const requestDigest = computeProcessContainmentEngineRunRequestDigest(request);
@@ -359,6 +445,8 @@ export async function prepareWindowsContainedGodotEngineRun(
     binding: input.binding,
     root: input.root,
     executable: input.executable,
+    profile,
+    inputBindingDigest,
     requestDigest,
     consumed: false,
   });
@@ -493,6 +581,9 @@ async function runNativeEngine(
   requestDigest: Sha256Digest,
   cancellationId: string,
   signal: AbortSignal | null,
+  maximumResponseBytes: number,
+  processTimeoutMs: number,
+  terminationGraceMs: number,
 ): Promise<NativeProcessResult> {
   return await new Promise<NativeProcessResult>((resolve, reject) => {
     const child = spawn(authority.artifactPath, ["godot-engine-run"], {
@@ -540,12 +631,12 @@ async function runNativeEngine(
     };
     const finishBuffered = (
       exitCode: number | null,
-      signal: NodeJS.Signals | null,
+      exitSignal: NodeJS.Signals | null,
     ): void => {
       try {
         void finish({
           exitCode,
-          signal,
+          signal: exitSignal,
           stdout: new TextDecoder("utf-8", { fatal: true }).decode(
             Buffer.concat(stdout),
           ),
@@ -556,13 +647,23 @@ async function runNativeEngine(
           timedOut,
         });
       } catch {
-        reject(
-          new WindowsContainmentProviderError(
-            "engine-run-output-invalid",
-            "Native engine run output is not valid UTF-8.",
-            true,
-          ),
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (terminationTimer !== undefined) clearTimeout(terminationTimer);
+        if (hardStopTimer !== undefined) clearTimeout(hardStopTimer);
+        signal?.removeEventListener("abort", abortListener);
+        const failure = new WindowsContainmentProviderError(
+          "engine-run-output-invalid",
+          "Native engine run output is not valid UTF-8.",
+          true,
         );
+        void (async () => {
+          if (cancellationTask !== undefined) {
+            await cancellationTask;
+          }
+          reject(failure);
+        })();
       }
     };
     const requestTermination = (): void => {
@@ -576,19 +677,19 @@ async function runNativeEngine(
           child.stderr.destroy();
           child.unref();
           finishBuffered(null, null);
-        }, PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS);
+        }, terminationGraceMs);
         hardStopTimer.unref();
-      }, PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS);
+      }, terminationGraceMs);
       terminationTimer.unref();
     };
     timer = setTimeout(() => {
       timedOut = true;
       requestTermination();
-    }, NATIVE_ENGINE_RUN_PROCESS_TIMEOUT_MS);
+    }, processTimeoutMs);
     timer.unref();
     child.stdout.on("data", (chunk: Buffer) => {
       stdoutBytes += chunk.byteLength;
-      if (stdoutBytes <= NATIVE_ENGINE_RUN_MAX_OUTPUT_BYTES) {
+      if (stdoutBytes <= maximumResponseBytes) {
         stdout.push(Buffer.from(chunk));
       } else {
         overflowed = true;
@@ -698,6 +799,7 @@ function parseNativeProcess(
 
 function parseNativeOutput(
   value: unknown,
+  request: ProcessContainmentEngineRunRequest,
 ): ProcessContainmentEngineRunOutputObservation {
   const record = exactRecord(
     value,
@@ -708,8 +810,8 @@ function parseNativeOutput(
   );
   if (
     !isSha256Digest(record["logDigest"]) ||
-    !integer(record["capturedBytes"], 0, PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES) ||
-    !integer(record["observedBytes"], 0, PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES) ||
+    !integer(record["capturedBytes"], 0, request.limits.maxOutputBytes) ||
+    !integer(record["observedBytes"], 0, request.limits.maxProfileBytes) ||
     typeof record["truncated"] !== "boolean"
   ) {
     return fail(
@@ -741,6 +843,7 @@ function parseNativeTermination(
     typeof record["confirmed"] !== "boolean" ||
     (record["cause"] !== "none" &&
       record["cause"] !== "engine-timeout" &&
+      record["cause"] !== "idle-timeout" &&
       record["cause"] !== "caller-cancelled" &&
       record["cause"] !== "safety-boundary")
   ) {
@@ -818,8 +921,12 @@ function parseNativeReport(
       "admissionDigest",
       "providerDescriptorDigest",
       "providerCatalogDigest",
+      "operationId",
       "profileDigest",
+      "profileContractDigest",
+      "profileCatalogDigest",
       "invocationDigest",
+      "inputBindingDigest",
       "snapshotBindingDigest",
       "projectSnapshotDigest",
       "executableSnapshotDigest",
@@ -846,14 +953,18 @@ function parseNativeReport(
     record["admissionDigest"] !== request.admissionDigest ||
     record["providerDescriptorDigest"] !== request.providerDescriptorDigest ||
     record["providerCatalogDigest"] !== request.providerCatalogDigest ||
+    record["operationId"] !== request.operationId ||
     record["profileDigest"] !== request.profile.digest ||
+    record["profileContractDigest"] !== request.profile.contractDigest ||
+    record["profileCatalogDigest"] !== request.profile.catalogDigest ||
     record["invocationDigest"] !== request.invocationDigest ||
+    record["inputBindingDigest"] !== request.inputBindingDigest ||
     record["snapshotBindingDigest"] !== request.snapshotBindingDigest ||
     record["projectSnapshotDigest"] !== request.project.snapshotDigest ||
     record["executableSnapshotDigest"] !== request.executable.snapshotDigest ||
     !timestamp(record["startedAt"]) ||
     !timestamp(record["completedAt"]) ||
-    !integer(record["durationMs"], 0, PROCESS_CONTAINMENT_ENGINE_RUN_MAX_REPORT_DURATION_MS) ||
+    !integer(record["durationMs"], 0, request.limits.maxReportDurationMs) ||
     (record["outcome"] !== "succeeded" &&
       record["outcome"] !== "failed" &&
       record["outcome"] !== "cancelled" &&
@@ -875,8 +986,12 @@ function parseNativeReport(
     admissionDigest: request.admissionDigest,
     providerDescriptorDigest: request.providerDescriptorDigest,
     providerCatalogDigest: request.providerCatalogDigest,
+    operationId: request.operationId,
     profileDigest: request.profile.digest,
+    profileContractDigest: request.profile.contractDigest,
+    profileCatalogDigest: request.profile.catalogDigest,
     invocationDigest: request.invocationDigest,
+    inputBindingDigest: request.inputBindingDigest,
     snapshotBindingDigest: request.snapshotBindingDigest,
     projectSnapshotDigest: request.project.snapshotDigest,
     executableSnapshotDigest: request.executable.snapshotDigest,
@@ -884,7 +999,7 @@ function parseNativeReport(
     completedAt: record["completedAt"],
     durationMs: record["durationMs"],
     process: parseNativeProcess(record["process"]),
-    output: parseNativeOutput(record["output"]),
+    output: parseNativeOutput(record["output"], request),
     termination: parseNativeTermination(record["termination"]),
     effects: parseNativeEffects(record["effects"]),
     outcome: record["outcome"],
@@ -892,9 +1007,95 @@ function parseNativeReport(
   });
 }
 
-export async function runWindowsContainedGodotEngine(
+function replayTranscriptCanTransfer(
+  report: ReplayTranscriptAttestation,
+): boolean {
+  const exitOutcomeMatches =
+    (report.process.exitCode === 0 && report.outcome === "succeeded") ||
+    (report.process.exitCode === 2 && report.outcome === "failed");
+  return (
+    report.process.started &&
+    report.process.totalProcesses === 1 &&
+    report.process.activeProcesses === 0 &&
+    exitOutcomeMatches &&
+    !report.output.truncated &&
+    !report.termination.requested &&
+    report.termination.confirmed &&
+    report.termination.cause === "none" &&
+    report.effects.sourceProjectPreserved &&
+    report.effects.sourceExecutablePreserved &&
+    report.effects.stagedProjectBaselinePreserved &&
+    report.effects.stagedExecutableBaselinePreserved &&
+    report.effects.profileBudgetPreserved &&
+    !report.effects.networkConnectionEstablished &&
+    !report.effects.childProcessStarted &&
+    report.effects.cleanup === "complete" &&
+    !report.mutationUncertain
+  );
+}
+
+function parseReplayTranscript(
   value: unknown,
-): Promise<ProcessContainmentEngineRunReport> {
+  native: NativeEngineRunReport,
+  request: ProcessContainmentEngineRunRequest,
+): string | undefined {
+  if (value === null) {
+    if (replayTranscriptCanTransfer(native)) {
+      return fail(
+        "engine-run-output-invalid",
+        "Native replay omitted a bounded transcript after a clean exit.",
+        true,
+      );
+    }
+    return undefined;
+  }
+  if (
+    typeof value !== "string" ||
+    value.length < 1 ||
+    value.length > NATIVE_ENGINE_REPLAY_MAX_OUTPUT_BYTES ||
+    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(
+      value,
+    )
+  ) {
+    return fail(
+      "engine-run-output-invalid",
+      "Native replay transcript encoding is outside the protocol.",
+      true,
+    );
+  }
+  const bytes = Buffer.from(value, "base64");
+  const digest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+  if (
+    bytes.toString("base64") !== value ||
+    bytes.byteLength < 1 ||
+    bytes.byteLength > request.limits.maxOutputBytes ||
+    native.output.truncated ||
+    native.output.capturedBytes !== bytes.byteLength ||
+    native.output.observedBytes !== bytes.byteLength ||
+    native.output.logDigest !== digest ||
+    !replayTranscriptCanTransfer(native)
+  ) {
+    return fail(
+      "engine-run-output-invalid",
+      "Native replay transcript contradicts its bounded output attestation.",
+      true,
+    );
+  }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return fail(
+      "engine-run-output-invalid",
+      "Native replay transcript is not valid UTF-8.",
+      true,
+    );
+  }
+}
+
+async function runWindowsContainedGodotEngineForProfile(
+  value: unknown,
+  expectedProfileId: ProcessContainmentEngineExecutionProfileId,
+): Promise<ContainedEngineRunResult> {
   const input = runRequest(value);
   const authority =
     input.prepared !== null && typeof input.prepared === "object"
@@ -904,6 +1105,12 @@ export async function runWindowsContainedGodotEngine(
     return fail(
       "invalid-engine-run-request",
       "Contained Godot run lacks its same-process preparation authority.",
+    );
+  }
+  if (authority.profile.profileId !== expectedProfileId) {
+    return fail(
+      "invalid-engine-run-request",
+      "Contained Godot run was prepared for a different execution profile.",
     );
   }
   if (authority.consumed) {
@@ -936,6 +1143,17 @@ export async function runWindowsContainedGodotEngine(
     );
   }
   const request = input.prepared.request;
+  if (
+    request.profile.id !== authority.profile.profileId ||
+    request.profile.digest !== authority.profile.profileDigest ||
+    request.profile.contractDigest !== authority.profile.contractDigest ||
+    request.inputBindingDigest !== authority.inputBindingDigest
+  ) {
+    return fail(
+      "invalid-engine-run-request",
+      "Contained Godot run profile no longer matches its preparation authority.",
+    );
+  }
   if (Date.now() >= Date.parse(request.startDeadline)) {
     return fail("engine-run-expired", "Contained Godot run start window expired.");
   }
@@ -948,17 +1166,19 @@ export async function runWindowsContainedGodotEngine(
     binding: authority.binding,
     root: authority.root,
     executable: authority.executable,
-    operationId: commandId,
-    invocationDigest: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+    operationId: authority.profile.operationId,
+    invocationDigest: authority.profile.invocationDigest,
   });
   const handoff = await issueEngineExecutionSourceHandoff({
     binding: authority.binding,
     root: authority.root,
     executable: authority.executable,
-    profileId: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
+    profileId: authority.profile.profileId,
   });
   if (
     handoff.profileDigest !== request.profile.digest ||
+    handoff.profileContractDigest !== request.profile.contractDigest ||
+    handoff.profileCatalogDigest !== request.profile.catalogDigest ||
     handoff.bindingDigest !== request.snapshotBindingDigest ||
     handoff.projectSnapshotDigest !== request.project.snapshotDigest ||
     handoff.executableSnapshotDigest !== request.executable.snapshotDigest ||
@@ -982,9 +1202,13 @@ export async function runWindowsContainedGodotEngine(
     providerDescriptorDigest: request.providerDescriptorDigest,
     providerCatalogDigest: request.providerCatalogDigest,
     policyDigest: request.policyDigest,
+    operationId: request.operationId,
     profileId: request.profile.id,
     profileDigest: request.profile.digest,
+    profileContractDigest: request.profile.contractDigest,
+    profileCatalogDigest: request.profile.catalogDigest,
     invocationDigest: request.invocationDigest,
+    inputBindingDigest: request.inputBindingDigest,
     snapshotBindingDigest: request.snapshotBindingDigest,
     projectRootIdentityDigest: request.project.rootIdentityDigest,
     projectSnapshotDigest: request.project.snapshotDigest,
@@ -1002,7 +1226,9 @@ export async function runWindowsContainedGodotEngine(
     sourceExecutableBytes: request.executable.bytes,
     issuedAt: request.issuedAt,
     startDeadline: request.startDeadline,
-    engineTimeoutMs: request.limits.engineTimeoutMs,
+    startValidityMs: request.limits.startValidityMs,
+    processTimeoutMs: request.limits.processTimeoutMs,
+    idleTimeoutMs: request.limits.idleTimeoutMs,
     maxOutputBytes: request.limits.maxOutputBytes,
     terminationGraceMs: request.limits.terminationGraceMs,
     maxProcesses: request.limits.maxProcesses,
@@ -1011,6 +1237,12 @@ export async function runWindowsContainedGodotEngine(
     maxProjectFileBytes: request.limits.maxProjectFileBytes,
     maxProjectBytes: request.limits.maxProjectBytes,
     maxProfileBytes: request.limits.maxProfileBytes,
+    maxReportDurationMs: request.limits.maxReportDurationMs,
+    outputKind: authority.profile.output.kind,
+    outputPrefix: authority.profile.output.prefix,
+    maxLineBytes: authority.profile.output.maxLineBytes,
+    maxEvents: authority.profile.output.maxEvents,
+    retainRawOutput: authority.profile.output.retainRawOutput,
   };
   const nativeInput = `${JSON.stringify(nativeRequest)}\n`;
   if (Buffer.byteLength(nativeInput, "utf8") > NATIVE_ENGINE_RUN_MAX_INPUT_BYTES) {
@@ -1026,6 +1258,11 @@ export async function runWindowsContainedGodotEngine(
     authority.requestDigest,
     cancellationId,
     input.signal,
+    authority.profile.operationId === "engine.deterministic-replay"
+      ? NATIVE_ENGINE_REPLAY_MAX_OUTPUT_BYTES
+      : NATIVE_ENGINE_RUN_MAX_OUTPUT_BYTES,
+    request.limits.maxReportDurationMs + 5_000,
+    request.limits.terminationGraceMs,
   );
   if (result.overflowed || result.timedOut || result.signal !== null) {
     return fail(
@@ -1057,7 +1294,34 @@ export async function runWindowsContainedGodotEngine(
       true,
     );
   }
-  const native = parseNativeReport(parsed, authority, request);
+  let nativeValue = parsed;
+  let encodedTranscript: unknown;
+  if (authority.profile.operationId === "engine.deterministic-replay") {
+    const envelope = exactRecord(
+      parsed,
+      ["schemaVersion", "operation", "report", "transcriptBase64"],
+      "engine-run-output-invalid",
+      "Native replay envelope is outside the protocol.",
+      true,
+    );
+    if (
+      envelope["schemaVersion"] !== "1.0.0" ||
+      envelope["operation"] !== "godot-engine-replay-envelope"
+    ) {
+      return fail(
+        "engine-run-output-invalid",
+        "Native replay envelope identity is outside the protocol.",
+        true,
+      );
+    }
+    nativeValue = envelope["report"];
+    encodedTranscript = envelope["transcriptBase64"];
+  }
+  const native = parseNativeReport(nativeValue, authority, request);
+  const transcript =
+    authority.profile.operationId === "engine.deterministic-replay"
+      ? parseReplayTranscript(encodedTranscript, native, request)
+      : undefined;
   const expectedExit =
     native.outcome === "succeeded"
       ? 0
@@ -1104,8 +1368,11 @@ export async function runWindowsContainedGodotEngine(
     providerCatalogDigest: request.providerCatalogDigest,
     engine: "godot",
     profileDigest: request.profile.digest,
+    profileContractDigest: request.profile.contractDigest,
+    profileCatalogDigest: request.profile.catalogDigest,
     operationId: request.operationId,
     invocationDigest: request.invocationDigest,
+    inputBindingDigest: request.inputBindingDigest,
     snapshotBindingDigest: request.snapshotBindingDigest,
     projectSnapshotDigest: request.project.snapshotDigest,
     executableSnapshotDigest: request.executable.snapshotDigest,
@@ -1133,5 +1400,73 @@ export async function runWindowsContainedGodotEngine(
       true,
     );
   }
-  return report;
+  const transferableTranscript =
+    transcript !== undefined && replayTranscriptCanTransfer(report)
+      ? transcript
+      : undefined;
+  return Object.freeze({
+    report,
+    ...(transferableTranscript === undefined
+      ? {}
+      : { transcript: transferableTranscript }),
+  });
+}
+
+export async function runWindowsContainedGodotEngine(
+  value: unknown,
+): Promise<ProcessContainmentEngineRunReport> {
+  const result = await runWindowsContainedGodotEngineForProfile(
+    value,
+    GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.profileId,
+  );
+  if (result.transcript !== undefined) {
+    return fail(
+      "engine-run-output-invalid",
+      "Headless preflight unexpectedly returned replay output.",
+      true,
+    );
+  }
+  return result.report;
+}
+
+export async function runWindowsContainedGodotReplay(
+  value: unknown,
+): Promise<WindowsContainedGodotReplayExecution> {
+  const result = await runWindowsContainedGodotEngineForProfile(
+    value,
+    GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE.profileId,
+  );
+  const execution: WindowsContainedGodotReplayExecution = Object.freeze({
+    schemaVersion: "1.0.0",
+    report: result.report,
+    transcript:
+      result.transcript === undefined
+        ? Object.freeze({ status: "unavailable" as const })
+        : Object.freeze({
+            status: "available" as const,
+            digest: result.report.output.logDigest,
+            bytes: result.report.output.capturedBytes,
+          }),
+  });
+  if (result.transcript !== undefined) {
+    replayTranscripts.set(execution, result.transcript);
+  }
+  return execution;
+}
+
+export function consumeWindowsContainedGodotReplayTranscript(
+  execution: unknown,
+): string {
+  const transcript =
+    execution !== null && typeof execution === "object"
+      ? replayTranscripts.get(execution)
+      : undefined;
+  if (transcript === undefined) {
+    return fail(
+      "engine-run-output-invalid",
+      "Godot replay transcript is unavailable, cloned, or already consumed.",
+    );
+  }
+  replayTranscripts.delete(execution as object);
+  return transcript;
 }

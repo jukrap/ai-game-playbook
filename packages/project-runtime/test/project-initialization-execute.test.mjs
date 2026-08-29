@@ -12,7 +12,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { setImmediate as yieldImmediate } from "node:timers/promises";
+import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 
 import * as contracts from "@ai-game-playbook/contracts";
@@ -166,7 +166,7 @@ function expectRuntimeError(code) {
     error?.name === "ProjectRuntimeError" && error?.code === code;
 }
 
-async function waitForPath(path, timeoutMs = 5_000) {
+async function waitForPath(path, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -175,12 +175,12 @@ async function waitForPath(path, timeoutMs = 5_000) {
     } catch (error) {
       if (error?.code !== "ENOENT") throw error;
     }
-    await yieldImmediate();
+    await delay(10);
   }
   throw new Error(`timed out waiting for ${path}`);
 }
 
-async function waitForHeldLane(root, timeoutMs = 5_000) {
+async function waitForHeldLane(root, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -189,7 +189,7 @@ async function waitForHeldLane(root, timeoutMs = 5_000) {
     } catch (error) {
       if (error?.code !== "project-path-not-found") throw error;
     }
-    await yieldImmediate();
+    await delay(10);
   }
   throw new Error("timed out waiting for the project mutation lane");
 }

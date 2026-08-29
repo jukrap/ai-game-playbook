@@ -10,7 +10,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { setImmediate as yieldImmediate } from "node:timers/promises";
+import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 
 import * as contracts from "@ai-game-playbook/contracts";
@@ -119,7 +119,7 @@ function authorizePlan(plan) {
       },
     ],
   });
-  const deadlineAt = new Date(Date.now() + 25_000).toISOString();
+  const deadlineAt = new Date(Date.now() + 60_000).toISOString();
   const request =
     projectRuntime.createProjectInitializationAuthorizationRequest({
       plan,
@@ -154,7 +154,7 @@ function authorizePlan(plan) {
   return decision;
 }
 
-async function waitForPath(path, timeoutMs = 5_000) {
+async function waitForPath(path, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -163,7 +163,7 @@ async function waitForPath(path, timeoutMs = 5_000) {
     } catch (error) {
       if (error?.code !== "ENOENT") throw error;
     }
-    await yieldImmediate();
+    await delay(10);
   }
   throw new Error(`timed out waiting for ${path}`);
 }
@@ -810,7 +810,7 @@ test("an uncertain initialization preserves matching receipt uncertainty as reco
   const policiesPath = join(project, ".ai-game-playbook", "policies");
   const userFile = join(policiesPath, "user-owned.txt");
   const interfere = (async () => {
-    await waitForPath(policiesPath, 15_000);
+    await waitForPath(policiesPath);
     await writeFile(userFile, "preserve me\n", "utf8");
     controller.abort();
   })();

@@ -1,68 +1,71 @@
 import {
   defineContractSchema,
+  type JsonSchemaObject,
   type VersionedContractSchema,
 } from "./contract-schema.js";
+import {
+  canonicalizeJson,
+  type CanonicalJsonValue,
+} from "./canonical-json.js";
 import { ENGINE_SNAPSHOT_MAX_FILE_BYTES } from "./engine-execution-snapshot-contracts.js";
-import { GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST } from "./godot-headless-preflight-contracts.js";
 import {
   digestCanonicalJson,
   isSha256Digest,
   type Sha256Digest,
 } from "./digest.js";
 import { PROCESS_CONTAINMENT_POLICY_DIGEST } from "./process-containment-assessment-contracts.js";
+import {
+  GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE,
+  PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES,
+  PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
+  PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_REPORT_DURATION_MS,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_START_VALIDITY_MS,
+  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
+  PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS,
+  assertProcessContainmentEngineExecutionProfileSemantics,
+  getProcessContainmentEngineExecutionProfile,
+  type ProcessContainmentEngineExecutionOperationId,
+  type ProcessContainmentEngineExecutionProfile,
+  type ProcessContainmentEngineExecutionProfileId,
+  type ProcessContainmentEngineExecutionProfileLimits,
+} from "./process-containment-engine-execution-profile-contracts.js";
 import { closedObject, contractRoot, reference } from "./schema-fragments.js";
-import { isStableId, type StableId } from "./stable-id.js";
+import { isStableId } from "./stable-id.js";
+import { isProxy } from "node:util/types";
 
-export const PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID =
-  "godot-headless-preflight-v1" as const;
-export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_START_VALIDITY_MS = 30_000;
-export const PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS = 10_000;
-export const PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS = 2_000;
-export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES = 262_144;
-export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES = 1;
-export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES = 1_024;
-export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES = 1_024;
-export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES =
-  16_777_216;
-export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES =
-  33_554_432;
-export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES =
-  67_108_864;
-export const PROCESS_CONTAINMENT_ENGINE_RUN_MAX_REPORT_DURATION_MS = 42_000;
-export const PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST: Sha256Digest =
-  digestCanonicalJson({
-    domain: "ai-game-playbook/process-containment-engine-run-profile",
-    version: "1.0.0",
-    id: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
-    engine: "godot",
-    operationId: "engine.headless-preflight",
-    invocationDigest: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
-    arguments: [
-      "--headless",
-      "--path",
-      "$stagedProject",
-      "--quit-after",
-      "1",
-      "--log-file",
-      "$profileLocalLog",
-      "--no-header",
-    ],
-    callerArguments: "denied",
-    callerEnvironment: "denied",
-    networkCapabilities: "none",
-    projectSource: "disposable-copy",
-  });
+export {
+  PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_REPORT_DURATION_MS,
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_START_VALIDITY_MS,
+  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
+  PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS,
+};
 
-export interface ProcessContainmentEngineRunLimits {
-  readonly engineTimeoutMs: typeof PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS;
-  readonly maxOutputBytes: typeof PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES;
-  readonly terminationGraceMs: typeof PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS;
-  readonly maxProcesses: typeof PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES;
-  readonly maxProjectFiles: typeof PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES;
-  readonly maxProjectDirectories: typeof PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES;
-  readonly maxProjectFileBytes: typeof PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES;
-  readonly maxProjectBytes: typeof PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES;
-  readonly maxProfileBytes: typeof PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES;
+export type ProcessContainmentEngineRunLimits =
+  ProcessContainmentEngineExecutionProfileLimits;
+
+export interface ProcessContainmentEngineRunProfileBinding {
+  readonly id: ProcessContainmentEngineExecutionProfileId;
+  readonly digest: Sha256Digest;
+  readonly contractDigest: Sha256Digest;
+  readonly catalogDigest: typeof PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST;
 }
 
 export interface ProcessContainmentEngineRunRequest {
@@ -78,12 +81,10 @@ export interface ProcessContainmentEngineRunRequest {
   readonly engine: "godot";
   readonly workload: "engine-project-process";
   readonly policyDigest: typeof PROCESS_CONTAINMENT_POLICY_DIGEST;
-  readonly profile: {
-    readonly id: typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID;
-    readonly digest: typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST;
-  };
-  readonly operationId: StableId;
-  readonly invocationDigest: typeof GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST;
+  readonly profile: ProcessContainmentEngineRunProfileBinding;
+  readonly operationId: ProcessContainmentEngineExecutionOperationId;
+  readonly invocationDigest: Sha256Digest;
+  readonly inputBindingDigest: Sha256Digest | null;
   readonly snapshotBindingDigest: Sha256Digest;
   readonly project: {
     readonly rootIdentityDigest: Sha256Digest;
@@ -113,6 +114,7 @@ export type ProcessContainmentEngineRunOutcome =
 export type ProcessContainmentEngineRunTerminationCause =
   | "none"
   | "engine-timeout"
+  | "idle-timeout"
   | "caller-cancelled"
   | "safety-boundary";
 
@@ -156,9 +158,12 @@ export interface ProcessContainmentEngineRunReportDigestInput {
   readonly providerDescriptorDigest: Sha256Digest;
   readonly providerCatalogDigest: Sha256Digest;
   readonly engine: "godot";
-  readonly profileDigest: typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST;
-  readonly operationId: StableId;
-  readonly invocationDigest: typeof GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST;
+  readonly profileDigest: Sha256Digest;
+  readonly profileContractDigest: Sha256Digest;
+  readonly profileCatalogDigest: typeof PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST;
+  readonly operationId: ProcessContainmentEngineExecutionOperationId;
+  readonly invocationDigest: Sha256Digest;
+  readonly inputBindingDigest: Sha256Digest | null;
   readonly snapshotBindingDigest: Sha256Digest;
   readonly projectSnapshotDigest: Sha256Digest;
   readonly executableSnapshotDigest: Sha256Digest;
@@ -192,6 +197,7 @@ function dataObject(
     value === null ||
     typeof value !== "object" ||
     Array.isArray(value) ||
+    isProxy(value) ||
     (Object.getPrototypeOf(value) !== Object.prototype &&
       Object.getPrototypeOf(value) !== null) ||
     Object.getOwnPropertySymbols(value).length > 0
@@ -240,42 +246,29 @@ function integer(value: unknown, minimum: number, maximum: number): boolean {
   );
 }
 
-function validateLimits(value: unknown): ProcessContainmentEngineRunLimits {
+function validateLimits(
+  value: unknown,
+  profile: ProcessContainmentEngineExecutionProfile,
+): ProcessContainmentEngineRunLimits {
   const limits = dataObject(
     value,
     [
-      "engineTimeoutMs",
-      "maxOutputBytes",
+      "startValidityMs",
+      "processTimeoutMs",
+      "idleTimeoutMs",
       "terminationGraceMs",
+      "maxOutputBytes",
       "maxProcesses",
       "maxProjectFiles",
       "maxProjectDirectories",
       "maxProjectFileBytes",
       "maxProjectBytes",
       "maxProfileBytes",
+      "maxReportDurationMs",
     ],
     "process containment engine run limits are outside the contract",
   );
-  if (
-    ownValue(limits, "engineTimeoutMs") !==
-      PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS ||
-    ownValue(limits, "maxOutputBytes") !==
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES ||
-    ownValue(limits, "terminationGraceMs") !==
-      PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS ||
-    ownValue(limits, "maxProcesses") !==
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES ||
-    ownValue(limits, "maxProjectFiles") !==
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES ||
-    ownValue(limits, "maxProjectDirectories") !==
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES ||
-    ownValue(limits, "maxProjectFileBytes") !==
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES ||
-    ownValue(limits, "maxProjectBytes") !==
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES ||
-    ownValue(limits, "maxProfileBytes") !==
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES
-  ) {
+  if (canonicalizeJson(limits) !== canonicalizeJson(profile.limits)) {
     throw new TypeError(
       "process containment engine run limits are outside the contract",
     );
@@ -301,6 +294,7 @@ export function assertProcessContainmentEngineRunRequestSemantics(
       "profile",
       "operationId",
       "invocationDigest",
+      "inputBindingDigest",
       "snapshotBindingDigest",
       "project",
       "executable",
@@ -317,9 +311,13 @@ export function assertProcessContainmentEngineRunRequestSemantics(
   );
   const profile = dataObject(
     ownValue(value, "profile"),
-    ["id", "digest"],
+    ["id", "digest", "contractDigest", "catalogDigest"],
     "process containment engine run profile is outside the contract",
   );
+  const executionProfile = getProcessContainmentEngineExecutionProfile(
+    ownValue(profile, "id"),
+  );
+  assertProcessContainmentEngineExecutionProfileSemantics(executionProfile);
   const project = dataObject(
     ownValue(value, "project"),
     [
@@ -337,10 +335,11 @@ export function assertProcessContainmentEngineRunRequestSemantics(
     ["snapshotDigest", "digest", "identityDigest", "bytes"],
     "process containment engine run executable is outside the contract",
   );
-  validateLimits(ownValue(value, "limits"));
+  validateLimits(ownValue(value, "limits"), executionProfile);
   const runId = ownValue(value, "runId");
   const issuedAt = ownValue(value, "issuedAt");
   const startDeadline = ownValue(value, "startDeadline");
+  const inputBindingDigest = ownValue(value, "inputBindingDigest");
   if (
     ownValue(value, "schemaVersion") !== "1.0.0" ||
     typeof runId !== "string" ||
@@ -353,13 +352,17 @@ export function assertProcessContainmentEngineRunRequestSemantics(
     ownValue(value, "engine") !== "godot" ||
     ownValue(value, "workload") !== "engine-project-process" ||
     ownValue(value, "policyDigest") !== PROCESS_CONTAINMENT_POLICY_DIGEST ||
-    ownValue(profile, "id") !== PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID ||
-    ownValue(profile, "digest") !==
-      PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST ||
-    ownValue(value, "operationId") !== "engine.headless-preflight" ||
+    ownValue(profile, "digest") !== executionProfile.profileDigest ||
+    ownValue(profile, "contractDigest") !== executionProfile.contractDigest ||
+    ownValue(profile, "catalogDigest") !==
+      PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST ||
+    ownValue(value, "operationId") !== executionProfile.operationId ||
     !isStableId(ownValue(value, "operationId")) ||
     ownValue(value, "invocationDigest") !==
-      GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST ||
+      executionProfile.invocationDigest ||
+    (executionProfile.operationId === "engine.headless-preflight"
+      ? inputBindingDigest !== null
+      : !isSha256Digest(inputBindingDigest)) ||
     !isSha256Digest(ownValue(value, "snapshotBindingDigest")) ||
     !isSha256Digest(ownValue(project, "rootIdentityDigest")) ||
     !isSha256Digest(ownValue(project, "snapshotDigest")) ||
@@ -367,17 +370,17 @@ export function assertProcessContainmentEngineRunRequestSemantics(
     !integer(
       ownValue(project, "fileCount"),
       1,
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
+      executionProfile.limits.maxProjectFiles,
     ) ||
     !integer(
       ownValue(project, "directoryCount"),
       1,
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
+      executionProfile.limits.maxProjectDirectories,
     ) ||
     !integer(
       ownValue(project, "totalBytes"),
       1,
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
+      executionProfile.limits.maxProjectBytes,
     ) ||
     !isSha256Digest(ownValue(executable, "snapshotDigest")) ||
     !isSha256Digest(ownValue(executable, "digest")) ||
@@ -397,7 +400,7 @@ export function assertProcessContainmentEngineRunRequestSemantics(
   const validity = Date.parse(startDeadline) - Date.parse(issuedAt);
   if (
     validity < 1 ||
-    validity > PROCESS_CONTAINMENT_ENGINE_RUN_MAX_START_VALIDITY_MS
+    validity > executionProfile.limits.startValidityMs
   ) {
     throw new TypeError(
       "process containment engine run start window is outside the contract",
@@ -457,6 +460,7 @@ function validateProcess(
 
 function validateOutput(
   value: unknown,
+  limits: ProcessContainmentEngineRunLimits,
 ): ProcessContainmentEngineRunOutputObservation {
   const output = dataObject(
     value,
@@ -471,12 +475,12 @@ function validateOutput(
     !integer(
       capturedBytes,
       0,
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
+      limits.maxOutputBytes,
     ) ||
     !integer(
       observedBytes,
       0,
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES,
+      limits.maxProfileBytes,
     ) ||
     typeof truncated !== "boolean" ||
     (typeof capturedBytes === "number" &&
@@ -504,6 +508,7 @@ function validateTermination(
     typeof ownValue(termination, "confirmed") !== "boolean" ||
     (ownValue(termination, "cause") !== "none" &&
       ownValue(termination, "cause") !== "engine-timeout" &&
+      ownValue(termination, "cause") !== "idle-timeout" &&
       ownValue(termination, "cause") !== "caller-cancelled" &&
       ownValue(termination, "cause") !== "safety-boundary")
   ) {
@@ -563,8 +568,11 @@ function validateReportInput(
       "providerCatalogDigest",
       "engine",
       "profileDigest",
+      "profileContractDigest",
+      "profileCatalogDigest",
       "operationId",
       "invocationDigest",
+      "inputBindingDigest",
       "snapshotBindingDigest",
       "projectSnapshotDigest",
       "executableSnapshotDigest",
@@ -583,7 +591,7 @@ function validateReportInput(
   const request = ownValue(value, "request") as ProcessContainmentEngineRunRequest;
   assertProcessContainmentEngineRunRequestSemantics(request);
   const process = validateProcess(ownValue(value, "process"));
-  const output = validateOutput(ownValue(value, "output"));
+  const output = validateOutput(ownValue(value, "output"), request.limits);
   const termination = validateTermination(ownValue(value, "termination"));
   const effects = validateEffects(ownValue(value, "effects"));
   const startedAt = ownValue(value, "startedAt");
@@ -602,8 +610,13 @@ function validateReportInput(
       request.providerCatalogDigest ||
     ownValue(value, "engine") !== request.engine ||
     ownValue(value, "profileDigest") !== request.profile.digest ||
+    ownValue(value, "profileContractDigest") !==
+      request.profile.contractDigest ||
+    ownValue(value, "profileCatalogDigest") !==
+      request.profile.catalogDigest ||
     ownValue(value, "operationId") !== request.operationId ||
     ownValue(value, "invocationDigest") !== request.invocationDigest ||
+    ownValue(value, "inputBindingDigest") !== request.inputBindingDigest ||
     ownValue(value, "snapshotBindingDigest") !==
       request.snapshotBindingDigest ||
     ownValue(value, "projectSnapshotDigest") !== request.project.snapshotDigest ||
@@ -614,7 +627,7 @@ function validateReportInput(
     !integer(
       durationMs,
       0,
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_REPORT_DURATION_MS,
+      request.limits.maxReportDurationMs,
     ) ||
     (outcome !== "succeeded" &&
       outcome !== "failed" &&
@@ -642,8 +655,11 @@ function validateReportInput(
       termination.cause !== "none" &&
       !(termination.cause === "caller-cancelled" && !process.started)) ||
     ((termination.cause === "engine-timeout" ||
+      termination.cause === "idle-timeout" ||
       termination.cause === "safety-boundary") &&
       !process.started) ||
+    (termination.cause === "idle-timeout" &&
+      request.operationId !== "engine.deterministic-replay") ||
     (termination.cause === "caller-cancelled" &&
       process.started !== termination.requested)
   ) {
@@ -708,6 +724,7 @@ function validateReportInput(
     !effects.stagedExecutableBaselinePreserved ||
     !effects.profileBudgetPreserved ||
     termination.cause === "engine-timeout" ||
+    termination.cause === "idle-timeout" ||
     termination.cause === "safety-boundary";
   if (
     (outcome === "succeeded" && (!success || mutationUncertain)) ||
@@ -748,8 +765,11 @@ export function assertProcessContainmentEngineRunReportSemantics(
       "providerCatalogDigest",
       "engine",
       "profileDigest",
+      "profileContractDigest",
+      "profileCatalogDigest",
       "operationId",
       "invocationDigest",
+      "inputBindingDigest",
       "snapshotBindingDigest",
       "projectSnapshotDigest",
       "executableSnapshotDigest",
@@ -799,13 +819,46 @@ const hostSchema = closedObject(
 
 const profileSchema = closedObject(
   {
-    id: { type: "string", const: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID },
-    digest: {
+    id: reference("stableId"),
+    digest: reference("sha256Digest"),
+    contractDigest: reference("sha256Digest"),
+    catalogDigest: {
       type: "string",
-      const: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+      const: PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
     },
   },
-  ["id", "digest"],
+  ["id", "digest", "contractDigest", "catalogDigest"],
+);
+
+const maximumProjectFiles = Math.max(
+  ...PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
+    ({ limits }) => limits.maxProjectFiles,
+  ),
+);
+const maximumProjectDirectories = Math.max(
+  ...PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
+    ({ limits }) => limits.maxProjectDirectories,
+  ),
+);
+const maximumProjectBytes = Math.max(
+  ...PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
+    ({ limits }) => limits.maxProjectBytes,
+  ),
+);
+const maximumOutputBytes = Math.max(
+  ...PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
+    ({ limits }) => limits.maxOutputBytes,
+  ),
+);
+const maximumProfileBytes = Math.max(
+  ...PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
+    ({ limits }) => limits.maxProfileBytes,
+  ),
+);
+const maximumReportDurationMs = Math.max(
+  ...PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
+    ({ limits }) => limits.maxReportDurationMs,
+  ),
 );
 
 const projectSchema = closedObject(
@@ -816,17 +869,17 @@ const projectSchema = closedObject(
     fileCount: {
       type: "integer",
       minimum: 1,
-      maximum: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
+      maximum: maximumProjectFiles,
     },
     directoryCount: {
       type: "integer",
       minimum: 1,
-      maximum: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
+      maximum: maximumProjectDirectories,
     },
     totalBytes: {
       type: "integer",
       minimum: 1,
-      maximum: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
+      maximum: maximumProjectBytes,
     },
   },
   [
@@ -855,44 +908,100 @@ const executableSchema = closedObject(
 
 const limitsSchema = closedObject(
   {
-    engineTimeoutMs: {
-      const: PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS,
-    },
-    maxOutputBytes: {
-      const: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
-    },
-    terminationGraceMs: {
-      const: PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS,
-    },
-    maxProcesses: { const: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES },
-    maxProjectFiles: {
-      const: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
-    },
+    startValidityMs: { type: "integer", minimum: 1, maximum: 60_000 },
+    processTimeoutMs: { type: "integer", minimum: 1, maximum: 600_000 },
+    idleTimeoutMs: { type: "integer", minimum: 1, maximum: 600_000 },
+    terminationGraceMs: { type: "integer", minimum: 1, maximum: 30_000 },
+    maxOutputBytes: { type: "integer", minimum: 1, maximum: 16_777_216 },
+    maxProcesses: { type: "integer", minimum: 1, maximum: 16 },
+    maxProjectFiles: { type: "integer", minimum: 1, maximum: 100_000 },
     maxProjectDirectories: {
-      const: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
+      type: "integer",
+      minimum: 1,
+      maximum: 100_000,
     },
     maxProjectFileBytes: {
-      const: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
+      type: "integer",
+      minimum: 1,
+      maximum: 1_073_741_824,
     },
     maxProjectBytes: {
-      const: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
+      type: "integer",
+      minimum: 1,
+      maximum: 4_294_967_296,
     },
     maxProfileBytes: {
-      const: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES,
+      type: "integer",
+      minimum: 1,
+      maximum: 4_294_967_296,
+    },
+    maxReportDurationMs: {
+      type: "integer",
+      minimum: 1,
+      maximum: 1_200_000,
     },
   },
   [
-    "engineTimeoutMs",
-    "maxOutputBytes",
+    "startValidityMs",
+    "processTimeoutMs",
+    "idleTimeoutMs",
     "terminationGraceMs",
+    "maxOutputBytes",
     "maxProcesses",
     "maxProjectFiles",
     "maxProjectDirectories",
     "maxProjectFileBytes",
     "maxProjectBytes",
     "maxProfileBytes",
+    "maxReportDurationMs",
   ],
 );
+
+function profileBinding(
+  profile: ProcessContainmentEngineExecutionProfile,
+): ProcessContainmentEngineRunProfileBinding {
+  return {
+    id: profile.profileId,
+    digest: profile.profileDigest,
+    contractDigest: profile.contractDigest,
+    catalogDigest:
+      PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
+  };
+}
+
+function inputBindingSchema(
+  profile: ProcessContainmentEngineExecutionProfile,
+): JsonSchemaObject {
+  return profile.operationId === "engine.headless-preflight"
+    ? { type: "null" }
+    : reference("sha256Digest");
+}
+
+function requestProfileVariantSchema(
+  profile: ProcessContainmentEngineExecutionProfile,
+): JsonSchemaObject {
+  return {
+    type: "object",
+    properties: {
+      profile: {
+        const: profileBinding(profile) as unknown as CanonicalJsonValue,
+      },
+      operationId: { const: profile.operationId },
+      invocationDigest: { const: profile.invocationDigest },
+      inputBindingDigest: inputBindingSchema(profile),
+      limits: {
+        const: profile.limits as unknown as CanonicalJsonValue,
+      },
+    },
+    required: [
+      "profile",
+      "operationId",
+      "invocationDigest",
+      "inputBindingDigest",
+      "limits",
+    ],
+  };
+}
 
 const requestProperties = {
   schemaVersion: { type: "string", const: "1.0.0" },
@@ -905,10 +1014,10 @@ const requestProperties = {
   workload: { type: "string", const: "engine-project-process" },
   policyDigest: { type: "string", const: PROCESS_CONTAINMENT_POLICY_DIGEST },
   profile: profileSchema,
-  operationId: { type: "string", const: "engine.headless-preflight" },
-  invocationDigest: {
-    type: "string",
-    const: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+  operationId: reference("stableId"),
+  invocationDigest: reference("sha256Digest"),
+  inputBindingDigest: {
+    anyOf: [reference("sha256Digest"), { type: "null" }],
   },
   snapshotBindingDigest: reference("sha256Digest"),
   project: projectSchema,
@@ -918,12 +1027,24 @@ const requestProperties = {
   limits: limitsSchema,
 };
 
+const requestShape: JsonSchemaObject = {
+  ...closedObject(requestProperties, Object.keys(requestProperties)),
+  oneOf: PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
+    requestProfileVariantSchema,
+  ),
+};
+
 export const processContainmentEngineRunRequestSchema: VersionedContractSchema =
   defineContractSchema({
     id: "process-containment-engine-run-request",
     version: "1.0.0",
     title: "Process containment engine run request",
-    schema: contractRoot(requestProperties, Object.keys(requestProperties)),
+    schema: {
+      ...contractRoot(requestProperties, Object.keys(requestProperties)),
+      oneOf: PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
+        requestProfileVariantSchema,
+      ),
+    },
   });
 
 const processSchema = closedObject(
@@ -960,12 +1081,12 @@ const outputSchema = closedObject(
     capturedBytes: {
       type: "integer",
       minimum: 0,
-      maximum: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
+      maximum: maximumOutputBytes,
     },
     observedBytes: {
       type: "integer",
       minimum: 0,
-      maximum: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES,
+      maximum: maximumProfileBytes,
     },
     truncated: { type: "boolean" },
   },
@@ -981,6 +1102,7 @@ const terminationSchema = closedObject(
       enum: [
         "none",
         "engine-timeout",
+        "idle-timeout",
         "caller-cancelled",
         "safety-boundary",
       ],
@@ -1018,20 +1140,22 @@ const effectsSchema = closedObject(
 const reportProperties = {
   schemaVersion: { type: "string", const: "1.0.0" },
   runId: reference("uuid"),
-  request: closedObject(requestProperties, Object.keys(requestProperties)),
+  request: requestShape,
   requestDigest: reference("sha256Digest"),
   admissionDigest: reference("sha256Digest"),
   providerDescriptorDigest: reference("sha256Digest"),
   providerCatalogDigest: reference("sha256Digest"),
   engine: { type: "string", const: "godot" },
-  profileDigest: {
+  profileDigest: reference("sha256Digest"),
+  profileContractDigest: reference("sha256Digest"),
+  profileCatalogDigest: {
     type: "string",
-    const: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+    const: PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
   },
-  operationId: { type: "string", const: "engine.headless-preflight" },
-  invocationDigest: {
-    type: "string",
-    const: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+  operationId: reference("stableId"),
+  invocationDigest: reference("sha256Digest"),
+  inputBindingDigest: {
+    anyOf: [reference("sha256Digest"), { type: "null" }],
   },
   snapshotBindingDigest: reference("sha256Digest"),
   projectSnapshotDigest: reference("sha256Digest"),
@@ -1041,7 +1165,7 @@ const reportProperties = {
   durationMs: {
     type: "integer",
     minimum: 0,
-    maximum: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_REPORT_DURATION_MS,
+    maximum: maximumReportDurationMs,
   },
   process: processSchema,
   output: outputSchema,
@@ -1055,10 +1179,93 @@ const reportProperties = {
   reportDigest: reference("sha256Digest"),
 };
 
+function reportProfileVariantSchema(
+  profile: ProcessContainmentEngineExecutionProfile,
+): JsonSchemaObject {
+  return {
+    type: "object",
+    properties: {
+      request: {
+        ...requestShape,
+        allOf: [requestProfileVariantSchema(profile)],
+      },
+      profileDigest: { const: profile.profileDigest },
+      profileContractDigest: { const: profile.contractDigest },
+      profileCatalogDigest: {
+        const: PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
+      },
+      operationId: { const: profile.operationId },
+      invocationDigest: { const: profile.invocationDigest },
+      inputBindingDigest: inputBindingSchema(profile),
+      durationMs: {
+        type: "integer",
+        minimum: 0,
+        maximum: profile.limits.maxReportDurationMs,
+      },
+      output: {
+        type: "object",
+        properties: {
+          capturedBytes: {
+            type: "integer",
+            minimum: 0,
+            maximum: profile.limits.maxOutputBytes,
+          },
+          observedBytes: {
+            type: "integer",
+            minimum: 0,
+            maximum: profile.limits.maxProfileBytes,
+          },
+        },
+        required: ["capturedBytes", "observedBytes"],
+      },
+      termination: {
+        type: "object",
+        properties: {
+          cause: {
+            enum:
+              profile.operationId === "engine.headless-preflight"
+                ? [
+                    "none",
+                    "engine-timeout",
+                    "caller-cancelled",
+                    "safety-boundary",
+                  ]
+                : [
+                    "none",
+                    "engine-timeout",
+                    "idle-timeout",
+                    "caller-cancelled",
+                    "safety-boundary",
+                  ],
+          },
+        },
+        required: ["cause"],
+      },
+    },
+    required: [
+      "request",
+      "profileDigest",
+      "profileContractDigest",
+      "profileCatalogDigest",
+      "operationId",
+      "invocationDigest",
+      "inputBindingDigest",
+      "durationMs",
+      "output",
+      "termination",
+    ],
+  };
+}
+
 export const processContainmentEngineRunReportSchema: VersionedContractSchema =
   defineContractSchema({
     id: "process-containment-engine-run-report",
     version: "1.0.0",
     title: "Process containment engine run report",
-    schema: contractRoot(reportProperties, Object.keys(reportProperties)),
+    schema: {
+      ...contractRoot(reportProperties, Object.keys(reportProperties)),
+      oneOf: PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
+        reportProfileVariantSchema,
+      ),
+    },
   });

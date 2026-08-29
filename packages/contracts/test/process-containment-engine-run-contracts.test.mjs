@@ -8,6 +8,8 @@ const digests = Array.from({ length: 24 }, (_, index) =>
 );
 
 function request() {
+  const executionProfile =
+    contracts.GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE;
   return {
     schemaVersion: "1.0.0",
     runId: "018f6f35-2c9e-7d1a-8a4b-123456789af0",
@@ -19,11 +21,15 @@ function request() {
     workload: "engine-project-process",
     policyDigest: contracts.PROCESS_CONTAINMENT_POLICY_DIGEST,
     profile: {
-      id: contracts.PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
-      digest: contracts.PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+      id: executionProfile.profileId,
+      digest: executionProfile.profileDigest,
+      contractDigest: executionProfile.contractDigest,
+      catalogDigest:
+        contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
     },
     operationId: "engine.headless-preflight",
     invocationDigest: contracts.GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+    inputBindingDigest: null,
     snapshotBindingDigest: digests[3],
     project: {
       rootIdentityDigest: digests[4],
@@ -41,26 +47,26 @@ function request() {
     },
     issuedAt: "2026-08-29T00:00:00.000Z",
     startDeadline: "2026-08-29T00:00:30.000Z",
-    limits: {
-      engineTimeoutMs:
-        contracts.PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS,
-      maxOutputBytes:
-        contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
-      terminationGraceMs:
-        contracts.PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS,
-      maxProcesses: contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES,
-      maxProjectFiles:
-        contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
-      maxProjectDirectories:
-        contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
-      maxProjectFileBytes:
-        contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
-      maxProjectBytes:
-        contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
-      maxProfileBytes:
-        contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES,
-    },
+    limits: structuredClone(executionProfile.limits),
   };
+}
+
+function replayRequest() {
+  const value = request();
+  const executionProfile =
+    contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE;
+  value.profile = {
+    id: executionProfile.profileId,
+    digest: executionProfile.profileDigest,
+    contractDigest: executionProfile.contractDigest,
+    catalogDigest:
+      contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
+  };
+  value.operationId = executionProfile.operationId;
+  value.invocationDigest = executionProfile.invocationDigest;
+  value.inputBindingDigest = digests[11];
+  value.limits = structuredClone(executionProfile.limits);
+  return value;
 }
 
 function successfulReportInput(runRequest = request()) {
@@ -74,8 +80,11 @@ function successfulReportInput(runRequest = request()) {
     providerCatalogDigest: runRequest.providerCatalogDigest,
     engine: runRequest.engine,
     profileDigest: runRequest.profile.digest,
+    profileContractDigest: runRequest.profile.contractDigest,
+    profileCatalogDigest: runRequest.profile.catalogDigest,
     operationId: runRequest.operationId,
     invocationDigest: runRequest.invocationDigest,
+    inputBindingDigest: runRequest.inputBindingDigest,
     snapshotBindingDigest: runRequest.snapshotBindingDigest,
     projectSnapshotDigest: runRequest.project.snapshotDigest,
     executableSnapshotDigest: runRequest.executable.snapshotDigest,
@@ -123,7 +132,7 @@ function report(input = successfulReportInput()) {
   };
 }
 
-test("engine run request binds one fixed path-free Godot profile", () => {
+test("engine run request preserves the fixed path-free Godot preflight profile", () => {
   const value = request();
   assert.doesNotThrow(() =>
     contracts.assertProcessContainmentEngineRunRequestSemantics(value),
@@ -165,6 +174,45 @@ test("engine run request binds one fixed path-free Godot profile", () => {
     },
     (candidate) => {
       candidate.limits.maxProcesses = 2;
+    },
+  ]) {
+    const changed = structuredClone(value);
+    mutate(changed);
+    assert.throws(
+      () => contracts.assertProcessContainmentEngineRunRequestSemantics(changed),
+      TypeError,
+    );
+  }
+});
+
+test("engine run request admits only the registered deterministic replay tuple", () => {
+  const value = replayRequest();
+  assert.doesNotThrow(() =>
+    contracts.assertProcessContainmentEngineRunRequestSemantics(value),
+  );
+  assert.doesNotThrow(() =>
+    contracts.assertProcessContainmentEngineRunReportSemantics(
+      report(successfulReportInput(value)),
+    ),
+  );
+
+  for (const mutate of [
+    (candidate) => {
+      candidate.profile.contractDigest =
+        contracts.GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.contractDigest;
+    },
+    (candidate) => {
+      candidate.operationId = "engine.headless-preflight";
+    },
+    (candidate) => {
+      candidate.invocationDigest =
+        contracts.GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST;
+    },
+    (candidate) => {
+      candidate.inputBindingDigest = null;
+    },
+    (candidate) => {
+      candidate.limits.idleTimeoutMs += 1;
     },
   ]) {
     const changed = structuredClone(value);
@@ -240,6 +288,29 @@ test("safe failure and uncertain settlement remain distinguishable", () => {
   const failed = report(failedInput);
   assert.doesNotThrow(() =>
     contracts.assertProcessContainmentEngineRunReportSemantics(failed),
+  );
+
+  const idleInput = successfulReportInput(replayRequest());
+  idleInput.process.exitCode = 124;
+  idleInput.termination.requested = true;
+  idleInput.termination.cause = "idle-timeout";
+  idleInput.outcome = "failed";
+  const idle = report(idleInput);
+  assert.doesNotThrow(() =>
+    contracts.assertProcessContainmentEngineRunReportSemantics(idle),
+  );
+
+  const preflightIdleInput = successfulReportInput();
+  preflightIdleInput.process.exitCode = 123;
+  preflightIdleInput.termination.requested = true;
+  preflightIdleInput.termination.cause = "idle-timeout";
+  preflightIdleInput.outcome = "failed";
+  assert.throws(
+    () =>
+      contracts.assertProcessContainmentEngineRunReportSemantics(
+        report(preflightIdleInput),
+      ),
+    TypeError,
   );
 
   const notStartedInput = successfulReportInput();

@@ -4,17 +4,7 @@ import {
   GODOT_DETERMINISTIC_REPLAY_INVOCATION_DIGEST,
   GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE,
   GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
-  PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
-  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
-  PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS,
+  PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
   PROCESS_CONTAINMENT_LAUNCH_MAX_DURATION_MS,
   PROCESS_CONTAINMENT_LAUNCH_MAX_OUTPUT_BYTES,
   PROCESS_CONTAINMENT_LAUNCH_TERMINATION_GRACE_MS,
@@ -174,11 +164,16 @@ const containmentEngineRunRequest = {
   workload: "engine-project-process",
   policyDigest: PROCESS_CONTAINMENT_POLICY_DIGEST,
   profile: {
-    id: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
-    digest: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+    id: GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.profileId,
+    digest: GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.profileDigest,
+    contractDigest:
+      GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.contractDigest,
+    catalogDigest: PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
   },
-  operationId: "engine.headless-preflight",
-  invocationDigest: GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+  operationId: GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.operationId,
+  invocationDigest:
+    GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.invocationDigest,
+  inputBindingDigest: null,
   snapshotBindingDigest: engineExecutionSnapshotBinding.bindingDigest,
   project: {
     rootIdentityDigest: engineProjectSnapshot.projectRootIdentityDigest,
@@ -196,20 +191,7 @@ const containmentEngineRunRequest = {
   },
   issuedAt: startedAt,
   startDeadline: "2026-08-26T01:02:33.000Z",
-  limits: {
-    engineTimeoutMs: PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS,
-    maxOutputBytes: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES,
-    terminationGraceMs:
-      PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS,
-    maxProcesses: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES,
-    maxProjectFiles: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
-    maxProjectDirectories:
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
-    maxProjectFileBytes:
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
-    maxProjectBytes: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
-    maxProfileBytes: PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROFILE_BYTES,
-  },
+  limits: { ...GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.limits },
 };
 const capabilityExecution = {
   detect: "static",
@@ -922,9 +904,13 @@ export const validFoundationProtocolFixtures = {
       containmentEngineRunRequest.providerDescriptorDigest,
     providerCatalogDigest: containmentEngineRunRequest.providerCatalogDigest,
     engine: "godot",
-    profileDigest: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+    profileDigest: containmentEngineRunRequest.profile.digest,
+    profileContractDigest:
+      containmentEngineRunRequest.profile.contractDigest,
+    profileCatalogDigest: containmentEngineRunRequest.profile.catalogDigest,
     operationId: containmentEngineRunRequest.operationId,
     invocationDigest: containmentEngineRunRequest.invocationDigest,
+    inputBindingDigest: containmentEngineRunRequest.inputBindingDigest,
     snapshotBindingDigest: containmentEngineRunRequest.snapshotBindingDigest,
     projectSnapshotDigest: containmentEngineRunRequest.project.snapshotDigest,
     executableSnapshotDigest:
@@ -1842,7 +1828,8 @@ const qualifiedGodotContainment = {
   policyDigest: PROCESS_CONTAINMENT_POLICY_DIGEST,
   providerDescriptorDigest: digest,
   providerCatalogDigest: secondDigest,
-  profileDigest: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+  profileDigest:
+    GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.profileDigest,
   snapshotBindingDigest: digest,
   projectSnapshotDigest: secondDigest,
   executableSnapshotDigest: digest,
@@ -1924,7 +1911,8 @@ export const validContainedGodotPreflightReportFixture = {
     requestDigest: secondDigest,
     reportDigest: digest,
     admissionDigest: digest,
-    profileDigest: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+    profileDigest:
+      GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.profileDigest,
     snapshotBindingDigest: digest,
     projectSnapshotDigest: secondDigest,
     executableSnapshotDigest: digest,

@@ -6,6 +6,7 @@ import {
   GODOT_HEADLESS_PREFLIGHT_TERMINATION_GRACE_MS,
   GODOT_VERSION_PROBE_TARGET_RELEASE_STATUS,
   GODOT_VERSION_PROBE_TARGET_VERSION,
+  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
   PROCESS_CONTAINMENT_POLICY_DIGEST,
   assertGodotHeadlessPreflightReportSemantics,
   assertGodotHeadlessPreflightRequestSemantics,
@@ -1165,6 +1166,19 @@ async function retainReceipt(
 function engineRunEvidence(
   report: ProcessContainmentEngineRunReport,
 ): GodotHeadlessPreflightEngineRunEvidence {
+  if (
+    report.request.profile.id !== PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID ||
+    report.operationId !== "engine.headless-preflight" ||
+    report.inputBindingDigest !== null ||
+    report.termination.cause === "idle-timeout"
+  ) {
+    throw new GodotAdapterBoundaryError(
+      "godot-headless-engine-report-profile-mismatch",
+      "Godot headless preflight evidence requires the exact preflight execution profile.",
+      true,
+    );
+  }
+
   return deepFreeze({
     requestDigest: report.requestDigest,
     reportDigest: report.reportDigest,
@@ -1180,7 +1194,11 @@ function engineRunEvidence(
       activeProcesses: report.process.activeProcesses,
     },
     output: report.output,
-    termination: report.termination,
+    termination: {
+      requested: report.termination.requested,
+      confirmed: report.termination.confirmed,
+      cause: report.termination.cause,
+    },
     effects: report.effects,
     outcome: report.outcome,
     mutationUncertain: report.mutationUncertain,

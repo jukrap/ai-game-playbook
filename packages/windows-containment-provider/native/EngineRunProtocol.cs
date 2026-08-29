@@ -7,23 +7,45 @@ namespace AiGamePlaybook.WindowsContainment;
 internal static partial class EngineRunProtocol
 {
     internal const int MaximumInputBytes = 4 * 1024 * 1024;
-    internal const int EngineTimeoutMs = 10_000;
-    internal const int MaximumOutputBytes = 256 * 1024;
-    internal const int TerminationGraceMs = 2_000;
     internal const int MaximumProcesses = 1;
     internal const int MaximumProjectFiles = 1_024;
     internal const int MaximumProjectDirectories = 1_024;
     internal const int MaximumProjectFileBytes = 16 * 1024 * 1024;
     internal const int MaximumProjectBytes = 32 * 1024 * 1024;
     internal const int MaximumProfileBytes = 64 * 1024 * 1024;
-    internal const string ProfileId = "godot-headless-preflight-v1";
-    internal const string ProfileDigest =
+    internal const string PreflightOperationId = "engine.headless-preflight";
+    internal const string PreflightProfileId = "godot-headless-preflight-v1";
+    internal const string PreflightProfileDigest =
         "sha256:e378585ddf388513ec5ae6e03a1a99645f16fe8909aa86dfddba5cca645c92f7";
-    internal const string InvocationDigest =
+    internal const string PreflightProfileContractDigest =
+        "sha256:fc65d9c249550080f0fb6d53034be5961b78a86de8464e5b69992554003e23f4";
+    internal const string PreflightInvocationDigest =
         "sha256:c6740c144e5fe945f6b586c56b84aed15a43ad2cc48f280a9615c1a872556a6f";
+    internal const string ReplayOperationId = "engine.deterministic-replay";
+    internal const string ReplayProfileId = "godot-deterministic-replay-v1";
+    internal const string ReplayProfileDigest =
+        "sha256:87bc6b4e9638a68789e3bf50b76cdcaf48d9444b1c0bee517aecfd273116a01f";
+    internal const string ReplayProfileContractDigest =
+        "sha256:f3448c2ab1e21105f1432b58e8689c0e43b39a616ab6a2a422b25e65435ce8c7";
+    internal const string ReplayInvocationDigest =
+        "sha256:03f938d99f08827f2aa2e6205d2ed55454c616c1a750b00ca08c9fd7438314f0";
+    internal const string ProfileCatalogDigest =
+        "sha256:3465d6ed6df65a2185d41a53ade8c75dd735694d19568c3c755da0dcd6948b36";
     internal const string PolicyDigest =
         "sha256:9279861178baa8b60e2b5e7b53c09466ab05618bda01e0e82c43a968e3f1339d";
-    private const int MaximumStartValidityMs = 30_000;
+    private const int StartValidityMs = 30_000;
+    private const int TerminationGraceMs = 2_000;
+    private const int PreflightProcessTimeoutMs = 10_000;
+    private const int PreflightIdleTimeoutMs = 10_000;
+    private const int PreflightMaximumOutputBytes = 256 * 1024;
+    private const int PreflightMaximumReportDurationMs = 42_000;
+    private const int ReplayProcessTimeoutMs = 30_000;
+    private const int ReplayIdleTimeoutMs = 15_000;
+    private const int ReplayMaximumOutputBytes = 1_024 * 1_024;
+    private const int ReplayMaximumReportDurationMs = 62_000;
+    private const int ReplayMaximumLineBytes = 65_536;
+    private const int ReplayMaximumEvents = 2_050;
+    private const string ReplayOutputPrefix = "AGPB_GRAYBOX ";
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly HashSet<string> ReservedNames = new(
         new[]
@@ -75,9 +97,13 @@ internal static partial class EngineRunProtocol
             "providerDescriptorDigest",
             "providerCatalogDigest",
             "policyDigest",
+            "operationId",
             "profileId",
             "profileDigest",
+            "profileContractDigest",
+            "profileCatalogDigest",
             "invocationDigest",
+            "inputBindingDigest",
             "snapshotBindingDigest",
             "projectRootIdentityDigest",
             "projectSnapshotDigest",
@@ -95,7 +121,9 @@ internal static partial class EngineRunProtocol
             "sourceExecutableBytes",
             "issuedAt",
             "startDeadline",
-            "engineTimeoutMs",
+            "startValidityMs",
+            "processTimeoutMs",
+            "idleTimeoutMs",
             "maxOutputBytes",
             "terminationGraceMs",
             "maxProcesses",
@@ -104,6 +132,12 @@ internal static partial class EngineRunProtocol
             "maxProjectFileBytes",
             "maxProjectBytes",
             "maxProfileBytes",
+            "maxReportDurationMs",
+            "outputKind",
+            "outputPrefix",
+            "maxLineBytes",
+            "maxEvents",
+            "retainRawOutput",
         };
         Dictionary<string, JsonElement> properties = ExactObject(root, expected);
 
@@ -117,9 +151,13 @@ internal static partial class EngineRunProtocol
         string providerDescriptorDigest = RequiredDigest(properties, "providerDescriptorDigest");
         string providerCatalogDigest = RequiredDigest(properties, "providerCatalogDigest");
         string policyDigest = RequiredDigest(properties, "policyDigest");
+        string operationId = RequiredString(properties, "operationId", 80);
         string profileId = RequiredString(properties, "profileId", 80);
         string profileDigest = RequiredDigest(properties, "profileDigest");
+        string profileContractDigest = RequiredDigest(properties, "profileContractDigest");
+        string profileCatalogDigest = RequiredDigest(properties, "profileCatalogDigest");
         string invocationDigest = RequiredDigest(properties, "invocationDigest");
+        string? inputBindingDigest = OptionalDigest(properties, "inputBindingDigest");
         string snapshotBindingDigest = RequiredDigest(properties, "snapshotBindingDigest");
         string projectRootIdentityDigest = RequiredDigest(properties, "projectRootIdentityDigest");
         string projectSnapshotDigest = RequiredDigest(properties, "projectSnapshotDigest");
@@ -157,7 +195,9 @@ internal static partial class EngineRunProtocol
             256 * 1024 * 1024);
         DateTimeOffset issuedAt = RequiredTimestamp(properties, "issuedAt");
         DateTimeOffset startDeadline = RequiredTimestamp(properties, "startDeadline");
-        int engineTimeoutMs = RequiredInteger(properties, "engineTimeoutMs", 1, int.MaxValue);
+        int startValidityMs = RequiredInteger(properties, "startValidityMs", 1, int.MaxValue);
+        int processTimeoutMs = RequiredInteger(properties, "processTimeoutMs", 1, int.MaxValue);
+        int idleTimeoutMs = RequiredInteger(properties, "idleTimeoutMs", 1, int.MaxValue);
         int maxOutputBytes = RequiredInteger(properties, "maxOutputBytes", 1, int.MaxValue);
         int terminationGraceMs = RequiredInteger(properties, "terminationGraceMs", 1, int.MaxValue);
         int maxProcesses = RequiredInteger(properties, "maxProcesses", 1, int.MaxValue);
@@ -174,6 +214,18 @@ internal static partial class EngineRunProtocol
             int.MaxValue);
         int maxProjectBytes = RequiredInteger(properties, "maxProjectBytes", 1, int.MaxValue);
         int maxProfileBytes = RequiredInteger(properties, "maxProfileBytes", 1, int.MaxValue);
+        int maxReportDurationMs = RequiredInteger(
+            properties,
+            "maxReportDurationMs",
+            1,
+            int.MaxValue);
+        string outputKind = RequiredString(properties, "outputKind", 80);
+        string? outputPrefix = OptionalString(properties, "outputPrefix", 128);
+        int? maxLineBytes = OptionalInteger(properties, "maxLineBytes", 1, int.MaxValue);
+        int? maxEvents = OptionalInteger(properties, "maxEvents", 1, int.MaxValue);
+        bool retainRawOutput = RequiredBoolean(properties, "retainRawOutput");
+
+        NativeEngineRunProfile profile = ResolveProfile(profileId);
 
         if (
             schemaVersion != "1.0.0"
@@ -186,25 +238,39 @@ internal static partial class EngineRunProtocol
                 cancellationId,
                 StringComparison.Ordinal)
             || policyDigest != PolicyDigest
-            || profileId != ProfileId
-            || profileDigest != ProfileDigest
-            || invocationDigest != InvocationDigest
-            || engineTimeoutMs != EngineTimeoutMs
-            || maxOutputBytes != MaximumOutputBytes
-            || terminationGraceMs != TerminationGraceMs
+            || operationId != profile.OperationId
+            || profileDigest != profile.ProfileDigest
+            || profileContractDigest != profile.ProfileContractDigest
+            || profileCatalogDigest != ProfileCatalogDigest
+            || invocationDigest != profile.InvocationDigest
+            || (profile.RequiresInputBinding
+                ? inputBindingDigest is null
+                : inputBindingDigest is not null)
+            || startValidityMs != profile.StartValidityMs
+            || processTimeoutMs != profile.ProcessTimeoutMs
+            || idleTimeoutMs != profile.IdleTimeoutMs
+            || maxOutputBytes != profile.MaximumOutputBytes
+            || terminationGraceMs != profile.TerminationGraceMs
             || maxProcesses != MaximumProcesses
             || maxProjectFiles != MaximumProjectFiles
             || maxProjectDirectories != MaximumProjectDirectories
             || maxProjectFileBytes != MaximumProjectFileBytes
             || maxProjectBytes != MaximumProjectBytes
-            || maxProfileBytes != MaximumProfileBytes)
+            || maxProfileBytes != MaximumProfileBytes
+            || maxReportDurationMs != profile.MaximumReportDurationMs
+            || outputKind != profile.OutputKind
+            || outputPrefix != profile.OutputPrefix
+            || maxLineBytes != profile.MaximumLineBytes
+            || maxEvents != profile.MaximumEvents
+            || retainRawOutput)
         {
             throw new ProtocolException("request-value-invalid");
         }
         long validityMs = (long)(startDeadline - issuedAt).TotalMilliseconds;
         DateTimeOffset now = DateTimeOffset.UtcNow;
         if (
-            validityMs is < 1 or > MaximumStartValidityMs
+            validityMs is < 1 or > StartValidityMs
+            || validityMs > startValidityMs
             || now < issuedAt
             || now >= startDeadline)
         {
@@ -226,9 +292,13 @@ internal static partial class EngineRunProtocol
             providerDescriptorDigest,
             providerCatalogDigest,
             policyDigest,
+            operationId,
             profileId,
             profileDigest,
+            profileContractDigest,
+            profileCatalogDigest,
             invocationDigest,
+            inputBindingDigest,
             snapshotBindingDigest,
             projectRootIdentityDigest,
             projectSnapshotDigest,
@@ -246,7 +316,9 @@ internal static partial class EngineRunProtocol
             sourceExecutableBytes,
             issuedAt,
             startDeadline,
-            engineTimeoutMs,
+            startValidityMs,
+            processTimeoutMs,
+            idleTimeoutMs,
             maxOutputBytes,
             terminationGraceMs,
             maxProcesses,
@@ -254,7 +326,13 @@ internal static partial class EngineRunProtocol
             maxProjectDirectories,
             maxProjectFileBytes,
             maxProjectBytes,
-            maxProfileBytes);
+            maxProfileBytes,
+            maxReportDurationMs,
+            outputKind,
+            outputPrefix,
+            maxLineBytes,
+            maxEvents,
+            retainRawOutput);
     }
 
     private static async Task<byte[]> ReadBoundedInputAsync()
@@ -331,6 +409,29 @@ internal static partial class EngineRunProtocol
         return value;
     }
 
+    private static string? OptionalDigest(
+        IReadOnlyDictionary<string, JsonElement> properties,
+        string name)
+    {
+        if (properties[name].ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+        return RequiredDigest(properties, name);
+    }
+
+    private static string? OptionalString(
+        IReadOnlyDictionary<string, JsonElement> properties,
+        string name,
+        int maximumLength)
+    {
+        if (properties[name].ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+        return RequiredString(properties, name, maximumLength);
+    }
+
     private static int RequiredInteger(
         IReadOnlyDictionary<string, JsonElement> properties,
         string name,
@@ -348,6 +449,68 @@ internal static partial class EngineRunProtocol
         }
         return integer;
     }
+
+    private static int? OptionalInteger(
+        IReadOnlyDictionary<string, JsonElement> properties,
+        string name,
+        int minimum,
+        int maximum)
+    {
+        if (properties[name].ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+        return RequiredInteger(properties, name, minimum, maximum);
+    }
+
+    private static bool RequiredBoolean(
+        IReadOnlyDictionary<string, JsonElement> properties,
+        string name)
+    {
+        JsonElement value = properties[name];
+        if (value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        {
+            throw new ProtocolException("request-value-invalid");
+        }
+        return value.GetBoolean();
+    }
+
+    private static NativeEngineRunProfile ResolveProfile(string profileId) => profileId switch
+    {
+        PreflightProfileId => new NativeEngineRunProfile(
+            PreflightOperationId,
+            PreflightProfileDigest,
+            PreflightProfileContractDigest,
+            PreflightInvocationDigest,
+            false,
+            StartValidityMs,
+            PreflightProcessTimeoutMs,
+            PreflightIdleTimeoutMs,
+            TerminationGraceMs,
+            PreflightMaximumOutputBytes,
+            PreflightMaximumReportDurationMs,
+            "digest-only-log",
+            null,
+            null,
+            null),
+        ReplayProfileId => new NativeEngineRunProfile(
+            ReplayOperationId,
+            ReplayProfileDigest,
+            ReplayProfileContractDigest,
+            ReplayInvocationDigest,
+            true,
+            StartValidityMs,
+            ReplayProcessTimeoutMs,
+            ReplayIdleTimeoutMs,
+            TerminationGraceMs,
+            ReplayMaximumOutputBytes,
+            ReplayMaximumReportDurationMs,
+            "prefixed-json-lines",
+            ReplayOutputPrefix,
+            ReplayMaximumLineBytes,
+            ReplayMaximumEvents),
+        _ => throw new ProtocolException("request-value-invalid"),
+    };
 
     private static DateTimeOffset RequiredTimestamp(
         IReadOnlyDictionary<string, JsonElement> properties,
@@ -533,6 +696,23 @@ internal static partial class EngineRunProtocol
 
 internal sealed record NativeEngineRunFile(string Path, string Digest, int Bytes);
 
+internal sealed record NativeEngineRunProfile(
+    string OperationId,
+    string ProfileDigest,
+    string ProfileContractDigest,
+    string InvocationDigest,
+    bool RequiresInputBinding,
+    int StartValidityMs,
+    int ProcessTimeoutMs,
+    int IdleTimeoutMs,
+    int TerminationGraceMs,
+    int MaximumOutputBytes,
+    int MaximumReportDurationMs,
+    string OutputKind,
+    string? OutputPrefix,
+    int? MaximumLineBytes,
+    int? MaximumEvents);
+
 internal sealed record NativeEngineRunRequest(
     string SchemaVersion,
     string Operation,
@@ -544,9 +724,13 @@ internal sealed record NativeEngineRunRequest(
     string ProviderDescriptorDigest,
     string ProviderCatalogDigest,
     string PolicyDigest,
+    string OperationId,
     string ProfileId,
     string ProfileDigest,
+    string ProfileContractDigest,
+    string ProfileCatalogDigest,
     string InvocationDigest,
+    string? InputBindingDigest,
     string SnapshotBindingDigest,
     string ProjectRootIdentityDigest,
     string ProjectSnapshotDigest,
@@ -564,7 +748,9 @@ internal sealed record NativeEngineRunRequest(
     int SourceExecutableBytes,
     DateTimeOffset IssuedAt,
     DateTimeOffset StartDeadline,
-    int EngineTimeoutMs,
+    int StartValidityMs,
+    int ProcessTimeoutMs,
+    int IdleTimeoutMs,
     int MaxOutputBytes,
     int TerminationGraceMs,
     int MaxProcesses,
@@ -572,4 +758,10 @@ internal sealed record NativeEngineRunRequest(
     int MaxProjectDirectories,
     int MaxProjectFileBytes,
     int MaxProjectBytes,
-    int MaxProfileBytes);
+    int MaxProfileBytes,
+    int MaxReportDurationMs,
+    string OutputKind,
+    string? OutputPrefix,
+    int? MaxLineBytes,
+    int? MaxEvents,
+    bool RetainRawOutput);

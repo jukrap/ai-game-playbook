@@ -53,11 +53,11 @@ function assertProtocolFailure(result, code) {
 
 function csharpConstant(source, name) {
   const match = new RegExp(
-    `(?:internal|private) const (?:int|string) ${name} =\\s*(?:\\r?\\n\\s*)?"?([^";]+)"?;`,
+    `(?:internal|private) const (?:int|string) ${name} =\\s*(?:\\r?\\n\\s*)?(?:"([^"]*)"|([^;]+));`,
     "u",
   ).exec(source);
   assert.notEqual(match, null, name);
-  return match[1].trim().replaceAll("_", "");
+  return match[1] ?? match[2].trim().replaceAll("_", "");
 }
 
 test("native engine profile remains synchronized with the typed contract", async () => {
@@ -70,26 +70,101 @@ test("native engine profile remains synchronized with the typed contract", async
     "utf8",
   );
 
+  const profiles = [
+    [
+      "Preflight",
+      contracts.GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE,
+    ],
+    [
+      "Replay",
+      contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE,
+    ],
+  ];
+  for (const [prefix, profile] of profiles) {
+    assert.equal(csharpConstant(protocol, `${prefix}OperationId`), profile.operationId);
+    assert.equal(csharpConstant(protocol, `${prefix}ProfileId`), profile.profileId);
+    assert.equal(
+      csharpConstant(protocol, `${prefix}ProfileDigest`),
+      profile.profileDigest,
+    );
+    assert.equal(
+      csharpConstant(protocol, `${prefix}ProfileContractDigest`),
+      profile.contractDigest,
+    );
+    assert.equal(
+      csharpConstant(protocol, `${prefix}InvocationDigest`),
+      profile.invocationDigest,
+    );
+  }
   assert.equal(
-    csharpConstant(protocol, "ProfileId"),
-    contracts.PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
-  );
-  assert.equal(
-    csharpConstant(protocol, "ProfileDigest"),
-    contracts.PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
-  );
-  assert.equal(
-    csharpConstant(protocol, "InvocationDigest"),
-    contracts.GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
+    csharpConstant(protocol, "ProfileCatalogDigest"),
+    contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
   );
   assert.equal(
     csharpConstant(protocol, "PolicyDigest"),
     contracts.PROCESS_CONTAINMENT_POLICY_DIGEST,
   );
   const integerConstants = [
-    ["EngineTimeoutMs", contracts.PROCESS_CONTAINMENT_ENGINE_RUN_ENGINE_TIMEOUT_MS],
-    ["MaximumOutputBytes", contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_OUTPUT_BYTES],
-    ["TerminationGraceMs", contracts.PROCESS_CONTAINMENT_ENGINE_RUN_TERMINATION_GRACE_MS],
+    [
+      "StartValidityMs",
+      contracts.GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.limits
+        .startValidityMs,
+    ],
+    [
+      "TerminationGraceMs",
+      contracts.GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.limits
+        .terminationGraceMs,
+    ],
+    [
+      "PreflightProcessTimeoutMs",
+      contracts.GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.limits
+        .processTimeoutMs,
+    ],
+    [
+      "PreflightIdleTimeoutMs",
+      contracts.GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.limits
+        .idleTimeoutMs,
+    ],
+    [
+      "PreflightMaximumOutputBytes",
+      contracts.GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.limits
+        .maxOutputBytes,
+    ],
+    [
+      "PreflightMaximumReportDurationMs",
+      contracts.GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.limits
+        .maxReportDurationMs,
+    ],
+    [
+      "ReplayProcessTimeoutMs",
+      contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE.limits
+        .processTimeoutMs,
+    ],
+    [
+      "ReplayIdleTimeoutMs",
+      contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE.limits
+        .idleTimeoutMs,
+    ],
+    [
+      "ReplayMaximumOutputBytes",
+      contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE.limits
+        .maxOutputBytes,
+    ],
+    [
+      "ReplayMaximumReportDurationMs",
+      contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE.limits
+        .maxReportDurationMs,
+    ],
+    [
+      "ReplayMaximumLineBytes",
+      contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE.output
+        .maxLineBytes,
+    ],
+    [
+      "ReplayMaximumEvents",
+      contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE.output
+        .maxEvents,
+    ],
     ["MaximumProcesses", contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES],
     ["MaximumProjectFiles", contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES],
     [
@@ -113,9 +188,17 @@ test("native engine profile remains synchronized with the typed contract", async
       name,
     );
   }
+  assert.equal(
+    csharpConstant(protocol, "ReplayOutputPrefix"),
+    contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE.output.prefix,
+  );
   assert.match(
     runner,
-    /string\[\] command =\s*\{\s*stagedExecutable,\s*"--headless",\s*"--path",\s*stagedProject,\s*"--quit-after",\s*"1",\s*"--log-file",\s*logPath,\s*"--no-header",\s*\};/u,
+    /EngineRunProtocol\.PreflightOperationId[\s\S]*"--quit-after"[\s\S]*"1"[\s\S]*"--no-header"/u,
+  );
+  assert.match(
+    runner,
+    /EngineRunProtocol\.ReplayOperationId[\s\S]*"--no-header"[\s\S]*"--"[\s\S]*"--agpb-replay"/u,
   );
 });
 

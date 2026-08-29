@@ -208,6 +208,14 @@ test("issues and consumes one frozen private source handoff", async (t) => {
 
   assert.equal(Object.isFrozen(handoff), true);
   assert.equal(handoff.bindingDigest, binding.bindingDigest);
+  assert.equal(
+    handoff.profileContractDigest,
+    contracts.GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.contractDigest,
+  );
+  assert.equal(
+    handoff.profileCatalogDigest,
+    contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
+  );
   assert.equal(JSON.stringify(handoff).includes(context.project), false);
   assert.equal(JSON.stringify(handoff).includes("project.godot"), false);
   assert.throws(
@@ -222,6 +230,8 @@ test("issues and consumes one frozen private source handoff", async (t) => {
   assert.equal(source.root, context.root);
   assert.equal(source.executable, context.executable);
   assert.equal(source.binding, binding);
+  assert.equal(source.profileContractDigest, handoff.profileContractDigest);
+  assert.equal(source.profileCatalogDigest, handoff.profileCatalogDigest);
   assert.deepEqual(
     source.manifest.files.map((entry) => entry.path),
     ["project.godot", "scenes/main.tscn"],
@@ -245,6 +255,34 @@ test("issues and consumes one frozen private source handoff", async (t) => {
     }),
     expectEngineError("engine-snapshot-authority-consumed"),
   );
+});
+
+test("issues a private source handoff for the registered replay profile", async (t) => {
+  const context = await fixture(t);
+  const binding = await engineCommon.captureEngineExecutionSnapshots(
+    request(context),
+  );
+  const profile =
+    contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE;
+
+  const handoff = await engineCommon.issueEngineExecutionSourceHandoff({
+    binding,
+    root: context.root,
+    executable: context.executable,
+    profileId: profile.profileId,
+  });
+
+  assert.equal(handoff.profileId, profile.profileId);
+  assert.equal(handoff.profileDigest, profile.profileDigest);
+  assert.equal(handoff.profileContractDigest, profile.contractDigest);
+  assert.equal(
+    handoff.profileCatalogDigest,
+    contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
+  );
+  const source = engineCommon.consumeEngineExecutionSourceHandoff(handoff);
+  assert.equal(source.profileId, profile.profileId);
+  assert.equal(source.profileDigest, profile.profileDigest);
+  assert.equal(source.profileContractDigest, profile.contractDigest);
 });
 
 test("burns the source authority when drift is found during handoff", async (t) => {
@@ -326,6 +364,34 @@ test("handoff request parsing never invokes accessors", async (t) => {
       return contracts.PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID;
     },
   });
+
+  await assert.rejects(
+    engineCommon.issueEngineExecutionSourceHandoff(hostile),
+    expectEngineError("engine-snapshot-handoff-invalid"),
+  );
+  assert.equal(called, false);
+});
+
+test("handoff request parsing rejects proxies without invoking traps", async (t) => {
+  const context = await fixture(t);
+  const binding = await engineCommon.captureEngineExecutionSnapshots(
+    request(context),
+  );
+  let called = false;
+  const hostile = new Proxy(
+    {
+      binding,
+      root: context.root,
+      executable: context.executable,
+      profileId: contracts.PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
+    },
+    {
+      getPrototypeOf() {
+        called = true;
+        return Object.prototype;
+      },
+    },
+  );
 
   await assert.rejects(
     engineCommon.issueEngineExecutionSourceHandoff(hostile),

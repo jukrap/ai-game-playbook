@@ -139,6 +139,75 @@ test("engine execution profile schema accepts only registered launch tuples", ()
   assert.equal(validate(changed), false);
 });
 
+test("engine run schemas accept both registered profiles without cross-profile drift", () => {
+  const ajv = validator();
+  const validateRequest = ajv.compile(
+    contracts.FOUNDATION_PROTOCOL_SCHEMAS[
+      "process-containment-engine-run-request"
+    ].schema,
+  );
+  const validateReport = ajv.compile(
+    contracts.FOUNDATION_PROTOCOL_SCHEMAS[
+      "process-containment-engine-run-report"
+    ].schema,
+  );
+  const request = structuredClone(
+    validFoundationProtocolFixtures["process-containment-engine-run-request"],
+  );
+  const profile =
+    contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE;
+  request.profile = {
+    id: profile.profileId,
+    digest: profile.profileDigest,
+    contractDigest: profile.contractDigest,
+    catalogDigest:
+      contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
+  };
+  request.operationId = profile.operationId;
+  request.invocationDigest = profile.invocationDigest;
+  request.inputBindingDigest = contracts.sha256Digest("replay expectation");
+  request.limits = structuredClone(profile.limits);
+  assert.equal(validateRequest(request), true, JSON.stringify(validateRequest.errors));
+
+  const report = structuredClone(
+    validFoundationProtocolFixtures["process-containment-engine-run-report"],
+  );
+  report.request = request;
+  report.profileDigest = request.profile.digest;
+  report.profileContractDigest = request.profile.contractDigest;
+  report.profileCatalogDigest = request.profile.catalogDigest;
+  report.operationId = request.operationId;
+  report.invocationDigest = request.invocationDigest;
+  report.inputBindingDigest = request.inputBindingDigest;
+  assert.equal(validateReport(report), true, JSON.stringify(validateReport.errors));
+
+  const mixed = structuredClone(request);
+  mixed.profile.contractDigest =
+    contracts.GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.contractDigest;
+  assert.equal(validateRequest(mixed), false);
+
+  const preflightIdle = structuredClone(
+    validFoundationProtocolFixtures["process-containment-engine-run-report"],
+  );
+  preflightIdle.termination = {
+    requested: true,
+    confirmed: true,
+    cause: "idle-timeout",
+  };
+  preflightIdle.outcome = "failed";
+  assert.equal(validateReport(preflightIdle), false);
+
+  const preflightOverflow = structuredClone(
+    validFoundationProtocolFixtures["process-containment-engine-run-report"],
+  );
+  preflightOverflow.output.capturedBytes =
+    contracts.GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE.limits
+      .maxOutputBytes + 1;
+  preflightOverflow.output.observedBytes =
+    preflightOverflow.output.capturedBytes;
+  assert.equal(validateReport(preflightOverflow), false);
+});
+
 test("foundation protocol schemas are complete, versioned, and strictly valid", () => {
   assert.deepEqual(
     Object.keys(contracts.FOUNDATION_PROTOCOL_SCHEMAS).sort(),

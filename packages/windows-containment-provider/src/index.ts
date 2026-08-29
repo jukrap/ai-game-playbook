@@ -43,13 +43,20 @@ export type {
   CreateWindowsContainedEngineAdmissionRequest,
 } from "./admission.js";
 export {
+  consumeWindowsContainedGodotReplayTranscript,
   prepareWindowsContainedGodotEngineRun,
+  prepareWindowsContainedGodotReplayRun,
   runWindowsContainedGodotEngine,
+  runWindowsContainedGodotReplay,
 } from "./engine-run.js";
 export type {
   PreparedWindowsContainedGodotEngineRun,
+  PreparedWindowsContainedGodotReplayRun,
   PrepareWindowsContainedGodotEngineRunRequest,
+  PrepareWindowsContainedGodotReplayRunRequest,
   RunWindowsContainedGodotEngineRequest,
+  RunWindowsContainedGodotReplayRequest,
+  WindowsContainedGodotReplayExecution,
 } from "./engine-run.js";
 export { WindowsContainmentProviderError } from "./errors.js";
 export type { WindowsContainmentProviderErrorCode } from "./errors.js";

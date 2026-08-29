@@ -758,6 +758,7 @@ export type {
   ProcessContainmentEngineRunOutcome,
   ProcessContainmentEngineRunOutputObservation,
   ProcessContainmentEngineRunProcessObservation,
+  ProcessContainmentEngineRunProfileBinding,
   ProcessContainmentEngineRunReport,
   ProcessContainmentEngineRunReportDigestInput,
   ProcessContainmentEngineRunRequest,

@@ -5,18 +5,14 @@ import {
   ENGINE_SNAPSHOT_MAX_FILES,
   ENGINE_SNAPSHOT_MAX_FILE_BYTES,
   ENGINE_SNAPSHOT_MAX_TOTAL_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES,
-  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
-  PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
+  PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
   assertEngineExecutionSnapshotBindingSemantics,
   compareCanonicalText,
   computeEngineExecutableSnapshotDigest,
   computeEngineExecutionSnapshotBindingDigest,
   computeEngineProjectSnapshotDigest,
   digestCanonicalJson,
+  getProcessContainmentEngineExecutionProfile,
   isSha256Digest,
   type EngineExecutableSnapshot,
   type EngineExecutableSnapshotDigestInput,
@@ -25,6 +21,8 @@ import {
   type EngineId,
   type EngineProjectSnapshot,
   type EngineProjectSnapshotDigestInput,
+  type ProcessContainmentEngineExecutionProfile,
+  type ProcessContainmentEngineExecutionProfileId,
   type Sha256Digest,
 } from "@ai-game-playbook/contracts";
 import {
@@ -43,6 +41,7 @@ import {
   type FileHandle,
 } from "node:fs/promises";
 import { join, normalize } from "node:path";
+import { isProxy } from "node:util/types";
 
 import {
   EngineCommonBoundaryError,
@@ -81,12 +80,14 @@ export interface IssueEngineExecutionSourceHandoffRequest {
   readonly binding: EngineExecutionSnapshotBinding;
   readonly root: CanonicalProjectRoot;
   readonly executable: BoundProcessExecutable;
-  readonly profileId: typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID;
+  readonly profileId: ProcessContainmentEngineExecutionProfileId;
 }
 
 export interface EngineExecutionSourceHandoff {
-  readonly profileId: typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID;
-  readonly profileDigest: typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST;
+  readonly profileId: ProcessContainmentEngineExecutionProfileId;
+  readonly profileDigest: Sha256Digest;
+  readonly profileContractDigest: Sha256Digest;
+  readonly profileCatalogDigest: typeof PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST;
   readonly bindingDigest: Sha256Digest;
   readonly projectSnapshotDigest: Sha256Digest;
   readonly executableSnapshotDigest: Sha256Digest;
@@ -98,8 +99,10 @@ export interface EngineExecutionSourceMaterial {
   readonly binding: EngineExecutionSnapshotBinding;
   readonly root: CanonicalProjectRoot;
   readonly executable: BoundProcessExecutable;
-  readonly profileId: typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID;
-  readonly profileDigest: typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST;
+  readonly profileId: ProcessContainmentEngineExecutionProfileId;
+  readonly profileDigest: Sha256Digest;
+  readonly profileContractDigest: Sha256Digest;
+  readonly profileCatalogDigest: typeof PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST;
   readonly manifest: EngineExecutionSourceManifest;
 }
 
@@ -144,6 +147,7 @@ function exactDataRecord(
     value === null ||
     typeof value !== "object" ||
     Array.isArray(value) ||
+    isProxy(value) ||
     (Object.getPrototypeOf(value) !== Object.prototype &&
       Object.getPrototypeOf(value) !== null) ||
     Object.getOwnPropertySymbols(value).length > 0
@@ -224,20 +228,26 @@ function handoffRequest(
     "executable",
     "profileId",
   ]);
-  if (
-    record === undefined ||
-    record["profileId"] !== PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID
-  ) {
+  if (record === undefined) {
     return fail(
       "engine-snapshot-handoff-invalid",
-      "Engine source handoff requires one exact fixed-profile request.",
+      "Engine source handoff requires one exact registered-profile request.",
+    );
+  }
+  let profile: ProcessContainmentEngineExecutionProfile;
+  try {
+    profile = getProcessContainmentEngineExecutionProfile(record["profileId"]);
+  } catch {
+    return fail(
+      "engine-snapshot-handoff-invalid",
+      "Engine source handoff requires one exact registered-profile request.",
     );
   }
   return Object.freeze({
     binding: record["binding"] as EngineExecutionSnapshotBinding,
     root: record["root"] as CanonicalProjectRoot,
     executable: record["executable"] as BoundProcessExecutable,
-    profileId: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID,
+    profileId: profile.profileId,
   });
 }
 
@@ -817,17 +827,18 @@ export async function assertEngineExecutionSnapshotAuthority(
 
 function sourceHandoffBudgetIsValid(
   authority: SnapshotAuthority,
+  profile: ProcessContainmentEngineExecutionProfile,
 ): boolean {
   return (
     authority.manifest.fileCount <=
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES &&
+      profile.limits.maxProjectFiles &&
     authority.manifest.directoryCount <=
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_DIRECTORIES &&
+      profile.limits.maxProjectDirectories &&
     authority.manifest.totalBytes <=
-      PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_BYTES &&
+      profile.limits.maxProjectBytes &&
     authority.manifest.files.every(
       (file) =>
-        file.bytes <= PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILE_BYTES,
+        file.bytes <= profile.limits.maxProjectFileBytes,
     )
   );
 }
@@ -836,6 +847,9 @@ export async function issueEngineExecutionSourceHandoff(
   value: unknown,
 ): Promise<EngineExecutionSourceHandoff> {
   const request = handoffRequest(value);
+  const profile = getProcessContainmentEngineExecutionProfile(
+    request.profileId,
+  );
   const authority =
     request.binding !== null && typeof request.binding === "object"
       ? snapshotAuthorities.get(request.binding)
@@ -873,7 +887,7 @@ export async function issueEngineExecutionSourceHandoff(
     );
   }
   claimedSnapshotBindings.add(request.binding);
-  if (!sourceHandoffBudgetIsValid(authority)) {
+  if (!sourceHandoffBudgetIsValid(authority, profile)) {
     return fail(
       "engine-snapshot-handoff-budget-exceeded",
       "Source snapshot exceeds the fixed engine-run staging budget.",
@@ -888,7 +902,10 @@ export async function issueEngineExecutionSourceHandoff(
 
   const handoffInput = Object.freeze({
     profileId: request.profileId,
-    profileDigest: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+    profileDigest: profile.profileDigest,
+    profileContractDigest: profile.contractDigest,
+    profileCatalogDigest:
+      PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
     bindingDigest: request.binding.bindingDigest,
     projectSnapshotDigest: request.binding.project.snapshotDigest,
     executableSnapshotDigest: request.binding.executable.snapshotDigest,
@@ -907,7 +924,10 @@ export async function issueEngineExecutionSourceHandoff(
     root: request.root,
     executable: request.executable,
     profileId: request.profileId,
-    profileDigest: PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST,
+    profileDigest: profile.profileDigest,
+    profileContractDigest: profile.contractDigest,
+    profileCatalogDigest:
+      PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
     manifest: authority.manifest,
   });
   sourceHandoffMaterials.set(handoff, material);

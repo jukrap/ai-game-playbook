@@ -8,6 +8,9 @@ namespace AiGamePlaybook.WindowsContainment;
 
 internal static class WindowsProcess
 {
+    internal const int AppContainerProfileDeleteMaximumAttempts = 3;
+    internal const int AppContainerProfileDeleteRetryDelayMs = 25;
+
     internal static bool IsCurrentProcessAppContainer()
     {
         if (!NativeMethods.OpenProcessToken(
@@ -365,6 +368,22 @@ internal static class WindowsProcess
 
     internal static string BuildCommandLine(IEnumerable<string> arguments) =>
         string.Join(' ', arguments.Select(QuoteWindowsArgument));
+
+    internal static bool DeleteAppContainerProfile(string name)
+    {
+        for (int attempt = 0; attempt < AppContainerProfileDeleteMaximumAttempts; attempt++)
+        {
+            if (NativeMethods.DeleteAppContainerProfile(name) == 0)
+            {
+                return true;
+            }
+            if (attempt + 1 < AppContainerProfileDeleteMaximumAttempts)
+            {
+                Thread.Sleep(AppContainerProfileDeleteRetryDelayMs * (attempt + 1));
+            }
+        }
+        return false;
+    }
 
     internal static bool DeleteOwnedFixture(string ownedRoot)
     {

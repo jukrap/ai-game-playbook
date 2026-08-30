@@ -276,6 +276,42 @@ test("native engine profile remains synchronized with the typed contract", async
   );
 });
 
+test("native runners share one bounded AppContainer profile cleanup contract", async () => {
+  const windowsProcess = await readFile(
+    fileURLToPath(new URL("../native/WindowsProcess.cs", import.meta.url)),
+    "utf8",
+  );
+  const runners = await Promise.all(
+    ["SelfTestRunner.cs", "SyntheticLaunchRunner.cs", "EngineRunRunner.cs"].map(
+      async (name) =>
+        await readFile(
+          fileURLToPath(new URL(`../native/${name}`, import.meta.url)),
+          "utf8",
+        ),
+    ),
+  );
+
+  assert.equal(
+    csharpConstant(windowsProcess, "AppContainerProfileDeleteMaximumAttempts"),
+    "3",
+  );
+  assert.equal(
+    csharpConstant(windowsProcess, "AppContainerProfileDeleteRetryDelayMs"),
+    "25",
+  );
+  assert.match(
+    windowsProcess,
+    /internal static bool DeleteAppContainerProfile\(string name\)[\s\S]*for \(int attempt = 0; attempt < AppContainerProfileDeleteMaximumAttempts; attempt\+\+\)[\s\S]*NativeMethods\.DeleteAppContainerProfile\(name\) == 0[\s\S]*Thread\.Sleep\(AppContainerProfileDeleteRetryDelayMs \* \(attempt \+ 1\)\);/u,
+  );
+  for (const runner of runners) {
+    assert.match(
+      runner,
+      /profileRemoved = WindowsProcess\.DeleteAppContainerProfile\(profileName\);/u,
+    );
+    assert.doesNotMatch(runner, /NativeMethods\.DeleteAppContainerProfile/u);
+  }
+});
+
 test(
   "native protocol rejects duplicate and undeclared request fields",
   { skip: !nativeAvailable },

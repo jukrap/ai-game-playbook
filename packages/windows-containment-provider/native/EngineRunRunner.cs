@@ -320,7 +320,7 @@ internal static class EngineRunRunner
             }
             if (profileCreated)
             {
-                profileRemoved = NativeMethods.DeleteAppContainerProfile(profileName) == 0;
+                profileRemoved = WindowsProcess.DeleteAppContainerProfile(profileName);
             }
             if (appContainerSid != IntPtr.Zero)
             {

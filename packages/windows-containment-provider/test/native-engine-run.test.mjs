@@ -42,7 +42,7 @@ function expectProviderError(code) {
     error?.code === code;
 }
 
-async function launchWitness(runtime, rootIdentityDigest) {
+async function launchWitness(runtime, rootIdentityDigest, scenario) {
   const selfTestPlan = provider.prepareWindowsContainmentSelfTest({
     runtime,
     projectRootIdentityDigest: rootIdentityDigest,
@@ -63,6 +63,18 @@ async function launchWitness(runtime, rootIdentityDigest) {
   const launchReport = await provider.runWindowsContainedSyntheticLaunch({
     prepared: launchPlan,
   });
+  assert.equal(
+    launchReport.outcome,
+    "succeeded",
+    `synthetic launch failed for ${scenario}: ${JSON.stringify({
+      durationMs: launchReport.durationMs,
+      process: launchReport.process,
+      output: launchReport.output,
+      termination: launchReport.termination,
+      effects: launchReport.effects,
+      mutationUncertain: launchReport.mutationUncertain,
+    })}`,
+  );
   return provider.consumeWindowsContainedSyntheticLaunchReport({
     runtime,
     report: launchReport,
@@ -72,7 +84,11 @@ async function launchWitness(runtime, rootIdentityDigest) {
 
 async function prepareRun(context, behavior) {
   await writeFile(context.behaviorPath, `${behavior}\n`);
-  const witness = await launchWitness(context.runtime, context.root.identityDigest);
+  const witness = await launchWitness(
+    context.runtime,
+    context.root.identityDigest,
+    behavior,
+  );
   const binding = await engineCommon.captureEngineExecutionSnapshots({
     root: context.root,
     executable: context.executable,
@@ -161,7 +177,11 @@ function failedReplay(value) {
 async function prepareReplay(context, behavior, transcript, expectationDigest) {
   await writeFile(context.behaviorPath, `${behavior}\n`);
   await writeFile(context.replayPath, transcript);
-  const witness = await launchWitness(context.runtime, context.root.identityDigest);
+  const witness = await launchWitness(
+    context.runtime,
+    context.root.identityDigest,
+    behavior,
+  );
   const binding = await engineCommon.captureEngineExecutionSnapshots({
     root: context.root,
     executable: context.executable,

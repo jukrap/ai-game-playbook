@@ -313,7 +313,7 @@ internal static class SelfTestRunner
             }
             if (profileCreated)
             {
-                profileRemoved = NativeMethods.DeleteAppContainerProfile(profileName) == 0;
+                profileRemoved = WindowsProcess.DeleteAppContainerProfile(profileName);
             }
             if (appContainerSid != IntPtr.Zero)
             {

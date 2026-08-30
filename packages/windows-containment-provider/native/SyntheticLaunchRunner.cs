@@ -284,7 +284,7 @@ internal static class SyntheticLaunchRunner
             }
             if (profileCreated)
             {
-                profileRemoved = NativeMethods.DeleteAppContainerProfile(profileName) == 0;
+                profileRemoved = WindowsProcess.DeleteAppContainerProfile(profileName);
             }
             if (appContainerSid != IntPtr.Zero)
             {

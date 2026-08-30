@@ -24,6 +24,12 @@
   ],
   "files": [
     {
+      "path": "addons/ai_game_playbook/validators/project_validation.gd",
+      "role": "validator-script",
+      "bytes": 4073,
+      "digest": "sha256:e7bb9a5327aee49ed5560a38ac2553d3e31d37bedfbc03ebee842174343faf66"
+    },
+    {
       "path": "project.godot",
       "role": "project-settings",
       "bytes": 638,
@@ -54,7 +60,7 @@
       "digest": "sha256:7a48568e5f89dc4747ff33672042547d8ea0a1830f05e5c2706219720c4a617d"
     }
   ],
-  "sourceDigest": "sha256:71c0af1a893a17988a73481324cbd74b242fa8143ca109efd222d670475132cd",
+  "sourceDigest": "sha256:cb8f615910e4a469fce980b25f7c003c39a3d3e42f203a3365c03a30245400b7",
   "support": {
     "grade": "planned",
     "evidenceGrade": "implemented",

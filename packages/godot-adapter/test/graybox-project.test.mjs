@@ -50,7 +50,7 @@ test("canonical Godot graybox source binds one exact static project", async () =
     godot.GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST,
   );
   assert.equal(report.sourceDigest, source.manifest.sourceDigest);
-  assert.equal(report.fileCount, 5);
+  assert.equal(report.fileCount, 6);
   assert.equal(report.totalBytes > 0, true);
   assert.equal(report.mainScene, "scenes/main.tscn");
   assert.deepEqual(report.features, [
@@ -98,7 +98,7 @@ test("canonical Godot graybox root matches the complete execution snapshot", asy
   const report = await godot.verifyGodotGrayboxProjectRoot(context);
 
   assert.equal(report.projectId, "golden.graybox.godot");
-  assert.equal(report.fileCount, 5);
+  assert.equal(report.fileCount, 6);
   assert.equal(report.manifestDigest, godot.GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST);
 });
 

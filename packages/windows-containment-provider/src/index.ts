@@ -44,19 +44,31 @@ export type {
 } from "./admission.js";
 export {
   consumeWindowsContainedGodotReplayTranscript,
+  consumeWindowsContainedGodotValidationTranscript,
   prepareWindowsContainedGodotEngineRun,
+  prepareWindowsContainedGodotImportRun,
   prepareWindowsContainedGodotReplayRun,
+  prepareWindowsContainedGodotValidationRun,
   runWindowsContainedGodotEngine,
+  runWindowsContainedGodotImport,
   runWindowsContainedGodotReplay,
+  runWindowsContainedGodotValidation,
 } from "./engine-run.js";
 export type {
   PreparedWindowsContainedGodotEngineRun,
+  PreparedWindowsContainedGodotImportRun,
   PreparedWindowsContainedGodotReplayRun,
+  PreparedWindowsContainedGodotValidationRun,
   PrepareWindowsContainedGodotEngineRunRequest,
+  PrepareWindowsContainedGodotImportRunRequest,
   PrepareWindowsContainedGodotReplayRunRequest,
+  PrepareWindowsContainedGodotValidationRunRequest,
   RunWindowsContainedGodotEngineRequest,
+  RunWindowsContainedGodotImportRequest,
   RunWindowsContainedGodotReplayRequest,
+  RunWindowsContainedGodotValidationRequest,
   WindowsContainedGodotReplayExecution,
+  WindowsContainedGodotValidationExecution,
 } from "./engine-run.js";
 export { WindowsContainmentProviderError } from "./errors.js";
 export type { WindowsContainmentProviderErrorCode } from "./errors.js";

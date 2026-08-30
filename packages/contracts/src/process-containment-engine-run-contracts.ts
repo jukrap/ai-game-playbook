@@ -659,7 +659,8 @@ function validateReportInput(
       termination.cause === "safety-boundary") &&
       !process.started) ||
     (termination.cause === "idle-timeout" &&
-      request.operationId !== "engine.deterministic-replay") ||
+      getProcessContainmentEngineExecutionProfile(request.profile.id).output
+        .kind !== "prefixed-json-lines") ||
     (termination.cause === "caller-cancelled" &&
       process.started !== termination.requested)
   ) {
@@ -1223,7 +1224,7 @@ function reportProfileVariantSchema(
         properties: {
           cause: {
             enum:
-              profile.operationId === "engine.headless-preflight"
+              profile.output.kind === "digest-only-log"
                 ? [
                     "none",
                     "engine-timeout",

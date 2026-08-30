@@ -42,24 +42,143 @@ internal static class Program
             && args[5] == "--no-header"
             && args[6] == "--"
             && args[7] == "--agpb-replay";
-        if (!preflight && !replay)
+        bool projectImport =
+            args.Length == 7
+            && args[0] == "--headless"
+            && args[1] == "--path"
+            && args[3] == "--import"
+            && args[4] == "--log-file"
+            && args[6] == "--no-header";
+        bool projectValidation =
+            args.Length == 8
+            && args[0] == "--headless"
+            && args[1] == "--path"
+            && args[3] == "--script"
+            && args[4] == "res://addons/ai_game_playbook/validators/project_validation.gd"
+            && args[5] == "--log-file"
+            && args[7] == "--no-header";
+        if (!preflight && !replay && !projectImport && !projectValidation)
         {
             return 64;
         }
         string project = args[2];
-        string log = preflight ? args[6] : args[4];
+        string log = preflight ? args[6]
+            : replay ? args[4]
+            : projectImport ? args[5]
+            : args[6];
         if (
             !Path.IsPathFullyQualified(project)
             || !Path.IsPathFullyQualified(log)
-            || !File.Exists(Path.Combine(project, "project.godot")))
+            || !File.Exists(Path.Combine(project, "project.godot"))
+            || (projectValidation
+                && !File.Exists(Path.Combine(
+                    project,
+                    "addons",
+                    "ai_game_playbook",
+                    "validators",
+                    "project_validation.gd"))))
         {
             return 65;
         }
         string behaviorPath = Path.Combine(project, "fixture-behavior.txt");
         string behavior = File.Exists(behaviorPath)
             ? (await File.ReadAllTextAsync(behaviorPath)).Trim()
-            : replay ? "replay-success" : "success";
+            : replay ? "replay-success"
+            : projectImport ? "project-import-success"
+            : projectValidation ? "project-validation-success"
+            : "success";
         Directory.CreateDirectory(Path.GetDirectoryName(log)!);
+        if (projectImport)
+        {
+            switch (behavior)
+            {
+                case "project-import-success":
+                    string cache = Path.Combine(project, ".godot", "imported");
+                    Directory.CreateDirectory(cache);
+                    await File.WriteAllTextAsync(
+                        Path.Combine(cache, "fixture.cache"),
+                        "bounded-import-cache\n",
+                        new UTF8Encoding(false));
+                    await File.WriteAllTextAsync(
+                        log,
+                        "fixture-project-import-success\n",
+                        new UTF8Encoding(false));
+                    return 0;
+                case "project-import-fail":
+                    await File.WriteAllTextAsync(
+                        log,
+                        "fixture-project-import-failure\n",
+                        new UTF8Encoding(false));
+                    return 7;
+                case "project-import-mutate-staged":
+                    await File.AppendAllTextAsync(
+                        Path.Combine(project, "project.godot"),
+                        "changed=true\n",
+                        new UTF8Encoding(false));
+                    await File.WriteAllTextAsync(
+                        log,
+                        "fixture-project-import-mutated\n",
+                        new UTF8Encoding(false));
+                    return 0;
+                default:
+                    return 66;
+            }
+        }
+        if (projectValidation)
+        {
+            string validationPath = Path.Combine(project, "fixture-validation.txt");
+            string validationOutput = File.Exists(validationPath)
+                ? await File.ReadAllTextAsync(validationPath)
+                : string.Empty;
+            switch (behavior)
+            {
+                case "project-validation-success":
+                    await File.WriteAllTextAsync(
+                        log,
+                        validationOutput,
+                        new UTF8Encoding(false));
+                    return 0;
+                case "project-validation-fail":
+                    await File.WriteAllTextAsync(
+                        log,
+                        validationOutput,
+                        new UTF8Encoding(false));
+                    return 2;
+                case "project-validation-mutate-staged":
+                    await File.AppendAllTextAsync(
+                        Path.Combine(project, "project.godot"),
+                        "changed=true\n",
+                        new UTF8Encoding(false));
+                    await File.WriteAllTextAsync(
+                        log,
+                        validationOutput,
+                        new UTF8Encoding(false));
+                    return 0;
+                case "project-validation-idle":
+                    await File.WriteAllTextAsync(
+                        log,
+                        "AGPB_PROJECT_VALIDATION {\"event\":\"validation-started\"}\n",
+                        new UTF8Encoding(false));
+                    await Task.Delay(TimeSpan.FromSeconds(30));
+                    return 0;
+                case "project-validation-line-overflow":
+                    await File.WriteAllTextAsync(
+                        log,
+                        $"AGPB_PROJECT_VALIDATION {new string('x', 17 * 1024)}\n",
+                        new UTF8Encoding(false));
+                    return 0;
+                case "project-validation-event-overflow":
+                    await File.WriteAllTextAsync(
+                        log,
+                        string.Concat(
+                            Enumerable.Range(0, 3).Select(
+                                index => $"AGPB_PROJECT_VALIDATION {{\"event\":\"event-{index}\"}}\n")),
+                        new UTF8Encoding(false));
+                    return 0;
+                default:
+                    return 66;
+            }
+        }
         if (replay)
         {
             string replayPath = Path.Combine(project, "fixture-replay.txt");

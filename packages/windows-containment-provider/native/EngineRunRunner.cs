@@ -361,7 +361,7 @@ internal static class EngineRunRunner
             && accounting?.TotalProcesses == 1
             && accounting.ActiveProcesses == 0
             && !output.Truncated
-            && (request.OperationId != EngineRunProtocol.ReplayOperationId
+            && (request.OutputKind != "prefixed-json-lines"
                 || transcriptBytes is not null)
             && !terminationRequested
             && terminationCause == "none"
@@ -453,8 +453,8 @@ internal static class EngineRunRunner
             "cancelled" => 4,
             _ => 3,
         };
-        bool cleanReplayTranscript =
-            request.OperationId == EngineRunProtocol.ReplayOperationId
+        bool cleanStructuredOutput =
+            request.OutputKind == "prefixed-json-lines"
             && terminationCause == "none"
             && terminationConfirmed
             && !output.Truncated
@@ -470,7 +470,7 @@ internal static class EngineRunRunner
         return new NativeEngineRunResult(
             report,
             exitCode,
-            cleanReplayTranscript ? transcriptBytes : null);
+            cleanStructuredOutput ? transcriptBytes : null);
     }
 
     private static string[] BuildEngineCommand(
@@ -509,6 +509,35 @@ internal static class EngineRunRunner
                 "--agpb-replay",
             };
         }
+        if (request.OperationId == EngineRunProtocol.ProjectImportOperationId)
+        {
+            return new[]
+            {
+                executable,
+                "--headless",
+                "--path",
+                project,
+                "--import",
+                "--log-file",
+                logPath,
+                "--no-header",
+            };
+        }
+        if (request.OperationId == EngineRunProtocol.ProjectValidationOperationId)
+        {
+            return new[]
+            {
+                executable,
+                "--headless",
+                "--path",
+                project,
+                "--script",
+                EngineRunProtocol.ProjectValidationScript,
+                "--log-file",
+                logPath,
+                "--no-header",
+            };
+        }
         throw new ProtocolException("request-value-invalid");
     }
 
@@ -521,7 +550,7 @@ internal static class EngineRunRunner
         var elapsed = Stopwatch.StartNew();
         long lastActivityMs = 0;
         EngineLogActivity priorActivity = ObserveLogActivity(logPath);
-        bool enforceIdle = request.OperationId == EngineRunProtocol.ReplayOperationId;
+        bool enforceIdle = request.OutputKind == "prefixed-json-lines";
         IntPtr[] handles =
         {
             process,
@@ -870,9 +899,9 @@ internal static class EngineRunRunner
             string digest = $"sha256:{Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant()}";
             bool truncated = observed > captured;
             if (
-                request.OperationId == EngineRunProtocol.ReplayOperationId
+                request.OutputKind == "prefixed-json-lines"
                 && !truncated
-                && !ReplayOutputWithinBounds(bytes, request))
+                && !PrefixedJsonLinesOutputWithinBounds(bytes, request))
             {
                 if (observed == 0)
                 {
@@ -891,7 +920,7 @@ internal static class EngineRunRunner
             var output = new NativeEngineRunOutput(digest, captured, observed, truncated);
             return new CapturedEngineLog(
                 output,
-                request.OperationId == EngineRunProtocol.ReplayOperationId && !truncated
+                request.OutputKind == "prefixed-json-lines" && !truncated
                     ? bytes
                     : null);
         }
@@ -903,7 +932,7 @@ internal static class EngineRunRunner
         }
     }
 
-    private static bool ReplayOutputWithinBounds(
+    private static bool PrefixedJsonLinesOutputWithinBounds(
         byte[] bytes,
         NativeEngineRunRequest request)
     {
@@ -1046,8 +1075,8 @@ internal sealed record NativeEngineRunResult(
     int ExitCode,
     byte[]? TranscriptBytes);
 
-internal sealed record NativeEngineReplayEnvelope(
+internal sealed record NativeEngineStructuredOutputEnvelope(
     string SchemaVersion,
     string Operation,
     NativeEngineRunReport Report,
-    string? TranscriptBase64);
+    string? StructuredOutputBase64);

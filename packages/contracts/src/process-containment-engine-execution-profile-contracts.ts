@@ -29,6 +29,22 @@ import {
   GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
 } from "./godot-headless-preflight-contracts.js";
 import {
+  GODOT_PROJECT_IMPORT_IDLE_TIMEOUT_MS,
+  GODOT_PROJECT_IMPORT_INVOCATION_DIGEST,
+  GODOT_PROJECT_IMPORT_MAX_OUTPUT_BYTES,
+  GODOT_PROJECT_IMPORT_PROCESS_TIMEOUT_MS,
+  GODOT_PROJECT_IMPORT_TERMINATION_GRACE_MS,
+  GODOT_PROJECT_VALIDATION_IDLE_TIMEOUT_MS,
+  GODOT_PROJECT_VALIDATION_INVOCATION_DIGEST,
+  GODOT_PROJECT_VALIDATION_MAX_EVENTS,
+  GODOT_PROJECT_VALIDATION_MAX_LINE_BYTES,
+  GODOT_PROJECT_VALIDATION_MAX_OUTPUT_BYTES,
+  GODOT_PROJECT_VALIDATION_OUTPUT_PREFIX,
+  GODOT_PROJECT_VALIDATION_PROCESS_TIMEOUT_MS,
+  GODOT_PROJECT_VALIDATION_TERMINATION_GRACE_MS,
+  GODOT_PROJECT_VALIDATOR_SCRIPT,
+} from "./godot-project-validation-contracts.js";
+import {
   closedObject,
   contractRoot,
   enumSchema,
@@ -58,13 +74,31 @@ export const GODOT_DETERMINISTIC_REPLAY_ENGINE_RUN_MAX_REPORT_DURATION_MS: numbe
   GODOT_DETERMINISTIC_REPLAY_PROCESS_TIMEOUT_MS +
   GODOT_DETERMINISTIC_REPLAY_TERMINATION_GRACE_MS;
 
+export const GODOT_PROJECT_IMPORT_ENGINE_RUN_PROFILE_ID =
+  "godot-project-import-v1" as const;
+export const GODOT_PROJECT_IMPORT_ENGINE_RUN_MAX_REPORT_DURATION_MS: number =
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_START_VALIDITY_MS +
+  GODOT_PROJECT_IMPORT_PROCESS_TIMEOUT_MS +
+  GODOT_PROJECT_IMPORT_TERMINATION_GRACE_MS;
+
+export const GODOT_PROJECT_VALIDATION_ENGINE_RUN_PROFILE_ID =
+  "godot-project-validation-v1" as const;
+export const GODOT_PROJECT_VALIDATION_ENGINE_RUN_MAX_REPORT_DURATION_MS: number =
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_START_VALIDITY_MS +
+  GODOT_PROJECT_VALIDATION_PROCESS_TIMEOUT_MS +
+  GODOT_PROJECT_VALIDATION_TERMINATION_GRACE_MS;
+
 export type ProcessContainmentEngineExecutionProfileId =
   | typeof GODOT_DETERMINISTIC_REPLAY_ENGINE_RUN_PROFILE_ID
+  | typeof GODOT_PROJECT_IMPORT_ENGINE_RUN_PROFILE_ID
+  | typeof GODOT_PROJECT_VALIDATION_ENGINE_RUN_PROFILE_ID
   | typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID;
 
 export type ProcessContainmentEngineExecutionOperationId =
   | "engine.deterministic-replay"
-  | "engine.headless-preflight";
+  | "engine.headless-preflight"
+  | "engine.project-import"
+  | "engine.project-validation";
 
 export interface ProcessContainmentEngineExecutionProfileLaunch {
   readonly workingDirectory: "$stagedProject";
@@ -400,6 +434,27 @@ const replayArguments: readonly string[] = Object.freeze([
   "--agpb-replay",
 ]);
 
+const projectImportArguments: readonly string[] = Object.freeze([
+  "--headless",
+  "--path",
+  "$stagedProject",
+  "--import",
+  "--log-file",
+  "$profileLocalLog",
+  "--no-header",
+]);
+
+const projectValidationArguments: readonly string[] = Object.freeze([
+  "--headless",
+  "--path",
+  "$stagedProject",
+  "--script",
+  GODOT_PROJECT_VALIDATOR_SCRIPT,
+  "--log-file",
+  "$profileLocalLog",
+  "--no-header",
+]);
+
 export const PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST: Sha256Digest =
   digestCanonicalJson({
     domain: "ai-game-playbook/process-containment-engine-run-profile",
@@ -424,6 +479,36 @@ export const GODOT_DETERMINISTIC_REPLAY_ENGINE_RUN_PROFILE_DIGEST: Sha256Digest 
     operationId: "engine.deterministic-replay",
     invocationDigest: GODOT_DETERMINISTIC_REPLAY_INVOCATION_DIGEST,
     arguments: replayArguments,
+    callerArguments: "denied",
+    callerEnvironment: "denied",
+    networkCapabilities: "none",
+    projectSource: "disposable-copy",
+  });
+
+export const GODOT_PROJECT_IMPORT_ENGINE_RUN_PROFILE_DIGEST: Sha256Digest =
+  digestCanonicalJson({
+    domain: "ai-game-playbook/process-containment-engine-run-profile",
+    version: "1.0.0",
+    id: GODOT_PROJECT_IMPORT_ENGINE_RUN_PROFILE_ID,
+    engine: "godot",
+    operationId: "engine.project-import",
+    invocationDigest: GODOT_PROJECT_IMPORT_INVOCATION_DIGEST,
+    arguments: projectImportArguments,
+    callerArguments: "denied",
+    callerEnvironment: "denied",
+    networkCapabilities: "none",
+    projectSource: "disposable-copy",
+  });
+
+export const GODOT_PROJECT_VALIDATION_ENGINE_RUN_PROFILE_DIGEST: Sha256Digest =
+  digestCanonicalJson({
+    domain: "ai-game-playbook/process-containment-engine-run-profile",
+    version: "1.0.0",
+    id: GODOT_PROJECT_VALIDATION_ENGINE_RUN_PROFILE_ID,
+    engine: "godot",
+    operationId: "engine.project-validation",
+    invocationDigest: GODOT_PROJECT_VALIDATION_INVOCATION_DIGEST,
+    arguments: projectValidationArguments,
     callerArguments: "denied",
     callerEnvironment: "denied",
     networkCapabilities: "none",
@@ -524,10 +609,84 @@ export const GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE: ProcessContain
     }),
   );
 
+export const GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE: ProcessContainmentEngineExecutionProfile =
+  createProfile(
+    Object.freeze({
+      schemaVersion: "1.0.0" as const,
+      profileId: GODOT_PROJECT_IMPORT_ENGINE_RUN_PROFILE_ID,
+      profileDigest: GODOT_PROJECT_IMPORT_ENGINE_RUN_PROFILE_DIGEST,
+      engine: "godot" as const,
+      operationId: "engine.project-import" as const,
+      invocationDigest: GODOT_PROJECT_IMPORT_INVOCATION_DIGEST,
+      launch: Object.freeze({
+        workingDirectory: "$stagedProject" as const,
+        arguments: projectImportArguments,
+        callerArguments: "denied" as const,
+        callerEnvironment: "denied" as const,
+        networkCapabilities: "none" as const,
+        projectSource: "disposable-copy" as const,
+      }),
+      limits: Object.freeze({
+        ...commonStagingLimits,
+        processTimeoutMs: GODOT_PROJECT_IMPORT_PROCESS_TIMEOUT_MS,
+        idleTimeoutMs: GODOT_PROJECT_IMPORT_IDLE_TIMEOUT_MS,
+        terminationGraceMs: GODOT_PROJECT_IMPORT_TERMINATION_GRACE_MS,
+        maxOutputBytes: GODOT_PROJECT_IMPORT_MAX_OUTPUT_BYTES,
+        maxReportDurationMs:
+          GODOT_PROJECT_IMPORT_ENGINE_RUN_MAX_REPORT_DURATION_MS,
+      }),
+      output: Object.freeze({
+        kind: "digest-only-log" as const,
+        prefix: null,
+        maxLineBytes: null,
+        maxEvents: null,
+        retainRawOutput: false as const,
+      }),
+    }),
+  );
+
+export const GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE: ProcessContainmentEngineExecutionProfile =
+  createProfile(
+    Object.freeze({
+      schemaVersion: "1.0.0" as const,
+      profileId: GODOT_PROJECT_VALIDATION_ENGINE_RUN_PROFILE_ID,
+      profileDigest: GODOT_PROJECT_VALIDATION_ENGINE_RUN_PROFILE_DIGEST,
+      engine: "godot" as const,
+      operationId: "engine.project-validation" as const,
+      invocationDigest: GODOT_PROJECT_VALIDATION_INVOCATION_DIGEST,
+      launch: Object.freeze({
+        workingDirectory: "$stagedProject" as const,
+        arguments: projectValidationArguments,
+        callerArguments: "denied" as const,
+        callerEnvironment: "denied" as const,
+        networkCapabilities: "none" as const,
+        projectSource: "disposable-copy" as const,
+      }),
+      limits: Object.freeze({
+        ...commonStagingLimits,
+        processTimeoutMs: GODOT_PROJECT_VALIDATION_PROCESS_TIMEOUT_MS,
+        idleTimeoutMs: GODOT_PROJECT_VALIDATION_IDLE_TIMEOUT_MS,
+        terminationGraceMs: GODOT_PROJECT_VALIDATION_TERMINATION_GRACE_MS,
+        maxOutputBytes: GODOT_PROJECT_VALIDATION_MAX_OUTPUT_BYTES,
+        maxReportDurationMs:
+          GODOT_PROJECT_VALIDATION_ENGINE_RUN_MAX_REPORT_DURATION_MS,
+      }),
+      output: Object.freeze({
+        kind: "prefixed-json-lines" as const,
+        prefix: GODOT_PROJECT_VALIDATION_OUTPUT_PREFIX,
+        maxLineBytes: GODOT_PROJECT_VALIDATION_MAX_LINE_BYTES,
+        maxEvents: GODOT_PROJECT_VALIDATION_MAX_EVENTS,
+        retainRawOutput: false as const,
+      }),
+    }),
+  );
+
 export const PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES: readonly ProcessContainmentEngineExecutionProfile[] =
   Object.freeze([
     GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE,
     GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE,
+    GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE,
+    GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE,
   ]);
 
 export const PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST: Sha256Digest =
@@ -547,6 +706,12 @@ export function getProcessContainmentEngineExecutionProfile(
   }
   if (profileId === PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID) {
     return GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE;
+  }
+  if (profileId === GODOT_PROJECT_IMPORT_ENGINE_RUN_PROFILE_ID) {
+    return GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE;
+  }
+  if (profileId === GODOT_PROJECT_VALIDATION_ENGINE_RUN_PROFILE_ID) {
+    return GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE;
   }
   return reject("engine execution profile is not registered");
 }

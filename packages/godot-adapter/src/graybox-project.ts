@@ -27,7 +27,7 @@ import { isProxy } from "node:util/types";
 import { GodotAdapterBoundaryError } from "./errors.js";
 
 export const GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST: Sha256Digest =
-  "sha256:910710e31f687f5b9b27dc7c9f41f68091ae6317e5fabb44e5a1d2047953ba3a" as Sha256Digest;
+  "sha256:db57a533c42ac88e04655e0638b1056f8c8088b7bf27639bcf083c61c2255ad4" as Sha256Digest;
 export const GODOT_GRAYBOX_SCENARIO_DIGEST: Sha256Digest =
   "sha256:4bce945905093f746939b6b8f1c6183d0795f2f74b533763970aeed5be4e6c0f" as Sha256Digest;
 export const GODOT_GRAYBOX_TARGET_VERSION = "4.7.2" as const;
@@ -44,6 +44,7 @@ export type GodotGrayboxFeature =
   | "win-state";
 
 export type GodotGrayboxSourceRole =
+  | "validator-script"
   | "project-settings"
   | "scenario"
   | "scene"
@@ -128,6 +129,10 @@ const expectedFeatures = Object.freeze([
 ] as const);
 
 const expectedFiles = Object.freeze([
+  Object.freeze({
+    path: "addons/ai_game_playbook/validators/project_validation.gd",
+    role: "validator-script" as const,
+  }),
   Object.freeze({ path: "project.godot", role: "project-settings" as const }),
   Object.freeze({ path: "scenario.json", role: "scenario" as const }),
   Object.freeze({ path: "scenes/main.tscn", role: "scene" as const }),
@@ -481,6 +486,25 @@ function requireTextFragments(
 }
 
 function assertStaticStructure(files: ReadonlyMap<string, string>): void {
+  const validator =
+    files.get(
+      "addons/ai_game_playbook/validators/project_validation.gd",
+    ) ?? "";
+  requireTextFragments(
+    validator,
+    [
+      "extends SceneTree",
+      "AGPB_PROJECT_VALIDATION ",
+      'ResourceLoader.load(',
+      '"validation-started"',
+      '"validation-passed"',
+      '"validation-failed"',
+      'quit(0)',
+      'quit(2)',
+    ],
+    "Godot graybox validator is missing a required script or scene boundary.",
+  );
+
   const project = files.get("project.godot") ?? "";
   requireTextFragments(
     project,

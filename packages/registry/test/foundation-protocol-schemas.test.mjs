@@ -37,6 +37,8 @@ const expectedIds = [
   "godot-executable-discovery-request",
   "godot-headless-preflight-report",
   "godot-headless-preflight-request",
+  "godot-project-validation-expectation",
+  "godot-project-validation-transcript",
   "godot-version-probe-report",
   "godot-version-probe-request",
   "init-report",
@@ -140,7 +142,7 @@ test("engine execution profile schema accepts only registered launch tuples", ()
   assert.equal(validate(changed), false);
 });
 
-test("engine run schemas accept both registered profiles without cross-profile drift", () => {
+test("engine run schemas accept registered profiles without cross-profile drift", () => {
   const ajv = validator();
   const validateRequest = ajv.compile(
     contracts.FOUNDATION_PROTOCOL_SCHEMAS[
@@ -169,6 +171,31 @@ test("engine run schemas accept both registered profiles without cross-profile d
   request.inputBindingDigest = contracts.sha256Digest("replay expectation");
   request.limits = structuredClone(profile.limits);
   assert.equal(validateRequest(request), true, JSON.stringify(validateRequest.errors));
+
+  for (const boundProfile of [
+    contracts.GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE,
+    contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE,
+  ]) {
+    const bound = structuredClone(
+      validFoundationProtocolFixtures["process-containment-engine-run-request"],
+    );
+    bound.profile = {
+      id: boundProfile.profileId,
+      digest: boundProfile.profileDigest,
+      contractDigest: boundProfile.contractDigest,
+      catalogDigest:
+        contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
+    };
+    bound.operationId = boundProfile.operationId;
+    bound.invocationDigest = boundProfile.invocationDigest;
+    bound.inputBindingDigest = contracts.sha256Digest(boundProfile.profileId);
+    bound.limits = structuredClone(boundProfile.limits);
+    assert.equal(
+      validateRequest(bound),
+      true,
+      `${boundProfile.profileId}: ${JSON.stringify(validateRequest.errors)}`,
+    );
+  }
 
   const report = structuredClone(
     validFoundationProtocolFixtures["process-containment-engine-run-report"],

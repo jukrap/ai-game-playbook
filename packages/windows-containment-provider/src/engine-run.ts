@@ -1,6 +1,8 @@
 import {
   GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE,
   GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE,
+  GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE,
+  GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE,
   PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
   PROCESS_CONTAINMENT_POLICY_DIGEST,
   assertProcessContainmentEngineRunReportSemantics,
@@ -50,7 +52,7 @@ import { safeWindowsContainmentProviderEnvironment } from "./self-test.js";
 
 const NATIVE_ENGINE_RUN_MAX_INPUT_BYTES = 4 * 1024 * 1024;
 const NATIVE_ENGINE_RUN_MAX_OUTPUT_BYTES = 256 * 1024;
-const NATIVE_ENGINE_REPLAY_MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
+const NATIVE_ENGINE_STRUCTURED_MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
 const NATIVE_ENGINE_RUN_MAX_ERROR_BYTES = 16 * 1024;
 const NATIVE_ENGINE_RUN_CANCELLATION_WAIT_MS = 2_000;
 const NATIVE_ENGINE_RUN_CANCELLATION_PROCESS_TIMEOUT_MS = 3_000;
@@ -72,6 +74,12 @@ export interface PrepareWindowsContainedGodotReplayRunRequest
   readonly expectationDigest: Sha256Digest;
 }
 
+export type PrepareWindowsContainedGodotImportRunRequest =
+  PrepareWindowsContainedGodotReplayRunRequest;
+
+export type PrepareWindowsContainedGodotValidationRunRequest =
+  PrepareWindowsContainedGodotReplayRunRequest;
+
 export interface PreparedWindowsContainedGodotEngineRun {
   readonly schemaVersion: "1.0.0";
   readonly request: ProcessContainmentEngineRunRequest;
@@ -86,7 +94,19 @@ export interface RunWindowsContainedGodotEngineRequest {
 export type PreparedWindowsContainedGodotReplayRun =
   PreparedWindowsContainedGodotEngineRun;
 
+export type PreparedWindowsContainedGodotImportRun =
+  PreparedWindowsContainedGodotEngineRun;
+
+export type PreparedWindowsContainedGodotValidationRun =
+  PreparedWindowsContainedGodotEngineRun;
+
 export type RunWindowsContainedGodotReplayRequest =
+  RunWindowsContainedGodotEngineRequest;
+
+export type RunWindowsContainedGodotImportRequest =
+  RunWindowsContainedGodotEngineRequest;
+
+export type RunWindowsContainedGodotValidationRequest =
   RunWindowsContainedGodotEngineRequest;
 
 export interface WindowsContainedGodotReplayExecution {
@@ -100,6 +120,9 @@ export interface WindowsContainedGodotReplayExecution {
       }
     | { readonly status: "unavailable" };
 }
+
+export type WindowsContainedGodotValidationExecution =
+  WindowsContainedGodotReplayExecution;
 
 interface ContainedEngineRunResult {
   readonly report: ProcessContainmentEngineRunReport;
@@ -168,6 +191,7 @@ interface ReplayTranscriptAttestation {
 
 const preparedAuthorities = new WeakMap<object, PreparedAuthority>();
 const replayTranscripts = new WeakMap<object, string>();
+const validationTranscripts = new WeakMap<object, string>();
 
 function fail(
   code:
@@ -264,6 +288,7 @@ function preparationRequest(
 
 function replayPreparationRequest(
   value: unknown,
+  label = "replay",
 ): PrepareWindowsContainedGodotReplayRunRequest {
   const record = exactRecord(
     value,
@@ -277,7 +302,7 @@ function replayPreparationRequest(
       "expectationDigest",
     ],
     "invalid-engine-run-request",
-    "Contained Godot replay preparation contains undeclared fields.",
+    `Contained Godot ${label} preparation contains undeclared fields.`,
   );
   if (
     typeof record["runId"] !== "string" ||
@@ -286,7 +311,7 @@ function replayPreparationRequest(
   ) {
     return fail(
       "invalid-engine-run-request",
-      "Contained Godot replay requires canonical run and expectation identities.",
+      `Contained Godot ${label} requires canonical run and expectation identities.`,
     );
   }
   return Object.freeze({
@@ -337,6 +362,28 @@ export async function prepareWindowsContainedGodotReplayRun(
   return await prepareWindowsContainedGodotEngineRunForProfile(
     input,
     GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE,
+    input.expectationDigest,
+  );
+}
+
+export async function prepareWindowsContainedGodotImportRun(
+  value: unknown,
+): Promise<PreparedWindowsContainedGodotImportRun> {
+  const input = replayPreparationRequest(value, "project import");
+  return await prepareWindowsContainedGodotEngineRunForProfile(
+    input,
+    GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE,
+    input.expectationDigest,
+  );
+}
+
+export async function prepareWindowsContainedGodotValidationRun(
+  value: unknown,
+): Promise<PreparedWindowsContainedGodotValidationRun> {
+  const input = replayPreparationRequest(value, "project validation");
+  return await prepareWindowsContainedGodotEngineRunForProfile(
+    input,
+    GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE,
     input.expectationDigest,
   );
 }
@@ -1007,7 +1054,7 @@ function parseNativeReport(
   });
 }
 
-function replayTranscriptCanTransfer(
+function structuredOutputCanTransfer(
   report: ReplayTranscriptAttestation,
 ): boolean {
   const exitOutcomeMatches =
@@ -1034,16 +1081,16 @@ function replayTranscriptCanTransfer(
   );
 }
 
-function parseReplayTranscript(
+function parseStructuredOutput(
   value: unknown,
   native: NativeEngineRunReport,
   request: ProcessContainmentEngineRunRequest,
 ): string | undefined {
   if (value === null) {
-    if (replayTranscriptCanTransfer(native)) {
+    if (structuredOutputCanTransfer(native)) {
       return fail(
         "engine-run-output-invalid",
-        "Native replay omitted a bounded transcript after a clean exit.",
+        "Native run omitted bounded structured output after a clean exit.",
         true,
       );
     }
@@ -1052,14 +1099,14 @@ function parseReplayTranscript(
   if (
     typeof value !== "string" ||
     value.length < 1 ||
-    value.length > NATIVE_ENGINE_REPLAY_MAX_OUTPUT_BYTES ||
+    value.length > NATIVE_ENGINE_STRUCTURED_MAX_OUTPUT_BYTES ||
     !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(
       value,
     )
   ) {
     return fail(
       "engine-run-output-invalid",
-      "Native replay transcript encoding is outside the protocol.",
+      "Native structured output encoding is outside the protocol.",
       true,
     );
   }
@@ -1073,11 +1120,11 @@ function parseReplayTranscript(
     native.output.capturedBytes !== bytes.byteLength ||
     native.output.observedBytes !== bytes.byteLength ||
     native.output.logDigest !== digest ||
-    !replayTranscriptCanTransfer(native)
+    !structuredOutputCanTransfer(native)
   ) {
     return fail(
       "engine-run-output-invalid",
-      "Native replay transcript contradicts its bounded output attestation.",
+      "Native structured output contradicts its bounded output attestation.",
       true,
     );
   }
@@ -1086,7 +1133,7 @@ function parseReplayTranscript(
   } catch {
     return fail(
       "engine-run-output-invalid",
-      "Native replay transcript is not valid UTF-8.",
+      "Native structured output is not valid UTF-8.",
       true,
     );
   }
@@ -1258,8 +1305,8 @@ async function runWindowsContainedGodotEngineForProfile(
     authority.requestDigest,
     cancellationId,
     input.signal,
-    authority.profile.operationId === "engine.deterministic-replay"
-      ? NATIVE_ENGINE_REPLAY_MAX_OUTPUT_BYTES
+    authority.profile.output.kind === "prefixed-json-lines"
+      ? NATIVE_ENGINE_STRUCTURED_MAX_OUTPUT_BYTES
       : NATIVE_ENGINE_RUN_MAX_OUTPUT_BYTES,
     request.limits.maxReportDurationMs + 5_000,
     request.limits.terminationGraceMs,
@@ -1295,32 +1342,32 @@ async function runWindowsContainedGodotEngineForProfile(
     );
   }
   let nativeValue = parsed;
-  let encodedTranscript: unknown;
-  if (authority.profile.operationId === "engine.deterministic-replay") {
+  let encodedStructuredOutput: unknown;
+  if (authority.profile.output.kind === "prefixed-json-lines") {
     const envelope = exactRecord(
       parsed,
-      ["schemaVersion", "operation", "report", "transcriptBase64"],
+      ["schemaVersion", "operation", "report", "structuredOutputBase64"],
       "engine-run-output-invalid",
-      "Native replay envelope is outside the protocol.",
+      "Native structured output envelope is outside the protocol.",
       true,
     );
     if (
       envelope["schemaVersion"] !== "1.0.0" ||
-      envelope["operation"] !== "godot-engine-replay-envelope"
+      envelope["operation"] !== "godot-engine-structured-output-envelope"
     ) {
       return fail(
         "engine-run-output-invalid",
-        "Native replay envelope identity is outside the protocol.",
+        "Native structured output envelope identity is outside the protocol.",
         true,
       );
     }
     nativeValue = envelope["report"];
-    encodedTranscript = envelope["transcriptBase64"];
+    encodedStructuredOutput = envelope["structuredOutputBase64"];
   }
   const native = parseNativeReport(nativeValue, authority, request);
   const transcript =
-    authority.profile.operationId === "engine.deterministic-replay"
-      ? parseReplayTranscript(encodedTranscript, native, request)
+    authority.profile.output.kind === "prefixed-json-lines"
+      ? parseStructuredOutput(encodedStructuredOutput, native, request)
       : undefined;
   const expectedExit =
     native.outcome === "succeeded"
@@ -1401,7 +1448,7 @@ async function runWindowsContainedGodotEngineForProfile(
     );
   }
   const transferableTranscript =
-    transcript !== undefined && replayTranscriptCanTransfer(report)
+    transcript !== undefined && structuredOutputCanTransfer(report)
       ? transcript
       : undefined;
   return Object.freeze({
@@ -1423,6 +1470,23 @@ export async function runWindowsContainedGodotEngine(
     return fail(
       "engine-run-output-invalid",
       "Headless preflight unexpectedly returned replay output.",
+      true,
+    );
+  }
+  return result.report;
+}
+
+export async function runWindowsContainedGodotImport(
+  value: unknown,
+): Promise<ProcessContainmentEngineRunReport> {
+  const result = await runWindowsContainedGodotEngineForProfile(
+    value,
+    GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE.profileId,
+  );
+  if (result.transcript !== undefined) {
+    return fail(
+      "engine-run-output-invalid",
+      "Project import unexpectedly returned structured output.",
       true,
     );
   }
@@ -1468,5 +1532,47 @@ export function consumeWindowsContainedGodotReplayTranscript(
     );
   }
   replayTranscripts.delete(execution as object);
+  return transcript;
+}
+
+export async function runWindowsContainedGodotValidation(
+  value: unknown,
+): Promise<WindowsContainedGodotValidationExecution> {
+  const result = await runWindowsContainedGodotEngineForProfile(
+    value,
+    GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE.profileId,
+  );
+  const execution: WindowsContainedGodotValidationExecution = Object.freeze({
+    schemaVersion: "1.0.0",
+    report: result.report,
+    transcript:
+      result.transcript === undefined
+        ? Object.freeze({ status: "unavailable" as const })
+        : Object.freeze({
+            status: "available" as const,
+            digest: result.report.output.logDigest,
+            bytes: result.report.output.capturedBytes,
+          }),
+  });
+  if (result.transcript !== undefined) {
+    validationTranscripts.set(execution, result.transcript);
+  }
+  return execution;
+}
+
+export function consumeWindowsContainedGodotValidationTranscript(
+  execution: unknown,
+): string {
+  const transcript =
+    execution !== null && typeof execution === "object"
+      ? validationTranscripts.get(execution)
+      : undefined;
+  if (transcript === undefined) {
+    return fail(
+      "engine-run-output-invalid",
+      "Godot project validation transcript is unavailable, cloned, or already consumed.",
+    );
+  }
+  validationTranscripts.delete(execution as object);
   return transcript;
 }

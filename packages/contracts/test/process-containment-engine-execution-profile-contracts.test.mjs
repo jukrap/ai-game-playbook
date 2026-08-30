@@ -16,12 +16,17 @@ function rawContractDigest(profile) {
   });
 }
 
-test("engine execution profile catalog fixes both Godot launch tuples", () => {
+test("engine execution profile catalog fixes four Godot launch tuples", () => {
   assert.deepEqual(
     contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
       ({ profileId }) => profileId,
     ),
-    ["godot-deterministic-replay-v1", "godot-headless-preflight-v1"],
+    [
+      "godot-deterministic-replay-v1",
+      "godot-headless-preflight-v1",
+      "godot-project-import-v1",
+      "godot-project-validation-v1",
+    ],
   );
 
   const preflight = contracts.GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE;
@@ -91,6 +96,55 @@ test("engine execution profile catalog fixes both Godot launch tuples", () => {
     maxEvents: contracts.GODOT_DETERMINISTIC_REPLAY_MAX_EVENTS,
     retainRawOutput: false,
   });
+
+  const projectImport =
+    contracts.GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE;
+  assert.equal(projectImport.operationId, "engine.project-import");
+  assert.equal(
+    projectImport.invocationDigest,
+    contracts.GODOT_PROJECT_IMPORT_INVOCATION_DIGEST,
+  );
+  assert.deepEqual(projectImport.launch.arguments, [
+    "--headless",
+    "--path",
+    "$stagedProject",
+    "--import",
+    "--log-file",
+    "$profileLocalLog",
+    "--no-header",
+  ]);
+  assert.deepEqual(projectImport.output, {
+    kind: "digest-only-log",
+    prefix: null,
+    maxLineBytes: null,
+    maxEvents: null,
+    retainRawOutput: false,
+  });
+
+  const validation =
+    contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE;
+  assert.equal(validation.operationId, "engine.project-validation");
+  assert.equal(
+    validation.invocationDigest,
+    contracts.GODOT_PROJECT_VALIDATION_INVOCATION_DIGEST,
+  );
+  assert.deepEqual(validation.launch.arguments, [
+    "--headless",
+    "--path",
+    "$stagedProject",
+    "--script",
+    contracts.GODOT_PROJECT_VALIDATOR_SCRIPT,
+    "--log-file",
+    "$profileLocalLog",
+    "--no-header",
+  ]);
+  assert.deepEqual(validation.output, {
+    kind: "prefixed-json-lines",
+    prefix: contracts.GODOT_PROJECT_VALIDATION_OUTPUT_PREFIX,
+    maxLineBytes: contracts.GODOT_PROJECT_VALIDATION_MAX_LINE_BYTES,
+    maxEvents: contracts.GODOT_PROJECT_VALIDATION_MAX_EVENTS,
+    retainRawOutput: false,
+  });
 });
 
 test("execution profiles are immutable, schema-backed, and canonically resolved", () => {
@@ -127,11 +181,19 @@ test("execution profiles are immutable, schema-backed, and canonically resolved"
   );
   assert.equal(
     contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
-    "sha256:3465d6ed6df65a2185d41a53ade8c75dd735694d19568c3c755da0dcd6948b36",
+    "sha256:fbb008396cebde8f78364a4aae09463227c05090af4b939291caf44344057d22",
   );
   assert.equal(
     contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_RUN_PROFILE_DIGEST,
     "sha256:87bc6b4e9638a68789e3bf50b76cdcaf48d9444b1c0bee517aecfd273116a01f",
+  );
+  assert.equal(
+    contracts.GODOT_PROJECT_IMPORT_ENGINE_RUN_PROFILE_DIGEST,
+    "sha256:d56447ed1bb84595f636475f7bf1890bc5dae11c46e6150fb958aaa98f1013e7",
+  );
+  assert.equal(
+    contracts.GODOT_PROJECT_VALIDATION_ENGINE_RUN_PROFILE_DIGEST,
+    "sha256:134ed14719534b48a2d7c0518d767c5046c88ccffb6a155944bce66e10af29e9",
   );
   assert.throws(
     () =>

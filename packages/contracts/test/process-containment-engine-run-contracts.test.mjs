@@ -69,6 +69,24 @@ function replayRequest() {
   return value;
 }
 
+function requestForProfile(executionProfile) {
+  const value = request();
+  value.profile = {
+    id: executionProfile.profileId,
+    digest: executionProfile.profileDigest,
+    contractDigest: executionProfile.contractDigest,
+    catalogDigest:
+      contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
+  };
+  value.operationId = executionProfile.operationId;
+  value.invocationDigest = executionProfile.invocationDigest;
+  value.inputBindingDigest = contracts.sha256Digest(
+    `input:${executionProfile.profileId}`,
+  );
+  value.limits = structuredClone(executionProfile.limits);
+  return value;
+}
+
 function successfulReportInput(runRequest = request()) {
   return {
     runId: runRequest.runId,
@@ -222,6 +240,55 @@ test("engine run request admits only the registered deterministic replay tuple",
       TypeError,
     );
   }
+});
+
+test("engine run request keeps project import and semantic validation distinct", () => {
+  const projectImport = requestForProfile(
+    contracts.GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE,
+  );
+  const validation = requestForProfile(
+    contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE,
+  );
+  assert.doesNotThrow(() =>
+    contracts.assertProcessContainmentEngineRunRequestSemantics(projectImport),
+  );
+  assert.doesNotThrow(() =>
+    contracts.assertProcessContainmentEngineRunRequestSemantics(validation),
+  );
+  assert.notEqual(projectImport.profile.id, validation.profile.id);
+  assert.notEqual(projectImport.invocationDigest, validation.invocationDigest);
+
+  const substituted = structuredClone(validation);
+  substituted.profile = structuredClone(projectImport.profile);
+  assert.throws(
+    () =>
+      contracts.assertProcessContainmentEngineRunRequestSemantics(substituted),
+    TypeError,
+  );
+
+  const validationIdleInput = successfulReportInput(validation);
+  validationIdleInput.process.exitCode = 123;
+  validationIdleInput.termination.requested = true;
+  validationIdleInput.termination.cause = "idle-timeout";
+  validationIdleInput.outcome = "failed";
+  assert.doesNotThrow(() =>
+    contracts.assertProcessContainmentEngineRunReportSemantics(
+      report(validationIdleInput),
+    ),
+  );
+
+  const importIdleInput = successfulReportInput(projectImport);
+  importIdleInput.process.exitCode = 123;
+  importIdleInput.termination.requested = true;
+  importIdleInput.termination.cause = "idle-timeout";
+  importIdleInput.outcome = "failed";
+  assert.throws(
+    () =>
+      contracts.assertProcessContainmentEngineRunReportSemantics(
+        report(importIdleInput),
+      ),
+    TypeError,
+  );
 });
 
 test("only a clean settled engine run can report succeeded", () => {

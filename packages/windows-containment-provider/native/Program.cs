@@ -37,11 +37,11 @@ internal static class Program
                     await EngineRunProtocol.ReadRequestAsync();
                 NativeEngineRunResult result =
                     await EngineRunRunner.RunAsync(request);
-                if (request.OperationId == EngineRunProtocol.ReplayOperationId)
+                if (request.OutputKind == "prefixed-json-lines")
                 {
-                    Protocol.WriteJson(new NativeEngineReplayEnvelope(
+                    Protocol.WriteJson(new NativeEngineStructuredOutputEnvelope(
                         "1.0.0",
-                        "godot-engine-replay-envelope",
+                        "godot-engine-structured-output-envelope",
                         result.Report,
                         result.TranscriptBytes is null
                             ? null

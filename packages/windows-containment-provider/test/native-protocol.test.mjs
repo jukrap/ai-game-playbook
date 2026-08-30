@@ -79,6 +79,14 @@ test("native engine profile remains synchronized with the typed contract", async
       "Replay",
       contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE,
     ],
+    [
+      "ProjectImport",
+      contracts.GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE,
+    ],
+    [
+      "ProjectValidation",
+      contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE,
+    ],
   ];
   for (const [prefix, profile] of profiles) {
     assert.equal(csharpConstant(protocol, `${prefix}OperationId`), profile.operationId);
@@ -165,6 +173,56 @@ test("native engine profile remains synchronized with the typed contract", async
       contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE.output
         .maxEvents,
     ],
+    [
+      "ProjectImportProcessTimeoutMs",
+      contracts.GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE.limits
+        .processTimeoutMs,
+    ],
+    [
+      "ProjectImportIdleTimeoutMs",
+      contracts.GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE.limits
+        .idleTimeoutMs,
+    ],
+    [
+      "ProjectImportMaximumOutputBytes",
+      contracts.GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE.limits
+        .maxOutputBytes,
+    ],
+    [
+      "ProjectImportMaximumReportDurationMs",
+      contracts.GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE.limits
+        .maxReportDurationMs,
+    ],
+    [
+      "ProjectValidationProcessTimeoutMs",
+      contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE.limits
+        .processTimeoutMs,
+    ],
+    [
+      "ProjectValidationIdleTimeoutMs",
+      contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE.limits
+        .idleTimeoutMs,
+    ],
+    [
+      "ProjectValidationMaximumOutputBytes",
+      contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE.limits
+        .maxOutputBytes,
+    ],
+    [
+      "ProjectValidationMaximumReportDurationMs",
+      contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE.limits
+        .maxReportDurationMs,
+    ],
+    [
+      "ProjectValidationMaximumLineBytes",
+      contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE.output
+        .maxLineBytes,
+    ],
+    [
+      "ProjectValidationMaximumEvents",
+      contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE.output
+        .maxEvents,
+    ],
     ["MaximumProcesses", contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES],
     ["MaximumProjectFiles", contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES],
     [
@@ -192,6 +250,14 @@ test("native engine profile remains synchronized with the typed contract", async
     csharpConstant(protocol, "ReplayOutputPrefix"),
     contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE.output.prefix,
   );
+  assert.equal(
+    csharpConstant(protocol, "ProjectValidationOutputPrefix"),
+    contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE.output.prefix,
+  );
+  assert.equal(
+    csharpConstant(protocol, "ProjectValidationScript"),
+    contracts.GODOT_PROJECT_VALIDATOR_SCRIPT,
+  );
   assert.match(
     runner,
     /EngineRunProtocol\.PreflightOperationId[\s\S]*"--quit-after"[\s\S]*"1"[\s\S]*"--no-header"/u,
@@ -199,6 +265,14 @@ test("native engine profile remains synchronized with the typed contract", async
   assert.match(
     runner,
     /EngineRunProtocol\.ReplayOperationId[\s\S]*"--no-header"[\s\S]*"--"[\s\S]*"--agpb-replay"/u,
+  );
+  assert.match(
+    runner,
+    /EngineRunProtocol\.ProjectImportOperationId[\s\S]*"--import"[\s\S]*"--log-file"[\s\S]*"--no-header"/u,
+  );
+  assert.match(
+    runner,
+    /EngineRunProtocol\.ProjectValidationOperationId[\s\S]*"--script"[\s\S]*EngineRunProtocol\.ProjectValidationScript[\s\S]*"--no-header"/u,
   );
 });
 

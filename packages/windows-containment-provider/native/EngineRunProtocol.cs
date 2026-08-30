@@ -29,8 +29,26 @@ internal static partial class EngineRunProtocol
         "sha256:f3448c2ab1e21105f1432b58e8689c0e43b39a616ab6a2a422b25e65435ce8c7";
     internal const string ReplayInvocationDigest =
         "sha256:03f938d99f08827f2aa2e6205d2ed55454c616c1a750b00ca08c9fd7438314f0";
+    internal const string ProjectImportOperationId = "engine.project-import";
+    internal const string ProjectImportProfileId = "godot-project-import-v1";
+    internal const string ProjectImportProfileDigest =
+        "sha256:d56447ed1bb84595f636475f7bf1890bc5dae11c46e6150fb958aaa98f1013e7";
+    internal const string ProjectImportProfileContractDigest =
+        "sha256:f166613560f199d0f3b8670666a83cb6d5e45190dd092b676ce8341aab7b285a";
+    internal const string ProjectImportInvocationDigest =
+        "sha256:0f3e56fc3ba72437c00a96309ab140c864c0b39751dd050f838986eed25a4c06";
+    internal const string ProjectValidationOperationId = "engine.project-validation";
+    internal const string ProjectValidationProfileId = "godot-project-validation-v1";
+    internal const string ProjectValidationProfileDigest =
+        "sha256:134ed14719534b48a2d7c0518d767c5046c88ccffb6a155944bce66e10af29e9";
+    internal const string ProjectValidationProfileContractDigest =
+        "sha256:07492d4ed4453e9a393872ad9339e0eb029e8bd98e223f2ec3f866da76d5bed4";
+    internal const string ProjectValidationInvocationDigest =
+        "sha256:f1647a8b1de201694f273e41bf8b350cd9a02d1e1c91c406ccf2b59f07bb42a7";
+    internal const string ProjectValidationScript =
+        "res://addons/ai_game_playbook/validators/project_validation.gd";
     internal const string ProfileCatalogDigest =
-        "sha256:3465d6ed6df65a2185d41a53ade8c75dd735694d19568c3c755da0dcd6948b36";
+        "sha256:fbb008396cebde8f78364a4aae09463227c05090af4b939291caf44344057d22";
     internal const string PolicyDigest =
         "sha256:9279861178baa8b60e2b5e7b53c09466ab05618bda01e0e82c43a968e3f1339d";
     private const int StartValidityMs = 30_000;
@@ -46,6 +64,17 @@ internal static partial class EngineRunProtocol
     private const int ReplayMaximumLineBytes = 65_536;
     private const int ReplayMaximumEvents = 2_050;
     private const string ReplayOutputPrefix = "AGPB_GRAYBOX ";
+    private const int ProjectImportProcessTimeoutMs = 120_000;
+    private const int ProjectImportIdleTimeoutMs = 120_000;
+    private const int ProjectImportMaximumOutputBytes = 1_024 * 1_024;
+    private const int ProjectImportMaximumReportDurationMs = 152_000;
+    private const int ProjectValidationProcessTimeoutMs = 30_000;
+    private const int ProjectValidationIdleTimeoutMs = 15_000;
+    private const int ProjectValidationMaximumOutputBytes = 65_536;
+    private const int ProjectValidationMaximumReportDurationMs = 62_000;
+    private const int ProjectValidationMaximumLineBytes = 16_384;
+    private const int ProjectValidationMaximumEvents = 2;
+    private const string ProjectValidationOutputPrefix = "AGPB_PROJECT_VALIDATION ";
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly HashSet<string> ReservedNames = new(
         new[]
@@ -509,6 +538,38 @@ internal static partial class EngineRunProtocol
             ReplayOutputPrefix,
             ReplayMaximumLineBytes,
             ReplayMaximumEvents),
+        ProjectImportProfileId => new NativeEngineRunProfile(
+            ProjectImportOperationId,
+            ProjectImportProfileDigest,
+            ProjectImportProfileContractDigest,
+            ProjectImportInvocationDigest,
+            true,
+            StartValidityMs,
+            ProjectImportProcessTimeoutMs,
+            ProjectImportIdleTimeoutMs,
+            TerminationGraceMs,
+            ProjectImportMaximumOutputBytes,
+            ProjectImportMaximumReportDurationMs,
+            "digest-only-log",
+            null,
+            null,
+            null),
+        ProjectValidationProfileId => new NativeEngineRunProfile(
+            ProjectValidationOperationId,
+            ProjectValidationProfileDigest,
+            ProjectValidationProfileContractDigest,
+            ProjectValidationInvocationDigest,
+            true,
+            StartValidityMs,
+            ProjectValidationProcessTimeoutMs,
+            ProjectValidationIdleTimeoutMs,
+            TerminationGraceMs,
+            ProjectValidationMaximumOutputBytes,
+            ProjectValidationMaximumReportDurationMs,
+            "prefixed-json-lines",
+            ProjectValidationOutputPrefix,
+            ProjectValidationMaximumLineBytes,
+            ProjectValidationMaximumEvents),
         _ => throw new ProtocolException("request-value-invalid"),
     };
 

@@ -19,6 +19,18 @@ export type {
   ParsedGodotDeterministicReplayOutput,
 } from "./deterministic-replay-result.js";
 export {
+  GODOT_PROJECT_VALIDATION_OUTPUT_PREFIX,
+  createGodotProjectValidationExpectation,
+  parseGodotProjectValidationOutput,
+} from "./project-validation-result.js";
+export type {
+  GodotProjectValidationExpectationInput,
+  GodotProjectValidationOutput,
+  GodotProjectValidationOutputInvalidCode,
+  InvalidGodotProjectValidationOutput,
+  ParsedGodotProjectValidationOutput,
+} from "./project-validation-result.js";
+export {
   GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST,
   GODOT_GRAYBOX_SCENARIO_DIGEST,
   GODOT_GRAYBOX_TARGET_VERSION,

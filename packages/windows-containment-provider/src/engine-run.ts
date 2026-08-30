@@ -1,6 +1,7 @@
 import {
   GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE,
   GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE,
+  GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE,
   GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE,
   GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE,
   PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
@@ -80,6 +81,9 @@ export type PrepareWindowsContainedGodotImportRunRequest =
 export type PrepareWindowsContainedGodotValidationRunRequest =
   PrepareWindowsContainedGodotReplayRunRequest;
 
+export type PrepareWindowsContainedGodotPersistenceRunRequest =
+  PrepareWindowsContainedGodotReplayRunRequest;
+
 export interface PreparedWindowsContainedGodotEngineRun {
   readonly schemaVersion: "1.0.0";
   readonly request: ProcessContainmentEngineRunRequest;
@@ -100,6 +104,9 @@ export type PreparedWindowsContainedGodotImportRun =
 export type PreparedWindowsContainedGodotValidationRun =
   PreparedWindowsContainedGodotEngineRun;
 
+export type PreparedWindowsContainedGodotPersistenceRun =
+  PreparedWindowsContainedGodotEngineRun;
+
 export type RunWindowsContainedGodotReplayRequest =
   RunWindowsContainedGodotEngineRequest;
 
@@ -107,6 +114,9 @@ export type RunWindowsContainedGodotImportRequest =
   RunWindowsContainedGodotEngineRequest;
 
 export type RunWindowsContainedGodotValidationRequest =
+  RunWindowsContainedGodotEngineRequest;
+
+export type RunWindowsContainedGodotPersistenceRequest =
   RunWindowsContainedGodotEngineRequest;
 
 export interface WindowsContainedGodotReplayExecution {
@@ -122,6 +132,9 @@ export interface WindowsContainedGodotReplayExecution {
 }
 
 export type WindowsContainedGodotValidationExecution =
+  WindowsContainedGodotReplayExecution;
+
+export type WindowsContainedGodotPersistenceExecution =
   WindowsContainedGodotReplayExecution;
 
 interface ContainedEngineRunResult {
@@ -192,6 +205,7 @@ interface ReplayTranscriptAttestation {
 const preparedAuthorities = new WeakMap<object, PreparedAuthority>();
 const replayTranscripts = new WeakMap<object, string>();
 const validationTranscripts = new WeakMap<object, string>();
+const persistenceTranscripts = new WeakMap<object, string>();
 
 function fail(
   code:
@@ -384,6 +398,17 @@ export async function prepareWindowsContainedGodotValidationRun(
   return await prepareWindowsContainedGodotEngineRunForProfile(
     input,
     GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE,
+    input.expectationDigest,
+  );
+}
+
+export async function prepareWindowsContainedGodotPersistenceRun(
+  value: unknown,
+): Promise<PreparedWindowsContainedGodotPersistenceRun> {
+  const input = replayPreparationRequest(value, "persistence cycle");
+  return await prepareWindowsContainedGodotEngineRunForProfile(
+    input,
+    GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE,
     input.expectationDigest,
   );
 }
@@ -1056,13 +1081,14 @@ function parseNativeReport(
 
 function structuredOutputCanTransfer(
   report: ReplayTranscriptAttestation,
+  expectedProcesses: number,
 ): boolean {
   const exitOutcomeMatches =
     (report.process.exitCode === 0 && report.outcome === "succeeded") ||
     (report.process.exitCode === 2 && report.outcome === "failed");
   return (
     report.process.started &&
-    report.process.totalProcesses === 1 &&
+    report.process.totalProcesses === expectedProcesses &&
     report.process.activeProcesses === 0 &&
     exitOutcomeMatches &&
     !report.output.truncated &&
@@ -1087,7 +1113,7 @@ function parseStructuredOutput(
   request: ProcessContainmentEngineRunRequest,
 ): string | undefined {
   if (value === null) {
-    if (structuredOutputCanTransfer(native)) {
+    if (structuredOutputCanTransfer(native, request.limits.maxProcesses)) {
       return fail(
         "engine-run-output-invalid",
         "Native run omitted bounded structured output after a clean exit.",
@@ -1120,7 +1146,7 @@ function parseStructuredOutput(
     native.output.capturedBytes !== bytes.byteLength ||
     native.output.observedBytes !== bytes.byteLength ||
     native.output.logDigest !== digest ||
-    !structuredOutputCanTransfer(native)
+    !structuredOutputCanTransfer(native, request.limits.maxProcesses)
   ) {
     return fail(
       "engine-run-output-invalid",
@@ -1448,7 +1474,8 @@ async function runWindowsContainedGodotEngineForProfile(
     );
   }
   const transferableTranscript =
-    transcript !== undefined && structuredOutputCanTransfer(report)
+    transcript !== undefined &&
+    structuredOutputCanTransfer(report, request.limits.maxProcesses)
       ? transcript
       : undefined;
   return Object.freeze({
@@ -1574,5 +1601,47 @@ export function consumeWindowsContainedGodotValidationTranscript(
     );
   }
   validationTranscripts.delete(execution as object);
+  return transcript;
+}
+
+export async function runWindowsContainedGodotPersistence(
+  value: unknown,
+): Promise<WindowsContainedGodotPersistenceExecution> {
+  const result = await runWindowsContainedGodotEngineForProfile(
+    value,
+    GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE.profileId,
+  );
+  const execution: WindowsContainedGodotPersistenceExecution = Object.freeze({
+    schemaVersion: "1.0.0",
+    report: result.report,
+    transcript:
+      result.transcript === undefined
+        ? Object.freeze({ status: "unavailable" as const })
+        : Object.freeze({
+            status: "available" as const,
+            digest: result.report.output.logDigest,
+            bytes: result.report.output.capturedBytes,
+          }),
+  });
+  if (result.transcript !== undefined) {
+    persistenceTranscripts.set(execution, result.transcript);
+  }
+  return execution;
+}
+
+export function consumeWindowsContainedGodotPersistenceTranscript(
+  execution: unknown,
+): string {
+  const transcript =
+    execution !== null && typeof execution === "object"
+      ? persistenceTranscripts.get(execution)
+      : undefined;
+  if (transcript === undefined) {
+    return fail(
+      "engine-run-output-invalid",
+      "Godot persistence transcript is unavailable, cloned, or already consumed.",
+    );
+  }
+  persistenceTranscripts.delete(execution as object);
   return transcript;
 }

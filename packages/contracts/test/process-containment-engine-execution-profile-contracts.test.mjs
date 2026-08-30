@@ -16,7 +16,7 @@ function rawContractDigest(profile) {
   });
 }
 
-test("engine execution profile catalog fixes four Godot launch tuples", () => {
+test("engine execution profile catalog fixes five Godot launch tuples", () => {
   assert.deepEqual(
     contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
       ({ profileId }) => profileId,
@@ -26,6 +26,7 @@ test("engine execution profile catalog fixes four Godot launch tuples", () => {
       "godot-headless-preflight-v1",
       "godot-project-import-v1",
       "godot-project-validation-v1",
+      "godot-persistence-cycle-v1",
     ],
   );
 
@@ -145,13 +146,77 @@ test("engine execution profile catalog fixes four Godot launch tuples", () => {
     maxEvents: contracts.GODOT_PROJECT_VALIDATION_MAX_EVENTS,
     retainRawOutput: false,
   });
+
+  const persistence =
+    contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE;
+  assert.equal(persistence.operationId, "engine.persistence-cycle");
+  assert.equal(
+    persistence.invocationDigest,
+    contracts.GODOT_PERSISTENCE_CYCLE_INVOCATION_DIGEST,
+  );
+  assert.deepEqual(persistence.launch, {
+    mode: "ordered-sequence",
+    workingDirectory: "$stagedProject",
+    phases: [
+      {
+        phase: "save",
+        arguments: [
+          "--headless",
+          "--path",
+          "$stagedProject",
+          "--log-file",
+          "$profileSaveLog",
+          "--no-header",
+          "--",
+          "--agpb-persistence-save",
+        ],
+      },
+      {
+        phase: "load",
+        arguments: [
+          "--headless",
+          "--path",
+          "$stagedProject",
+          "--log-file",
+          "$profileLoadLog",
+          "--no-header",
+          "--",
+          "--agpb-persistence-load",
+        ],
+      },
+    ],
+    callerArguments: "denied",
+    callerEnvironment: "denied",
+    networkCapabilities: "none",
+    projectSource: "disposable-copy",
+  });
+  assert.equal(persistence.limits.maxProcesses, 2);
+  assert.equal(
+    persistence.limits.maxReportDurationMs,
+    contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_MAX_REPORT_DURATION_MS,
+  );
+  assert.deepEqual(persistence.output, {
+    kind: "prefixed-json-lines",
+    prefix: contracts.GODOT_PERSISTENCE_CYCLE_OUTPUT_PREFIX,
+    maxLineBytes: contracts.GODOT_PERSISTENCE_CYCLE_MAX_LINE_BYTES,
+    maxEvents: contracts.GODOT_PERSISTENCE_CYCLE_MAX_EVENTS,
+    retainRawOutput: false,
+  });
 });
 
 test("execution profiles are immutable, schema-backed, and canonically resolved", () => {
   for (const profile of contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES) {
     assert.equal(Object.isFrozen(profile), true);
     assert.equal(Object.isFrozen(profile.launch), true);
-    assert.equal(Object.isFrozen(profile.launch.arguments), true);
+    if (profile.launch.mode === "ordered-sequence") {
+      assert.equal(Object.isFrozen(profile.launch.phases), true);
+      for (const phase of profile.launch.phases) {
+        assert.equal(Object.isFrozen(phase), true);
+        assert.equal(Object.isFrozen(phase.arguments), true);
+      }
+    } else {
+      assert.equal(Object.isFrozen(profile.launch.arguments), true);
+    }
     assert.equal(Object.isFrozen(profile.limits), true);
     assert.equal(Object.isFrozen(profile.output), true);
     assert.doesNotThrow(() =>
@@ -181,7 +246,7 @@ test("execution profiles are immutable, schema-backed, and canonically resolved"
   );
   assert.equal(
     contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
-    "sha256:fbb008396cebde8f78364a4aae09463227c05090af4b939291caf44344057d22",
+    "sha256:baee3614224937ecdfad06848e4253b0350fea7ad2c930e4366eabfd9bd146a7",
   );
   assert.equal(
     contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_RUN_PROFILE_DIGEST,
@@ -194,6 +259,10 @@ test("execution profiles are immutable, schema-backed, and canonically resolved"
   assert.equal(
     contracts.GODOT_PROJECT_VALIDATION_ENGINE_RUN_PROFILE_DIGEST,
     "sha256:134ed14719534b48a2d7c0518d767c5046c88ccffb6a155944bce66e10af29e9",
+  );
+  assert.match(
+    contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_PROFILE_DIGEST,
+    /^sha256:[0-9a-f]{64}$/,
   );
   assert.throws(
     () =>
@@ -213,6 +282,19 @@ test("profile semantics reject tuple substitution even with a recomputed digest"
   assert.throws(
     () =>
       contracts.assertProcessContainmentEngineExecutionProfileSemantics(replay),
+    TypeError,
+  );
+
+  const reordered = structuredClone(
+    contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE,
+  );
+  reordered.launch.phases.reverse();
+  reordered.contractDigest = rawContractDigest(reordered);
+  assert.throws(
+    () =>
+      contracts.assertProcessContainmentEngineExecutionProfileSemantics(
+        reordered,
+      ),
     TypeError,
   );
 

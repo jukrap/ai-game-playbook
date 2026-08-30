@@ -88,6 +88,10 @@ import {
   godotProjectValidationTranscriptSchema,
 } from "./godot-project-validation-contracts.js";
 import {
+  godotPersistenceCycleExpectationSchema,
+  godotPersistenceCycleTranscriptSchema,
+} from "./godot-persistence-cycle-contracts.js";
+import {
   godotProjectImportReportSchema,
   godotProjectValidationReportSchema,
 } from "./godot-project-validation-report-contracts.js";
@@ -186,6 +190,10 @@ export const FOUNDATION_PROTOCOL_SCHEMAS: ContractSchemaCatalog =
     "godot-executable-discovery-request": godotExecutableDiscoveryRequestSchema,
     "godot-headless-preflight-report": godotHeadlessPreflightReportSchema,
     "godot-headless-preflight-request": godotHeadlessPreflightRequestSchema,
+    "godot-persistence-cycle-expectation":
+      godotPersistenceCycleExpectationSchema,
+    "godot-persistence-cycle-transcript":
+      godotPersistenceCycleTranscriptSchema,
     "godot-project-validation-expectation":
       godotProjectValidationExpectationSchema,
     "godot-project-import-report": godotProjectImportReportSchema,

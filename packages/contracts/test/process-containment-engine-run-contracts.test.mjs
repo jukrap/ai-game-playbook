@@ -242,6 +242,32 @@ test("engine run request admits only the registered deterministic replay tuple",
   }
 });
 
+test("persistence cycle requires both ordered processes before succeeding", () => {
+  const persistence = requestForProfile(
+    contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE,
+  );
+  assert.doesNotThrow(() =>
+    contracts.assertProcessContainmentEngineRunRequestSemantics(persistence),
+  );
+
+  const completedInput = successfulReportInput(persistence);
+  completedInput.process.totalProcesses = 2;
+  assert.doesNotThrow(() =>
+    contracts.assertProcessContainmentEngineRunReportSemantics(
+      report(completedInput),
+    ),
+  );
+
+  const incompleteInput = successfulReportInput(persistence);
+  assert.throws(
+    () =>
+      contracts.assertProcessContainmentEngineRunReportSemantics(
+        report(incompleteInput),
+      ),
+    TypeError,
+  );
+});
+
 test("engine run request keeps project import and semantic validation distinct", () => {
   const projectImport = requestForProfile(
     contracts.GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE,

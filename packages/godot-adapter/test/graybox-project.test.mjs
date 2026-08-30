@@ -50,9 +50,14 @@ test("canonical Godot graybox source binds one exact static project", async () =
     godot.GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST,
   );
   assert.equal(report.sourceDigest, source.manifest.sourceDigest);
-  assert.equal(report.fileCount, 6);
+  assert.equal(report.fileCount, 7);
   assert.equal(report.totalBytes > 0, true);
   assert.equal(report.mainScene, "scenes/main.tscn");
+  assert.deepEqual(report.persistence, {
+    saveSchemaVersion: "1.0.0",
+    freshStateHash: godot.GODOT_GRAYBOX_FRESH_STATE_HASH,
+    persistedStateHash: godot.GODOT_GRAYBOX_PERSISTED_STATE_HASH,
+  });
   assert.deepEqual(report.features, [
     "camera-follow",
     "collision",
@@ -73,6 +78,7 @@ test("canonical Godot graybox source binds one exact static project", async () =
   assert.equal(Object.isFrozen(report.features), true);
   assert.equal(Object.isFrozen(report.engine), true);
   assert.equal(Object.isFrozen(report.support), true);
+  assert.equal(Object.isFrozen(report.persistence), true);
 });
 
 async function rootVerificationContext(project) {
@@ -98,7 +104,7 @@ test("canonical Godot graybox root matches the complete execution snapshot", asy
   const report = await godot.verifyGodotGrayboxProjectRoot(context);
 
   assert.equal(report.projectId, "golden.graybox.godot");
-  assert.equal(report.fileCount, 6);
+  assert.equal(report.fileCount, 7);
   assert.equal(report.manifestDigest, godot.GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST);
 });
 

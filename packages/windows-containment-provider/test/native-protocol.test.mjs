@@ -87,6 +87,10 @@ test("native engine profile remains synchronized with the typed contract", async
       "ProjectValidation",
       contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE,
     ],
+    [
+      "Persistence",
+      contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE,
+    ],
   ];
   for (const [prefix, profile] of profiles) {
     assert.equal(csharpConstant(protocol, `${prefix}OperationId`), profile.operationId);
@@ -223,7 +227,44 @@ test("native engine profile remains synchronized with the typed contract", async
       contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE.output
         .maxEvents,
     ],
-    ["MaximumProcesses", contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROCESSES],
+    [
+      "PersistenceProcessTimeoutMs",
+      contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE.limits
+        .processTimeoutMs,
+    ],
+    [
+      "PersistenceIdleTimeoutMs",
+      contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE.limits
+        .idleTimeoutMs,
+    ],
+    [
+      "PersistenceMaximumOutputBytes",
+      contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE.limits
+        .maxOutputBytes,
+    ],
+    [
+      "PersistenceMaximumReportDurationMs",
+      contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE.limits
+        .maxReportDurationMs,
+    ],
+    [
+      "PersistenceMaximumLineBytes",
+      contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE.output
+        .maxLineBytes,
+    ],
+    [
+      "PersistenceMaximumEvents",
+      contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE.output
+        .maxEvents,
+    ],
+    [
+      "MaximumProcesses",
+      Math.max(
+        ...contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
+          (profile) => profile.limits.maxProcesses,
+        ),
+      ),
+    ],
     ["MaximumProjectFiles", contracts.PROCESS_CONTAINMENT_ENGINE_RUN_MAX_PROJECT_FILES],
     [
       "MaximumProjectDirectories",
@@ -255,6 +296,10 @@ test("native engine profile remains synchronized with the typed contract", async
     contracts.GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE.output.prefix,
   );
   assert.equal(
+    csharpConstant(protocol, "PersistenceOutputPrefix"),
+    contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE.output.prefix,
+  );
+  assert.equal(
     csharpConstant(protocol, "ProjectValidationScript"),
     contracts.GODOT_PROJECT_VALIDATOR_SCRIPT,
   );
@@ -273,6 +318,10 @@ test("native engine profile remains synchronized with the typed contract", async
   assert.match(
     runner,
     /EngineRunProtocol\.ProjectValidationOperationId[\s\S]*"--script"[\s\S]*EngineRunProtocol\.ProjectValidationScript[\s\S]*"--no-header"/u,
+  );
+  assert.match(
+    runner,
+    /EngineRunProtocol\.PersistenceOperationId[\s\S]*"--agpb-persistence-save"[\s\S]*"--agpb-persistence-load"/u,
   );
 });
 

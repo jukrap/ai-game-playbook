@@ -27,10 +27,14 @@ import { isProxy } from "node:util/types";
 import { GodotAdapterBoundaryError } from "./errors.js";
 
 export const GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST: Sha256Digest =
-  "sha256:db57a533c42ac88e04655e0638b1056f8c8088b7bf27639bcf083c61c2255ad4" as Sha256Digest;
+  "sha256:043d7433e084bda9e612cd02808f270012c3d34fcb038e1ae057ffd0739bed65" as Sha256Digest;
 export const GODOT_GRAYBOX_SCENARIO_DIGEST: Sha256Digest =
   "sha256:4bce945905093f746939b6b8f1c6183d0795f2f74b533763970aeed5be4e6c0f" as Sha256Digest;
 export const GODOT_GRAYBOX_TARGET_VERSION = "4.7.2" as const;
+export const GODOT_GRAYBOX_FRESH_STATE_HASH: Sha256Digest =
+  "sha256:1d025ef5d6fbb149d4efc570386222eba43a70940cf840cefe6abcb292a6f7b6" as Sha256Digest;
+export const GODOT_GRAYBOX_PERSISTED_STATE_HASH: Sha256Digest =
+  "sha256:d03c747825e76805b014f27fe25efa647c05dcbfb8a80fba68fd26ffecd5cef7" as Sha256Digest;
 
 export type GodotGrayboxFeature =
   | "camera-follow"
@@ -49,6 +53,7 @@ export type GodotGrayboxSourceRole =
   | "scenario"
   | "scene"
   | "gameplay-script"
+  | "persistence-script"
   | "replay-script";
 
 export interface GodotGrayboxSourceDescriptor {
@@ -70,6 +75,11 @@ export interface GodotGrayboxProjectManifest {
   readonly scenario: {
     readonly path: "scenario.json";
     readonly digest: typeof GODOT_GRAYBOX_SCENARIO_DIGEST;
+  };
+  readonly persistence: {
+    readonly saveSchemaVersion: "1.0.0";
+    readonly freshStateHash: typeof GODOT_GRAYBOX_FRESH_STATE_HASH;
+    readonly persistedStateHash: typeof GODOT_GRAYBOX_PERSISTED_STATE_HASH;
   };
   readonly features: readonly GodotGrayboxFeature[];
   readonly files: readonly GodotGrayboxSourceDescriptor[];
@@ -103,6 +113,7 @@ export interface GodotGrayboxProjectReport {
   readonly engine: GodotGrayboxProjectManifest["engine"];
   readonly mainScene: "scenes/main.tscn";
   readonly scenarioDigest: typeof GODOT_GRAYBOX_SCENARIO_DIGEST;
+  readonly persistence: GodotGrayboxProjectManifest["persistence"];
   readonly manifestDigest: typeof GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST;
   readonly sourceDigest: Sha256Digest;
   readonly fileCount: number;
@@ -139,6 +150,10 @@ const expectedFiles = Object.freeze([
   Object.freeze({
     path: "scripts/graybox_game.gd",
     role: "gameplay-script" as const,
+  }),
+  Object.freeze({
+    path: "scripts/graybox_persistence.gd",
+    role: "persistence-script" as const,
   }),
   Object.freeze({
     path: "scripts/graybox_replay.gd",
@@ -292,6 +307,7 @@ function parseManifest(value: unknown): GodotGrayboxProjectManifest {
       "engine",
       "mainScene",
       "scenario",
+      "persistence",
       "features",
       "files",
       "sourceDigest",
@@ -334,6 +350,33 @@ function parseManifest(value: unknown): GodotGrayboxProjectManifest {
   const scenario = Object.freeze({
     path: "scenario.json" as const,
     digest: GODOT_GRAYBOX_SCENARIO_DIGEST,
+  });
+
+  const persistenceRecord = dataRecord(
+    record["persistence"],
+    ["saveSchemaVersion", "freshStateHash", "persistedStateHash"],
+    "godot-graybox-manifest-invalid",
+    "Godot graybox persistence identity is invalid.",
+  );
+  exactText(
+    persistenceRecord["saveSchemaVersion"],
+    "1.0.0",
+    "Godot graybox save schema does not match.",
+  );
+  exactText(
+    persistenceRecord["freshStateHash"],
+    GODOT_GRAYBOX_FRESH_STATE_HASH,
+    "Godot graybox fresh-state identity does not match.",
+  );
+  exactText(
+    persistenceRecord["persistedStateHash"],
+    GODOT_GRAYBOX_PERSISTED_STATE_HASH,
+    "Godot graybox persisted-state identity does not match.",
+  );
+  const persistence = Object.freeze({
+    saveSchemaVersion: "1.0.0" as const,
+    freshStateHash: GODOT_GRAYBOX_FRESH_STATE_HASH,
+    persistedStateHash: GODOT_GRAYBOX_PERSISTED_STATE_HASH,
   });
 
   const featureValues = dataArray(
@@ -430,6 +473,7 @@ function parseManifest(value: unknown): GodotGrayboxProjectManifest {
     engine,
     mainScene: "scenes/main.tscn",
     scenario,
+    persistence,
     features,
     files,
     sourceDigest: record["sourceDigest"],
@@ -543,7 +587,10 @@ function assertStaticStructure(files: ReadonlyMap<string, string>): void {
       "func save_game(",
       "func load_game(",
       "func state_value(",
-      '"--agpb-replay" in OS.get_cmdline_user_args()',
+      'OS.get_cmdline_user_args()',
+      '"--agpb-replay" in user_arguments',
+      '"--agpb-persistence-save" in user_arguments',
+      '"--agpb-persistence-load" in user_arguments',
       'FileAccess.get_file_as_string("res://scenario.json")',
     ],
     "Godot graybox gameplay source is missing a required behavior boundary.",
@@ -561,6 +608,24 @@ function assertStaticStructure(files: ReadonlyMap<string, string>): void {
       GODOT_GRAYBOX_SCENARIO_DIGEST,
     ],
     "Godot graybox replay source is missing a required deterministic boundary.",
+  );
+
+  const persistence = files.get("scripts/graybox_persistence.gd") ?? "";
+  requireTextFragments(
+    persistence,
+    [
+      "AGPB_PERSISTENCE ",
+      'OS.is_userfs_persistent()',
+      'FileAccess.get_sha256(SAVE_PATH)',
+      '"persistence-save-started"',
+      '"persistence-save-completed"',
+      '"persistence-load-started"',
+      '"persistence-load-completed"',
+      '"persistence-cycle-passed"',
+      GODOT_GRAYBOX_FRESH_STATE_HASH,
+      GODOT_GRAYBOX_PERSISTED_STATE_HASH,
+    ],
+    "Godot graybox persistence source is missing a required restart boundary.",
   );
 
   const allSource = [...files.values()].join("\n");
@@ -712,6 +777,7 @@ export function verifyGodotGrayboxProjectBundle(
     engine: manifest.engine,
     mainScene: manifest.mainScene,
     scenarioDigest: manifest.scenario.digest,
+    persistence: manifest.persistence,
     manifestDigest: GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST,
     sourceDigest: manifest.sourceDigest,
     fileCount: files.length,

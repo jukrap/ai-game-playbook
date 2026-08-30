@@ -11,6 +11,11 @@
     "path": "scenario.json",
     "digest": "sha256:4bce945905093f746939b6b8f1c6183d0795f2f74b533763970aeed5be4e6c0f"
   },
+  "persistence": {
+    "saveSchemaVersion": "1.0.0",
+    "freshStateHash": "sha256:1d025ef5d6fbb149d4efc570386222eba43a70940cf840cefe6abcb292a6f7b6",
+    "persistedStateHash": "sha256:d03c747825e76805b014f27fe25efa647c05dcbfb8a80fba68fd26ffecd5cef7"
+  },
   "features": [
     "camera-follow",
     "collision",
@@ -50,8 +55,14 @@
     {
       "path": "scripts/graybox_game.gd",
       "role": "gameplay-script",
-      "bytes": 11711,
-      "digest": "sha256:6fcb37b029f19f783c49ac8b1c0b4864f3bc52a7c2d5d6912b860193c5116aa3"
+      "bytes": 13171,
+      "digest": "sha256:f5c58d6d535051f712040a8272e35cc4a0a83765d78983ddfeb2a4f7cac6db7e"
+    },
+    {
+      "path": "scripts/graybox_persistence.gd",
+      "role": "persistence-script",
+      "bytes": 3517,
+      "digest": "sha256:e73a71297faef384ebe01d687c190096bc05cf91a8db74fdba466bb0b0532b13"
     },
     {
       "path": "scripts/graybox_replay.gd",
@@ -60,7 +71,7 @@
       "digest": "sha256:7a48568e5f89dc4747ff33672042547d8ea0a1830f05e5c2706219720c4a617d"
     }
   ],
-  "sourceDigest": "sha256:cb8f615910e4a469fce980b25f7c003c39a3d3e42f203a3365c03a30245400b7",
+  "sourceDigest": "sha256:a38debb2d85540f090554ed3784e00df38d6c160a957b0feb65d7328b7d5844f",
   "support": {
     "grade": "planned",
     "evidenceGrade": "implemented",

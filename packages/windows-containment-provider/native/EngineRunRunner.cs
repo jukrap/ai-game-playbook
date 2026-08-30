@@ -54,7 +54,7 @@ internal static class EngineRunRunner
         JobAccounting? accounting = null;
         string? profileRoot = null;
         string? stagedProject = null;
-        string? logPath = null;
+        string? logDirectory = null;
         NativeEngineRunOutput output = EmptyOutput();
         byte[]? transcriptBytes = null;
 
@@ -97,9 +97,9 @@ internal static class EngineRunRunner
             string profileState = Path.Combine(profileRoot, "LocalState");
             string profileTemp = Path.Combine(profileRoot, "TempState");
             stagedProject = Path.Combine(profileState, "project");
-            logPath = Path.Combine(profileState, "logs", "godot.log");
+            logDirectory = Path.Combine(profileState, "logs");
             Directory.CreateDirectory(stagedProject);
-            Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+            Directory.CreateDirectory(logDirectory);
             Directory.CreateDirectory(profileTemp);
 
             ownedRootCreated = true;
@@ -146,84 +146,119 @@ internal static class EngineRunRunner
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "job-create-failed");
             }
             WindowsProcess.ConfigureJob(job);
-            string[] command = BuildEngineCommand(request, stagedExecutable, stagedProject, logPath);
             IReadOnlyDictionary<string, string> environment =
                 WindowsProcess.BuildContainedEnvironment(profileRoot, profileTemp);
-            (process, thread) = WindowsProcess.CreateContainedProcess(
-                stagedExecutable,
-                WindowsProcess.BuildCommandLine(command),
-                stagedProject,
-                WindowsProcess.BuildEnvironmentBlock(environment),
-                appContainerSid);
-            processStarted = true;
-            processStartedAt = Protocol.TruncateToMilliseconds(DateTimeOffset.UtcNow);
-            terminationConfirmed = false;
-            if (!NativeMethods.AssignProcessToJobObject(job, process))
-            {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "job-assignment-failed");
-            }
-            processAssignedToJob = true;
-            if (NativeMethods.ResumeThread(thread) == uint.MaxValue)
-            {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "process-resume-failed");
-            }
-
-            EngineWaitResult engineWait = WaitForEngine(
+            IReadOnlyList<EnginePhaseCommand> commands = BuildEngineCommands(
                 request,
-                process,
-                cancellationEvent,
-                logPath);
-            uint wait = engineWait.ProcessExited
-                ? NativeMethods.WaitObject0
-                : NativeMethods.WaitTimeout;
-            if (engineWait.Uncertain)
+                stagedExecutable,
+                stagedProject,
+                logDirectory);
+            foreach (EnginePhaseCommand command in commands)
             {
-                observationUncertain = true;
-            }
-            else if (engineWait.Cause == "caller-cancelled")
-            {
-                terminationCause = "caller-cancelled";
-                terminationRequested = true;
-                if (!NativeMethods.TerminateJobObject(job, 125))
+                ThrowIfCancellationRequested(cancellationEvent);
+                processAssignedToJob = false;
+                (process, thread) = WindowsProcess.CreateContainedProcess(
+                    stagedExecutable,
+                    WindowsProcess.BuildCommandLine(command.Command),
+                    stagedProject,
+                    WindowsProcess.BuildEnvironmentBlock(environment),
+                    appContainerSid);
+                processStarted = true;
+                processStartedAt ??=
+                    Protocol.TruncateToMilliseconds(DateTimeOffset.UtcNow);
+                terminationConfirmed = false;
+                if (!NativeMethods.AssignProcessToJobObject(job, process))
+                {
+                    throw new Win32Exception(
+                        Marshal.GetLastWin32Error(),
+                        "job-assignment-failed");
+                }
+                processAssignedToJob = true;
+                if (NativeMethods.ResumeThread(thread) == uint.MaxValue)
+                {
+                    throw new Win32Exception(
+                        Marshal.GetLastWin32Error(),
+                        "process-resume-failed");
+                }
+                NativeMethods.CloseHandle(thread);
+                thread = IntPtr.Zero;
+
+                EngineWaitResult engineWait = WaitForEngine(
+                    request,
+                    process,
+                    cancellationEvent,
+                    command.LogPath);
+                uint wait = engineWait.ProcessExited
+                    ? NativeMethods.WaitObject0
+                    : NativeMethods.WaitTimeout;
+                if (engineWait.Uncertain)
                 {
                     observationUncertain = true;
                 }
-                wait = NativeMethods.WaitForSingleObject(
-                    process,
-                    (uint)request.TerminationGraceMs);
-            }
-            else if (engineWait.Cause is "engine-timeout" or "idle-timeout")
-            {
-                terminationCause = engineWait.Cause;
-                terminationRequested = true;
-                uint timeoutExitCode = terminationCause == "idle-timeout" ? 123u : 124u;
-                if (!NativeMethods.TerminateJobObject(job, timeoutExitCode))
+                else if (engineWait.Cause == "caller-cancelled")
+                {
+                    terminationCause = "caller-cancelled";
+                    terminationRequested = true;
+                    if (!NativeMethods.TerminateJobObject(job, 125))
+                    {
+                        observationUncertain = true;
+                    }
+                    wait = NativeMethods.WaitForSingleObject(
+                        process,
+                        (uint)request.TerminationGraceMs);
+                }
+                else if (engineWait.Cause is "engine-timeout" or "idle-timeout")
+                {
+                    terminationCause = engineWait.Cause;
+                    terminationRequested = true;
+                    uint timeoutExitCode = terminationCause == "idle-timeout"
+                        ? 123u
+                        : 124u;
+                    if (!NativeMethods.TerminateJobObject(job, timeoutExitCode))
+                    {
+                        observationUncertain = true;
+                    }
+                    wait = NativeMethods.WaitForSingleObject(
+                        process,
+                        (uint)request.TerminationGraceMs);
+                }
+                else if (!engineWait.ProcessExited)
                 {
                     observationUncertain = true;
                 }
-                wait = NativeMethods.WaitForSingleObject(
-                    process,
-                    (uint)request.TerminationGraceMs);
-            }
-            else if (!engineWait.ProcessExited)
-            {
-                observationUncertain = true;
-            }
-            terminationConfirmed = wait == NativeMethods.WaitObject0;
-            if (!terminationConfirmed)
-            {
-                observationUncertain = true;
-            }
-            else if (!NativeMethods.GetExitCodeProcess(process, out uint nativeExitCode))
-            {
-                observationUncertain = true;
-            }
-            else
-            {
-                processExitCode = unchecked((int)nativeExitCode);
+                terminationConfirmed = wait == NativeMethods.WaitObject0;
+                if (!terminationConfirmed)
+                {
+                    observationUncertain = true;
+                }
+                else if (!NativeMethods.GetExitCodeProcess(process, out uint nativeExitCode))
+                {
+                    observationUncertain = true;
+                }
+                else
+                {
+                    processExitCode = unchecked((int)nativeExitCode);
+                }
+                accounting = WindowsProcess.QueryJobAccounting(job);
+                if (terminationConfirmed)
+                {
+                    NativeMethods.CloseHandle(process);
+                    process = IntPtr.Zero;
+                    processAssignedToJob = false;
+                }
+                if (
+                    observationUncertain
+                    || terminationRequested
+                    || !terminationConfirmed
+                    || processExitCode != 0)
+                {
+                    break;
+                }
             }
             accounting = WindowsProcess.QueryJobAccounting(job);
-            CapturedEngineLog capturedLog = ReadBoundedLog(logPath, request);
+            CapturedEngineLog capturedLog = ReadBoundedLogs(
+                commands.Select(command => command.LogPath).ToArray(),
+                request);
             output = capturedLog.Output;
             transcriptBytes = capturedLog.TranscriptBytes;
             stagedProjectBaselinePreserved = ProjectMatches(request, stagedProject);
@@ -358,7 +393,7 @@ internal static class EngineRunRunner
             processStarted
             && processStartedAt is not null
             && processExitCode == 0
-            && accounting?.TotalProcesses == 1
+            && accounting?.TotalProcesses == request.MaxProcesses
             && accounting.ActiveProcesses == 0
             && !output.Truncated
             && (request.OutputKind != "prefixed-json-lines"
@@ -385,7 +420,8 @@ internal static class EngineRunRunner
             && (!processStarted
                 || (processExitCode is not null
                     && accounting is not null
-                    && accounting.TotalProcesses == request.MaxProcesses
+                    && accounting.TotalProcesses >= 1
+                    && accounting.TotalProcesses <= request.MaxProcesses
                     && accounting.ActiveProcesses == 0
                     && stagedProjectBaselinePreserved
                     && stagedExecutableBaselinePreserved));
@@ -459,6 +495,8 @@ internal static class EngineRunRunner
             && terminationConfirmed
             && !output.Truncated
             && processExitCode is 0 or 2
+            && accounting?.TotalProcesses == request.MaxProcesses
+            && accounting.ActiveProcesses == 0
             && sourceProjectPreserved
             && sourceExecutablePreserved
             && stagedProjectBaselinePreserved
@@ -473,7 +511,61 @@ internal static class EngineRunRunner
             cleanStructuredOutput ? transcriptBytes : null);
     }
 
-    private static string[] BuildEngineCommand(
+    private static IReadOnlyList<EnginePhaseCommand> BuildEngineCommands(
+        NativeEngineRunRequest request,
+        string executable,
+        string project,
+        string logDirectory)
+    {
+        if (request.OperationId == EngineRunProtocol.PersistenceOperationId)
+        {
+            string saveLog = Path.Combine(logDirectory, "persistence-save.log");
+            string loadLog = Path.Combine(logDirectory, "persistence-load.log");
+            return new[]
+            {
+                new EnginePhaseCommand(
+                    "save",
+                    saveLog,
+                    new[]
+                    {
+                        executable,
+                        "--headless",
+                        "--path",
+                        project,
+                        "--log-file",
+                        saveLog,
+                        "--no-header",
+                        "--",
+                        "--agpb-persistence-save",
+                    }),
+                new EnginePhaseCommand(
+                    "load",
+                    loadLog,
+                    new[]
+                    {
+                        executable,
+                        "--headless",
+                        "--path",
+                        project,
+                        "--log-file",
+                        loadLog,
+                        "--no-header",
+                        "--",
+                        "--agpb-persistence-load",
+                    }),
+            };
+        }
+        string logPath = Path.Combine(logDirectory, "godot.log");
+        return new[]
+        {
+            new EnginePhaseCommand(
+                "single",
+                logPath,
+                BuildSingleEngineCommand(request, executable, project, logPath)),
+        };
+    }
+
+    private static string[] BuildSingleEngineCommand(
         NativeEngineRunRequest request,
         string executable,
         string project,
@@ -853,42 +945,59 @@ internal static class EngineRunRunner
         }
     }
 
-    private static CapturedEngineLog ReadBoundedLog(
-        string path,
+    private static CapturedEngineLog ReadBoundedLogs(
+        IReadOnlyList<string> paths,
         NativeEngineRunRequest request)
     {
         try
         {
-            if (!File.Exists(path))
-            {
-                return new CapturedEngineLog(EmptyOutput(), null);
-            }
-            if (HasReparsePoint(path))
+            if (paths.Count < 1 || paths.Count > request.MaxProcesses)
             {
                 return new CapturedEngineLog(
                     new NativeEngineRunOutput(EmptyDigest(), 0, 1, true),
                     null);
             }
-            long length = new FileInfo(path).Length;
-            int observed = checked((int)Math.Min(length, request.MaxProfileBytes));
+            long totalLength = 0;
+            foreach (string path in paths)
+            {
+                if (!File.Exists(path))
+                {
+                    continue;
+                }
+                if (HasReparsePoint(path))
+                {
+                    return new CapturedEngineLog(
+                        new NativeEngineRunOutput(EmptyDigest(), 0, 1, true),
+                        null);
+                }
+                totalLength = checked(totalLength + new FileInfo(path).Length);
+            }
+            int observed = checked((int)Math.Min(totalLength, request.MaxProfileBytes));
             int captured = Math.Min(observed, request.MaxOutputBytes);
             byte[] bytes = new byte[captured];
-            using FileStream stream = new(
-                path,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                64 * 1024,
-                FileOptions.SequentialScan);
             int offset = 0;
-            while (offset < captured)
+            foreach (string path in paths)
             {
-                int read = stream.Read(bytes, offset, captured - offset);
-                if (read == 0)
+                if (!File.Exists(path) || offset >= captured)
                 {
-                    break;
+                    continue;
                 }
-                offset += read;
+                using FileStream stream = new(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    64 * 1024,
+                    FileOptions.SequentialScan);
+                while (offset < captured)
+                {
+                    int read = stream.Read(bytes, offset, captured - offset);
+                    if (read == 0)
+                    {
+                        break;
+                    }
+                    offset += read;
+                }
             }
             if (offset != captured)
             {
@@ -1009,6 +1118,11 @@ internal readonly record struct EngineLogActivity(
     bool Exists,
     long Length,
     long LastWriteTicks);
+
+internal sealed record EnginePhaseCommand(
+    string Phase,
+    string LogPath,
+    string[] Command);
 
 internal sealed record CapturedEngineLog(
     NativeEngineRunOutput Output,

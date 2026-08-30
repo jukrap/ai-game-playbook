@@ -23,6 +23,18 @@ export {
   createGodotProjectValidationExpectation,
   parseGodotProjectValidationOutput,
 } from "./project-validation-result.js";
+export {
+  GODOT_PERSISTENCE_CYCLE_OUTPUT_PREFIX,
+  createGodotPersistenceCycleExpectation,
+  parseGodotPersistenceCycleOutput,
+} from "./persistence-cycle-result.js";
+export type {
+  GodotPersistenceCycleExpectationInput,
+  GodotPersistenceCycleOutput,
+  GodotPersistenceCycleOutputInvalidCode,
+  InvalidGodotPersistenceCycleOutput,
+  ParsedGodotPersistenceCycleOutput,
+} from "./persistence-cycle-result.js";
 export type {
   GodotProjectValidationExpectationInput,
   GodotProjectValidationOutput,
@@ -32,6 +44,8 @@ export type {
 } from "./project-validation-result.js";
 export {
   GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST,
+  GODOT_GRAYBOX_FRESH_STATE_HASH,
+  GODOT_GRAYBOX_PERSISTED_STATE_HASH,
   GODOT_GRAYBOX_SCENARIO_DIGEST,
   GODOT_GRAYBOX_TARGET_VERSION,
   verifyGodotGrayboxProjectBundle,

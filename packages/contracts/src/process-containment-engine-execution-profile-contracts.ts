@@ -29,6 +29,19 @@ import {
   GODOT_HEADLESS_PREFLIGHT_INVOCATION_DIGEST,
 } from "./godot-headless-preflight-contracts.js";
 import {
+  GODOT_PERSISTENCE_CYCLE_IDLE_TIMEOUT_MS,
+  GODOT_PERSISTENCE_CYCLE_INVOCATION_DIGEST,
+  GODOT_PERSISTENCE_CYCLE_LOAD_ARGUMENTS,
+  GODOT_PERSISTENCE_CYCLE_MAX_EVENTS,
+  GODOT_PERSISTENCE_CYCLE_MAX_LINE_BYTES,
+  GODOT_PERSISTENCE_CYCLE_MAX_OUTPUT_BYTES,
+  GODOT_PERSISTENCE_CYCLE_OUTPUT_PREFIX,
+  GODOT_PERSISTENCE_CYCLE_PHASE_COUNT,
+  GODOT_PERSISTENCE_CYCLE_PROCESS_TIMEOUT_MS,
+  GODOT_PERSISTENCE_CYCLE_SAVE_ARGUMENTS,
+  GODOT_PERSISTENCE_CYCLE_TERMINATION_GRACE_MS,
+} from "./godot-persistence-cycle-contracts.js";
+import {
   GODOT_PROJECT_IMPORT_IDLE_TIMEOUT_MS,
   GODOT_PROJECT_IMPORT_INVOCATION_DIGEST,
   GODOT_PROJECT_IMPORT_MAX_OUTPUT_BYTES,
@@ -88,19 +101,29 @@ export const GODOT_PROJECT_VALIDATION_ENGINE_RUN_MAX_REPORT_DURATION_MS: number 
   GODOT_PROJECT_VALIDATION_PROCESS_TIMEOUT_MS +
   GODOT_PROJECT_VALIDATION_TERMINATION_GRACE_MS;
 
+export const GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_PROFILE_ID =
+  "godot-persistence-cycle-v1" as const;
+export const GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_MAX_REPORT_DURATION_MS: number =
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_START_VALIDITY_MS +
+  GODOT_PERSISTENCE_CYCLE_PROCESS_TIMEOUT_MS *
+    GODOT_PERSISTENCE_CYCLE_PHASE_COUNT +
+  GODOT_PERSISTENCE_CYCLE_TERMINATION_GRACE_MS;
+
 export type ProcessContainmentEngineExecutionProfileId =
   | typeof GODOT_DETERMINISTIC_REPLAY_ENGINE_RUN_PROFILE_ID
   | typeof GODOT_PROJECT_IMPORT_ENGINE_RUN_PROFILE_ID
   | typeof GODOT_PROJECT_VALIDATION_ENGINE_RUN_PROFILE_ID
+  | typeof GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_PROFILE_ID
   | typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID;
 
 export type ProcessContainmentEngineExecutionOperationId =
   | "engine.deterministic-replay"
   | "engine.headless-preflight"
+  | "engine.persistence-cycle"
   | "engine.project-import"
   | "engine.project-validation";
 
-export interface ProcessContainmentEngineExecutionProfileLaunch {
+export interface ProcessContainmentEngineExecutionProfileSingleLaunch {
   readonly workingDirectory: "$stagedProject";
   readonly arguments: readonly string[];
   readonly callerArguments: "denied";
@@ -108,6 +131,25 @@ export interface ProcessContainmentEngineExecutionProfileLaunch {
   readonly networkCapabilities: "none";
   readonly projectSource: "disposable-copy";
 }
+
+export interface ProcessContainmentEngineExecutionProfileSequencePhase {
+  readonly phase: "load" | "save";
+  readonly arguments: readonly string[];
+}
+
+export interface ProcessContainmentEngineExecutionProfileSequenceLaunch {
+  readonly mode: "ordered-sequence";
+  readonly workingDirectory: "$stagedProject";
+  readonly phases: readonly ProcessContainmentEngineExecutionProfileSequencePhase[];
+  readonly callerArguments: "denied";
+  readonly callerEnvironment: "denied";
+  readonly networkCapabilities: "none";
+  readonly projectSource: "disposable-copy";
+}
+
+export type ProcessContainmentEngineExecutionProfileLaunch =
+  | ProcessContainmentEngineExecutionProfileSequenceLaunch
+  | ProcessContainmentEngineExecutionProfileSingleLaunch;
 
 export interface ProcessContainmentEngineExecutionProfileLimits {
   readonly startValidityMs: number;
@@ -290,16 +332,31 @@ function assertProfileDigestInput(
     ],
     "engine execution profile digest input is outside the contract",
   );
+  const launchNames =
+    value["launch"] !== null && typeof value["launch"] === "object"
+      ? Object.getOwnPropertyNames(value["launch"])
+      : [];
+  const sequenceLaunch = launchNames.includes("mode");
   const launch = exactObject(
     value["launch"],
-    [
-      "workingDirectory",
-      "arguments",
-      "callerArguments",
-      "callerEnvironment",
-      "networkCapabilities",
-      "projectSource",
-    ],
+    sequenceLaunch
+      ? [
+          "mode",
+          "workingDirectory",
+          "phases",
+          "callerArguments",
+          "callerEnvironment",
+          "networkCapabilities",
+          "projectSource",
+        ]
+      : [
+          "workingDirectory",
+          "arguments",
+          "callerArguments",
+          "callerEnvironment",
+          "networkCapabilities",
+          "projectSource",
+        ],
     "engine execution profile launch is outside the contract",
   );
   const limits = exactObject(
@@ -325,7 +382,46 @@ function assertProfileDigestInput(
     ["kind", "prefix", "maxLineBytes", "maxEvents", "retainRawOutput"],
     "engine execution profile output is outside the contract",
   );
-  const argumentsValue = launch["arguments"];
+  let phaseCount = 1;
+  if (sequenceLaunch) {
+    const phases = launch["phases"];
+    if (
+      launch["mode"] !== "ordered-sequence" ||
+      !Array.isArray(phases) ||
+      phases.length !== GODOT_PERSISTENCE_CYCLE_PHASE_COUNT
+    ) {
+      reject("engine execution sequence is outside the contract");
+    }
+    const phaseNames: string[] = [];
+    for (const candidate of phases) {
+      const phase = exactObject(
+        candidate,
+        ["phase", "arguments"],
+        "engine execution sequence phase is outside the contract",
+      );
+      const argumentsValue = phase["arguments"];
+      if (
+        (phase["phase"] !== "save" && phase["phase"] !== "load") ||
+        !Array.isArray(argumentsValue) ||
+        argumentsValue.length < 1 ||
+        argumentsValue.length > 16 ||
+        argumentsValue.some(
+          (argument) =>
+            typeof argument !== "string" ||
+            argument.length < 1 ||
+            argument.length > 128,
+        )
+      ) {
+        reject("engine execution sequence phase is outside the contract");
+      }
+      phaseNames.push(phase["phase"]);
+    }
+    if (phaseNames[0] !== "save" || phaseNames[1] !== "load") {
+      reject("engine execution sequence order is outside the contract");
+    }
+    phaseCount = phases.length;
+  }
+  const argumentsValue = sequenceLaunch ? undefined : launch["arguments"];
   const processTimeoutMs = limits["processTimeoutMs"];
   const idleTimeoutMs = limits["idleTimeoutMs"];
   const terminationGraceMs = limits["terminationGraceMs"];
@@ -342,15 +438,16 @@ function assertProfileDigestInput(
     !isStableId(value["operationId"]) ||
     !isSha256Digest(value["invocationDigest"]) ||
     launch["workingDirectory"] !== "$stagedProject" ||
-    !Array.isArray(argumentsValue) ||
-    argumentsValue.length < 1 ||
-    argumentsValue.length > 16 ||
-    argumentsValue.some(
-      (argument) =>
-        typeof argument !== "string" ||
-        argument.length < 1 ||
-        argument.length > 128,
-    ) ||
+    (!sequenceLaunch &&
+      (!Array.isArray(argumentsValue) ||
+        argumentsValue.length < 1 ||
+        argumentsValue.length > 16 ||
+        argumentsValue.some(
+          (argument) =>
+            typeof argument !== "string" ||
+            argument.length < 1 ||
+            argument.length > 128,
+        ))) ||
     launch["callerArguments"] !== "denied" ||
     launch["callerEnvironment"] !== "denied" ||
     launch["networkCapabilities"] !== "none" ||
@@ -362,6 +459,7 @@ function assertProfileDigestInput(
     !integer(terminationGraceMs, 1, 30_000) ||
     !integer(maxOutputBytes, 1, 16_777_216) ||
     !integer(limits["maxProcesses"], 1, 16) ||
+    limits["maxProcesses"] !== phaseCount ||
     !integer(limits["maxProjectFiles"], 1, 100_000) ||
     !integer(limits["maxProjectDirectories"], 1, 100_000) ||
     !integer(limits["maxProjectFileBytes"], 1, 1_073_741_824) ||
@@ -371,7 +469,7 @@ function assertProfileDigestInput(
     !integer(maxReportDurationMs, 1, 1_200_000) ||
     maxReportDurationMs !==
       (startValidityMs as number) +
-        (processTimeoutMs as number) +
+        (processTimeoutMs as number) * phaseCount +
         (terminationGraceMs as number) ||
     output["retainRawOutput"] !== false
   ) {
@@ -455,6 +553,18 @@ const projectValidationArguments: readonly string[] = Object.freeze([
   "--no-header",
 ]);
 
+const persistencePhases: readonly ProcessContainmentEngineExecutionProfileSequencePhase[] =
+  Object.freeze([
+    Object.freeze({
+      phase: "save" as const,
+      arguments: GODOT_PERSISTENCE_CYCLE_SAVE_ARGUMENTS,
+    }),
+    Object.freeze({
+      phase: "load" as const,
+      arguments: GODOT_PERSISTENCE_CYCLE_LOAD_ARGUMENTS,
+    }),
+  ]);
+
 export const PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST: Sha256Digest =
   digestCanonicalJson({
     domain: "ai-game-playbook/process-containment-engine-run-profile",
@@ -509,6 +619,21 @@ export const GODOT_PROJECT_VALIDATION_ENGINE_RUN_PROFILE_DIGEST: Sha256Digest =
     operationId: "engine.project-validation",
     invocationDigest: GODOT_PROJECT_VALIDATION_INVOCATION_DIGEST,
     arguments: projectValidationArguments,
+    callerArguments: "denied",
+    callerEnvironment: "denied",
+    networkCapabilities: "none",
+    projectSource: "disposable-copy",
+  });
+
+export const GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_PROFILE_DIGEST: Sha256Digest =
+  digestCanonicalJson({
+    domain: "ai-game-playbook/process-containment-engine-run-profile",
+    version: "1.0.0",
+    id: GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_PROFILE_ID,
+    engine: "godot",
+    operationId: "engine.persistence-cycle",
+    invocationDigest: GODOT_PERSISTENCE_CYCLE_INVOCATION_DIGEST,
+    phases: persistencePhases,
     callerArguments: "denied",
     callerEnvironment: "denied",
     networkCapabilities: "none",
@@ -681,12 +806,51 @@ export const GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE: ProcessContainme
     }),
   );
 
+export const GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE: ProcessContainmentEngineExecutionProfile =
+  createProfile(
+    Object.freeze({
+      schemaVersion: "1.0.0" as const,
+      profileId: GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_PROFILE_ID,
+      profileDigest: GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_PROFILE_DIGEST,
+      engine: "godot" as const,
+      operationId: "engine.persistence-cycle" as const,
+      invocationDigest: GODOT_PERSISTENCE_CYCLE_INVOCATION_DIGEST,
+      launch: Object.freeze({
+        mode: "ordered-sequence" as const,
+        workingDirectory: "$stagedProject" as const,
+        phases: persistencePhases,
+        callerArguments: "denied" as const,
+        callerEnvironment: "denied" as const,
+        networkCapabilities: "none" as const,
+        projectSource: "disposable-copy" as const,
+      }),
+      limits: Object.freeze({
+        ...commonStagingLimits,
+        processTimeoutMs: GODOT_PERSISTENCE_CYCLE_PROCESS_TIMEOUT_MS,
+        idleTimeoutMs: GODOT_PERSISTENCE_CYCLE_IDLE_TIMEOUT_MS,
+        terminationGraceMs: GODOT_PERSISTENCE_CYCLE_TERMINATION_GRACE_MS,
+        maxOutputBytes: GODOT_PERSISTENCE_CYCLE_MAX_OUTPUT_BYTES,
+        maxProcesses: GODOT_PERSISTENCE_CYCLE_PHASE_COUNT,
+        maxReportDurationMs:
+          GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_MAX_REPORT_DURATION_MS,
+      }),
+      output: Object.freeze({
+        kind: "prefixed-json-lines" as const,
+        prefix: GODOT_PERSISTENCE_CYCLE_OUTPUT_PREFIX,
+        maxLineBytes: GODOT_PERSISTENCE_CYCLE_MAX_LINE_BYTES,
+        maxEvents: GODOT_PERSISTENCE_CYCLE_MAX_EVENTS,
+        retainRawOutput: false as const,
+      }),
+    }),
+  );
+
 export const PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES: readonly ProcessContainmentEngineExecutionProfile[] =
   Object.freeze([
     GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE,
     GODOT_HEADLESS_PREFLIGHT_ENGINE_EXECUTION_PROFILE,
     GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE,
     GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE,
+    GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE,
   ]);
 
 export const PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST: Sha256Digest =
@@ -712,6 +876,9 @@ export function getProcessContainmentEngineExecutionProfile(
   }
   if (profileId === GODOT_PROJECT_VALIDATION_ENGINE_RUN_PROFILE_ID) {
     return GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE;
+  }
+  if (profileId === GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_PROFILE_ID) {
+    return GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE;
   }
   return reject("engine execution profile is not registered");
 }
@@ -779,7 +946,7 @@ export function assertProcessContainmentEngineExecutionProfileSemantics(
   }
 }
 
-const launchSchema = closedObject(
+const singleLaunchSchema = closedObject(
   {
     workingDirectory: { type: "string", const: "$stagedProject" },
     arguments: {
@@ -802,6 +969,59 @@ const launchSchema = closedObject(
     "projectSource",
   ],
 );
+
+const sequenceArgumentsSchema = {
+  type: "array",
+  items: { type: "string", minLength: 1, maxLength: 128 },
+  minItems: 1,
+  maxItems: 16,
+};
+
+const sequenceLaunchSchema = closedObject(
+  {
+    mode: { type: "string", const: "ordered-sequence" },
+    workingDirectory: { type: "string", const: "$stagedProject" },
+    phases: {
+      type: "array",
+      prefixItems: [
+        closedObject(
+          {
+            phase: { const: "save" },
+            arguments: sequenceArgumentsSchema,
+          },
+          ["phase", "arguments"],
+        ),
+        closedObject(
+          {
+            phase: { const: "load" },
+            arguments: sequenceArgumentsSchema,
+          },
+          ["phase", "arguments"],
+        ),
+      ],
+      items: false,
+      minItems: GODOT_PERSISTENCE_CYCLE_PHASE_COUNT,
+      maxItems: GODOT_PERSISTENCE_CYCLE_PHASE_COUNT,
+    },
+    callerArguments: { type: "string", const: "denied" },
+    callerEnvironment: { type: "string", const: "denied" },
+    networkCapabilities: { type: "string", const: "none" },
+    projectSource: { type: "string", const: "disposable-copy" },
+  },
+  [
+    "mode",
+    "workingDirectory",
+    "phases",
+    "callerArguments",
+    "callerEnvironment",
+    "networkCapabilities",
+    "projectSource",
+  ],
+);
+
+const launchSchema = {
+  oneOf: [singleLaunchSchema, sequenceLaunchSchema],
+};
 
 const limitsSchema = closedObject(
   {

@@ -684,7 +684,7 @@ function validateReportInput(
   const success =
     process.started &&
     process.exitCode === 0 &&
-    process.totalProcesses === 1 &&
+    process.totalProcesses === request.limits.maxProcesses &&
     process.activeProcesses === 0 &&
     !output.truncated &&
     !termination.requested &&
@@ -710,7 +710,9 @@ function validateReportInput(
     !output.truncated &&
     (process.started
       ? process.exitCode !== null &&
-        process.totalProcesses === request.limits.maxProcesses &&
+        process.totalProcesses !== null &&
+        process.totalProcesses >= 1 &&
+        process.totalProcesses <= request.limits.maxProcesses &&
         process.activeProcesses === 0 &&
         effects.stagedProjectBaselinePreserved &&
         effects.stagedExecutableBaselinePreserved

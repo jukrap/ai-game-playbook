@@ -7,7 +7,7 @@ namespace AiGamePlaybook.WindowsContainment;
 internal static partial class EngineRunProtocol
 {
     internal const int MaximumInputBytes = 4 * 1024 * 1024;
-    internal const int MaximumProcesses = 1;
+    internal const int MaximumProcesses = 2;
     internal const int MaximumProjectFiles = 1_024;
     internal const int MaximumProjectDirectories = 1_024;
     internal const int MaximumProjectFileBytes = 16 * 1024 * 1024;
@@ -47,8 +47,16 @@ internal static partial class EngineRunProtocol
         "sha256:f1647a8b1de201694f273e41bf8b350cd9a02d1e1c91c406ccf2b59f07bb42a7";
     internal const string ProjectValidationScript =
         "res://addons/ai_game_playbook/validators/project_validation.gd";
+    internal const string PersistenceOperationId = "engine.persistence-cycle";
+    internal const string PersistenceProfileId = "godot-persistence-cycle-v1";
+    internal const string PersistenceProfileDigest =
+        "sha256:1fed4d4bed3917a31c270484c779a3ef14481b474ac8d7c026bacd4380a1603b";
+    internal const string PersistenceProfileContractDigest =
+        "sha256:ae816e5aed8682f7b0554f41f6b1207939f100b97879f87ea125c6b092c24175";
+    internal const string PersistenceInvocationDigest =
+        "sha256:674f37428afa5ac1364207906045956991069711512b62616013a349d261335c";
     internal const string ProfileCatalogDigest =
-        "sha256:fbb008396cebde8f78364a4aae09463227c05090af4b939291caf44344057d22";
+        "sha256:baee3614224937ecdfad06848e4253b0350fea7ad2c930e4366eabfd9bd146a7";
     internal const string PolicyDigest =
         "sha256:9279861178baa8b60e2b5e7b53c09466ab05618bda01e0e82c43a968e3f1339d";
     private const int StartValidityMs = 30_000;
@@ -75,6 +83,13 @@ internal static partial class EngineRunProtocol
     private const int ProjectValidationMaximumLineBytes = 16_384;
     private const int ProjectValidationMaximumEvents = 2;
     private const string ProjectValidationOutputPrefix = "AGPB_PROJECT_VALIDATION ";
+    private const int PersistenceProcessTimeoutMs = 30_000;
+    private const int PersistenceIdleTimeoutMs = 15_000;
+    private const int PersistenceMaximumOutputBytes = 65_536;
+    private const int PersistenceMaximumReportDurationMs = 92_000;
+    private const int PersistenceMaximumLineBytes = 16_384;
+    private const int PersistenceMaximumEvents = 5;
+    private const string PersistenceOutputPrefix = "AGPB_PERSISTENCE ";
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly HashSet<string> ReservedNames = new(
         new[]
@@ -280,7 +295,8 @@ internal static partial class EngineRunProtocol
             || idleTimeoutMs != profile.IdleTimeoutMs
             || maxOutputBytes != profile.MaximumOutputBytes
             || terminationGraceMs != profile.TerminationGraceMs
-            || maxProcesses != MaximumProcesses
+            || maxProcesses != profile.MaximumProcesses
+            || maxProcesses > MaximumProcesses
             || maxProjectFiles != MaximumProjectFiles
             || maxProjectDirectories != MaximumProjectDirectories
             || maxProjectFileBytes != MaximumProjectFileBytes
@@ -521,7 +537,8 @@ internal static partial class EngineRunProtocol
             "digest-only-log",
             null,
             null,
-            null),
+            null,
+            1),
         ReplayProfileId => new NativeEngineRunProfile(
             ReplayOperationId,
             ReplayProfileDigest,
@@ -537,7 +554,8 @@ internal static partial class EngineRunProtocol
             "prefixed-json-lines",
             ReplayOutputPrefix,
             ReplayMaximumLineBytes,
-            ReplayMaximumEvents),
+            ReplayMaximumEvents,
+            1),
         ProjectImportProfileId => new NativeEngineRunProfile(
             ProjectImportOperationId,
             ProjectImportProfileDigest,
@@ -553,7 +571,8 @@ internal static partial class EngineRunProtocol
             "digest-only-log",
             null,
             null,
-            null),
+            null,
+            1),
         ProjectValidationProfileId => new NativeEngineRunProfile(
             ProjectValidationOperationId,
             ProjectValidationProfileDigest,
@@ -569,7 +588,25 @@ internal static partial class EngineRunProtocol
             "prefixed-json-lines",
             ProjectValidationOutputPrefix,
             ProjectValidationMaximumLineBytes,
-            ProjectValidationMaximumEvents),
+            ProjectValidationMaximumEvents,
+            1),
+        PersistenceProfileId => new NativeEngineRunProfile(
+            PersistenceOperationId,
+            PersistenceProfileDigest,
+            PersistenceProfileContractDigest,
+            PersistenceInvocationDigest,
+            true,
+            StartValidityMs,
+            PersistenceProcessTimeoutMs,
+            PersistenceIdleTimeoutMs,
+            TerminationGraceMs,
+            PersistenceMaximumOutputBytes,
+            PersistenceMaximumReportDurationMs,
+            "prefixed-json-lines",
+            PersistenceOutputPrefix,
+            PersistenceMaximumLineBytes,
+            PersistenceMaximumEvents,
+            2),
         _ => throw new ProtocolException("request-value-invalid"),
     };
 
@@ -772,7 +809,8 @@ internal sealed record NativeEngineRunProfile(
     string OutputKind,
     string? OutputPrefix,
     int? MaximumLineBytes,
-    int? MaximumEvents);
+    int? MaximumEvents,
+    int MaximumProcesses);
 
 internal sealed record NativeEngineRunRequest(
     string SchemaVersion,

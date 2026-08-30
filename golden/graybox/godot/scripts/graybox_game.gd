@@ -1,6 +1,7 @@
 extends Node3D
 
 const GrayboxReplay = preload("res://scripts/graybox_replay.gd")
+const GrayboxPersistence = preload("res://scripts/graybox_persistence.gd")
 
 const START_POSITION := Vector3(0.0, 1.0, 4.0)
 const MOVE_SPEED := 4.0
@@ -24,6 +25,8 @@ var _tick := 0
 var _replay_mode := false
 var _replay_finished := false
 var _replay_runner
+var _persistence_mode := ""
+var _persistence_finished := false
 
 
 func _ready() -> void:
@@ -34,7 +37,16 @@ func _ready() -> void:
 		push_error("Graybox scenario could not be loaded.")
 		get_tree().quit(2)
 		return
-	_replay_mode = "--agpb-replay" in OS.get_cmdline_user_args()
+	var user_arguments := OS.get_cmdline_user_args()
+	_replay_mode = "--agpb-replay" in user_arguments
+	if "--agpb-persistence-save" in user_arguments:
+		_persistence_mode = "save"
+	elif "--agpb-persistence-load" in user_arguments:
+		_persistence_mode = "load"
+	if not _persistence_mode.is_empty():
+		_update_hud()
+		GrayboxPersistence.new(self).run(_persistence_mode)
+		return
 	if _replay_mode:
 		_replay_runner = GrayboxReplay.new(self, scenario)
 	elif DisplayServer.get_name() != "headless":
@@ -53,7 +65,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _replay_mode:
+	if _replay_mode or not _persistence_mode.is_empty():
 		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_camera_yaw += event.relative.x * 0.0025
@@ -289,11 +301,22 @@ func reset_fresh_profile() -> void:
 
 
 func save_game() -> bool:
+	var payload := _save_payload()
+	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify(payload))
+	file.flush()
+	file = null
+	return true
+
+
+func _save_payload() -> Dictionary:
 	var collected_ids: Array[String] = []
 	for collectible_id in COLLECTIBLE_ORDER:
 		if bool(_collected.get(collectible_id, false)):
 			collected_ids.append(collectible_id)
-	var payload := {
+	return {
 		"schemaVersion": "1.0.0",
 		"position": [
 			_player.position.x,
@@ -304,11 +327,6 @@ func save_game() -> bool:
 		"collected": collected_ids,
 		"won": _won,
 	}
-	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if file == null:
-		return false
-	file.store_string(JSON.stringify(payload))
-	return true
 
 
 func load_game() -> bool:
@@ -336,6 +354,37 @@ func load_game() -> bool:
 		_set_collectible_active(collectible_id, not is_collected)
 	_update_hud()
 	return true
+
+
+func persistence_state_is_fresh() -> bool:
+	return (
+		_player.position == START_POSITION
+		and _score == 0
+		and not _won
+		and not bool(_collected.get("first", false))
+		and not bool(_collected.get("second", false))
+	)
+
+
+func prepare_persistence_saved_state() -> void:
+	_player.position = Vector3(-2.0, 1.0, -6.0)
+	_player.velocity = Vector3.ZERO
+	_score = 2
+	_won = true
+	for collectible_id in COLLECTIBLE_ORDER:
+		_collected[collectible_id] = true
+		_set_collectible_active(collectible_id, false)
+	_update_hud()
+
+
+func persistence_state_is_saved() -> bool:
+	return (
+		_player.position == Vector3(-2.0, 1.0, -6.0)
+		and _score == 2
+		and _won
+		and bool(_collected.get("first", false))
+		and bool(_collected.get("second", false))
+	)
 
 
 func has_state_path(path: String) -> bool:
@@ -399,6 +448,13 @@ func finish_replay(exit_code: int) -> void:
 	if _replay_finished:
 		return
 	_replay_finished = true
+	get_tree().quit(exit_code)
+
+
+func finish_persistence(exit_code: int) -> void:
+	if _persistence_finished:
+		return
+	_persistence_finished = true
 	get_tree().quit(exit_code)
 
 

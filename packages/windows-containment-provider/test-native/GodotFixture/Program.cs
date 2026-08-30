@@ -57,7 +57,29 @@ internal static class Program
             && args[4] == "res://addons/ai_game_playbook/validators/project_validation.gd"
             && args[5] == "--log-file"
             && args[7] == "--no-header";
-        if (!preflight && !replay && !projectImport && !projectValidation)
+        bool persistenceSave =
+            args.Length == 8
+            && args[0] == "--headless"
+            && args[1] == "--path"
+            && args[3] == "--log-file"
+            && args[5] == "--no-header"
+            && args[6] == "--"
+            && args[7] == "--agpb-persistence-save";
+        bool persistenceLoad =
+            args.Length == 8
+            && args[0] == "--headless"
+            && args[1] == "--path"
+            && args[3] == "--log-file"
+            && args[5] == "--no-header"
+            && args[6] == "--"
+            && args[7] == "--agpb-persistence-load";
+        bool persistence = persistenceSave || persistenceLoad;
+        if (
+            !preflight
+            && !replay
+            && !projectImport
+            && !projectValidation
+            && !persistence)
         {
             return 64;
         }
@@ -65,6 +87,7 @@ internal static class Program
         string log = preflight ? args[6]
             : replay ? args[4]
             : projectImport ? args[5]
+            : persistence ? args[4]
             : args[6];
         if (
             !Path.IsPathFullyQualified(project)
@@ -86,8 +109,131 @@ internal static class Program
             : replay ? "replay-success"
             : projectImport ? "project-import-success"
             : projectValidation ? "project-validation-success"
+            : persistence ? "persistence-success"
             : "success";
         Directory.CreateDirectory(Path.GetDirectoryName(log)!);
+        if (persistence)
+        {
+            string appData = Environment.GetEnvironmentVariable("APPDATA") ?? string.Empty;
+            if (!Path.IsPathFullyQualified(appData))
+            {
+                return 65;
+            }
+            string savePath = Path.Combine(
+                appData,
+                "Godot",
+                "app_userdata",
+                "AI Game Playbook Graybox",
+                "graybox-save.json");
+            switch (behavior)
+            {
+                case "persistence-success":
+                    if (persistenceSave)
+                    {
+                        byte[] saveBytes = Encoding.UTF8.GetBytes(
+                            "{\"schemaVersion\":\"1.0.0\",\"position\":[-2,1,-6],\"score\":2,\"collected\":[\"first\",\"second\"],\"won\":true}\n");
+                        Directory.CreateDirectory(Path.GetDirectoryName(savePath)!);
+                        await File.WriteAllBytesAsync(savePath, saveBytes);
+                        await File.WriteAllTextAsync(
+                            log,
+                            await BuildPersistenceTranscriptAsync(
+                                project,
+                                "save",
+                                saveBytes),
+                            new UTF8Encoding(false));
+                        return 0;
+                    }
+                    if (!File.Exists(savePath))
+                    {
+                        return 67;
+                    }
+                    byte[] loadedBytes = await File.ReadAllBytesAsync(savePath);
+                    await File.WriteAllTextAsync(
+                        log,
+                        await BuildPersistenceTranscriptAsync(
+                            project,
+                            "load",
+                            loadedBytes),
+                        new UTF8Encoding(false));
+                    return 0;
+                case "persistence-save-fail":
+                    if (!persistenceSave)
+                    {
+                        return 68;
+                    }
+                    await File.WriteAllTextAsync(
+                        log,
+                        await BuildPersistenceStartOnlyAsync(project, "save", null),
+                        new UTF8Encoding(false));
+                    return 2;
+                case "persistence-load-fail":
+                    if (persistenceSave)
+                    {
+                        byte[] saveBytes = Encoding.UTF8.GetBytes("fixture-save\n");
+                        Directory.CreateDirectory(Path.GetDirectoryName(savePath)!);
+                        await File.WriteAllBytesAsync(savePath, saveBytes);
+                        await File.WriteAllTextAsync(
+                            log,
+                            await BuildPersistenceTranscriptAsync(
+                                project,
+                                "save",
+                                saveBytes),
+                            new UTF8Encoding(false));
+                        return 0;
+                    }
+                    byte[] failedLoadBytes = await File.ReadAllBytesAsync(savePath);
+                    await File.WriteAllTextAsync(
+                        log,
+                        await BuildPersistenceStartOnlyAsync(
+                            project,
+                            "load",
+                            failedLoadBytes),
+                        new UTF8Encoding(false));
+                    return 2;
+                case "persistence-load-idle":
+                    if (persistenceSave)
+                    {
+                        byte[] saveBytes = Encoding.UTF8.GetBytes("fixture-save\n");
+                        Directory.CreateDirectory(Path.GetDirectoryName(savePath)!);
+                        await File.WriteAllBytesAsync(savePath, saveBytes);
+                        await File.WriteAllTextAsync(
+                            log,
+                            await BuildPersistenceTranscriptAsync(
+                                project,
+                                "save",
+                                saveBytes),
+                            new UTF8Encoding(false));
+                        return 0;
+                    }
+                    byte[] idleBytes = await File.ReadAllBytesAsync(savePath);
+                    await File.WriteAllTextAsync(
+                        log,
+                        await BuildPersistenceStartOnlyAsync(
+                            project,
+                            "load",
+                            idleBytes),
+                        new UTF8Encoding(false));
+                    await Task.Delay(TimeSpan.FromSeconds(30));
+                    return 0;
+                case "persistence-mutate-staged":
+                    if (persistenceSave)
+                    {
+                        await File.AppendAllTextAsync(
+                            Path.Combine(project, "project.godot"),
+                            "changed=true\n",
+                            new UTF8Encoding(false));
+                    }
+                    return 2;
+                case "persistence-line-overflow":
+                    await File.WriteAllTextAsync(
+                        log,
+                        $"AGPB_PERSISTENCE {new string('x', 17 * 1024)}\n",
+                        new UTF8Encoding(false));
+                    return 0;
+                default:
+                    return 66;
+            }
+        }
         if (projectImport)
         {
             switch (behavior)
@@ -407,6 +553,109 @@ internal static class Program
         return transcript.ToString();
     }
 
+    private static async Task<string> BuildPersistenceTranscriptAsync(
+        string project,
+        string phase,
+        byte[] saveBytes)
+    {
+        (string projectId, string sourceDigest) =
+            await PersistenceIdentityAsync(project);
+        string saveDigest = "sha256:" + Convert.ToHexString(
+            SHA256.HashData(saveBytes)).ToLowerInvariant();
+        StringBuilder transcript = new();
+        if (phase == "save")
+        {
+            AppendPersistenceEvent(transcript, new Dictionary<string, object?>
+            {
+                ["event"] = "persistence-save-started",
+                ["projectId"] = projectId,
+                ["sourceDigest"] = sourceDigest,
+                ["freshStateHash"] =
+                    "sha256:1d025ef5d6fbb149d4efc570386222eba43a70940cf840cefe6abcb292a6f7b6",
+            });
+            AppendPersistenceEvent(transcript, new Dictionary<string, object?>
+            {
+                ["event"] = "persistence-save-completed",
+                ["projectId"] = projectId,
+                ["sourceDigest"] = sourceDigest,
+                ["stateHash"] =
+                    "sha256:d03c747825e76805b014f27fe25efa647c05dcbfb8a80fba68fd26ffecd5cef7",
+                ["saveDigest"] = saveDigest,
+                ["saveBytes"] = saveBytes.Length,
+                ["userfsPersistent"] = true,
+            });
+            return transcript.ToString();
+        }
+        AppendPersistenceEvent(transcript, new Dictionary<string, object?>
+        {
+            ["event"] = "persistence-load-started",
+            ["projectId"] = projectId,
+            ["sourceDigest"] = sourceDigest,
+            ["freshStateHash"] =
+                "sha256:1d025ef5d6fbb149d4efc570386222eba43a70940cf840cefe6abcb292a6f7b6",
+            ["saveDigest"] = saveDigest,
+            ["saveBytes"] = saveBytes.Length,
+            ["userfsPersistent"] = true,
+        });
+        foreach (string name in new[]
+                 {
+                     "persistence-load-completed",
+                     "persistence-cycle-passed",
+                 })
+        {
+            AppendPersistenceEvent(transcript, new Dictionary<string, object?>
+            {
+                ["event"] = name,
+                ["projectId"] = projectId,
+                ["sourceDigest"] = sourceDigest,
+                ["stateHash"] =
+                    "sha256:d03c747825e76805b014f27fe25efa647c05dcbfb8a80fba68fd26ffecd5cef7",
+                ["saveDigest"] = saveDigest,
+                ["saveBytes"] = saveBytes.Length,
+            });
+        }
+        return transcript.ToString();
+    }
+
+    private static async Task<string> BuildPersistenceStartOnlyAsync(
+        string project,
+        string phase,
+        byte[]? saveBytes)
+    {
+        (string projectId, string sourceDigest) =
+            await PersistenceIdentityAsync(project);
+        StringBuilder transcript = new();
+        var value = new Dictionary<string, object?>
+        {
+            ["event"] = phase == "save"
+                ? "persistence-save-started"
+                : "persistence-load-started",
+            ["projectId"] = projectId,
+            ["sourceDigest"] = sourceDigest,
+            ["freshStateHash"] =
+                "sha256:1d025ef5d6fbb149d4efc570386222eba43a70940cf840cefe6abcb292a6f7b6",
+        };
+        if (saveBytes is not null)
+        {
+            value["saveDigest"] = "sha256:" + Convert.ToHexString(
+                SHA256.HashData(saveBytes)).ToLowerInvariant();
+            value["saveBytes"] = saveBytes.Length;
+            value["userfsPersistent"] = true;
+        }
+        AppendPersistenceEvent(transcript, value);
+        return transcript.ToString();
+    }
+
+    private static async Task<(string ProjectId, string SourceDigest)>
+        PersistenceIdentityAsync(string project)
+    {
+        using JsonDocument manifest = JsonDocument.Parse(
+            await File.ReadAllTextAsync(Path.Combine(project, "manifest.json")));
+        return (
+            manifest.RootElement.GetProperty("projectId").GetString()!,
+            manifest.RootElement.GetProperty("sourceDigest").GetString()!);
+    }
+
     private static IEnumerable<(JsonElement Oracle, bool Terminal)> ReplayOracles(
         JsonElement scenario)
     {
@@ -441,6 +690,15 @@ internal static class Program
         Dictionary<string, object?> value)
     {
         transcript.Append("AGPB_PROJECT_VALIDATION ");
+        transcript.Append(JsonSerializer.Serialize(value));
+        transcript.Append('\n');
+    }
+
+    private static void AppendPersistenceEvent(
+        StringBuilder transcript,
+        Dictionary<string, object?> value)
+    {
+        transcript.Append("AGPB_PERSISTENCE ");
         transcript.Append(JsonSerializer.Serialize(value));
         transcript.Append('\n');
     }

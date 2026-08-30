@@ -375,7 +375,9 @@ function scanJsonValue(
     : { next: jsonPrimitivePattern.lastIndex, duplicate: false };
 }
 
-function parseJsonEvent(payload: string): Record<string, unknown> | undefined {
+export function parseGodotStructuredOutputJsonRecord(
+  payload: string,
+): Record<string, unknown> | undefined {
   if (payload.length === 0 || /[\t\n\r ]/u.test(payload.replace(/"(?:\\.|[^"\\])*"/gu, ""))) {
     return undefined;
   }
@@ -393,6 +395,17 @@ function parseJsonEvent(payload: string): Record<string, unknown> | undefined {
   ) {
     return undefined;
   }
+  return exactRecord(
+    parsed,
+    [],
+    parsed === null || typeof parsed !== "object"
+      ? []
+      : Object.getOwnPropertyNames(parsed),
+  );
+}
+
+function parseJsonEvent(payload: string): Record<string, unknown> | undefined {
+  const parsed = parseGodotStructuredOutputJsonRecord(payload);
   return exactRecord(parsed, ["event"], [
     "code",
     "oracleId",

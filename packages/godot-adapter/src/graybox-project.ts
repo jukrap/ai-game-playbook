@@ -27,7 +27,7 @@ import { isProxy } from "node:util/types";
 import { GodotAdapterBoundaryError } from "./errors.js";
 
 export const GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST: Sha256Digest =
-  "sha256:043d7433e084bda9e612cd02808f270012c3d34fcb038e1ae057ffd0739bed65" as Sha256Digest;
+  "sha256:ac51170d266af7e907551084959b824f8ccead3c56b55e15994e8463e3e6674d" as Sha256Digest;
 export const GODOT_GRAYBOX_SCENARIO_DIGEST: Sha256Digest =
   "sha256:4bce945905093f746939b6b8f1c6183d0795f2f74b533763970aeed5be4e6c0f" as Sha256Digest;
 export const GODOT_GRAYBOX_TARGET_VERSION = "4.7.2" as const;
@@ -43,6 +43,7 @@ export type GodotGrayboxFeature =
   | "deterministic-input-replay"
   | "hud-counter"
   | "movement"
+  | "runtime-frame-capture"
   | "save-load"
   | "state-trace"
   | "win-state";
@@ -53,6 +54,7 @@ export type GodotGrayboxSourceRole =
   | "scenario"
   | "scene"
   | "gameplay-script"
+  | "capture-script"
   | "persistence-script"
   | "replay-script";
 
@@ -134,6 +136,7 @@ const expectedFeatures = Object.freeze([
   "deterministic-input-replay",
   "hud-counter",
   "movement",
+  "runtime-frame-capture",
   "save-load",
   "state-trace",
   "win-state",
@@ -147,6 +150,10 @@ const expectedFiles = Object.freeze([
   Object.freeze({ path: "project.godot", role: "project-settings" as const }),
   Object.freeze({ path: "scenario.json", role: "scenario" as const }),
   Object.freeze({ path: "scenes/main.tscn", role: "scene" as const }),
+  Object.freeze({
+    path: "scripts/graybox_capture.gd",
+    role: "capture-script" as const,
+  }),
   Object.freeze({
     path: "scripts/graybox_game.gd",
     role: "gameplay-script" as const,
@@ -589,6 +596,7 @@ function assertStaticStructure(files: ReadonlyMap<string, string>): void {
       "func state_value(",
       'OS.get_cmdline_user_args()',
       '"--agpb-replay" in user_arguments',
+      '"--agpb-runtime-frame" in user_arguments',
       '"--agpb-persistence-save" in user_arguments',
       '"--agpb-persistence-load" in user_arguments',
       'FileAccess.get_file_as_string("res://scenario.json")',
@@ -608,6 +616,28 @@ function assertStaticStructure(files: ReadonlyMap<string, string>): void {
       GODOT_GRAYBOX_SCENARIO_DIGEST,
     ],
     "Godot graybox replay source is missing a required deterministic boundary.",
+  );
+
+  const capture = files.get("scripts/graybox_capture.gd") ?? "";
+  requireTextFragments(
+    capture,
+    [
+      "AGPB_RUNTIME_FRAME ",
+      'RenderingServer.frame_post_draw',
+      'get_viewport().get_texture().get_image()',
+      'image.save_png(_artifact_path)',
+      'RenderingServer.get_current_rendering_method()',
+      'RenderingServer.get_current_rendering_driver_name()',
+      'FileAccess.get_sha256(_artifact_path)',
+      'arguments.size() != 7',
+      '_artifact_path.is_absolute_path()',
+      '_artifact_path.get_file() == "runtime-frame.png"',
+      '"capture-started"',
+      '"capture-passed"',
+      '"capture-failed"',
+      GODOT_GRAYBOX_SCENARIO_DIGEST,
+    ],
+    "Godot graybox capture source is missing a required rendered-frame boundary.",
   );
 
   const persistence = files.get("scripts/graybox_persistence.gd") ?? "";

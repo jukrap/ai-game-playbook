@@ -50,7 +50,7 @@ test("canonical Godot graybox source binds one exact static project", async () =
     godot.GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST,
   );
   assert.equal(report.sourceDigest, source.manifest.sourceDigest);
-  assert.equal(report.fileCount, 7);
+  assert.equal(report.fileCount, 8);
   assert.equal(report.totalBytes > 0, true);
   assert.equal(report.mainScene, "scenes/main.tscn");
   assert.deepEqual(report.persistence, {
@@ -65,6 +65,7 @@ test("canonical Godot graybox source binds one exact static project", async () =
     "deterministic-input-replay",
     "hud-counter",
     "movement",
+    "runtime-frame-capture",
     "save-load",
     "state-trace",
     "win-state",
@@ -79,6 +80,31 @@ test("canonical Godot graybox source binds one exact static project", async () =
   assert.equal(Object.isFrozen(report.engine), true);
   assert.equal(Object.isFrozen(report.support), true);
   assert.equal(Object.isFrozen(report.persistence), true);
+});
+
+test("Godot runtime frame source fixes capture and replay boundaries", async () => {
+  const source = await fixture();
+  const capture = source.files.find(
+    ({ path }) => path === "scripts/graybox_capture.gd",
+  )?.text;
+  const game = source.files.find(
+    ({ path }) => path === "scripts/graybox_game.gd",
+  )?.text;
+  const replay = source.files.find(
+    ({ path }) => path === "scripts/graybox_replay.gd",
+  )?.text;
+
+  assert.equal(typeof capture, "string");
+  assert.equal(typeof game, "string");
+  assert.equal(typeof replay, "string");
+  assert.match(capture, /arguments\.size\(\) != 7/u);
+  assert.match(capture, /_artifact_path\.get_file\(\) == "runtime-frame\.png"/u);
+  assert.match(capture, /await RenderingServer\.frame_post_draw/u);
+  assert.match(capture, /"artifactDigest": artifact_digest/u);
+  assert.doesNotMatch(capture, /"artifactPath"/u);
+  assert.match(game, /func freeze_runtime_frame\(\) -> void:/u);
+  assert.match(replay, /_passed_handler\.call\(tick\)/u);
+  assert.match(replay, /_game\.finish_replay\(0\)/u);
 });
 
 async function rootVerificationContext(project) {
@@ -104,7 +130,7 @@ test("canonical Godot graybox root matches the complete execution snapshot", asy
   const report = await godot.verifyGodotGrayboxProjectRoot(context);
 
   assert.equal(report.projectId, "golden.graybox.godot");
-  assert.equal(report.fileCount, 7);
+  assert.equal(report.fileCount, 8);
   assert.equal(report.manifestDigest, godot.GODOT_GRAYBOX_PROJECT_MANIFEST_DIGEST);
 });
 

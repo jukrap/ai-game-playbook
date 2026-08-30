@@ -137,6 +137,7 @@ const sourcePaths = Object.freeze([
   "project.godot",
   "scenario.json",
   "scenes/main.tscn",
+  "scripts/graybox_capture.gd",
   "scripts/graybox_game.gd",
   "scripts/graybox_replay.gd",
 ]);

@@ -23,6 +23,7 @@
     "deterministic-input-replay",
     "hud-counter",
     "movement",
+    "runtime-frame-capture",
     "save-load",
     "state-trace",
     "win-state"
@@ -53,10 +54,16 @@
       "digest": "sha256:1406507a8219cb52c2e965352f373c031dfff5143fd2a52e43c28c23e2ab7722"
     },
     {
+      "path": "scripts/graybox_capture.gd",
+      "role": "capture-script",
+      "bytes": 6085,
+      "digest": "sha256:a890d6744a4cffb1635325ee6cf373c60a8154b51d46b11f3875136f79d3fc72"
+    },
+    {
       "path": "scripts/graybox_game.gd",
       "role": "gameplay-script",
-      "bytes": 13171,
-      "digest": "sha256:f5c58d6d535051f712040a8272e35cc4a0a83765d78983ddfeb2a4f7cac6db7e"
+      "bytes": 13856,
+      "digest": "sha256:4668bb0201046d17be81d8a856d748ae7e2e40f5f2b49752aed28e3b1de60b1a"
     },
     {
       "path": "scripts/graybox_persistence.gd",
@@ -67,11 +74,11 @@
     {
       "path": "scripts/graybox_replay.gd",
       "role": "replay-script",
-      "bytes": 6098,
-      "digest": "sha256:7a48568e5f89dc4747ff33672042547d8ea0a1830f05e5c2706219720c4a617d"
+      "bytes": 6449,
+      "digest": "sha256:cfbea5c48a9e3dff997c1eec783c25490481086d20c2f4e91f59ab7489aa6ab4"
     }
   ],
-  "sourceDigest": "sha256:a38debb2d85540f090554ed3784e00df38d6c160a957b0feb65d7328b7d5844f",
+  "sourceDigest": "sha256:47ffc71a03b1489f3e2b5b4587e3b85ff2fc1e524116eebaf01c6256324727c3",
   "support": {
     "grade": "planned",
     "evidenceGrade": "implemented",

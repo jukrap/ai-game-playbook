@@ -11,11 +11,20 @@ var _terminal: Array
 var _next_input := 0
 var _passed: Dictionary = {}
 var _finished := false
+var _event_sink := Callable()
+var _passed_handler := Callable()
 
 
-func _init(game, scenario: Dictionary) -> void:
+func _init(
+	game,
+	scenario: Dictionary,
+	event_sink: Callable = Callable(),
+	passed_handler: Callable = Callable()
+) -> void:
 	_game = game
 	_scenario = scenario
+	_event_sink = event_sink
+	_passed_handler = passed_handler
 	_inputs = scenario.get("inputs", [])
 	_checkpoints = scenario.get("checkpoints", [])
 	_terminal = scenario.get("terminal", [])
@@ -61,7 +70,10 @@ func after_tick(tick: int) -> void:
 				"scenarioDigest": SCENARIO_DIGEST,
 			})
 			_finished = true
-			_game.finish_replay(0)
+			if _passed_handler.is_valid():
+				_passed_handler.call(tick)
+			else:
+				_game.finish_replay(0)
 		else:
 			_fail("checkpoint-incomplete", tick, {})
 		return
@@ -222,6 +234,9 @@ func _fail(code: String, tick: int, details: Dictionary) -> void:
 
 
 func _emit(event: String, details: Dictionary) -> void:
+	if _event_sink.is_valid():
+		_event_sink.call(event, details)
+		return
 	var output := {"event": event}
 	for key in details:
 		output[key] = details[key]

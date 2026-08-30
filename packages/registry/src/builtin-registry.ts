@@ -753,7 +753,7 @@ const engineDeterministicReplayCommand: CommandDescriptor = Object.freeze({
     package: "@ai-game-playbook/godot-adapter",
     export: "runGodotDeterministicReplay",
     digest: parseSha256Digest(
-      "sha256:53268cac9d23f67b8f5d37ce5daec0af61334d6e9d6172e95db96a218c92d27b",
+      "sha256:d71d9d8dfb7b230fd607f06109ac8885bd9714c01eaed7454e0184523268b10a",
     ),
   }),
 });
@@ -815,7 +815,7 @@ const enginePersistenceCycleCommand: CommandDescriptor = Object.freeze({
     package: "@ai-game-playbook/godot-adapter",
     export: "runGodotPersistenceCycle",
     digest: parseSha256Digest(
-      "sha256:c212452b2d572fd9be4c9c42a24d5fa6574895a640232709f1b78df329ac1b56",
+      "sha256:3358200752e6a769c87d45f1f78536c942a06553f5c1f8ef09fcef15648763cf",
     ),
   }),
 });
@@ -877,7 +877,7 @@ const engineProjectImportCommand: CommandDescriptor = Object.freeze({
     package: "@ai-game-playbook/godot-adapter",
     export: "runGodotProjectImport",
     digest: parseSha256Digest(
-      "sha256:41ca82058aa72fdfc869fe6f96a0323d9a86b970e4deeeab370f221c8ee1cb1b",
+      "sha256:789947258d0ea2098fc736dc124aa381cb4350382824ac3f1faa6a7ffb6130b0",
     ),
   }),
 });
@@ -939,7 +939,7 @@ const engineProjectValidationCommand: CommandDescriptor = Object.freeze({
     package: "@ai-game-playbook/godot-adapter",
     export: "runGodotProjectValidation",
     digest: parseSha256Digest(
-      "sha256:41ca82058aa72fdfc869fe6f96a0323d9a86b970e4deeeab370f221c8ee1cb1b",
+      "sha256:789947258d0ea2098fc736dc124aa381cb4350382824ac3f1faa6a7ffb6130b0",
     ),
   }),
 });

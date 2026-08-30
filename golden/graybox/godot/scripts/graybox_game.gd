@@ -2,6 +2,7 @@ extends Node3D
 
 const GrayboxReplay = preload("res://scripts/graybox_replay.gd")
 const GrayboxPersistence = preload("res://scripts/graybox_persistence.gd")
+const GrayboxCapture = preload("res://scripts/graybox_capture.gd")
 
 const START_POSITION := Vector3(0.0, 1.0, 4.0)
 const MOVE_SPEED := 4.0
@@ -25,6 +26,8 @@ var _tick := 0
 var _replay_mode := false
 var _replay_finished := false
 var _replay_runner
+var _capture_mode := false
+var _capture_runner
 var _persistence_mode := ""
 var _persistence_finished := false
 
@@ -38,7 +41,8 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	var user_arguments := OS.get_cmdline_user_args()
-	_replay_mode = "--agpb-replay" in user_arguments
+	_capture_mode = "--agpb-runtime-frame" in user_arguments
+	_replay_mode = "--agpb-replay" in user_arguments or _capture_mode
 	if "--agpb-persistence-save" in user_arguments:
 		_persistence_mode = "save"
 	elif "--agpb-persistence-load" in user_arguments:
@@ -48,7 +52,19 @@ func _ready() -> void:
 		GrayboxPersistence.new(self).run(_persistence_mode)
 		return
 	if _replay_mode:
-		_replay_runner = GrayboxReplay.new(self, scenario)
+		if _capture_mode:
+			_capture_runner = GrayboxCapture.new(self, scenario, user_arguments)
+			if not _capture_runner.is_ready():
+				finish_replay(2)
+				return
+			_replay_runner = GrayboxReplay.new(
+				self,
+				scenario,
+				Callable(_capture_runner, "emit_replay_event"),
+				Callable(_capture_runner, "complete_replay")
+			)
+		else:
+			_replay_runner = GrayboxReplay.new(self, scenario)
 	elif DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_update_hud()
@@ -449,6 +465,14 @@ func finish_replay(exit_code: int) -> void:
 		return
 	_replay_finished = true
 	get_tree().quit(exit_code)
+
+
+func freeze_runtime_frame() -> void:
+	set_physics_process(false)
+	_held_actions.clear()
+	_player.velocity = Vector3.ZERO
+	_update_camera()
+	_update_hud()
 
 
 func finish_persistence(exit_code: int) -> void:

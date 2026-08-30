@@ -26,6 +26,7 @@ export {
   GODOT_RUNTIME_FRAME_CAPTURE_VIEWPORT,
   assessGodotRuntimeFrameArtifact,
   classifyGodotRuntimeFrameCaptureExecution,
+  consumeGodotRuntimeFrameArtifactBytes,
   createGodotRuntimeFrameCaptureExpectation,
   createGodotRuntimeFrameEvidence,
   parseGodotRuntimeFrameCaptureOutput,

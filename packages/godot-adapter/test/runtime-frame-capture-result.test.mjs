@@ -484,3 +484,39 @@ test("Godot runtime frame evidence requires original validated transcript and ar
     expectGodotError("godot-capture-frame-evidence-invalid"),
   );
 });
+
+test("validated Godot runtime frame bytes are available once to the original assessment", async () => {
+  const value = await scenario();
+  const expectation = godot.createGodotRuntimeFrameCaptureExpectation({
+    runId,
+    scenario: value,
+  });
+  const content = runtimeFramePng();
+  const { parsed } = parseSuccess(value, expectation, content);
+  const artifact = godot.assessGodotRuntimeFrameArtifact({
+    transcript: parsed.transcript,
+    attestation: {
+      digest: contracts.sha256Digest(content),
+      bytes: content.byteLength,
+    },
+    content,
+  });
+  assert.equal(artifact.status, "validated");
+
+  const consumed = godot.consumeGodotRuntimeFrameArtifactBytes(artifact);
+  assert.notEqual(consumed, content);
+  assert.deepEqual(consumed, content);
+  consumed.fill(0);
+
+  assert.throws(
+    () => godot.consumeGodotRuntimeFrameArtifactBytes(artifact),
+    expectGodotError("godot-capture-artifact-bytes-unavailable"),
+  );
+  assert.throws(
+    () =>
+      godot.consumeGodotRuntimeFrameArtifactBytes(structuredClone(artifact)),
+    expectGodotError("godot-capture-artifact-bytes-unavailable"),
+  );
+  assert.equal(JSON.stringify(artifact).includes("content"), false);
+  assert.equal(JSON.stringify(artifact).includes("runtime-frame.png"), false);
+});

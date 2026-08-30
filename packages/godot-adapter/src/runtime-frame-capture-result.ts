@@ -305,6 +305,7 @@ const replayExpectations = new WeakMap<
 >();
 const transcripts = new WeakSet<object>();
 const validatedArtifacts = new WeakSet<object>();
+const validatedArtifactBytes = new WeakMap<object, Uint8Array>();
 
 function fail(code: string, message: string): never {
   throw new GodotAdapterBoundaryError(code, message, false);
@@ -995,7 +996,32 @@ export function assessGodotRuntimeFrameArtifact(
     format: Object.freeze({ ...inspected.format }),
   });
   validatedArtifacts.add(result);
+  validatedArtifactBytes.set(result, snapshot);
   return result;
+}
+
+export function consumeGodotRuntimeFrameArtifactBytes(
+  value: unknown,
+): Uint8Array {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    !validatedArtifacts.has(value)
+  ) {
+    return fail(
+      "godot-capture-artifact-bytes-unavailable",
+      "Godot capture artifact bytes require an original validated assessment.",
+    );
+  }
+  const snapshot = validatedArtifactBytes.get(value);
+  if (snapshot === undefined) {
+    return fail(
+      "godot-capture-artifact-bytes-unavailable",
+      "Godot capture artifact bytes are unavailable, cloned, or already consumed.",
+    );
+  }
+  validatedArtifactBytes.delete(value);
+  return Uint8Array.from(snapshot);
 }
 
 export interface CreateGodotRuntimeFrameEvidenceRequest {

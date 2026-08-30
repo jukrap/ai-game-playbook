@@ -21,6 +21,11 @@ test("runtime command handler metadata attests each exact compiled module", asyn
     ],
     ["engine.headless-preflight", "godot-adapter", "headless-preflight.js"],
     [
+      "engine.persistence-cycle",
+      "godot-adapter",
+      "contained-persistence-cycle.js",
+    ],
+    [
       "engine.project-import",
       "godot-adapter",
       "contained-project-validation.js",

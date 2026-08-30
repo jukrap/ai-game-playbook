@@ -158,6 +158,21 @@ export type {
   RunGodotContainedDeterministicReplayRequest,
 } from "./contained-deterministic-replay.js";
 export {
+  assertPreparedGodotContainedPersistenceCycle,
+  consumeGodotContainedPersistenceCycleTranscript,
+  createGodotContainedPersistenceCycleAuthorizationRequest,
+  isGodotContainedPersistenceCycleRunRequest,
+  prepareGodotContainedPersistenceCycle,
+  runGodotContainedPersistenceCycle,
+  runGodotPersistenceCycle,
+} from "./contained-persistence-cycle.js";
+export type {
+  CreateGodotContainedPersistenceCycleAuthorizationRequest,
+  PrepareGodotContainedPersistenceCycleRequest,
+  PreparedGodotContainedPersistenceCycle,
+  RunGodotContainedPersistenceCycleRequest,
+} from "./contained-persistence-cycle.js";
+export {
   assertPreparedGodotContainedProjectImport,
   assertPreparedGodotContainedProjectValidation,
   consumeGodotContainedProjectValidationTranscript,

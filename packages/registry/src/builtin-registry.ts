@@ -17,6 +17,12 @@ import {
   GODOT_HEADLESS_PREFLIGHT_COMMAND_TIMEOUT_MS,
   GODOT_HEADLESS_PREFLIGHT_MAX_OUTPUT_BYTES,
   GODOT_HEADLESS_PREFLIGHT_TERMINATION_GRACE_MS,
+  GODOT_PERSISTENCE_CYCLE_COMMAND_ID,
+  GODOT_PERSISTENCE_CYCLE_COMMAND_TIMEOUT_MS,
+  GODOT_PERSISTENCE_CYCLE_MAX_OUTPUT_BYTES,
+  GODOT_PERSISTENCE_CYCLE_STEP_ID,
+  GODOT_PERSISTENCE_CYCLE_TERMINATION_GRACE_MS,
+  GODOT_PERSISTENCE_CYCLE_WORKFLOW_ID,
   GODOT_PROJECT_IMPORT_COMMAND_ID,
   GODOT_PROJECT_IMPORT_COMMAND_TIMEOUT_MS,
   GODOT_PROJECT_IMPORT_MAX_OUTPUT_BYTES,
@@ -34,6 +40,8 @@ import {
   godotExecutableDiscoveryRequestSchema,
   godotHeadlessPreflightReportSchema,
   godotHeadlessPreflightRequestSchema,
+  godotPersistenceCycleExpectationSchema,
+  godotPersistenceCycleReportSchema,
   godotProjectImportReportSchema,
   godotProjectValidationExpectationSchema,
   godotProjectValidationReportSchema,
@@ -746,6 +754,68 @@ const engineDeterministicReplayCommand: CommandDescriptor = Object.freeze({
     export: "runGodotDeterministicReplay",
     digest: parseSha256Digest(
       "sha256:53268cac9d23f67b8f5d37ce5daec0af61334d6e9d6172e95db96a218c92d27b",
+    ),
+  }),
+});
+
+const enginePersistenceCycleCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId(GODOT_PERSISTENCE_CYCLE_COMMAND_ID),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Run one identity-bound Godot save, restart, and load cycle in containment.",
+  cli: Object.freeze({
+    path: Object.freeze(["internal", "engine", "persistence-cycle"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: godotPersistenceCycleExpectationSchema.schemaId,
+    digest: godotPersistenceCycleExpectationSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: godotPersistenceCycleReportSchema.schemaId,
+    digest: godotPersistenceCycleReportSchema.digest,
+  }),
+  capabilities: Object.freeze([
+    parseStableId(GODOT_PERSISTENCE_CYCLE_COMMAND_ID),
+  ]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>([
+    "read-project",
+    "host-tool-inspection",
+    "test-build",
+  ]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "process",
+      scope: "godot-persistence-cycle",
+      boundary: "local",
+    }),
+  ]),
+  lane: "build-bound",
+  timeoutMs: GODOT_PERSISTENCE_CYCLE_COMMAND_TIMEOUT_MS,
+  cancellation: Object.freeze({
+    mode: "process-tree",
+    graceMs: GODOT_PERSISTENCE_CYCLE_TERMINATION_GRACE_MS,
+  }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: GODOT_PERSISTENCE_CYCLE_COMMAND_TIMEOUT_MS,
+    maxOutputBytes: GODOT_PERSISTENCE_CYCLE_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([
+    parseStableId("godot-persistence-cycle"),
+    parseStableId("run-receipt"),
+  ]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/godot-adapter",
+    export: "runGodotPersistenceCycle",
+    digest: parseSha256Digest(
+      "sha256:c212452b2d572fd9be4c9c42a24d5fa6574895a640232709f1b78df329ac1b56",
     ),
   }),
 });
@@ -1909,6 +1979,47 @@ const godotHeadlessPreflightWorkflow: WorkflowDescriptor = Object.freeze({
   ]),
 });
 
+const godotPersistenceCycleWorkflow: WorkflowDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId(GODOT_PERSISTENCE_CYCLE_WORKFLOW_ID),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Execute one bounded Godot save, restart, and load cycle and retain its receipt.",
+  input: Object.freeze({
+    schemaId: godotPersistenceCycleExpectationSchema.schemaId,
+    digest: godotPersistenceCycleExpectationSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: godotPersistenceCycleReportSchema.schemaId,
+    digest: godotPersistenceCycleReportSchema.digest,
+  }),
+  supportedStages: supportedStages(),
+  steps: Object.freeze([
+    Object.freeze({
+      id: parseStableId(GODOT_PERSISTENCE_CYCLE_STEP_ID),
+      commandId: parseStableId(GODOT_PERSISTENCE_CYCLE_COMMAND_ID),
+      dependsOn: Object.freeze([]),
+      onFailure: "blocked" as const,
+      approvalCheckpoint: false,
+    }),
+  ]),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: GODOT_PERSISTENCE_CYCLE_COMMAND_TIMEOUT_MS,
+    maxOutputBytes: GODOT_PERSISTENCE_CYCLE_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  resumePolicy: "never",
+  terminalOracle:
+    "The two-process persistence transcript, contained engine report, permission settlement, and retained receipt must agree without promoting engine support.",
+  requiredEvidence: Object.freeze([
+    parseStableId("godot-persistence-cycle"),
+    parseStableId("run-receipt"),
+  ]),
+});
+
 const godotProjectValidationWorkflow: WorkflowDescriptor = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   id: parseStableId(GODOT_PROJECT_VALIDATION_WORKFLOW_ID),
@@ -2145,6 +2256,8 @@ const definition: RegistryDefinition = Object.freeze({
     godotExecutableDiscoveryReportSchema,
     godotHeadlessPreflightRequestSchema,
     godotHeadlessPreflightReportSchema,
+    godotPersistenceCycleExpectationSchema,
+    godotPersistenceCycleReportSchema,
     godotDeterministicReplayReportSchema,
     godotDeterministicReplayTranscriptSchema,
     godotProjectImportReportSchema,
@@ -2189,6 +2302,7 @@ const definition: RegistryDefinition = Object.freeze({
     engineDeterministicReplayCommand,
     engineExecutableDiscoveryCommand,
     engineHeadlessPreflightCommand,
+    enginePersistenceCycleCommand,
     engineProjectImportCommand,
     engineProjectValidationCommand,
     engineStatusCommand,
@@ -2210,6 +2324,7 @@ const definition: RegistryDefinition = Object.freeze({
   workflows: Object.freeze([
     godotDeterministicReplayWorkflow,
     godotHeadlessPreflightWorkflow,
+    godotPersistenceCycleWorkflow,
     godotProjectValidationWorkflow,
     packAddWorkflow,
     packRecoveryWorkflow,

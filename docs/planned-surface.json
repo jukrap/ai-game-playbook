@@ -4,7 +4,7 @@
   "reviewedAt": "2026-08-27",
   "implementationStatus": "partial",
   "executableAvailable": true,
-  "runtimeRegistryDigest": "sha256:5e8f51a499a796162e391d121e54d8a9047ef18618ad15896bedf975393ad25e",
+  "runtimeRegistryDigest": "sha256:74af8df8a7e2baa3cf638ea6961455293839e3c9ee8b778771c64158eb8a2530",
   "package": {
     "npm": "ai-game-playbook",
     "executable": "agpb"

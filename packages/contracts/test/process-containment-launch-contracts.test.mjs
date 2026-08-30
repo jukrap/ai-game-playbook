@@ -139,6 +139,11 @@ function report(input = successfulReportInput()) {
 test("launch snapshots and request bind fresh path-free identities", () => {
   const request = launchRequest();
 
+  assert.equal(contracts.PROCESS_CONTAINMENT_LAUNCH_MAX_DURATION_MS, 15_000);
+  assert.equal(
+    request.limits.timeoutMs - request.limits.terminationGraceMs,
+    13_000,
+  );
   assert.doesNotThrow(() =>
     contracts.assertProcessContainmentLaunchRequestSemantics(request),
   );

@@ -325,6 +325,18 @@ test("native engine profile remains synchronized with the typed contract", async
   );
 });
 
+test("native synthetic launch duration remains synchronized with the typed contract", async () => {
+  const protocol = await readFile(
+    fileURLToPath(new URL("../native/Protocol.cs", import.meta.url)),
+    "utf8",
+  );
+
+  assert.equal(
+    csharpConstant(protocol, "SyntheticLaunchMaximumDurationMs"),
+    String(contracts.PROCESS_CONTAINMENT_LAUNCH_MAX_DURATION_MS),
+  );
+});
+
 test("native runners share one bounded AppContainer profile cleanup contract", async () => {
   const windowsProcess = await readFile(
     fileURLToPath(new URL("../native/WindowsProcess.cs", import.meta.url)),

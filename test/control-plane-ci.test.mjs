@@ -67,6 +67,6 @@ test("Windows containment integration tests run one native scenario at a time", 
   assert.equal(typeof verification, "string");
   assert.match(
     verification,
-    /node --test --test-concurrency=1 packages\/windows-containment-provider\/test\/\*\.test\.mjs packages\/godot-adapter\/test\/contained-headless-admission\.test\.mjs packages\/godot-adapter\/test\/contained-deterministic-replay\.test\.mjs packages\/godot-adapter\/test\/contained-project-validation\.test\.mjs$/,
+    /node --test --test-concurrency=1 packages\/windows-containment-provider\/test\/\*\.test\.mjs packages\/godot-adapter\/test\/contained-headless-admission\.test\.mjs packages\/godot-adapter\/test\/contained-deterministic-replay\.test\.mjs packages\/godot-adapter\/test\/contained-persistence-cycle\.test\.mjs packages\/godot-adapter\/test\/contained-project-validation\.test\.mjs$/,
   );
 });

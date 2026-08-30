@@ -17,6 +17,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
       "engine.deterministic-replay",
       "engine.executable-discovery",
       "engine.headless-preflight",
+      "engine.persistence-cycle",
       "engine.project-import",
       "engine.project-validation",
       "engine.status",
@@ -53,6 +54,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     false,
   );
   for (const commandId of [
+    "engine.persistence-cycle",
     "engine.project-import",
     "engine.project-validation",
   ]) {
@@ -414,6 +416,62 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   );
   assert.match(deterministicReplay.handler.digest, digestPattern);
 
+  const persistenceCycle = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === contracts.GODOT_PERSISTENCE_CYCLE_COMMAND_ID,
+  );
+  assert.notEqual(persistenceCycle, undefined);
+  assert.equal(persistenceCycle.lifecycle, "internal");
+  assert.deepEqual(persistenceCycle.cli, {
+    path: ["internal", "engine", "persistence-cycle"],
+    aliases: [],
+  });
+  assert.deepEqual(persistenceCycle.capabilities, [
+    contracts.GODOT_PERSISTENCE_CYCLE_COMMAND_ID,
+  ]);
+  assert.deepEqual(persistenceCycle.permissions, [
+    "read-project",
+    "host-tool-inspection",
+    "test-build",
+  ]);
+  assert.deepEqual(persistenceCycle.sideEffects, [
+    {
+      kind: "process",
+      scope: "godot-persistence-cycle",
+      boundary: "local",
+    },
+  ]);
+  assert.equal(persistenceCycle.lane, "build-bound");
+  assert.equal(
+    persistenceCycle.timeoutMs,
+    contracts.GODOT_PERSISTENCE_CYCLE_COMMAND_TIMEOUT_MS,
+  );
+  assert.deepEqual(persistenceCycle.cancellation, {
+    mode: "process-tree",
+    graceMs: contracts.GODOT_PERSISTENCE_CYCLE_TERMINATION_GRACE_MS,
+  });
+  assert.deepEqual(persistenceCycle.retry, {
+    mode: "never",
+    maxAttempts: 1,
+  });
+  assert.equal(
+    persistenceCycle.input.schemaId,
+    contracts.godotPersistenceCycleExpectationSchema.schemaId,
+  );
+  assert.equal(
+    persistenceCycle.output.schemaId,
+    contracts.godotPersistenceCycleReportSchema.schemaId,
+  );
+  assert.deepEqual(persistenceCycle.requiredEvidence, [
+    "godot-persistence-cycle",
+    "run-receipt",
+  ]);
+  assert.equal(
+    persistenceCycle.handler.package,
+    "@ai-game-playbook/godot-adapter",
+  );
+  assert.equal(persistenceCycle.handler.export, "runGodotPersistenceCycle");
+  assert.match(persistenceCycle.handler.digest, digestPattern);
+
   const versionProbe = registry.BUILTIN_REGISTRY.commands.find(
     ({ id }) => id === "engine.version-probe",
   );
@@ -685,6 +743,7 @@ test("the builtin registry binds internal operations to finite workflow steps", 
       "workflow.evidence-reconciliation",
       "workflow.godot-deterministic-replay",
       "workflow.godot-headless-preflight",
+      "workflow.godot-persistence-cycle",
       "workflow.godot-project-validation",
       "workflow.pack-add",
       "workflow.pack-recover",
@@ -763,6 +822,48 @@ test("the builtin registry binds internal operations to finite workflow steps", 
   assert.equal(replayPlan.steps[0].command.id, "engine.deterministic-replay");
   assert.equal(replayPlan.steps[0].command.lane, "build-bound");
   assert.equal(contracts.isResolvedWorkflowPlanDigestValid(replayPlan), true);
+
+  const persistence = registry.BUILTIN_REGISTRY.workflows.find(
+    ({ id }) => id === contracts.GODOT_PERSISTENCE_CYCLE_WORKFLOW_ID,
+  );
+  assert.notEqual(persistence, undefined);
+  assert.equal(persistence.lifecycle, "internal");
+  assert.equal(
+    persistence.input.schemaId,
+    contracts.godotPersistenceCycleExpectationSchema.schemaId,
+  );
+  assert.equal(
+    persistence.output.schemaId,
+    contracts.godotPersistenceCycleReportSchema.schemaId,
+  );
+  assert.deepEqual(persistence.steps, [
+    {
+      id: contracts.GODOT_PERSISTENCE_CYCLE_STEP_ID,
+      commandId: contracts.GODOT_PERSISTENCE_CYCLE_COMMAND_ID,
+      dependsOn: [],
+      onFailure: "blocked",
+      approvalCheckpoint: false,
+    },
+  ]);
+  assert.deepEqual(persistence.requiredEvidence, [
+    "godot-persistence-cycle",
+    "run-receipt",
+  ]);
+  const persistencePlan = registry.resolveWorkflowPlan(
+    registry.BUILTIN_REGISTRY,
+    persistence.id,
+    "vertical-slice",
+  );
+  assert.equal(persistencePlan.steps.length, 1);
+  assert.equal(
+    persistencePlan.steps[0].command.id,
+    contracts.GODOT_PERSISTENCE_CYCLE_COMMAND_ID,
+  );
+  assert.equal(persistencePlan.steps[0].command.lane, "build-bound");
+  assert.equal(
+    contracts.isResolvedWorkflowPlanDigestValid(persistencePlan),
+    true,
+  );
 
   const projectValidation = registry.BUILTIN_REGISTRY.workflows.find(
     ({ id }) => id === "workflow.godot-project-validation",

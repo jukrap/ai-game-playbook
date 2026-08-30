@@ -14,7 +14,7 @@ import {
 } from "./schema-fragments.js";
 import { PROCESS_CONTAINMENT_POLICY_DIGEST } from "./process-containment-assessment-contracts.js";
 
-export const PROCESS_CONTAINMENT_LAUNCH_MAX_DURATION_MS = 10_000;
+export const PROCESS_CONTAINMENT_LAUNCH_MAX_DURATION_MS = 15_000;
 export const PROCESS_CONTAINMENT_LAUNCH_MAX_VALIDITY_MS = 30_000;
 export const PROCESS_CONTAINMENT_LAUNCH_MAX_OUTPUT_BYTES: number = 64 * 1024;
 export const PROCESS_CONTAINMENT_LAUNCH_TERMINATION_GRACE_MS = 2_000;

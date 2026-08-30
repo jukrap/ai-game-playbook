@@ -9,7 +9,7 @@ internal static partial class Protocol
 {
     internal const int MaximumInputBytes = 16 * 1024;
     internal const int MaximumDurationMs = 30_000;
-    internal const int SyntheticLaunchMaximumDurationMs = 10_000;
+    internal const int SyntheticLaunchMaximumDurationMs = 15_000;
     internal const int SyntheticLaunchMaximumOutputBytes = 64 * 1024;
     internal const int SyntheticLaunchMaximumProjectBytes = 64 * 1024;
     internal const int SyntheticLaunchMaximumArtifactBytes = 128 * 1024 * 1024;

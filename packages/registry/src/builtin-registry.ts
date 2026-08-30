@@ -23,6 +23,13 @@ import {
   GODOT_PERSISTENCE_CYCLE_STEP_ID,
   GODOT_PERSISTENCE_CYCLE_TERMINATION_GRACE_MS,
   GODOT_PERSISTENCE_CYCLE_WORKFLOW_ID,
+  GODOT_RUNTIME_FRAME_CAPTURE_COMMAND_ID,
+  GODOT_RUNTIME_FRAME_CAPTURE_COMMAND_TIMEOUT_MS,
+  GODOT_RUNTIME_FRAME_CAPTURE_MAX_ARTIFACT_BYTES,
+  GODOT_RUNTIME_FRAME_CAPTURE_MAX_OUTPUT_BYTES,
+  GODOT_RUNTIME_FRAME_CAPTURE_STEP_ID,
+  GODOT_RUNTIME_FRAME_CAPTURE_TERMINATION_GRACE_MS,
+  GODOT_RUNTIME_FRAME_CAPTURE_WORKFLOW_ID,
   GODOT_PROJECT_IMPORT_COMMAND_ID,
   GODOT_PROJECT_IMPORT_COMMAND_TIMEOUT_MS,
   GODOT_PROJECT_IMPORT_MAX_OUTPUT_BYTES,
@@ -817,6 +824,74 @@ const enginePersistenceCycleCommand: CommandDescriptor = Object.freeze({
     export: "runGodotPersistenceCycle",
     digest: parseSha256Digest(
       "sha256:3358200752e6a769c87d45f1f78536c942a06553f5c1f8ef09fcef15648763cf",
+    ),
+  }),
+});
+
+const engineRuntimeFrameCaptureCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId(GODOT_RUNTIME_FRAME_CAPTURE_COMMAND_ID),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Capture one replay-bound Godot runtime frame and retain its verified artifact.",
+  cli: Object.freeze({
+    path: Object.freeze(["internal", "engine", "runtime-frame-capture"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: playtestScenarioSchema.schemaId,
+    digest: playtestScenarioSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: runtimeFrameEvidenceSchema.schemaId,
+    digest: runtimeFrameEvidenceSchema.digest,
+  }),
+  capabilities: Object.freeze([
+    parseStableId(GODOT_RUNTIME_FRAME_CAPTURE_COMMAND_ID),
+  ]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>([
+    "read-project",
+    "host-tool-inspection",
+    "test-build",
+    "write-project-metadata",
+  ]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "process",
+      scope: "godot-runtime-frame-capture",
+      boundary: "local",
+    }),
+    Object.freeze({
+      kind: "filesystem",
+      scope: "godot-runtime-frame-source",
+      boundary: "local",
+    }),
+  ]),
+  lane: "build-bound",
+  timeoutMs: GODOT_RUNTIME_FRAME_CAPTURE_COMMAND_TIMEOUT_MS,
+  cancellation: Object.freeze({
+    mode: "process-tree",
+    graceMs: GODOT_RUNTIME_FRAME_CAPTURE_TERMINATION_GRACE_MS,
+  }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 1,
+    maxChangedBytes: GODOT_RUNTIME_FRAME_CAPTURE_MAX_ARTIFACT_BYTES,
+    maxDurationMs: GODOT_RUNTIME_FRAME_CAPTURE_COMMAND_TIMEOUT_MS,
+    maxOutputBytes: GODOT_RUNTIME_FRAME_CAPTURE_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([
+    parseStableId("runtime-frame-evidence"),
+    parseStableId("run-receipt"),
+  ]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/godot-adapter",
+    export: "runGodotRuntimeFrameCapture",
+    digest: parseSha256Digest(
+      "sha256:ad0e541927608310bc8bf052111d4e6c38f1716907b37a0608e6809e108a4c06",
     ),
   }),
 });
@@ -1939,6 +2014,47 @@ const godotDeterministicReplayWorkflow: WorkflowDescriptor = Object.freeze({
   ]),
 });
 
+const godotRuntimeFrameCaptureWorkflow: WorkflowDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId(GODOT_RUNTIME_FRAME_CAPTURE_WORKFLOW_ID),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Capture one deterministic Godot runtime frame and retain its receipt-backed artifact.",
+  input: Object.freeze({
+    schemaId: playtestScenarioSchema.schemaId,
+    digest: playtestScenarioSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: runtimeFrameEvidenceSchema.schemaId,
+    digest: runtimeFrameEvidenceSchema.digest,
+  }),
+  supportedStages: supportedStages(),
+  steps: Object.freeze([
+    Object.freeze({
+      id: parseStableId(GODOT_RUNTIME_FRAME_CAPTURE_STEP_ID),
+      commandId: parseStableId(GODOT_RUNTIME_FRAME_CAPTURE_COMMAND_ID),
+      dependsOn: Object.freeze([]),
+      onFailure: "blocked" as const,
+      approvalCheckpoint: false,
+    }),
+  ]),
+  budgets: Object.freeze({
+    maxChangedFiles: 1,
+    maxChangedBytes: GODOT_RUNTIME_FRAME_CAPTURE_MAX_ARTIFACT_BYTES,
+    maxDurationMs: GODOT_RUNTIME_FRAME_CAPTURE_COMMAND_TIMEOUT_MS,
+    maxOutputBytes: GODOT_RUNTIME_FRAME_CAPTURE_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  resumePolicy: "never",
+  terminalOracle:
+    "The replay-bound frame, immutable artifact object, manifest, permission settlement, and durable receipt must agree without promoting live engine support.",
+  requiredEvidence: Object.freeze([
+    parseStableId("runtime-frame-evidence"),
+    parseStableId("run-receipt"),
+  ]),
+});
+
 const godotHeadlessPreflightWorkflow: WorkflowDescriptor = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   id: parseStableId("workflow.godot-headless-preflight"),
@@ -2307,6 +2423,7 @@ const definition: RegistryDefinition = Object.freeze({
     enginePersistenceCycleCommand,
     engineProjectImportCommand,
     engineProjectValidationCommand,
+    engineRuntimeFrameCaptureCommand,
     engineStatusCommand,
     engineVersionProbeCommand,
     initCommand,
@@ -2328,6 +2445,7 @@ const definition: RegistryDefinition = Object.freeze({
     godotHeadlessPreflightWorkflow,
     godotPersistenceCycleWorkflow,
     godotProjectValidationWorkflow,
+    godotRuntimeFrameCaptureWorkflow,
     packAddWorkflow,
     packRecoveryWorkflow,
     projectInitializationWorkflow,

@@ -1,4 +1,6 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -125,16 +127,29 @@ internal static class Program
             : projectImport ? "project-import-success"
             : projectValidation ? "project-validation-success"
             : persistence ? "persistence-success"
+            : runtimeFrameCapture && args[8].EndsWith("f", StringComparison.Ordinal)
+                ? "capture-fail"
             : runtimeFrameCapture ? "capture-success"
             : "success";
         Directory.CreateDirectory(Path.GetDirectoryName(log)!);
         if (runtimeFrameCapture)
         {
             string artifact = args[12];
-            byte[] png = Convert.FromBase64String(
-                "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAC0lEQVR4nGOohwIAEeUD+Ueg6nYAAAAASUVORK5CYII=");
-            string transcript =
-                "AGPB_RUNTIME_FRAME {\"event\":\"fixture-frame-captured\"}\n";
+            bool detailedRuntimeFrame =
+                File.Exists(Path.Combine(project, "scenario.json"))
+                && File.Exists(Path.Combine(project, "manifest.json"));
+            byte[] png = detailedRuntimeFrame
+                ? BuildRuntimeFramePng()
+                : Convert.FromBase64String(
+                    "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAC0lEQVR4nGOohwIAEeUD+Ueg6nYAAAAASUVORK5CYII=");
+            string transcript = detailedRuntimeFrame
+                ? await BuildRuntimeFrameTranscriptAsync(
+                    project,
+                    args[8],
+                    args[10],
+                    png,
+                    false)
+                : "AGPB_RUNTIME_FRAME {\"event\":\"fixture-frame-captured\"}\n";
             switch (behavior)
             {
                 case "capture-success":
@@ -151,8 +166,17 @@ internal static class Program
                     await File.WriteAllTextAsync(log, transcript, new UTF8Encoding(false));
                     return 0;
                 case "capture-fail":
-                    await File.WriteAllBytesAsync(artifact, png);
-                    await File.WriteAllTextAsync(log, transcript, new UTF8Encoding(false));
+                    await File.WriteAllTextAsync(
+                        log,
+                        detailedRuntimeFrame
+                            ? await BuildRuntimeFrameTranscriptAsync(
+                                project,
+                                args[8],
+                                args[10],
+                                png,
+                                true)
+                            : transcript,
+                        new UTF8Encoding(false));
                     return 2;
                 case "capture-mutate-staged":
                     await File.AppendAllTextAsync(
@@ -515,7 +539,7 @@ internal static class Program
         string manifestPath = Path.Combine(project, "manifest.json");
         if (!File.Exists(scenarioPath) || !File.Exists(manifestPath))
         {
-            return string.Empty;
+            return "AGPB_RUNTIME_FRAME {\"event\":\"fixture-frame-captured\"}\n";
         }
 
         using JsonDocument scenario = JsonDocument.Parse(
@@ -577,6 +601,210 @@ internal static class Program
             ["scenarioDigest"] = scenarioDigest,
         });
         return transcript.ToString();
+    }
+
+    private static async Task<string> BuildRuntimeFrameTranscriptAsync(
+        string project,
+        string runId,
+        string inputBindingDigest,
+        byte[] png,
+        bool captureFailed)
+    {
+        string scenarioPath = Path.Combine(project, "scenario.json");
+        string manifestPath = Path.Combine(project, "manifest.json");
+        if (!File.Exists(scenarioPath) || !File.Exists(manifestPath))
+        {
+            return string.Empty;
+        }
+
+        using JsonDocument scenario = JsonDocument.Parse(
+            await File.ReadAllTextAsync(scenarioPath));
+        using JsonDocument manifest = JsonDocument.Parse(
+            await File.ReadAllTextAsync(manifestPath));
+        JsonElement root = scenario.RootElement;
+        string scenarioId = root.GetProperty("scenarioId").GetString()!;
+        string scenarioDigest = manifest.RootElement
+            .GetProperty("scenario")
+            .GetProperty("digest")
+            .GetString()!;
+        string seed = root
+            .GetProperty("initialState")
+            .GetProperty("seed")
+            .GetString()!;
+        StringBuilder transcript = new();
+        AppendRuntimeFrameEvent(transcript, new Dictionary<string, object?>
+        {
+            ["event"] = "capture-started",
+            ["runId"] = runId,
+            ["scenarioId"] = scenarioId,
+            ["scenarioDigest"] = scenarioDigest,
+            ["seed"] = seed,
+            ["inputBindingDigest"] = inputBindingDigest,
+            ["sceneId"] = "scene.graybox.main",
+            ["cameraId"] = "camera.follow",
+        });
+        int terminalTick = 0;
+        string terminalStateHash = string.Empty;
+        foreach ((JsonElement oracle, bool terminal) in ReplayOracles(root))
+        {
+            int tick = OracleTick(oracle);
+            terminalTick = terminal ? Math.Max(terminalTick, tick) : terminalTick;
+            List<Dictionary<string, object?>> state = [];
+            int value = 0;
+            foreach (JsonElement path in oracle.GetProperty("stateHashFields").EnumerateArray())
+            {
+                state.Add(new Dictionary<string, object?>
+                {
+                    ["path"] = path.GetString()!,
+                    ["value"] = value,
+                });
+                value += 1;
+            }
+            string stateJson = JsonSerializer.Serialize(state);
+            string stateHash = "sha256:" + Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(stateJson))).ToLowerInvariant();
+            if (terminal)
+            {
+                terminalStateHash = stateHash;
+            }
+            AppendRuntimeFrameEvent(transcript, new Dictionary<string, object?>
+            {
+                ["event"] = "oracle-passed",
+                ["oracleId"] = oracle.GetProperty("oracleId").GetString()!,
+                ["terminal"] = terminal,
+                ["tick"] = tick,
+                ["state"] = state,
+                ["stateHash"] = stateHash,
+            });
+        }
+        AppendRuntimeFrameEvent(transcript, new Dictionary<string, object?>
+        {
+            ["event"] = "replay-passed",
+            ["tick"] = terminalTick,
+            ["scenarioDigest"] = scenarioDigest,
+        });
+        if (captureFailed)
+        {
+            AppendRuntimeFrameEvent(transcript, new Dictionary<string, object?>
+            {
+                ["event"] = "capture-failed",
+                ["runId"] = runId,
+                ["code"] = "image-unavailable",
+                ["tick"] = terminalTick,
+                ["scenarioDigest"] = scenarioDigest,
+            });
+            return transcript.ToString();
+        }
+        string artifactDigest = "sha256:" + Convert.ToHexString(
+            SHA256.HashData(png)).ToLowerInvariant();
+        AppendRuntimeFrameEvent(transcript, new Dictionary<string, object?>
+        {
+            ["event"] = "capture-passed",
+            ["runId"] = runId,
+            ["tick"] = terminalTick,
+            ["scenarioDigest"] = scenarioDigest,
+            ["stateDigest"] = terminalStateHash,
+            ["inputBindingDigest"] = inputBindingDigest,
+            ["sceneId"] = "scene.graybox.main",
+            ["cameraId"] = "camera.follow",
+            ["renderer"] = "gl_compatibility",
+            ["renderingDriver"] = "opengl3",
+            ["displayServer"] = "windows",
+            ["engineVersion"] = "4.7.2",
+            ["engineStatus"] = "stable",
+            ["viewport"] = new Dictionary<string, object?>
+            {
+                ["width"] = 960,
+                ["height"] = 540,
+                ["scale"] = "1.000000",
+            },
+            ["artifactDigest"] = artifactDigest,
+            ["artifactBytes"] = png.Length,
+        });
+        return transcript.ToString();
+    }
+
+    private static byte[] BuildRuntimeFramePng()
+    {
+        const int width = 960;
+        const int height = 540;
+        byte[] pixels = new byte[height * (1 + width * 4)];
+        for (int y = 0; y < height; y += 1)
+        {
+            int row = y * (1 + width * 4);
+            pixels[row] = 0;
+            for (int x = 0; x < width; x += 1)
+            {
+                int pixel = row + 1 + x * 4;
+                pixels[pixel] = (byte)(32 + x % 160);
+                pixels[pixel + 1] = (byte)(48 + y % 144);
+                pixels[pixel + 2] = (byte)(96 + (x + y) % 128);
+                pixels[pixel + 3] = 255;
+            }
+        }
+        byte[] compressed;
+        using (MemoryStream compressedStream = new())
+        {
+            using (ZLibStream zlib = new(
+                compressedStream,
+                CompressionLevel.SmallestSize,
+                true))
+            {
+                zlib.Write(pixels);
+            }
+            compressed = compressedStream.ToArray();
+        }
+        using MemoryStream png = new();
+        png.Write(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 });
+        byte[] header = new byte[13];
+        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(0, 4), width);
+        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(4, 4), height);
+        header[8] = 8;
+        header[9] = 6;
+        header[10] = 0;
+        header[11] = 0;
+        header[12] = 0;
+        WritePngChunk(png, "IHDR", header);
+        WritePngChunk(png, "IDAT", compressed);
+        WritePngChunk(png, "IEND", Array.Empty<byte>());
+        return png.ToArray();
+    }
+
+    private static void WritePngChunk(
+        Stream output,
+        string type,
+        ReadOnlySpan<byte> data)
+    {
+        Span<byte> length = stackalloc byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(length, (uint)data.Length);
+        output.Write(length);
+        byte[] typeBytes = Encoding.ASCII.GetBytes(type);
+        output.Write(typeBytes);
+        output.Write(data);
+        uint crc = 0xffffffff;
+        foreach (byte value in typeBytes)
+        {
+            crc = UpdateCrc32(crc, value);
+        }
+        foreach (byte value in data)
+        {
+            crc = UpdateCrc32(crc, value);
+        }
+        Span<byte> checksum = stackalloc byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(checksum, crc ^ 0xffffffff);
+        output.Write(checksum);
+    }
+
+    private static uint UpdateCrc32(uint crc, byte value)
+    {
+        crc ^= value;
+        for (int bit = 0; bit < 8; bit += 1)
+        {
+            crc = (crc & 1) == 1
+                ? 0xedb88320u ^ (crc >> 1)
+                : crc >> 1;
+        }
+        return crc;
     }
 
     private static async Task<string> BuildProjectValidationTranscriptAsync(
@@ -742,6 +970,15 @@ internal static class Program
         Dictionary<string, object?> value)
     {
         transcript.Append("AGPB_GRAYBOX ");
+        transcript.Append(JsonSerializer.Serialize(value));
+        transcript.Append('\n');
+    }
+
+    private static void AppendRuntimeFrameEvent(
+        StringBuilder transcript,
+        Dictionary<string, object?> value)
+    {
+        transcript.Append("AGPB_RUNTIME_FRAME ");
         transcript.Append(JsonSerializer.Serialize(value));
         transcript.Append('\n');
     }

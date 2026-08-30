@@ -20,6 +20,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
       "engine.persistence-cycle",
       "engine.project-import",
       "engine.project-validation",
+      "engine.runtime-frame-capture",
       "engine.status",
       "engine.version-probe",
       "init",
@@ -57,6 +58,7 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     "engine.persistence-cycle",
     "engine.project-import",
     "engine.project-validation",
+    "engine.runtime-frame-capture",
   ]) {
     assert.equal(
       registry.BUILTIN_REGISTRY_SURFACES.cli.data.commands.some(
@@ -416,6 +418,79 @@ test("the builtin runtime registry exposes only implemented commands", () => {
   );
   assert.match(deterministicReplay.handler.digest, digestPattern);
 
+  const runtimeFrameCapture = registry.BUILTIN_REGISTRY.commands.find(
+    ({ id }) => id === contracts.GODOT_RUNTIME_FRAME_CAPTURE_COMMAND_ID,
+  );
+  assert.notEqual(runtimeFrameCapture, undefined);
+  assert.equal(runtimeFrameCapture.lifecycle, "internal");
+  assert.deepEqual(runtimeFrameCapture.cli, {
+    path: ["internal", "engine", "runtime-frame-capture"],
+    aliases: [],
+  });
+  assert.deepEqual(runtimeFrameCapture.permissions, [
+    "read-project",
+    "host-tool-inspection",
+    "test-build",
+    "write-project-metadata",
+  ]);
+  assert.deepEqual(runtimeFrameCapture.sideEffects, [
+    {
+      kind: "process",
+      scope: "godot-runtime-frame-capture",
+      boundary: "local",
+    },
+    {
+      kind: "filesystem",
+      scope: "godot-runtime-frame-source",
+      boundary: "local",
+    },
+  ]);
+  assert.equal(runtimeFrameCapture.lane, "build-bound");
+  assert.equal(
+    runtimeFrameCapture.timeoutMs,
+    contracts.GODOT_RUNTIME_FRAME_CAPTURE_COMMAND_TIMEOUT_MS,
+  );
+  assert.deepEqual(runtimeFrameCapture.cancellation, {
+    mode: "process-tree",
+    graceMs: contracts.GODOT_RUNTIME_FRAME_CAPTURE_TERMINATION_GRACE_MS,
+  });
+  assert.deepEqual(runtimeFrameCapture.budgets, {
+    maxChangedBytes: contracts.GODOT_RUNTIME_FRAME_CAPTURE_MAX_ARTIFACT_BYTES,
+    maxChangedFiles: 1,
+    maxDurationMs: contracts.GODOT_RUNTIME_FRAME_CAPTURE_COMMAND_TIMEOUT_MS,
+    maxOutputBytes: contracts.GODOT_RUNTIME_FRAME_CAPTURE_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  });
+  assert.equal(
+    runtimeFrameCapture.output.schemaId,
+    contracts.runtimeFrameEvidenceSchema.schemaId,
+  );
+  assert.deepEqual(runtimeFrameCapture.requiredEvidence, [
+    "runtime-frame-evidence",
+    "run-receipt",
+  ]);
+  assert.equal(
+    runtimeFrameCapture.handler.export,
+    "runGodotRuntimeFrameCapture",
+  );
+  assert.match(runtimeFrameCapture.handler.digest, digestPattern);
+
+  const runtimeFrameWorkflow = registry.BUILTIN_REGISTRY.workflows.find(
+    ({ id }) => id === contracts.GODOT_RUNTIME_FRAME_CAPTURE_WORKFLOW_ID,
+  );
+  assert.notEqual(runtimeFrameWorkflow, undefined);
+  assert.equal(runtimeFrameWorkflow.lifecycle, "internal");
+  assert.equal(runtimeFrameWorkflow.steps.length, 1);
+  assert.equal(
+    runtimeFrameWorkflow.steps[0].id,
+    contracts.GODOT_RUNTIME_FRAME_CAPTURE_STEP_ID,
+  );
+  assert.equal(
+    runtimeFrameWorkflow.steps[0].commandId,
+    contracts.GODOT_RUNTIME_FRAME_CAPTURE_COMMAND_ID,
+  );
+  assert.equal(runtimeFrameWorkflow.resumePolicy, "never");
+
   const persistenceCycle = registry.BUILTIN_REGISTRY.commands.find(
     ({ id }) => id === contracts.GODOT_PERSISTENCE_CYCLE_COMMAND_ID,
   );
@@ -753,6 +828,7 @@ test("the builtin registry binds internal operations to finite workflow steps", 
       "workflow.godot-headless-preflight",
       "workflow.godot-persistence-cycle",
       "workflow.godot-project-validation",
+      "workflow.godot-runtime-frame-capture",
       "workflow.pack-add",
       "workflow.pack-recover",
       "workflow.project-initialization",

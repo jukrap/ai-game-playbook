@@ -18,6 +18,9 @@ export function authorizeHostTool({
   createRequest,
   maxOutputBytes,
   maxDurationMs = 10_000,
+  maxChangedFiles = 0,
+  maxChangedBytes = 0,
+  approvalPermissions = ["host-tool-inspection"],
   authorizationWindowMs = hostToolAuthorizationWindowMs(maxDurationMs),
 }) {
   const now = Date.now();
@@ -30,8 +33,8 @@ export function authorizeHostTool({
       identityDigest: plan.project.identityDigest,
       stage: "vertical-slice",
       budgets: {
-        maxChangedFiles: 0,
-        maxChangedBytes: 0,
+        maxChangedFiles,
+        maxChangedBytes,
         maxDurationMs,
         maxOutputBytes,
         maxRepairCycles: 0,
@@ -42,29 +45,33 @@ export function authorizeHostTool({
   });
   const pending = broker.authorize(request, []);
   assert.equal(pending.status, "approval-required");
-  assert.deepEqual(pending.missingPermissions, ["host-tool-inspection"]);
-  const subject = core.createApprovalGrantSubject(pending.challenge, {
-    grantId: "approval.host-tool-inspection",
-    permission: "host-tool-inspection",
-    approvedAt: new Date(now - 1_000).toISOString(),
-    expiresAt: new Date(now + authorizationWindowMs - 1_000).toISOString(),
-    maxUses: 1,
-  });
-  const signature = sign(
-    null,
-    Buffer.from(contracts.computeApprovalGrantSigningDigest(subject), "utf8"),
-    privateKey,
-  ).toString("base64url");
-  const decision = broker.authorize(request, [
-    {
+  assert.deepEqual(pending.missingPermissions, approvalPermissions);
+  const grants = approvalPermissions.map((permission) => {
+    const subject = core.createApprovalGrantSubject(pending.challenge, {
+      grantId: `approval.${permission}`,
+      permission,
+      approvedAt: new Date(now - 1_000).toISOString(),
+      expiresAt: new Date(now + authorizationWindowMs - 1_000).toISOString(),
+      maxUses: 1,
+    });
+    const signature = sign(
+      null,
+      Buffer.from(
+        contracts.computeApprovalGrantSigningDigest(subject),
+        "utf8",
+      ),
+      privateKey,
+    ).toString("base64url");
+    return {
       ...subject,
       signature: {
         algorithm: "ed25519",
         keyId,
         value: signature,
       },
-    },
-  ]);
+    };
+  });
+  const decision = broker.authorize(request, grants);
   assert.equal(decision.status, "authorized");
   return { decision, pending, request };
 }

@@ -35,6 +35,11 @@ test("runtime command handler metadata attests each exact compiled module", asyn
       "godot-adapter",
       "contained-project-validation.js",
     ],
+    [
+      "engine.runtime-frame-capture",
+      "godot-adapter",
+      "contained-runtime-frame-capture.js",
+    ],
     ["engine.status", "godot-adapter", "status.js"],
     ["engine.version-probe", "godot-adapter", "version-probe.js"],
     ["init", "cli", "init.js"],

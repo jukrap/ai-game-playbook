@@ -56,6 +56,20 @@ export type {
   ValidatedGodotRuntimeFrameArtifact,
 } from "./runtime-frame-capture-result.js";
 export {
+  assertPreparedGodotContainedRuntimeFrameCapture,
+  createGodotContainedRuntimeFrameCaptureAuthorizationRequest,
+  isGodotContainedRuntimeFrameCaptureRunRequest,
+  prepareGodotContainedRuntimeFrameCapture,
+  runGodotContainedRuntimeFrameCapture,
+  runGodotRuntimeFrameCapture,
+} from "./contained-runtime-frame-capture.js";
+export type {
+  CreateGodotContainedRuntimeFrameCaptureAuthorizationRequest,
+  PrepareGodotContainedRuntimeFrameCaptureRequest,
+  PreparedGodotContainedRuntimeFrameCapture,
+  RunGodotContainedRuntimeFrameCaptureRequest,
+} from "./contained-runtime-frame-capture.js";
+export {
   GODOT_PROJECT_VALIDATION_OUTPUT_PREFIX,
   createGodotProjectValidationExpectation,
   parseGodotProjectValidationOutput,

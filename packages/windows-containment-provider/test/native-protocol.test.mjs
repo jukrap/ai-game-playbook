@@ -91,6 +91,10 @@ test("native engine profile remains synchronized with the typed contract", async
       "Persistence",
       contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE,
     ],
+    [
+      "RuntimeFrameCapture",
+      contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE,
+    ],
   ];
   for (const [prefix, profile] of profiles) {
     assert.equal(csharpConstant(protocol, `${prefix}OperationId`), profile.operationId);
@@ -258,6 +262,41 @@ test("native engine profile remains synchronized with the typed contract", async
         .maxEvents,
     ],
     [
+      "RuntimeFrameCaptureProcessTimeoutMs",
+      contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE.limits
+        .processTimeoutMs,
+    ],
+    [
+      "RuntimeFrameCaptureIdleTimeoutMs",
+      contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE.limits
+        .idleTimeoutMs,
+    ],
+    [
+      "RuntimeFrameCaptureMaximumOutputBytes",
+      contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE.limits
+        .maxOutputBytes,
+    ],
+    [
+      "RuntimeFrameCaptureMaximumReportDurationMs",
+      contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE.limits
+        .maxReportDurationMs,
+    ],
+    [
+      "RuntimeFrameCaptureMaximumLineBytes",
+      contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE.output
+        .maxLineBytes,
+    ],
+    [
+      "RuntimeFrameCaptureMaximumEvents",
+      contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE.output
+        .maxEvents,
+    ],
+    [
+      "RuntimeFrameCaptureMaximumArtifactBytes",
+      contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE.artifact
+        .maxBytes,
+    ],
+    [
       "MaximumProcesses",
       Math.max(
         ...contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
@@ -300,6 +339,15 @@ test("native engine profile remains synchronized with the typed contract", async
     contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE.output.prefix,
   );
   assert.equal(
+    csharpConstant(protocol, "RuntimeFrameCaptureOutputPrefix"),
+    contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE.output.prefix,
+  );
+  assert.equal(
+    csharpConstant(protocol, "RuntimeFrameCaptureArtifactFileName"),
+    contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE.artifact
+      .fileName,
+  );
+  assert.equal(
     csharpConstant(protocol, "ProjectValidationScript"),
     contracts.GODOT_PROJECT_VALIDATOR_SCRIPT,
   );
@@ -322,6 +370,10 @@ test("native engine profile remains synchronized with the typed contract", async
   assert.match(
     runner,
     /EngineRunProtocol\.PersistenceOperationId[\s\S]*"--agpb-persistence-save"[\s\S]*"--agpb-persistence-load"/u,
+  );
+  assert.match(
+    runner,
+    /EngineRunProtocol\.RuntimeFrameCaptureOperationId[\s\S]*"--agpb-runtime-frame"[\s\S]*request\.RunId[\s\S]*request\.InputBindingDigest[\s\S]*artifactPath/u,
   );
 });
 

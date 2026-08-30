@@ -16,7 +16,7 @@ function rawContractDigest(profile) {
   });
 }
 
-test("engine execution profile catalog fixes five Godot launch tuples", () => {
+test("engine execution profile catalog fixes six Godot launch tuples", () => {
   assert.deepEqual(
     contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
       ({ profileId }) => profileId,
@@ -27,6 +27,7 @@ test("engine execution profile catalog fixes five Godot launch tuples", () => {
       "godot-project-import-v1",
       "godot-project-validation-v1",
       "godot-persistence-cycle-v1",
+      "godot-runtime-frame-capture-v1",
     ],
   );
 
@@ -202,6 +203,37 @@ test("engine execution profile catalog fixes five Godot launch tuples", () => {
     maxEvents: contracts.GODOT_PERSISTENCE_CYCLE_MAX_EVENTS,
     retainRawOutput: false,
   });
+
+  const capture =
+    contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE;
+  assert.equal(capture.operationId, "engine.runtime-frame-capture");
+  assert.equal(
+    capture.invocationDigest,
+    contracts.GODOT_RUNTIME_FRAME_CAPTURE_INVOCATION_DIGEST,
+  );
+  assert.deepEqual(
+    capture.launch.arguments,
+    contracts.GODOT_RUNTIME_FRAME_CAPTURE_ARGUMENTS,
+  );
+  assert.equal(
+    capture.limits.maxReportDurationMs,
+    contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_RUN_MAX_REPORT_DURATION_MS,
+  );
+  assert.deepEqual(capture.output, {
+    kind: "prefixed-json-lines",
+    prefix: contracts.GODOT_RUNTIME_FRAME_CAPTURE_OUTPUT_PREFIX,
+    maxLineBytes: contracts.GODOT_RUNTIME_FRAME_CAPTURE_MAX_LINE_BYTES,
+    maxEvents: contracts.GODOT_RUNTIME_FRAME_CAPTURE_MAX_EVENTS,
+    retainRawOutput: false,
+  });
+  assert.deepEqual(capture.artifact, {
+    kind: "single-profile-file",
+    pathToken: contracts.GODOT_RUNTIME_FRAME_CAPTURE_ARTIFACT_PATH_TOKEN,
+    fileName: contracts.GODOT_RUNTIME_FRAME_CAPTURE_ARTIFACT_FILE_NAME,
+    format: "png",
+    maxBytes: contracts.GODOT_RUNTIME_FRAME_CAPTURE_MAX_ARTIFACT_BYTES,
+    transfer: "same-process-one-use",
+  });
 });
 
 test("execution profiles are immutable, schema-backed, and canonically resolved", () => {
@@ -219,6 +251,9 @@ test("execution profiles are immutable, schema-backed, and canonically resolved"
     }
     assert.equal(Object.isFrozen(profile.limits), true);
     assert.equal(Object.isFrozen(profile.output), true);
+    if (profile.artifact !== undefined) {
+      assert.equal(Object.isFrozen(profile.artifact), true);
+    }
     assert.doesNotThrow(() =>
       contracts.assertProcessContainmentEngineExecutionProfileSemantics(
         structuredClone(profile),
@@ -240,13 +275,32 @@ test("execution profiles are immutable, schema-backed, and canonically resolved"
     contracts.processContainmentEngineExecutionProfileSchema.id,
     "process-containment-engine-execution-profile",
   );
+  const registeredVariants =
+    contracts.processContainmentEngineExecutionProfileSchema.schema.oneOf;
+  assert.equal(registeredVariants.length, 6);
+  for (const variant of registeredVariants) {
+    const isCapture =
+      variant.properties.profileId.const ===
+      contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_RUN_PROFILE_ID;
+    if (isCapture) {
+      assert.deepEqual(variant.properties.artifact, {
+        const:
+          contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE
+            .artifact,
+      });
+      assert.equal(variant.required.includes("artifact"), true);
+    } else {
+      assert.equal(variant.properties.artifact, false);
+      assert.equal(variant.required.includes("artifact"), false);
+    }
+  }
   assert.match(
     contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
     /^sha256:[0-9a-f]{64}$/,
   );
   assert.equal(
     contracts.PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
-    "sha256:baee3614224937ecdfad06848e4253b0350fea7ad2c930e4366eabfd9bd146a7",
+    "sha256:fb311f29a815b34af42dc0423593be2663f11be4e79ad168660fd941b6a6c14d",
   );
   assert.equal(
     contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_RUN_PROFILE_DIGEST,
@@ -263,6 +317,10 @@ test("execution profiles are immutable, schema-backed, and canonically resolved"
   assert.match(
     contracts.GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_PROFILE_DIGEST,
     /^sha256:[0-9a-f]{64}$/,
+  );
+  assert.equal(
+    contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_RUN_PROFILE_DIGEST,
+    "sha256:1035892daaaf704418cbf708cec8b61147e80d70683304c29d86afa606d587fc",
   );
   assert.throws(
     () =>
@@ -313,6 +371,18 @@ test("profile semantics reject tuple substitution even with a recomputed digest"
 
   const exposedOutput = structuredClone(
     contracts.GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE,
+  );
+
+  const callerArtifact = structuredClone(
+    contracts.GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE,
+  );
+  callerArtifact.artifact.fileName = "caller.png";
+  assert.throws(
+    () =>
+      contracts.computeProcessContainmentEngineExecutionProfileContractDigest(
+        digestInput(callerArtifact),
+      ),
+    TypeError,
   );
   exposedOutput.output.retainRawOutput = true;
   assert.throws(

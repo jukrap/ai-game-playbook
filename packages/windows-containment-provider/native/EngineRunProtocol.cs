@@ -55,8 +55,16 @@ internal static partial class EngineRunProtocol
         "sha256:ae816e5aed8682f7b0554f41f6b1207939f100b97879f87ea125c6b092c24175";
     internal const string PersistenceInvocationDigest =
         "sha256:674f37428afa5ac1364207906045956991069711512b62616013a349d261335c";
+    internal const string RuntimeFrameCaptureOperationId = "engine.runtime-frame-capture";
+    internal const string RuntimeFrameCaptureProfileId = "godot-runtime-frame-capture-v1";
+    internal const string RuntimeFrameCaptureProfileDigest =
+        "sha256:1035892daaaf704418cbf708cec8b61147e80d70683304c29d86afa606d587fc";
+    internal const string RuntimeFrameCaptureProfileContractDigest =
+        "sha256:2dca5b9e349bf5cab7525f9fb38dde4b8283ea95032f2ec74072aa02595c4d7a";
+    internal const string RuntimeFrameCaptureInvocationDigest =
+        "sha256:e3ff3aaca21c198a6b9826c46220b7082681617c27655cf19dd5f5dfbe9f43e1";
     internal const string ProfileCatalogDigest =
-        "sha256:baee3614224937ecdfad06848e4253b0350fea7ad2c930e4366eabfd9bd146a7";
+        "sha256:fb311f29a815b34af42dc0423593be2663f11be4e79ad168660fd941b6a6c14d";
     internal const string PolicyDigest =
         "sha256:9279861178baa8b60e2b5e7b53c09466ab05618bda01e0e82c43a968e3f1339d";
     private const int StartValidityMs = 30_000;
@@ -90,6 +98,15 @@ internal static partial class EngineRunProtocol
     private const int PersistenceMaximumLineBytes = 16_384;
     private const int PersistenceMaximumEvents = 5;
     private const string PersistenceOutputPrefix = "AGPB_PERSISTENCE ";
+    private const int RuntimeFrameCaptureProcessTimeoutMs = 45_000;
+    private const int RuntimeFrameCaptureIdleTimeoutMs = 20_000;
+    private const int RuntimeFrameCaptureMaximumOutputBytes = 1_024 * 1_024;
+    private const int RuntimeFrameCaptureMaximumReportDurationMs = 77_000;
+    private const int RuntimeFrameCaptureMaximumLineBytes = 65_536;
+    private const int RuntimeFrameCaptureMaximumEvents = 2_051;
+    private const int RuntimeFrameCaptureMaximumArtifactBytes = 4 * 1_024 * 1_024;
+    private const string RuntimeFrameCaptureOutputPrefix = "AGPB_RUNTIME_FRAME ";
+    private const string RuntimeFrameCaptureArtifactFileName = "runtime-frame.png";
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly HashSet<string> ReservedNames = new(
         new[]
@@ -377,7 +394,10 @@ internal static partial class EngineRunProtocol
             outputPrefix,
             maxLineBytes,
             maxEvents,
-            retainRawOutput);
+            retainRawOutput,
+            profile.ArtifactFileName,
+            profile.ArtifactFormat,
+            profile.MaximumArtifactBytes);
     }
 
     private static async Task<byte[]> ReadBoundedInputAsync()
@@ -538,7 +558,10 @@ internal static partial class EngineRunProtocol
             null,
             null,
             null,
-            1),
+            1,
+            null,
+            null,
+            0),
         ReplayProfileId => new NativeEngineRunProfile(
             ReplayOperationId,
             ReplayProfileDigest,
@@ -555,7 +578,10 @@ internal static partial class EngineRunProtocol
             ReplayOutputPrefix,
             ReplayMaximumLineBytes,
             ReplayMaximumEvents,
-            1),
+            1,
+            null,
+            null,
+            0),
         ProjectImportProfileId => new NativeEngineRunProfile(
             ProjectImportOperationId,
             ProjectImportProfileDigest,
@@ -572,7 +598,10 @@ internal static partial class EngineRunProtocol
             null,
             null,
             null,
-            1),
+            1,
+            null,
+            null,
+            0),
         ProjectValidationProfileId => new NativeEngineRunProfile(
             ProjectValidationOperationId,
             ProjectValidationProfileDigest,
@@ -589,7 +618,10 @@ internal static partial class EngineRunProtocol
             ProjectValidationOutputPrefix,
             ProjectValidationMaximumLineBytes,
             ProjectValidationMaximumEvents,
-            1),
+            1,
+            null,
+            null,
+            0),
         PersistenceProfileId => new NativeEngineRunProfile(
             PersistenceOperationId,
             PersistenceProfileDigest,
@@ -606,7 +638,30 @@ internal static partial class EngineRunProtocol
             PersistenceOutputPrefix,
             PersistenceMaximumLineBytes,
             PersistenceMaximumEvents,
-            2),
+            2,
+            null,
+            null,
+            0),
+        RuntimeFrameCaptureProfileId => new NativeEngineRunProfile(
+            RuntimeFrameCaptureOperationId,
+            RuntimeFrameCaptureProfileDigest,
+            RuntimeFrameCaptureProfileContractDigest,
+            RuntimeFrameCaptureInvocationDigest,
+            true,
+            StartValidityMs,
+            RuntimeFrameCaptureProcessTimeoutMs,
+            RuntimeFrameCaptureIdleTimeoutMs,
+            TerminationGraceMs,
+            RuntimeFrameCaptureMaximumOutputBytes,
+            RuntimeFrameCaptureMaximumReportDurationMs,
+            "prefixed-json-lines",
+            RuntimeFrameCaptureOutputPrefix,
+            RuntimeFrameCaptureMaximumLineBytes,
+            RuntimeFrameCaptureMaximumEvents,
+            1,
+            RuntimeFrameCaptureArtifactFileName,
+            "png",
+            RuntimeFrameCaptureMaximumArtifactBytes),
         _ => throw new ProtocolException("request-value-invalid"),
     };
 
@@ -810,7 +865,10 @@ internal sealed record NativeEngineRunProfile(
     string? OutputPrefix,
     int? MaximumLineBytes,
     int? MaximumEvents,
-    int MaximumProcesses);
+    int MaximumProcesses,
+    string? ArtifactFileName,
+    string? ArtifactFormat,
+    int MaximumArtifactBytes);
 
 internal sealed record NativeEngineRunRequest(
     string SchemaVersion,
@@ -863,4 +921,7 @@ internal sealed record NativeEngineRunRequest(
     string? OutputPrefix,
     int? MaxLineBytes,
     int? MaxEvents,
-    bool RetainRawOutput);
+    bool RetainRawOutput,
+    string? ArtifactFileName,
+    string? ArtifactFormat,
+    int MaxArtifactBytes);

@@ -58,6 +58,20 @@ import {
   GODOT_PROJECT_VALIDATOR_SCRIPT,
 } from "./godot-project-validation-contracts.js";
 import {
+  GODOT_RUNTIME_FRAME_CAPTURE_ARGUMENTS,
+  GODOT_RUNTIME_FRAME_CAPTURE_ARTIFACT_FILE_NAME,
+  GODOT_RUNTIME_FRAME_CAPTURE_ARTIFACT_PATH_TOKEN,
+  GODOT_RUNTIME_FRAME_CAPTURE_IDLE_TIMEOUT_MS,
+  GODOT_RUNTIME_FRAME_CAPTURE_INVOCATION_DIGEST,
+  GODOT_RUNTIME_FRAME_CAPTURE_MAX_ARTIFACT_BYTES,
+  GODOT_RUNTIME_FRAME_CAPTURE_MAX_EVENTS,
+  GODOT_RUNTIME_FRAME_CAPTURE_MAX_LINE_BYTES,
+  GODOT_RUNTIME_FRAME_CAPTURE_MAX_OUTPUT_BYTES,
+  GODOT_RUNTIME_FRAME_CAPTURE_OUTPUT_PREFIX,
+  GODOT_RUNTIME_FRAME_CAPTURE_PROCESS_TIMEOUT_MS,
+  GODOT_RUNTIME_FRAME_CAPTURE_TERMINATION_GRACE_MS,
+} from "./godot-runtime-frame-capture-contracts.js";
+import {
   closedObject,
   contractRoot,
   enumSchema,
@@ -109,11 +123,19 @@ export const GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_MAX_REPORT_DURATION_MS: number =
     GODOT_PERSISTENCE_CYCLE_PHASE_COUNT +
   GODOT_PERSISTENCE_CYCLE_TERMINATION_GRACE_MS;
 
+export const GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_RUN_PROFILE_ID =
+  "godot-runtime-frame-capture-v1" as const;
+export const GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_RUN_MAX_REPORT_DURATION_MS: number =
+  PROCESS_CONTAINMENT_ENGINE_RUN_MAX_START_VALIDITY_MS +
+  GODOT_RUNTIME_FRAME_CAPTURE_PROCESS_TIMEOUT_MS +
+  GODOT_RUNTIME_FRAME_CAPTURE_TERMINATION_GRACE_MS;
+
 export type ProcessContainmentEngineExecutionProfileId =
   | typeof GODOT_DETERMINISTIC_REPLAY_ENGINE_RUN_PROFILE_ID
   | typeof GODOT_PROJECT_IMPORT_ENGINE_RUN_PROFILE_ID
   | typeof GODOT_PROJECT_VALIDATION_ENGINE_RUN_PROFILE_ID
   | typeof GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_PROFILE_ID
+  | typeof GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_RUN_PROFILE_ID
   | typeof PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_ID;
 
 export type ProcessContainmentEngineExecutionOperationId =
@@ -121,7 +143,8 @@ export type ProcessContainmentEngineExecutionOperationId =
   | "engine.headless-preflight"
   | "engine.persistence-cycle"
   | "engine.project-import"
-  | "engine.project-validation";
+  | "engine.project-validation"
+  | "engine.runtime-frame-capture";
 
 export interface ProcessContainmentEngineExecutionProfileSingleLaunch {
   readonly workingDirectory: "$stagedProject";
@@ -174,6 +197,15 @@ export interface ProcessContainmentEngineExecutionProfileOutput {
   readonly retainRawOutput: false;
 }
 
+export interface ProcessContainmentEngineExecutionProfileArtifact {
+  readonly kind: "single-profile-file";
+  readonly pathToken: typeof GODOT_RUNTIME_FRAME_CAPTURE_ARTIFACT_PATH_TOKEN;
+  readonly fileName: typeof GODOT_RUNTIME_FRAME_CAPTURE_ARTIFACT_FILE_NAME;
+  readonly format: "png";
+  readonly maxBytes: typeof GODOT_RUNTIME_FRAME_CAPTURE_MAX_ARTIFACT_BYTES;
+  readonly transfer: "same-process-one-use";
+}
+
 export interface ProcessContainmentEngineExecutionProfileDigestInput {
   readonly schemaVersion: "1.0.0";
   readonly profileId: ProcessContainmentEngineExecutionProfileId;
@@ -184,6 +216,7 @@ export interface ProcessContainmentEngineExecutionProfileDigestInput {
   readonly launch: ProcessContainmentEngineExecutionProfileLaunch;
   readonly limits: ProcessContainmentEngineExecutionProfileLimits;
   readonly output: ProcessContainmentEngineExecutionProfileOutput;
+  readonly artifact?: ProcessContainmentEngineExecutionProfileArtifact;
 }
 
 export interface ProcessContainmentEngineExecutionProfile
@@ -317,6 +350,11 @@ function assertProfileDigestInput(
   assertDataTree(input, "$profile", 0, {
     remaining: maximumProfileTreeNodes,
   });
+  const inputNames =
+    input !== null && typeof input === "object"
+      ? Object.getOwnPropertyNames(input)
+      : [];
+  const hasArtifact = inputNames.includes("artifact");
   const value = exactObject(
     input,
     [
@@ -329,6 +367,7 @@ function assertProfileDigestInput(
       "launch",
       "limits",
       "output",
+      ...(hasArtifact ? ["artifact"] : []),
     ],
     "engine execution profile digest input is outside the contract",
   );
@@ -382,6 +421,13 @@ function assertProfileDigestInput(
     ["kind", "prefix", "maxLineBytes", "maxEvents", "retainRawOutput"],
     "engine execution profile output is outside the contract",
   );
+  const artifact = hasArtifact
+    ? exactObject(
+        value["artifact"],
+        ["kind", "pathToken", "fileName", "format", "maxBytes", "transfer"],
+        "engine execution profile artifact is outside the contract",
+      )
+    : undefined;
   let phaseCount = 1;
   if (sequenceLaunch) {
     const phases = launch["phases"];
@@ -497,6 +543,26 @@ function assertProfileDigestInput(
   } else {
     reject("engine execution profile output kind is outside the contract");
   }
+
+  if (
+    value["operationId"] === "engine.runtime-frame-capture" &&
+    (artifact === undefined ||
+      artifact["kind"] !== "single-profile-file" ||
+      artifact["pathToken"] !==
+        GODOT_RUNTIME_FRAME_CAPTURE_ARTIFACT_PATH_TOKEN ||
+      artifact["fileName"] !== GODOT_RUNTIME_FRAME_CAPTURE_ARTIFACT_FILE_NAME ||
+      artifact["format"] !== "png" ||
+      artifact["maxBytes"] !== GODOT_RUNTIME_FRAME_CAPTURE_MAX_ARTIFACT_BYTES ||
+      artifact["transfer"] !== "same-process-one-use")
+  ) {
+    reject("runtime frame artifact transfer is outside the contract");
+  }
+  if (
+    value["operationId"] !== "engine.runtime-frame-capture" &&
+    artifact !== undefined
+  ) {
+    reject("engine execution profile declares an unexpected artifact transfer");
+  }
 }
 
 function computeProfileContractDigest(
@@ -564,6 +630,16 @@ const persistencePhases: readonly ProcessContainmentEngineExecutionProfileSequen
       arguments: GODOT_PERSISTENCE_CYCLE_LOAD_ARGUMENTS,
     }),
   ]);
+
+const runtimeFrameCaptureArtifact: ProcessContainmentEngineExecutionProfileArtifact =
+  Object.freeze({
+    kind: "single-profile-file" as const,
+    pathToken: GODOT_RUNTIME_FRAME_CAPTURE_ARTIFACT_PATH_TOKEN,
+    fileName: GODOT_RUNTIME_FRAME_CAPTURE_ARTIFACT_FILE_NAME,
+    format: "png" as const,
+    maxBytes: GODOT_RUNTIME_FRAME_CAPTURE_MAX_ARTIFACT_BYTES,
+    transfer: "same-process-one-use" as const,
+  });
 
 export const PROCESS_CONTAINMENT_ENGINE_RUN_PROFILE_DIGEST: Sha256Digest =
   digestCanonicalJson({
@@ -638,6 +714,22 @@ export const GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_PROFILE_DIGEST: Sha256Digest =
     callerEnvironment: "denied",
     networkCapabilities: "none",
     projectSource: "disposable-copy",
+  });
+
+export const GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_RUN_PROFILE_DIGEST: Sha256Digest =
+  digestCanonicalJson({
+    domain: "ai-game-playbook/process-containment-engine-run-profile",
+    version: "1.0.0",
+    id: GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_RUN_PROFILE_ID,
+    engine: "godot",
+    operationId: "engine.runtime-frame-capture",
+    invocationDigest: GODOT_RUNTIME_FRAME_CAPTURE_INVOCATION_DIGEST,
+    arguments: GODOT_RUNTIME_FRAME_CAPTURE_ARGUMENTS,
+    callerArguments: "denied",
+    callerEnvironment: "denied",
+    networkCapabilities: "none",
+    projectSource: "disposable-copy",
+    artifact: runtimeFrameCaptureArtifact,
   });
 
 function createProfile(
@@ -844,6 +936,44 @@ export const GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE: ProcessContainmen
     }),
   );
 
+export const GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE: ProcessContainmentEngineExecutionProfile =
+  createProfile(
+    Object.freeze({
+      schemaVersion: "1.0.0" as const,
+      profileId: GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_RUN_PROFILE_ID,
+      profileDigest: GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_RUN_PROFILE_DIGEST,
+      engine: "godot" as const,
+      operationId: "engine.runtime-frame-capture" as const,
+      invocationDigest: GODOT_RUNTIME_FRAME_CAPTURE_INVOCATION_DIGEST,
+      launch: Object.freeze({
+        workingDirectory: "$stagedProject" as const,
+        arguments: GODOT_RUNTIME_FRAME_CAPTURE_ARGUMENTS,
+        callerArguments: "denied" as const,
+        callerEnvironment: "denied" as const,
+        networkCapabilities: "none" as const,
+        projectSource: "disposable-copy" as const,
+      }),
+      limits: Object.freeze({
+        ...commonStagingLimits,
+        processTimeoutMs: GODOT_RUNTIME_FRAME_CAPTURE_PROCESS_TIMEOUT_MS,
+        idleTimeoutMs: GODOT_RUNTIME_FRAME_CAPTURE_IDLE_TIMEOUT_MS,
+        terminationGraceMs:
+          GODOT_RUNTIME_FRAME_CAPTURE_TERMINATION_GRACE_MS,
+        maxOutputBytes: GODOT_RUNTIME_FRAME_CAPTURE_MAX_OUTPUT_BYTES,
+        maxReportDurationMs:
+          GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_RUN_MAX_REPORT_DURATION_MS,
+      }),
+      output: Object.freeze({
+        kind: "prefixed-json-lines" as const,
+        prefix: GODOT_RUNTIME_FRAME_CAPTURE_OUTPUT_PREFIX,
+        maxLineBytes: GODOT_RUNTIME_FRAME_CAPTURE_MAX_LINE_BYTES,
+        maxEvents: GODOT_RUNTIME_FRAME_CAPTURE_MAX_EVENTS,
+        retainRawOutput: false as const,
+      }),
+      artifact: runtimeFrameCaptureArtifact,
+    }),
+  );
+
 export const PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES: readonly ProcessContainmentEngineExecutionProfile[] =
   Object.freeze([
     GODOT_DETERMINISTIC_REPLAY_ENGINE_EXECUTION_PROFILE,
@@ -851,6 +981,7 @@ export const PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES: readonly ProcessCont
     GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE,
     GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE,
     GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE,
+    GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE,
   ]);
 
 export const PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST: Sha256Digest =
@@ -879,6 +1010,9 @@ export function getProcessContainmentEngineExecutionProfile(
   }
   if (profileId === GODOT_PERSISTENCE_CYCLE_ENGINE_RUN_PROFILE_ID) {
     return GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE;
+  }
+  if (profileId === GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_RUN_PROFILE_ID) {
+    return GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE;
   }
   return reject("engine execution profile is not registered");
 }
@@ -910,6 +1044,10 @@ export function assertProcessContainmentEngineExecutionProfileSemantics(
   assertDataTree(profile, "$profile", 0, {
     remaining: maximumProfileTreeNodes,
   });
+  const profileNames =
+    profile !== null && typeof profile === "object"
+      ? Object.getOwnPropertyNames(profile)
+      : [];
   const value = exactObject(
     profile,
     [
@@ -922,6 +1060,7 @@ export function assertProcessContainmentEngineExecutionProfileSemantics(
       "launch",
       "limits",
       "output",
+      ...(profileNames.includes("artifact") ? ["artifact"] : []),
       "contractDigest",
     ],
     "engine execution profile is outside the contract",
@@ -1100,6 +1239,27 @@ const outputSchema = closedObject(
   ["kind", "prefix", "maxLineBytes", "maxEvents", "retainRawOutput"],
 );
 
+const artifactSchema = closedObject(
+  {
+    kind: { type: "string", const: "single-profile-file" },
+    pathToken: {
+      type: "string",
+      const: GODOT_RUNTIME_FRAME_CAPTURE_ARTIFACT_PATH_TOKEN,
+    },
+    fileName: {
+      type: "string",
+      const: GODOT_RUNTIME_FRAME_CAPTURE_ARTIFACT_FILE_NAME,
+    },
+    format: { type: "string", const: "png" },
+    maxBytes: {
+      type: "integer",
+      const: GODOT_RUNTIME_FRAME_CAPTURE_MAX_ARTIFACT_BYTES,
+    },
+    transfer: { type: "string", const: "same-process-one-use" },
+  },
+  ["kind", "pathToken", "fileName", "format", "maxBytes", "transfer"],
+);
+
 const profileProperties = {
   schemaVersion: { type: "string", const: "1.0.0" },
   profileId: reference("stableId"),
@@ -1110,6 +1270,7 @@ const profileProperties = {
   launch: launchSchema,
   limits: limitsSchema,
   output: outputSchema,
+  artifact: artifactSchema,
   contractDigest: reference("sha256Digest"),
 };
 
@@ -1127,6 +1288,12 @@ function registeredProfileVariantSchema(
       launch: { const: profile.launch as unknown as CanonicalJsonValue },
       limits: { const: profile.limits as unknown as CanonicalJsonValue },
       output: { const: profile.output as unknown as CanonicalJsonValue },
+      artifact:
+        profile.artifact === undefined
+          ? false
+          : {
+              const: profile.artifact as unknown as CanonicalJsonValue,
+            },
       contractDigest: { const: profile.contractDigest },
     },
     required: [
@@ -1138,6 +1305,7 @@ function registeredProfileVariantSchema(
       "launch",
       "limits",
       "output",
+      ...(profile.artifact === undefined ? [] : ["artifact"]),
       "contractDigest",
     ],
   };
@@ -1149,7 +1317,10 @@ export const processContainmentEngineExecutionProfileSchema: VersionedContractSc
     version: "1.0.0",
     title: "Process containment engine execution profile",
     schema: {
-      ...contractRoot(profileProperties, Object.keys(profileProperties)),
+      ...contractRoot(
+        profileProperties,
+        Object.keys(profileProperties).filter((name) => name !== "artifact"),
+      ),
       oneOf: PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILES.map(
         registeredProfileVariantSchema,
       ),

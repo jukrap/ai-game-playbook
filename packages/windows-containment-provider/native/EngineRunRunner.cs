@@ -55,8 +55,11 @@ internal static class EngineRunRunner
         string? profileRoot = null;
         string? stagedProject = null;
         string? logDirectory = null;
+        string? artifactDirectory = null;
+        string? artifactPath = null;
         NativeEngineRunOutput output = EmptyOutput();
         byte[]? transcriptBytes = null;
+        CapturedEngineArtifact? capturedArtifact = null;
 
         try
         {
@@ -100,6 +103,12 @@ internal static class EngineRunRunner
             logDirectory = Path.Combine(profileState, "logs");
             Directory.CreateDirectory(stagedProject);
             Directory.CreateDirectory(logDirectory);
+            if (request.ArtifactFileName is not null)
+            {
+                artifactDirectory = Path.Combine(profileState, "artifacts");
+                artifactPath = Path.Combine(artifactDirectory, request.ArtifactFileName);
+                Directory.CreateDirectory(artifactDirectory);
+            }
             Directory.CreateDirectory(profileTemp);
 
             ownedRootCreated = true;
@@ -152,7 +161,8 @@ internal static class EngineRunRunner
                 request,
                 stagedExecutable,
                 stagedProject,
-                logDirectory);
+                logDirectory,
+                artifactPath);
             foreach (EnginePhaseCommand command in commands)
             {
                 ThrowIfCancellationRequested(cancellationEvent);
@@ -261,6 +271,13 @@ internal static class EngineRunRunner
                 request);
             output = capturedLog.Output;
             transcriptBytes = capturedLog.TranscriptBytes;
+            if (artifactPath is not null && artifactDirectory is not null)
+            {
+                capturedArtifact = ReadBoundedArtifact(
+                    artifactDirectory,
+                    artifactPath,
+                    request);
+            }
             stagedProjectBaselinePreserved = ProjectMatches(request, stagedProject);
             stagedExecutableBaselinePreserved = ExecutableMatches(
                 stagedExecutable,
@@ -505,17 +522,25 @@ internal static class EngineRunRunner
             && !childProcessStarted
             && cleanup == "complete"
             && !observationUncertain;
+        bool cleanArtifactOutput =
+            request.ArtifactFileName is not null
+            && cleanStructuredOutput
+            && outcome == "succeeded"
+            && capturedArtifact is not null;
         return new NativeEngineRunResult(
             report,
             exitCode,
-            cleanStructuredOutput ? transcriptBytes : null);
+            cleanStructuredOutput ? transcriptBytes : null,
+            cleanArtifactOutput ? capturedArtifact?.Attestation : null,
+            cleanArtifactOutput ? capturedArtifact?.Content : null);
     }
 
     private static IReadOnlyList<EnginePhaseCommand> BuildEngineCommands(
         NativeEngineRunRequest request,
         string executable,
         string project,
-        string logDirectory)
+        string logDirectory,
+        string? artifactPath)
     {
         if (request.OperationId == EngineRunProtocol.PersistenceOperationId)
         {
@@ -561,7 +586,12 @@ internal static class EngineRunRunner
             new EnginePhaseCommand(
                 "single",
                 logPath,
-                BuildSingleEngineCommand(request, executable, project, logPath)),
+                BuildSingleEngineCommand(
+                    request,
+                    executable,
+                    project,
+                    logPath,
+                    artifactPath)),
         };
     }
 
@@ -569,7 +599,8 @@ internal static class EngineRunRunner
         NativeEngineRunRequest request,
         string executable,
         string project,
-        string logPath)
+        string logPath,
+        string? artifactPath)
     {
         if (request.OperationId == EngineRunProtocol.PreflightOperationId)
         {
@@ -628,6 +659,30 @@ internal static class EngineRunRunner
                 "--log-file",
                 logPath,
                 "--no-header",
+            };
+        }
+        if (request.OperationId == EngineRunProtocol.RuntimeFrameCaptureOperationId)
+        {
+            if (artifactPath is null || request.InputBindingDigest is null)
+            {
+                throw new ProtocolException("request-value-invalid");
+            }
+            return new[]
+            {
+                executable,
+                "--path",
+                project,
+                "--log-file",
+                logPath,
+                "--no-header",
+                "--",
+                "--agpb-runtime-frame",
+                "--agpb-run-id",
+                request.RunId,
+                "--agpb-input-binding",
+                request.InputBindingDigest,
+                "--agpb-artifact",
+                artifactPath,
             };
         }
         throw new ProtocolException("request-value-invalid");
@@ -1084,6 +1139,65 @@ internal static class EngineRunRunner
     private static NativeEngineRunOutput EmptyOutput() =>
         new(EmptyDigest(), 0, 0, false);
 
+    private static CapturedEngineArtifact? ReadBoundedArtifact(
+        string directory,
+        string path,
+        NativeEngineRunRequest request)
+    {
+        try
+        {
+            if (
+                request.ArtifactFileName is null
+                || request.ArtifactFormat != "png"
+                || request.MaxArtifactBytes < 8
+                || !Directory.Exists(directory)
+                || HasReparsePoint(directory)
+                || !File.Exists(path)
+                || HasReparsePoint(path))
+            {
+                return null;
+            }
+            var info = new FileInfo(path);
+            if (
+                info.Length < 8
+                || info.Length > request.MaxArtifactBytes
+                || info.Length > int.MaxValue)
+            {
+                return null;
+            }
+            byte[] first = File.ReadAllBytes(path);
+            if (
+                first.Length != info.Length
+                || first.Length > request.MaxArtifactBytes
+                || !first.AsSpan(0, 8).SequenceEqual(
+                    new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }))
+            {
+                return null;
+            }
+            byte[] second = File.ReadAllBytes(path);
+            if (
+                !first.AsSpan().SequenceEqual(second)
+                || HasReparsePoint(directory)
+                || HasReparsePoint(path))
+            {
+                return null;
+            }
+            string digest =
+                $"sha256:{Convert.ToHexString(SHA256.HashData(first)).ToLowerInvariant()}";
+            return new CapturedEngineArtifact(
+                new NativeEngineRunArtifact(
+                    "runtime-frame",
+                    request.ArtifactFormat,
+                    digest,
+                    first.Length),
+                first);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static string EmptyDigest() =>
         $"sha256:{Convert.ToHexString(SHA256.HashData(Array.Empty<byte>())).ToLowerInvariant()}";
 
@@ -1127,6 +1241,16 @@ internal sealed record EnginePhaseCommand(
 internal sealed record CapturedEngineLog(
     NativeEngineRunOutput Output,
     byte[]? TranscriptBytes);
+
+internal sealed record CapturedEngineArtifact(
+    NativeEngineRunArtifact Attestation,
+    byte[] Content);
+
+internal sealed record NativeEngineRunArtifact(
+    string Kind,
+    string Format,
+    string Digest,
+    int Bytes);
 
 internal sealed record NativeEngineRunProcess(
     bool Started,
@@ -1187,10 +1311,26 @@ internal sealed record NativeEngineRunReport(
 internal sealed record NativeEngineRunResult(
     NativeEngineRunReport Report,
     int ExitCode,
-    byte[]? TranscriptBytes);
+    byte[]? TranscriptBytes,
+    NativeEngineRunArtifact? Artifact,
+    byte[]? ArtifactBytes);
 
 internal sealed record NativeEngineStructuredOutputEnvelope(
     string SchemaVersion,
     string Operation,
     NativeEngineRunReport Report,
     string? StructuredOutputBase64);
+
+internal sealed record NativeEngineArtifactOutputEnvelope(
+    string SchemaVersion,
+    string Operation,
+    NativeEngineRunReport Report,
+    string? StructuredOutputBase64,
+    NativeEngineTransferredArtifact? Artifact);
+
+internal sealed record NativeEngineTransferredArtifact(
+    string Kind,
+    string Format,
+    string Digest,
+    int Bytes,
+    string ContentBase64);

@@ -4,6 +4,8 @@ import {
   GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE,
   GODOT_PROJECT_IMPORT_ENGINE_EXECUTION_PROFILE,
   GODOT_PROJECT_VALIDATION_ENGINE_EXECUTION_PROFILE,
+  GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE,
+  GODOT_RUNTIME_FRAME_CAPTURE_MAX_ARTIFACT_BYTES,
   PROCESS_CONTAINMENT_ENGINE_EXECUTION_PROFILE_CATALOG_DIGEST,
   PROCESS_CONTAINMENT_POLICY_DIGEST,
   assertProcessContainmentEngineRunReportSemantics,
@@ -54,6 +56,7 @@ import { safeWindowsContainmentProviderEnvironment } from "./self-test.js";
 const NATIVE_ENGINE_RUN_MAX_INPUT_BYTES = 4 * 1024 * 1024;
 const NATIVE_ENGINE_RUN_MAX_OUTPUT_BYTES = 256 * 1024;
 const NATIVE_ENGINE_STRUCTURED_MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
+const NATIVE_ENGINE_CAPTURE_MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
 const NATIVE_ENGINE_RUN_MAX_ERROR_BYTES = 16 * 1024;
 const NATIVE_ENGINE_RUN_CANCELLATION_WAIT_MS = 2_000;
 const NATIVE_ENGINE_RUN_CANCELLATION_PROCESS_TIMEOUT_MS = 3_000;
@@ -84,6 +87,9 @@ export type PrepareWindowsContainedGodotValidationRunRequest =
 export type PrepareWindowsContainedGodotPersistenceRunRequest =
   PrepareWindowsContainedGodotReplayRunRequest;
 
+export type PrepareWindowsContainedGodotCaptureRunRequest =
+  PrepareWindowsContainedGodotReplayRunRequest;
+
 export interface PreparedWindowsContainedGodotEngineRun {
   readonly schemaVersion: "1.0.0";
   readonly request: ProcessContainmentEngineRunRequest;
@@ -107,6 +113,9 @@ export type PreparedWindowsContainedGodotValidationRun =
 export type PreparedWindowsContainedGodotPersistenceRun =
   PreparedWindowsContainedGodotEngineRun;
 
+export type PreparedWindowsContainedGodotCaptureRun =
+  PreparedWindowsContainedGodotEngineRun;
+
 export type RunWindowsContainedGodotReplayRequest =
   RunWindowsContainedGodotEngineRequest;
 
@@ -117,6 +126,9 @@ export type RunWindowsContainedGodotValidationRequest =
   RunWindowsContainedGodotEngineRequest;
 
 export type RunWindowsContainedGodotPersistenceRequest =
+  RunWindowsContainedGodotEngineRequest;
+
+export type RunWindowsContainedGodotCaptureRequest =
   RunWindowsContainedGodotEngineRequest;
 
 export interface WindowsContainedGodotReplayExecution {
@@ -137,9 +149,43 @@ export type WindowsContainedGodotValidationExecution =
 export type WindowsContainedGodotPersistenceExecution =
   WindowsContainedGodotReplayExecution;
 
+export interface WindowsContainedGodotCaptureExecution {
+  readonly schemaVersion: "1.0.0";
+  readonly report: ProcessContainmentEngineRunReport;
+  readonly transcript:
+    | {
+        readonly status: "available";
+        readonly digest: Sha256Digest;
+        readonly bytes: number;
+      }
+    | { readonly status: "unavailable" };
+  readonly artifact:
+    | {
+        readonly status: "available";
+        readonly kind: "runtime-frame";
+        readonly format: "png";
+        readonly digest: Sha256Digest;
+        readonly bytes: number;
+      }
+    | { readonly status: "unavailable" };
+}
+
+export interface WindowsContainedGodotCapturePayload {
+  readonly transcript: string;
+  readonly artifact?: Uint8Array;
+}
+
+interface TransferredEngineArtifact {
+  readonly kind: "runtime-frame";
+  readonly format: "png";
+  readonly digest: Sha256Digest;
+  readonly bytes: Uint8Array;
+}
+
 interface ContainedEngineRunResult {
   readonly report: ProcessContainmentEngineRunReport;
   readonly transcript?: string;
+  readonly artifact?: TransferredEngineArtifact;
 }
 
 interface PreparedAuthority {
@@ -206,6 +252,7 @@ const preparedAuthorities = new WeakMap<object, PreparedAuthority>();
 const replayTranscripts = new WeakMap<object, string>();
 const validationTranscripts = new WeakMap<object, string>();
 const persistenceTranscripts = new WeakMap<object, string>();
+const capturePayloads = new WeakMap<object, WindowsContainedGodotCapturePayload>();
 
 function fail(
   code:
@@ -409,6 +456,17 @@ export async function prepareWindowsContainedGodotPersistenceRun(
   return await prepareWindowsContainedGodotEngineRunForProfile(
     input,
     GODOT_PERSISTENCE_CYCLE_ENGINE_EXECUTION_PROFILE,
+    input.expectationDigest,
+  );
+}
+
+export async function prepareWindowsContainedGodotCaptureRun(
+  value: unknown,
+): Promise<PreparedWindowsContainedGodotCaptureRun> {
+  const input = replayPreparationRequest(value, "runtime frame capture");
+  return await prepareWindowsContainedGodotEngineRunForProfile(
+    input,
+    GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE,
     input.expectationDigest,
   );
 }
@@ -1165,6 +1223,92 @@ function parseStructuredOutput(
   }
 }
 
+function captureArtifactCanTransfer(
+  report: ReplayTranscriptAttestation,
+  expectedProcesses: number,
+): boolean {
+  return (
+    structuredOutputCanTransfer(report, expectedProcesses) &&
+    report.process.exitCode === 0 &&
+    report.outcome === "succeeded"
+  );
+}
+
+function parseTransferredCaptureArtifact(
+  value: unknown,
+  native: NativeEngineRunReport,
+  request: ProcessContainmentEngineRunRequest,
+): TransferredEngineArtifact | undefined {
+  const transferable = captureArtifactCanTransfer(
+    native,
+    request.limits.maxProcesses,
+  );
+  if (value === null) {
+    return undefined;
+  }
+  if (!transferable) {
+    return fail(
+      "engine-run-output-invalid",
+      "Native capture exposed artifact bytes without a clean successful run.",
+      true,
+    );
+  }
+  const record = exactRecord(
+    value,
+    ["kind", "format", "digest", "bytes", "contentBase64"],
+    "engine-run-output-invalid",
+    "Native capture artifact envelope is outside the protocol.",
+    true,
+  );
+  const encoded = record["contentBase64"];
+  const maximumEncodedBytes =
+    Math.ceil(GODOT_RUNTIME_FRAME_CAPTURE_MAX_ARTIFACT_BYTES / 3) * 4;
+  if (
+    record["kind"] !== "runtime-frame" ||
+    record["format"] !== "png" ||
+    !isSha256Digest(record["digest"]) ||
+    !integer(
+      record["bytes"],
+      1,
+      GODOT_RUNTIME_FRAME_CAPTURE_MAX_ARTIFACT_BYTES,
+    ) ||
+    typeof encoded !== "string" ||
+    encoded.length < 1 ||
+    encoded.length > maximumEncodedBytes ||
+    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(
+      encoded,
+    )
+  ) {
+    return fail(
+      "engine-run-output-invalid",
+      "Native capture artifact identity is outside the protocol.",
+      true,
+    );
+  }
+  const bytes = Buffer.from(encoded, "base64");
+  const digest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+  const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (
+    bytes.toString("base64") !== encoded ||
+    bytes.byteLength !== record["bytes"] ||
+    digest !== record["digest"] ||
+    bytes.byteLength < pngSignature.byteLength ||
+    !bytes.subarray(0, pngSignature.byteLength).equals(pngSignature)
+  ) {
+    return fail(
+      "engine-run-output-invalid",
+      "Native capture artifact bytes contradict their attestation.",
+      true,
+    );
+  }
+  return Object.freeze({
+    kind: "runtime-frame" as const,
+    format: "png" as const,
+    digest: record["digest"],
+    bytes: Uint8Array.from(bytes),
+  });
+}
+
 async function runWindowsContainedGodotEngineForProfile(
   value: unknown,
   expectedProfileId: ProcessContainmentEngineExecutionProfileId,
@@ -1331,9 +1475,11 @@ async function runWindowsContainedGodotEngineForProfile(
     authority.requestDigest,
     cancellationId,
     input.signal,
-    authority.profile.output.kind === "prefixed-json-lines"
-      ? NATIVE_ENGINE_STRUCTURED_MAX_OUTPUT_BYTES
-      : NATIVE_ENGINE_RUN_MAX_OUTPUT_BYTES,
+    authority.profile.artifact !== undefined
+      ? NATIVE_ENGINE_CAPTURE_MAX_OUTPUT_BYTES
+      : authority.profile.output.kind === "prefixed-json-lines"
+        ? NATIVE_ENGINE_STRUCTURED_MAX_OUTPUT_BYTES
+        : NATIVE_ENGINE_RUN_MAX_OUTPUT_BYTES,
     request.limits.maxReportDurationMs + 5_000,
     request.limits.terminationGraceMs,
   );
@@ -1369,7 +1515,29 @@ async function runWindowsContainedGodotEngineForProfile(
   }
   let nativeValue = parsed;
   let encodedStructuredOutput: unknown;
-  if (authority.profile.output.kind === "prefixed-json-lines") {
+  let encodedArtifact: unknown;
+  if (authority.profile.artifact !== undefined) {
+    const envelope = exactRecord(
+      parsed,
+      ["schemaVersion", "operation", "report", "structuredOutputBase64", "artifact"],
+      "engine-run-output-invalid",
+      "Native capture output envelope is outside the protocol.",
+      true,
+    );
+    if (
+      envelope["schemaVersion"] !== "1.0.0" ||
+      envelope["operation"] !== "godot-engine-artifact-output-envelope"
+    ) {
+      return fail(
+        "engine-run-output-invalid",
+        "Native capture output envelope identity is outside the protocol.",
+        true,
+      );
+    }
+    nativeValue = envelope["report"];
+    encodedStructuredOutput = envelope["structuredOutputBase64"];
+    encodedArtifact = envelope["artifact"];
+  } else if (authority.profile.output.kind === "prefixed-json-lines") {
     const envelope = exactRecord(
       parsed,
       ["schemaVersion", "operation", "report", "structuredOutputBase64"],
@@ -1395,6 +1563,10 @@ async function runWindowsContainedGodotEngineForProfile(
     authority.profile.output.kind === "prefixed-json-lines"
       ? parseStructuredOutput(encodedStructuredOutput, native, request)
       : undefined;
+  const artifact =
+    authority.profile.artifact === undefined
+      ? undefined
+      : parseTransferredCaptureArtifact(encodedArtifact, native, request);
   const expectedExit =
     native.outcome === "succeeded"
       ? 0
@@ -1478,11 +1650,19 @@ async function runWindowsContainedGodotEngineForProfile(
     structuredOutputCanTransfer(report, request.limits.maxProcesses)
       ? transcript
       : undefined;
+  const transferableArtifact =
+    artifact !== undefined &&
+    captureArtifactCanTransfer(report, request.limits.maxProcesses)
+      ? artifact
+      : undefined;
   return Object.freeze({
     report,
     ...(transferableTranscript === undefined
       ? {}
       : { transcript: transferableTranscript }),
+    ...(transferableArtifact === undefined
+      ? {}
+      : { artifact: transferableArtifact }),
   });
 }
 
@@ -1644,4 +1824,69 @@ export function consumeWindowsContainedGodotPersistenceTranscript(
   }
   persistenceTranscripts.delete(execution as object);
   return transcript;
+}
+
+export async function runWindowsContainedGodotCapture(
+  value: unknown,
+): Promise<WindowsContainedGodotCaptureExecution> {
+  const result = await runWindowsContainedGodotEngineForProfile(
+    value,
+    GODOT_RUNTIME_FRAME_CAPTURE_ENGINE_EXECUTION_PROFILE.profileId,
+  );
+  const transcriptAvailable = result.transcript !== undefined;
+  const artifactAvailable = result.artifact !== undefined;
+  const execution: WindowsContainedGodotCaptureExecution = Object.freeze({
+    schemaVersion: "1.0.0",
+    report: result.report,
+    transcript: transcriptAvailable
+      ? Object.freeze({
+          status: "available" as const,
+          digest: result.report.output.logDigest,
+          bytes: result.report.output.capturedBytes,
+        })
+      : Object.freeze({ status: "unavailable" as const }),
+    artifact: artifactAvailable
+      ? Object.freeze({
+          status: "available" as const,
+          kind: result.artifact.kind,
+          format: result.artifact.format,
+          digest: result.artifact.digest,
+          bytes: result.artifact.bytes.byteLength,
+        })
+      : Object.freeze({ status: "unavailable" as const }),
+  });
+  if (transcriptAvailable) {
+    capturePayloads.set(
+      execution,
+      Object.freeze({
+        transcript: result.transcript,
+        ...(artifactAvailable
+          ? { artifact: Uint8Array.from(result.artifact.bytes) }
+          : {}),
+      }),
+    );
+  }
+  return execution;
+}
+
+export function consumeWindowsContainedGodotCapturePayload(
+  execution: unknown,
+): WindowsContainedGodotCapturePayload {
+  const payload =
+    execution !== null && typeof execution === "object"
+      ? capturePayloads.get(execution)
+      : undefined;
+  if (payload === undefined) {
+    return fail(
+      "engine-run-output-invalid",
+      "Godot capture payload is unavailable, cloned, or already consumed.",
+    );
+  }
+  capturePayloads.delete(execution as object);
+  return Object.freeze({
+    transcript: payload.transcript,
+    ...(payload.artifact === undefined
+      ? {}
+      : { artifact: Uint8Array.from(payload.artifact) }),
+  });
 }

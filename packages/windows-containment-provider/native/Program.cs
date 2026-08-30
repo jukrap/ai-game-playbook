@@ -37,7 +37,27 @@ internal static class Program
                     await EngineRunProtocol.ReadRequestAsync();
                 NativeEngineRunResult result =
                     await EngineRunRunner.RunAsync(request);
-                if (request.OutputKind == "prefixed-json-lines")
+                if (request.OperationId == EngineRunProtocol.RuntimeFrameCaptureOperationId)
+                {
+                    NativeEngineTransferredArtifact? artifact =
+                        result.Artifact is null || result.ArtifactBytes is null
+                            ? null
+                            : new NativeEngineTransferredArtifact(
+                                result.Artifact.Kind,
+                                result.Artifact.Format,
+                                result.Artifact.Digest,
+                                result.Artifact.Bytes,
+                                Convert.ToBase64String(result.ArtifactBytes));
+                    Protocol.WriteJson(new NativeEngineArtifactOutputEnvelope(
+                        "1.0.0",
+                        "godot-engine-artifact-output-envelope",
+                        result.Report,
+                        result.TranscriptBytes is null
+                            ? null
+                            : Convert.ToBase64String(result.TranscriptBytes),
+                        artifact));
+                }
+                else if (request.OutputKind == "prefixed-json-lines")
                 {
                     Protocol.WriteJson(new NativeEngineStructuredOutputEnvelope(
                         "1.0.0",

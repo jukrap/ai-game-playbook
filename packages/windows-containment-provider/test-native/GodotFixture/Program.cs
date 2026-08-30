@@ -74,25 +74,40 @@ internal static class Program
             && args[6] == "--"
             && args[7] == "--agpb-persistence-load";
         bool persistence = persistenceSave || persistenceLoad;
+        bool runtimeFrameCapture =
+            args.Length == 13
+            && args[0] == "--path"
+            && args[2] == "--log-file"
+            && args[4] == "--no-header"
+            && args[5] == "--"
+            && args[6] == "--agpb-runtime-frame"
+            && args[7] == "--agpb-run-id"
+            && Guid.TryParseExact(args[8], "D", out _)
+            && args[9] == "--agpb-input-binding"
+            && args[10].StartsWith("sha256:", StringComparison.Ordinal)
+            && args[11] == "--agpb-artifact";
         if (
             !preflight
             && !replay
             && !projectImport
             && !projectValidation
-            && !persistence)
+            && !persistence
+            && !runtimeFrameCapture)
         {
             return 64;
         }
-        string project = args[2];
+        string project = runtimeFrameCapture ? args[1] : args[2];
         string log = preflight ? args[6]
             : replay ? args[4]
             : projectImport ? args[5]
             : persistence ? args[4]
+            : runtimeFrameCapture ? args[3]
             : args[6];
         if (
             !Path.IsPathFullyQualified(project)
             || !Path.IsPathFullyQualified(log)
             || !File.Exists(Path.Combine(project, "project.godot"))
+            || (runtimeFrameCapture && !Path.IsPathFullyQualified(args[12]))
             || (projectValidation
                 && !File.Exists(Path.Combine(
                     project,
@@ -110,8 +125,54 @@ internal static class Program
             : projectImport ? "project-import-success"
             : projectValidation ? "project-validation-success"
             : persistence ? "persistence-success"
+            : runtimeFrameCapture ? "capture-success"
             : "success";
         Directory.CreateDirectory(Path.GetDirectoryName(log)!);
+        if (runtimeFrameCapture)
+        {
+            string artifact = args[12];
+            byte[] png = Convert.FromBase64String(
+                "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAC0lEQVR4nGOohwIAEeUD+Ueg6nYAAAAASUVORK5CYII=");
+            string transcript =
+                "AGPB_RUNTIME_FRAME {\"event\":\"fixture-frame-captured\"}\n";
+            switch (behavior)
+            {
+                case "capture-success":
+                    await File.WriteAllBytesAsync(artifact, png);
+                    await File.WriteAllTextAsync(log, transcript, new UTF8Encoding(false));
+                    return 0;
+                case "capture-missing":
+                    await File.WriteAllTextAsync(log, transcript, new UTF8Encoding(false));
+                    return 0;
+                case "capture-oversize":
+                    byte[] oversized = new byte[4 * 1024 * 1024 + 1];
+                    png.AsSpan(0, 8).CopyTo(oversized);
+                    await File.WriteAllBytesAsync(artifact, oversized);
+                    await File.WriteAllTextAsync(log, transcript, new UTF8Encoding(false));
+                    return 0;
+                case "capture-fail":
+                    await File.WriteAllBytesAsync(artifact, png);
+                    await File.WriteAllTextAsync(log, transcript, new UTF8Encoding(false));
+                    return 2;
+                case "capture-mutate-staged":
+                    await File.AppendAllTextAsync(
+                        Path.Combine(project, "project.godot"),
+                        "changed=true\n",
+                        new UTF8Encoding(false));
+                    await File.WriteAllBytesAsync(artifact, png);
+                    await File.WriteAllTextAsync(log, transcript, new UTF8Encoding(false));
+                    return 0;
+                case "capture-line-overflow":
+                    await File.WriteAllBytesAsync(artifact, png);
+                    await File.WriteAllTextAsync(
+                        log,
+                        $"AGPB_RUNTIME_FRAME {new string('x', 66 * 1024)}\n",
+                        new UTF8Encoding(false));
+                    return 0;
+                default:
+                    return 66;
+            }
+        }
         if (persistence)
         {
             string appData = Environment.GetEnvironmentVariable("APPDATA") ?? string.Empty;

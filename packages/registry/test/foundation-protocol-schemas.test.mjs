@@ -38,6 +38,7 @@ const expectedIds = [
   "godot-headless-preflight-report",
   "godot-headless-preflight-request",
   "godot-persistence-cycle-expectation",
+  "godot-persistence-cycle-report",
   "godot-persistence-cycle-transcript",
   "godot-project-import-report",
   "godot-project-validation-expectation",

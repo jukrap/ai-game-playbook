@@ -532,6 +532,32 @@ export type {
   GodotDeterministicReplayValidatedTranscriptSummary,
 } from "./godot-deterministic-replay-report-contracts.js";
 export {
+  GODOT_PERSISTENCE_CYCLE_COMMAND_ID,
+  GODOT_PERSISTENCE_CYCLE_OUTPUT_INVALID_CODES,
+  GODOT_PERSISTENCE_CYCLE_REPORT_CODES,
+  GODOT_PERSISTENCE_CYCLE_STEP_ID,
+  GODOT_PERSISTENCE_CYCLE_WORKFLOW_ID,
+  assertGodotPersistenceCycleReportSemantics,
+  computeGodotPersistenceCycleReportDigest,
+  godotPersistenceCycleReportSchema,
+} from "./godot-persistence-cycle-report-contracts.js";
+export type {
+  GodotPersistenceCycleAuthorization,
+  GodotPersistenceCycleContainmentBinding,
+  GodotPersistenceCycleEngineRunEvidence,
+  GodotPersistenceCycleOutputInvalidCode,
+  GodotPersistenceCycleReceiptPointer,
+  GodotPersistenceCycleRejectedTranscriptSummary,
+  GodotPersistenceCycleReport,
+  GodotPersistenceCycleReportCode,
+  GodotPersistenceCycleReportDigestInput,
+  GodotPersistenceCycleReportStatus,
+  GodotPersistenceCycleTranscriptSummary,
+  GodotPersistenceCycleUnavailableTranscriptSummary,
+  GodotPersistenceCycleValidatedTranscriptSummary,
+  GodotPersistenceCycleWorkflowBinding,
+} from "./godot-persistence-cycle-report-contracts.js";
+export {
   PROCESS_CONTAINMENT_POLICY_DIGEST,
   PROCESS_CONTAINMENT_REQUIREMENTS,
   assertProcessContainmentAssessmentReportSemantics,

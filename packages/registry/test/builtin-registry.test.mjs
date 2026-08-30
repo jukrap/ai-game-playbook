@@ -17,6 +17,8 @@ test("the builtin runtime registry exposes only implemented commands", () => {
       "engine.deterministic-replay",
       "engine.executable-discovery",
       "engine.headless-preflight",
+      "engine.project-import",
+      "engine.project-validation",
       "engine.status",
       "engine.version-probe",
       "init",
@@ -50,6 +52,23 @@ test("the builtin runtime registry exposes only implemented commands", () => {
     ),
     false,
   );
+  for (const commandId of [
+    "engine.project-import",
+    "engine.project-validation",
+  ]) {
+    assert.equal(
+      registry.BUILTIN_REGISTRY_SURFACES.cli.data.commands.some(
+        ({ id }) => id === commandId,
+      ),
+      false,
+    );
+    assert.equal(
+      registry.BUILTIN_REGISTRY_SURFACES.mcp.data.tools.some(
+        ({ commandId: candidate }) => candidate === commandId,
+      ),
+      false,
+    );
+  }
 
   const packAdd = registry.BUILTIN_REGISTRY.commands.find(
     ({ id }) => id === "pack.add",
@@ -666,6 +685,7 @@ test("the builtin registry binds internal operations to finite workflow steps", 
       "workflow.evidence-reconciliation",
       "workflow.godot-deterministic-replay",
       "workflow.godot-headless-preflight",
+      "workflow.godot-project-validation",
       "workflow.pack-add",
       "workflow.pack-recover",
       "workflow.project-initialization",
@@ -743,6 +763,55 @@ test("the builtin registry binds internal operations to finite workflow steps", 
   assert.equal(replayPlan.steps[0].command.id, "engine.deterministic-replay");
   assert.equal(replayPlan.steps[0].command.lane, "build-bound");
   assert.equal(contracts.isResolvedWorkflowPlanDigestValid(replayPlan), true);
+
+  const projectValidation = registry.BUILTIN_REGISTRY.workflows.find(
+    ({ id }) => id === "workflow.godot-project-validation",
+  );
+  assert.notEqual(projectValidation, undefined);
+  assert.deepEqual(projectValidation.steps, [
+    {
+      id: "step.godot-project-import",
+      commandId: "engine.project-import",
+      dependsOn: [],
+      onFailure: "blocked",
+      approvalCheckpoint: false,
+    },
+    {
+      id: "step.godot-project-validation",
+      commandId: "engine.project-validation",
+      dependsOn: ["step.godot-project-import"],
+      onFailure: "blocked",
+      approvalCheckpoint: false,
+    },
+  ]);
+  const projectValidationPlan = registry.resolveWorkflowPlan(
+    registry.BUILTIN_REGISTRY,
+    projectValidation.id,
+    "vertical-slice",
+  );
+  assert.deepEqual(
+    projectValidationPlan.steps.map(({ id, command, dependsOn }) => ({
+      id,
+      commandId: command.id,
+      dependsOn,
+    })),
+    [
+      {
+        id: "step.godot-project-import",
+        commandId: "engine.project-import",
+        dependsOn: [],
+      },
+      {
+        id: "step.godot-project-validation",
+        commandId: "engine.project-validation",
+        dependsOn: ["step.godot-project-import"],
+      },
+    ],
+  );
+  assert.equal(
+    contracts.isResolvedWorkflowPlanDigestValid(projectValidationPlan),
+    true,
+  );
 
   const initialization = registry.BUILTIN_REGISTRY.workflows.find(
     ({ id }) => id === "workflow.project-initialization",

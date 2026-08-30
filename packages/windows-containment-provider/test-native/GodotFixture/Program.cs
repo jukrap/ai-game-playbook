@@ -129,7 +129,7 @@ internal static class Program
             string validationPath = Path.Combine(project, "fixture-validation.txt");
             string validationOutput = File.Exists(validationPath)
                 ? await File.ReadAllTextAsync(validationPath)
-                : string.Empty;
+                : await BuildProjectValidationTranscriptAsync(project);
             switch (behavior)
             {
                 case "project-validation-success":
@@ -372,6 +372,41 @@ internal static class Program
         return transcript.ToString();
     }
 
+    private static async Task<string> BuildProjectValidationTranscriptAsync(
+        string project)
+    {
+        string manifestPath = Path.Combine(project, "manifest.json");
+        if (!File.Exists(manifestPath))
+        {
+            return string.Empty;
+        }
+
+        using JsonDocument manifest = JsonDocument.Parse(
+            await File.ReadAllTextAsync(manifestPath));
+        JsonElement root = manifest.RootElement;
+        string projectId = root.GetProperty("projectId").GetString()!;
+        string sourceDigest = root.GetProperty("sourceDigest").GetString()!;
+        string mainScene = root.GetProperty("mainScene").GetString()!;
+        StringBuilder transcript = new();
+        AppendProjectValidationEvent(transcript, new Dictionary<string, object?>
+        {
+            ["event"] = "validation-started",
+            ["projectId"] = projectId,
+            ["sourceDigest"] = sourceDigest,
+            ["mainScene"] = mainScene,
+        });
+        AppendProjectValidationEvent(transcript, new Dictionary<string, object?>
+        {
+            ["event"] = "validation-passed",
+            ["projectId"] = projectId,
+            ["sourceDigest"] = sourceDigest,
+            ["mainScene"] = mainScene,
+            ["resourceType"] = "PackedScene",
+            ["rootType"] = "Node3D",
+        });
+        return transcript.ToString();
+    }
+
     private static IEnumerable<(JsonElement Oracle, bool Terminal)> ReplayOracles(
         JsonElement scenario)
     {
@@ -397,6 +432,15 @@ internal static class Program
         Dictionary<string, object?> value)
     {
         transcript.Append("AGPB_GRAYBOX ");
+        transcript.Append(JsonSerializer.Serialize(value));
+        transcript.Append('\n');
+    }
+
+    private static void AppendProjectValidationEvent(
+        StringBuilder transcript,
+        Dictionary<string, object?> value)
+    {
+        transcript.Append("AGPB_PROJECT_VALIDATION ");
         transcript.Append(JsonSerializer.Serialize(value));
         transcript.Append('\n');
     }

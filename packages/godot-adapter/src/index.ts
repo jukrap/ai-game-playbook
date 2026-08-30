@@ -143,3 +143,28 @@ export type {
   PreparedGodotContainedDeterministicReplay,
   RunGodotContainedDeterministicReplayRequest,
 } from "./contained-deterministic-replay.js";
+export {
+  assertPreparedGodotContainedProjectImport,
+  assertPreparedGodotContainedProjectValidation,
+  consumeGodotContainedProjectValidationTranscript,
+  createGodotContainedProjectImportAuthorizationRequest,
+  createGodotContainedProjectValidationAuthorizationRequest,
+  isGodotContainedProjectImportRunRequest,
+  isGodotContainedProjectValidationRunRequest,
+  prepareGodotContainedProjectImport,
+  prepareGodotContainedProjectValidation,
+  runGodotContainedProjectImport,
+  runGodotContainedProjectValidation,
+  runGodotProjectImport,
+  runGodotProjectValidation,
+} from "./contained-project-validation.js";
+export type {
+  CreateGodotContainedProjectImportAuthorizationRequest,
+  CreateGodotContainedProjectValidationAuthorizationRequest,
+  PrepareGodotContainedProjectImportRequest,
+  PrepareGodotContainedProjectValidationRequest,
+  PreparedGodotContainedProjectImport,
+  PreparedGodotContainedProjectValidation,
+  RunGodotContainedProjectImportRequest,
+  RunGodotContainedProjectValidationRequest,
+} from "./contained-project-validation.js";

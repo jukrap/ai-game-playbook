@@ -17,12 +17,27 @@ import {
   GODOT_HEADLESS_PREFLIGHT_COMMAND_TIMEOUT_MS,
   GODOT_HEADLESS_PREFLIGHT_MAX_OUTPUT_BYTES,
   GODOT_HEADLESS_PREFLIGHT_TERMINATION_GRACE_MS,
+  GODOT_PROJECT_IMPORT_COMMAND_ID,
+  GODOT_PROJECT_IMPORT_COMMAND_TIMEOUT_MS,
+  GODOT_PROJECT_IMPORT_MAX_OUTPUT_BYTES,
+  GODOT_PROJECT_IMPORT_STEP_ID,
+  GODOT_PROJECT_IMPORT_TERMINATION_GRACE_MS,
+  GODOT_PROJECT_VALIDATION_COMMAND_ID,
+  GODOT_PROJECT_VALIDATION_COMMAND_TIMEOUT_MS,
+  GODOT_PROJECT_VALIDATION_MAX_OUTPUT_BYTES,
+  GODOT_PROJECT_VALIDATION_STEP_ID,
+  GODOT_PROJECT_VALIDATION_TERMINATION_GRACE_MS,
+  GODOT_PROJECT_VALIDATION_WORKFLOW_ID,
   GODOT_VERSION_PROBE_MAX_OUTPUT_BYTES,
   gameProjectProfileSchema,
   godotExecutableDiscoveryReportSchema,
   godotExecutableDiscoveryRequestSchema,
   godotHeadlessPreflightReportSchema,
   godotHeadlessPreflightRequestSchema,
+  godotProjectImportReportSchema,
+  godotProjectValidationExpectationSchema,
+  godotProjectValidationReportSchema,
+  godotProjectValidationTranscriptSchema,
   godotDeterministicReplayReportSchema,
   godotDeterministicReplayTranscriptSchema,
   godotVersionProbeReportSchema,
@@ -731,6 +746,130 @@ const engineDeterministicReplayCommand: CommandDescriptor = Object.freeze({
     export: "runGodotDeterministicReplay",
     digest: parseSha256Digest(
       "sha256:53268cac9d23f67b8f5d37ce5daec0af61334d6e9d6172e95db96a218c92d27b",
+    ),
+  }),
+});
+
+const engineProjectImportCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId(GODOT_PROJECT_IMPORT_COMMAND_ID),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Run one identity-bound Godot project import in a disposable contained copy.",
+  cli: Object.freeze({
+    path: Object.freeze(["internal", "engine", "project-import"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: godotProjectValidationExpectationSchema.schemaId,
+    digest: godotProjectValidationExpectationSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: godotProjectImportReportSchema.schemaId,
+    digest: godotProjectImportReportSchema.digest,
+  }),
+  capabilities: Object.freeze([
+    parseStableId(GODOT_PROJECT_IMPORT_COMMAND_ID),
+  ]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>([
+    "read-project",
+    "host-tool-inspection",
+    "test-build",
+  ]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "process",
+      scope: "godot-project-import",
+      boundary: "local",
+    }),
+  ]),
+  lane: "build-bound",
+  timeoutMs: GODOT_PROJECT_IMPORT_COMMAND_TIMEOUT_MS,
+  cancellation: Object.freeze({
+    mode: "process-tree",
+    graceMs: GODOT_PROJECT_IMPORT_TERMINATION_GRACE_MS,
+  }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: GODOT_PROJECT_IMPORT_COMMAND_TIMEOUT_MS,
+    maxOutputBytes: GODOT_PROJECT_IMPORT_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([
+    parseStableId("godot-project-import"),
+    parseStableId("run-receipt"),
+  ]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/godot-adapter",
+    export: "runGodotProjectImport",
+    digest: parseSha256Digest(
+      "sha256:41ca82058aa72fdfc869fe6f96a0323d9a86b970e4deeeab370f221c8ee1cb1b",
+    ),
+  }),
+});
+
+const engineProjectValidationCommand: CommandDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId(GODOT_PROJECT_VALIDATION_COMMAND_ID),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Validate one imported Godot project source with the fixed script and scene validator.",
+  cli: Object.freeze({
+    path: Object.freeze(["internal", "engine", "project-validation"]),
+    aliases: Object.freeze([]),
+  }),
+  input: Object.freeze({
+    schemaId: godotProjectValidationExpectationSchema.schemaId,
+    digest: godotProjectValidationExpectationSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: godotProjectValidationReportSchema.schemaId,
+    digest: godotProjectValidationReportSchema.digest,
+  }),
+  capabilities: Object.freeze([
+    parseStableId(GODOT_PROJECT_VALIDATION_COMMAND_ID),
+  ]),
+  supportedStages: supportedStages(),
+  permissions: Object.freeze<PermissionClass[]>([
+    "read-project",
+    "host-tool-inspection",
+    "test-build",
+  ]),
+  sideEffects: Object.freeze([
+    Object.freeze({
+      kind: "process",
+      scope: "godot-project-validation",
+      boundary: "local",
+    }),
+  ]),
+  lane: "build-bound",
+  timeoutMs: GODOT_PROJECT_VALIDATION_COMMAND_TIMEOUT_MS,
+  cancellation: Object.freeze({
+    mode: "process-tree",
+    graceMs: GODOT_PROJECT_VALIDATION_TERMINATION_GRACE_MS,
+  }),
+  retry: Object.freeze({ mode: "never", maxAttempts: 1 }),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs: GODOT_PROJECT_VALIDATION_COMMAND_TIMEOUT_MS,
+    maxOutputBytes: GODOT_PROJECT_VALIDATION_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  requiredEvidence: Object.freeze([
+    parseStableId("godot-project-validation"),
+    parseStableId("run-receipt"),
+  ]),
+  handler: Object.freeze({
+    package: "@ai-game-playbook/godot-adapter",
+    export: "runGodotProjectValidation",
+    digest: parseSha256Digest(
+      "sha256:41ca82058aa72fdfc869fe6f96a0323d9a86b970e4deeeab370f221c8ee1cb1b",
     ),
   }),
 });
@@ -1770,6 +1909,61 @@ const godotHeadlessPreflightWorkflow: WorkflowDescriptor = Object.freeze({
   ]),
 });
 
+const godotProjectValidationWorkflow: WorkflowDescriptor = Object.freeze({
+  schemaVersion: parseSemanticVersion("1.0.0").value,
+  id: parseStableId(GODOT_PROJECT_VALIDATION_WORKFLOW_ID),
+  version: parseSemanticVersion("1.0.0").value,
+  lifecycle: "internal",
+  summary:
+    "Import one bounded Godot project snapshot, then validate its fixed script and main scene.",
+  input: Object.freeze({
+    schemaId: godotProjectValidationExpectationSchema.schemaId,
+    digest: godotProjectValidationExpectationSchema.digest,
+  }),
+  output: Object.freeze({
+    schemaId: godotProjectValidationReportSchema.schemaId,
+    digest: godotProjectValidationReportSchema.digest,
+  }),
+  supportedStages: supportedStages(),
+  steps: Object.freeze([
+    Object.freeze({
+      id: parseStableId(GODOT_PROJECT_IMPORT_STEP_ID),
+      commandId: parseStableId(GODOT_PROJECT_IMPORT_COMMAND_ID),
+      dependsOn: Object.freeze([]),
+      onFailure: "blocked" as const,
+      approvalCheckpoint: false,
+    }),
+    Object.freeze({
+      id: parseStableId(GODOT_PROJECT_VALIDATION_STEP_ID),
+      commandId: parseStableId(GODOT_PROJECT_VALIDATION_COMMAND_ID),
+      dependsOn: Object.freeze([
+        parseStableId(GODOT_PROJECT_IMPORT_STEP_ID),
+      ]),
+      onFailure: "blocked" as const,
+      approvalCheckpoint: false,
+    }),
+  ]),
+  budgets: Object.freeze({
+    maxChangedFiles: 0,
+    maxChangedBytes: 0,
+    maxDurationMs:
+      GODOT_PROJECT_IMPORT_COMMAND_TIMEOUT_MS +
+      GODOT_PROJECT_VALIDATION_COMMAND_TIMEOUT_MS,
+    maxOutputBytes:
+      GODOT_PROJECT_IMPORT_MAX_OUTPUT_BYTES +
+      GODOT_PROJECT_VALIDATION_MAX_OUTPUT_BYTES,
+    maxRepairCycles: 0,
+  }),
+  resumePolicy: "never",
+  terminalOracle:
+    "The retained import receipt must be the exact predecessor of a fresh validation receipt, and both contained phase reports must agree on project source, executable, expectation, effects, and support limits.",
+  requiredEvidence: Object.freeze([
+    parseStableId("godot-project-import"),
+    parseStableId("godot-project-validation"),
+    parseStableId("run-receipt"),
+  ]),
+});
+
 const projectInitializationWorkflow: WorkflowDescriptor = Object.freeze({
   schemaVersion: parseSemanticVersion("1.0.0").value,
   id: parseStableId("workflow.project-initialization"),
@@ -1953,6 +2147,10 @@ const definition: RegistryDefinition = Object.freeze({
     godotHeadlessPreflightReportSchema,
     godotDeterministicReplayReportSchema,
     godotDeterministicReplayTranscriptSchema,
+    godotProjectImportReportSchema,
+    godotProjectValidationExpectationSchema,
+    godotProjectValidationReportSchema,
+    godotProjectValidationTranscriptSchema,
     godotVersionProbeRequestSchema,
     godotVersionProbeReportSchema,
     gameProjectProfileSchema,
@@ -1991,6 +2189,8 @@ const definition: RegistryDefinition = Object.freeze({
     engineDeterministicReplayCommand,
     engineExecutableDiscoveryCommand,
     engineHeadlessPreflightCommand,
+    engineProjectImportCommand,
+    engineProjectValidationCommand,
     engineStatusCommand,
     engineVersionProbeCommand,
     initCommand,
@@ -2010,6 +2210,7 @@ const definition: RegistryDefinition = Object.freeze({
   workflows: Object.freeze([
     godotDeterministicReplayWorkflow,
     godotHeadlessPreflightWorkflow,
+    godotProjectValidationWorkflow,
     packAddWorkflow,
     packRecoveryWorkflow,
     projectInitializationWorkflow,
